@@ -1,0 +1,15 @@
+.buildpath
+.settings/
+.project
+*.patch
+.idea/
+.git/
+.env*
+.DS_Store
+LICENSE
+tests/.phpunit.result.cache
+.phpunit.result.cache
+runtime/logs
+runtime/main
+runtime/
+bin/

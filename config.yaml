@@ -1,0 +1,31 @@
+app:
+  name: rangine
+  env: debug
+  server: http
+  cors:
+    - http://localhost:8000
+server:
+  http:
+    host: 0.0.0.0
+    port: 8084
+log:
+  default:
+    driver: stream
+    path: run.log
+    level: debug
+database:
+  default:
+    driver: sqlite
+    user_name: ${DB_USERNAME-root}
+    password: ${DB_PASSWORD-123456}
+    db_name: ${DB_DATABASE-./dpanel.db }
+    charset: utf8mb4
+    prefix: ims_
+redis:
+  default:
+    host: 127.0.0.1
+    port: 6379
+    password:
+    db: 0
+docker:
+  sock: unix:///Users/renchao/Library/Containers/com.docker.docker/Data/docker.raw.sock

@@ -1,0 +1,10 @@
+config:
+  tag_json_camel: lower
+relation:
+  - table: ims_site
+    relate:
+      - table: ims_container
+        foreign_key: container_id
+        type: has_one
+  - table: ims_container
+  - table: ims_run_env
