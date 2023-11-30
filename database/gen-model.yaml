@@ -8,3 +8,4 @@ relation:
         type: has_one
   - table: ims_container
   - table: ims_run_env
+  - table: ims_task

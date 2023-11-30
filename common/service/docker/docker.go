@@ -9,12 +9,12 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-type dockerClient struct {
+type Builder struct {
 	Client *client.Client
 	Ctx    context.Context
 }
 
-func NewDockerClient() (*dockerClient, error) {
+func NewDockerClient() (*Builder, error) {
 	client, err := client.NewClientWithOpts(
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
@@ -24,13 +24,13 @@ func NewDockerClient() (*dockerClient, error) {
 		return nil, err
 	}
 
-	return &dockerClient{
+	return &Builder{
 		Client: client,
 		Ctx:    context.Background(),
 	}, nil
 }
 
-func (self dockerClient) GetContainerCreateBuilder() *ContainerCreateBuilder {
+func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {
 	builder := &ContainerCreateBuilder{
 		containerConfig: &container.Config{
 			ExposedPorts: make(nat.PortSet),

@@ -1,16 +1,13 @@
 package docker
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"io"
 )
 
 type ContainerCreateBuilder struct {
@@ -21,10 +18,16 @@ type ContainerCreateBuilder struct {
 	containerName    string
 	err              error
 	dockerSdk        *client.Client
+	ctx              context.Context
 }
 
 func (self *ContainerCreateBuilder) withSdk(sdk *client.Client) *ContainerCreateBuilder {
 	self.dockerSdk = sdk
+	return self
+}
+
+func (self *ContainerCreateBuilder) WithContext(ctx context.Context) *ContainerCreateBuilder {
+	self.ctx = ctx
 	return self
 }
 
@@ -85,25 +88,8 @@ func (self *ContainerCreateBuilder) Execute() (response container.CreateResponse
 	if self.err != nil {
 		return response, self.err
 	}
-	ctx := context.Background()
-	reader, err := self.dockerSdk.ImagePull(ctx, self.containerConfig.Image, types.ImagePullOptions{})
-	if err != nil {
-		return response, err
-	}
-	defer reader.Close()
-
-	out := bufio.NewReader(reader)
-	for {
-		str, err := out.ReadString('\n')
-		if err == io.EOF { // 读到文件末尾
-			break
-		} else {
-			fmt.Printf("有数据了 %v \n", string(str))
-		}
-	}
-
 	return self.dockerSdk.ContainerCreate(
-		ctx,
+		self.ctx,
 		self.containerConfig,
 		self.hostConfig,
 		self.networkingConfig,

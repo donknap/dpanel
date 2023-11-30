@@ -20,6 +20,7 @@ var (
 	Container *container
 	RunEnv    *runEnv
 	Site      *site
+	Task      *task
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
@@ -27,6 +28,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	Container = &Q.Container
 	RunEnv = &Q.RunEnv
 	Site = &Q.Site
+	Task = &Q.Task
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
@@ -35,6 +37,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Container: newContainer(db, opts...),
 		RunEnv:    newRunEnv(db, opts...),
 		Site:      newSite(db, opts...),
+		Task:      newTask(db, opts...),
 	}
 }
 
@@ -44,6 +47,7 @@ type Query struct {
 	Container container
 	RunEnv    runEnv
 	Site      site
+	Task      task
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -54,6 +58,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Container: q.Container.clone(db),
 		RunEnv:    q.RunEnv.clone(db),
 		Site:      q.Site.clone(db),
+		Task:      q.Task.clone(db),
 	}
 }
 
@@ -71,6 +76,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Container: q.Container.replaceDB(db),
 		RunEnv:    q.RunEnv.replaceDB(db),
 		Site:      q.Site.replaceDB(db),
+		Task:      q.Task.replaceDB(db),
 	}
 }
 
@@ -78,6 +84,7 @@ type queryCtx struct {
 	Container IContainerDo
 	RunEnv    IRunEnvDo
 	Site      ISiteDo
+	Task      ITaskDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
@@ -85,6 +92,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Container: q.Container.WithContext(ctx),
 		RunEnv:    q.RunEnv.WithContext(ctx),
 		Site:      q.Site.WithContext(ctx),
+		Task:      q.Task.WithContext(ctx),
 	}
 }
 

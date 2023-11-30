@@ -1,18 +1,34 @@
 package logic
 
 import (
+	"bufio"
 	"context"
-	"fmt"
+	"encoding/json"
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
-	"log"
+	"io"
 	"log/slog"
+	"math"
 )
+
+const REGISTER_NAME = "containerTask"
+
+func RegisterContainerTask() {
+	err := facade.GetContainer().NamedSingleton(REGISTER_NAME, func() *ContainerTask {
+		obj := &ContainerTask{}
+		obj.QueueCreate = make(chan *CreateMessage)
+		obj.stepLog = make(map[int32]*stepMessage)
+		return obj
+	})
+	if err != nil {
+		panic(err)
+	}
+}
 
 func NewContainerTask() *ContainerTask {
 	var obj *ContainerTask
-	err := facade.GetContainer().NamedResolve(&obj, "containerTask")
+	err := facade.GetContainer().NamedResolve(&obj, REGISTER_NAME)
 	if err != nil {
 		slog.Error(err.Error())
 	}
@@ -20,28 +36,47 @@ func NewContainerTask() *ContainerTask {
 }
 
 type CreateMessage struct {
-	Name      string
-	Image     string
-	RunParams *ContainerRunParams
+	Name       string
+	Image      string
+	TaskLinkId int32
+	RunParams  *ContainerRunParams
 }
 
 type ContainerTask struct {
 	QueueCreate chan *CreateMessage
+	stepLog     map[int32]*stepMessage // 用于记录部署任务日志
+	sdk         *docker.Builder
+}
+
+func (self *ContainerTask) GetTaskStepLog(taskId int32) *stepMessage {
+	if stepLog, ok := self.stepLog[taskId]; ok {
+		return stepLog
+	}
+	return nil
 }
 
 func (self *ContainerTask) CreateLoop() {
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		panic(err)
+	}
+	self.sdk = sdk
+
 	for {
 		select {
 		case message := <-self.QueueCreate:
-			log.Printf("build %s from %s starting", message.Name, message.Image)
-			sdk, err := docker.NewDockerClient()
-			if err != nil {
-				fmt.Printf("%v \n", err)
-			}
+			// 拿到部署任务后，先新建一个任务对象
+			// 用于记录进行状态（数据库中）
+			// 在本单例对象中建立一个map对象，存放过程中的数据，这些数据不入库
+			self.stepLog[message.TaskLinkId] = newStepMessage(message.TaskLinkId)
+			self.stepLog[message.TaskLinkId].step(STEP_IMAGE_PULL)
+			self.pullImage(message)
+
+			self.stepLog[message.TaskLinkId].step(STEP_CONTAINER_BUILD)
 			builder := sdk.GetContainerCreateBuilder()
 			builder.WithImage(message.Image)
+			builder.WithContext(context.Background())
 			builder.WithContainerName(message.Name)
-
 			if message.RunParams.Ports != nil {
 				for _, value := range message.RunParams.Ports {
 					builder.WithPort(value.Host, value.Dest)
@@ -69,13 +104,82 @@ func (self *ContainerTask) CreateLoop() {
 			builder.WithPrivileged()
 			response, err := builder.Execute()
 			if err != nil {
-				log.Printf("%v \n", err)
+				slog.Error(err.Error())
+				self.stepLog[message.TaskLinkId].err(err)
+				return
 			}
-			log.Printf("%v \n", response.ID)
+			slog.Info("Container id: ", response)
+
+			self.stepLog[message.TaskLinkId].step(STEP_CONTAINER_RUN)
 			err = sdk.Client.ContainerStart(context.Background(), response.ID, types.ContainerStartOptions{})
 			if err != nil {
-				log.Printf("%v \n", err)
+				slog.Error(err.Error())
+				self.stepLog[message.TaskLinkId].err(err)
+				return
 			}
+			self.stepLog[message.TaskLinkId].success()
+			delete(self.stepLog, message.TaskLinkId)
+		}
+	}
+}
+
+func (self *ContainerTask) pullImage(message *CreateMessage) {
+	type progressDetail struct {
+		Id             string `json:"id"`
+		Status         string `json:"status"`
+		ProgressDetail struct {
+			Current float64 `json:"current"`
+			Total   float64 `json:"total"`
+		} `json:"progressDetail"`
+	}
+	type progress struct {
+		Downloading float64 `json:"downloading"`
+		Extracting  float64 `json:"extracting"`
+	}
+	slog.Info("pull image ", message)
+	//尝试拉取镜像
+	reader, err := self.sdk.Client.ImagePull(context.Background(), message.Image, types.ImagePullOptions{})
+	if err != nil {
+		self.stepLog[message.TaskLinkId].error = err
+		return
+	}
+	defer reader.Close()
+
+	// 解析进度数据
+	pg := make(map[string]*progress)
+	out := bufio.NewReader(reader)
+	for {
+		str, err := out.ReadString('\n')
+		if err == io.EOF {
+			break
+		} else {
+			pd := &progressDetail{}
+			err = json.Unmarshal([]byte(str), pd)
+			if err != nil {
+				self.stepLog[message.TaskLinkId].error = err
+				return
+			}
+			if pd.Status == "Pulling fs layer" {
+				pg[pd.Id] = &progress{
+					Extracting:  0,
+					Downloading: 0,
+				}
+			}
+			if pd.ProgressDetail.Total > 0 && pd.Status == "Downloading" {
+				pg[pd.Id].Downloading = math.Floor((pd.ProgressDetail.Current / pd.ProgressDetail.Total) * 100)
+			}
+			if pd.ProgressDetail.Total > 0 && pd.Status == "Extracting" {
+				pg[pd.Id].Extracting = math.Floor((pd.ProgressDetail.Current / pd.ProgressDetail.Total) * 100)
+			}
+			if pd.Status == "Download complete" {
+				pg[pd.Id].Downloading = 100
+			}
+			if pd.Status == "Pull complete" {
+				pg[pd.Id].Extracting = 100
+			}
+
+			// 进度信息
+			self.stepLog[message.TaskLinkId].process(pg)
 		}
 	}
 }

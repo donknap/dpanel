@@ -35,6 +35,12 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Links:       params.Links,
 	}
 
+	siteRow := &entity.Site{
+		SiteID:   params.SiteId,
+		SiteName: params.SiteName,
+		SiteURL:  params.SiteDomain,
+	}
+
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
 		site, _ := tx.Site.Where(dao.Site.SiteID.Eq(params.SiteId)).First()
 		if site != nil {
@@ -52,12 +58,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 		if err != nil {
 			return err
 		}
-		siteRow := &entity.Site{
-			ContainerID: containerRow.ID,
-			SiteID:      params.SiteId,
-			SiteName:    params.SiteName,
-			SiteURL:     params.SiteDomain,
-		}
+
+		siteRow.ContainerID = containerRow.ID
 		err = tx.Site.Create(siteRow)
 		if err != nil {
 			return err
@@ -70,20 +72,37 @@ func (self Site) CreateByImage(http *gin.Context) {
 		return
 	}
 
-	task := logic.NewContainerTask()
-	taskRow := &logic.CreateMessage{
-		Name:      params.SiteId,
-		Image:     params.Image,
-		RunParams: runParams,
+	err = dao.Q.Transaction(func(tx *dao.Query) (err error) {
+		_, err = tx.Task.Where(tx.Task.TaskLinkID.Eq(siteRow.ID)).Delete()
+		if err != nil {
+			return err
+		}
+		task := logic.NewContainerTask()
+		runTaskRow := &logic.CreateMessage{
+			Name:       params.SiteId,
+			TaskLinkId: siteRow.ID,
+			Image:      params.Image,
+			RunParams:  runParams,
+		}
+		task.QueueCreate <- runTaskRow
+		return nil
+	})
+
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
-	task.QueueCreate <- taskRow
-	self.JsonSuccessResponse(http)
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"siteId": siteRow.ID,
+	})
 	return
 }
 
 func (self Site) GetList(http *gin.Context) {
 	type ParamsValidate struct {
 		Page     int    `form:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize int    `form:"pageSize" binding:"omitempty"`
 		SiteName string `form:"siteName" binding:"omitempty"`
 		Sort     string `form:"sort,default=new" binding:"omitempty,oneof=hot new"`
 	}
@@ -95,13 +114,16 @@ func (self Site) GetList(http *gin.Context) {
 	if params.Page < 1 {
 		params.Page = 1
 	}
-	limit := 20
+	if params.PageSize < 1 {
+		params.PageSize = 10
+	}
 
 	query := dao.Site.Preload(dao.Site.Container.Select(dao.Container.ID, dao.Container.Image, dao.Container.Status))
 	if params.SiteName != "" {
 		query = query.Where(dao.Site.SiteName.Like("%" + params.SiteName + "%"))
 	}
-	list, total, _ := query.FindByPage((params.Page-1)*limit, limit)
+	query = query.Order(dao.Site.ID.Desc())
+	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
 	self.JsonResponseWithoutError(http, gin.H{
 		"total": total,
 		"page":  params.Page,
