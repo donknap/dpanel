@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/core/err_handler"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"strings"
 )
 
 type Site struct {
@@ -24,7 +25,10 @@ func (self Site) CreateByImage(http *gin.Context) {
 	}
 
 	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
+	if !self.Validate(
+		http,
+		&params,
+	) {
 		return
 	}
 
@@ -35,67 +39,106 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Links:       params.Links,
 	}
 
-	siteRow := &entity.Site{
-		SiteID:   params.SiteId,
-		SiteName: params.SiteName,
-		SiteURL:  params.SiteDomain,
+	siteEnv, err := json.Marshal(runParams)
+	if err != nil {
+		self.JsonResponseWithError(
+			http,
+			err,
+			500,
+		)
+		return
 	}
-
-	err := dao.Q.Transaction(func(tx *dao.Query) error {
-		site, _ := tx.Site.Where(dao.Site.SiteID.Eq(params.SiteId)).First()
-		if site != nil {
-			//return errors.New("站点已经存在，请更换标识")
-		}
-		param, err := json.Marshal(runParams)
-		if err != nil {
-			return err
-		}
-		containerRow := &entity.Container{
-			Image:  params.Image,
-			Params: string(param),
-		}
-		err = tx.Container.Create(containerRow)
-		if err != nil {
-			return err
-		}
-
-		siteRow.ContainerID = containerRow.ID
-		err = tx.Site.Create(siteRow)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	siteUrlExt, err := json.Marshal(
+		[]string{
+			params.SiteDomain,
+		},
+	)
+	if err != nil {
+		self.JsonResponseWithError(
+			http,
+			err,
+			500,
+		)
+		return
+	}
+	siteRow := &entity.Site{
+		SiteID:     params.SiteId,
+		SiteName:   params.SiteName,
+		SiteURL:    params.SiteDomain,
+		SiteURLExt: string(siteUrlExt),
+		Env:        string(siteEnv),
+		Status:     logic.STATUS_STOP,
+	}
+	err = dao.Q.Transaction(
+		func(tx *dao.Query) error {
+			site, _ := tx.Site.Where(dao.Site.SiteID.Eq(params.SiteId)).First()
+			if site != nil {
+				//return errors.New("站点已经存在，请更换标识")
+			}
+			if params.Image != "" {
+				imageArr := strings.Split(
+					params.Image+":",
+					":",
+				)
+				containerRow, _ := tx.Container.Where(
+					tx.Container.Image.Eq(imageArr[0]),
+					tx.Container.Version.Eq(imageArr[1]),
+				).First()
+				if containerRow != nil {
+					siteRow.ContainerID = containerRow.ID
+				} else {
+					containerRow = &entity.Container{
+						Image:   imageArr[0],
+						Version: imageArr[1],
+					}
+					err = tx.Container.Create(containerRow)
+					if err != nil {
+						return err
+					}
+					siteRow.ContainerID = containerRow.ID
+				}
+			}
+			err = tx.Site.Create(siteRow)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	)
 
 	if err_handler.Found(err) {
-		self.JsonResponseWithError(http, err, 500)
+		self.JsonResponseWithError(
+			http,
+			err,
+			500,
+		)
 		return
 	}
 
-	err = dao.Q.Transaction(func(tx *dao.Query) (err error) {
-		_, err = tx.Task.Where(tx.Task.TaskLinkID.Eq(siteRow.ID)).Delete()
-		if err != nil {
-			return err
-		}
-		task := logic.NewContainerTask()
-		runTaskRow := &logic.CreateMessage{
-			Name:       params.SiteId,
-			TaskLinkId: siteRow.ID,
-			Image:      params.Image,
-			RunParams:  runParams,
-		}
-		task.QueueCreate <- runTaskRow
-		return nil
-	})
+	err = dao.Q.Transaction(
+		func(tx *dao.Query) (err error) {
+			_, err = tx.Task.Where(tx.Task.SiteID.Eq(siteRow.ID)).Delete()
+			if err != nil {
+				return err
+			}
+			task := logic.NewContainerTask()
+			runTaskRow := &logic.CreateMessage{
+				Name:      params.SiteId,
+				SiteId:    siteRow.ID,
+				Image:     params.Image,
+				RunParams: runParams,
+			}
+			task.QueueCreate <- runTaskRow
+			return nil
+		},
+	)
 
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
-	self.JsonResponseWithoutError(http, gin.H{
-		"siteId": siteRow.ID,
-	})
+	self.JsonResponseWithoutError(http, gin.H{"siteId": siteRow.ID})
 	return
 }
 
@@ -117,17 +160,33 @@ func (self Site) GetList(http *gin.Context) {
 	if params.PageSize < 1 {
 		params.PageSize = 10
 	}
+	query := dao.Site.Preload(
+		dao.Site.Container.Select(
+			dao.Container.ID,
+			dao.Container.Image,
+			dao.Container.Status,
+			dao.Container.Version,
+		),
+	).Select(
+		dao.Site.SiteID,
+		dao.Site.ID,
+		dao.Site.SiteName,
+		dao.Site.SiteURL,
+		dao.Site.ContainerID,
+		dao.Site.Status,
+	)
 
-	query := dao.Site.Preload(dao.Site.Container.Select(dao.Container.ID, dao.Container.Image, dao.Container.Status))
 	if params.SiteName != "" {
 		query = query.Where(dao.Site.SiteName.Like("%" + params.SiteName + "%"))
 	}
 	query = query.Order(dao.Site.ID.Desc())
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
-	self.JsonResponseWithoutError(http, gin.H{
-		"total": total,
-		"page":  params.Page,
-		"list":  list,
-	})
+	self.JsonResponseWithoutError(
+		http, gin.H{
+			"total": total,
+			"page":  params.Page,
+			"list":  list,
+		},
+	)
 	return
 }

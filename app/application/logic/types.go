@@ -7,6 +7,20 @@ const (
 	STATUS_SUCCESS    = 30 // 部署成功
 )
 
+const (
+	STEP_IMAGE_PULL      = "imagePull"
+	STEP_IMAGE_BUILD     = "imageBuild"
+	STEP_CONTAINER_BUILD = "containerBuild"
+	STEP_CONTAINER_RUN   = "containerRun"
+)
+
+var StepStatus = map[string]int{
+	STEP_IMAGE_BUILD:     10,
+	STEP_IMAGE_PULL:      20,
+	STEP_CONTAINER_BUILD: 30,
+	STEP_CONTAINER_RUN:   40,
+}
+
 type MappingItem struct {
 	Host string `json:"host"`
 	Dest string `json:"dest"`

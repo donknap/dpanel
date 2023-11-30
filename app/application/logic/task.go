@@ -1,25 +1,19 @@
 package logic
 
 import (
+	"fmt"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 )
 
-const (
-	STEP_IMAGE_PULL      = "imagePull"
-	STEP_IMAGE_BUILD     = "imageBuild"
-	STEP_CONTAINER_BUILD = "containerBuild"
-	STEP_CONTAINER_RUN   = "containerRun"
-)
-
-func newStepMessage(taskLinkId int32) *stepMessage {
+func newStepMessage(siteId int32) *stepMessage {
 	task := &stepMessage{}
-	taskRow, _ := dao.Task.Where(dao.Task.TaskLinkID.Eq(taskLinkId)).First()
+	taskRow, _ := dao.Task.Where(dao.Task.SiteID.Eq(siteId)).First()
 	if taskRow == nil {
 		taskRow = &entity.Task{
-			TaskLinkID: taskLinkId,
-			Status:     STATUS_STOP,
-			Message:    "",
+			SiteID:  siteId,
+			Status:  STATUS_STOP,
+			Message: "",
 		}
 		dao.Task.Create(taskRow)
 	}
@@ -36,18 +30,26 @@ type stepMessage struct {
 
 // 记录任务错误
 func (self *stepMessage) err(err error) {
-	dao.Task.Where(dao.Task.ID.Eq(self.recordId)).Updates(entity.Task{
-		Status:  STATUS_ERROR,
-		Message: err.Error(),
-	})
+	dao.Task.Where(dao.Task.ID.Eq(self.recordId)).Updates(
+		entity.Task{
+			Status:  STATUS_ERROR,
+			Message: err.Error(),
+		},
+	)
+	//状态同步到站点上
+	self.syncSiteStatus(STATUS_ERROR)
 }
 
 // 更新任务进度
 func (self *stepMessage) step(step string) {
-	dao.Task.Where(dao.Task.ID.Eq(self.recordId)).Updates(entity.Task{
-		Status:  STATUS_PROCESSING,
-		Message: step,
-	})
+	dao.Task.Where(dao.Task.ID.Eq(self.recordId)).Updates(
+		entity.Task{
+			Status: STATUS_PROCESSING,
+			Step:   step,
+		},
+	)
+	//状态同步到站点上
+	self.syncSiteStatus(STATUS_PROCESSING)
 }
 
 func (self *stepMessage) process(data interface{}) {
@@ -59,8 +61,22 @@ func (self *stepMessage) GetProcess() interface{} {
 }
 
 func (self *stepMessage) success() {
-	dao.Task.Where(dao.Task.ID.Eq(self.recordId)).Updates(entity.Task{
-		Status:  STATUS_SUCCESS,
-		Message: "",
-	})
+	query := dao.Task.Where(dao.Task.ID.Eq(self.recordId))
+	query.Updates(
+		entity.Task{
+			Status:  STATUS_SUCCESS,
+			Message: "",
+		},
+	)
+	//状态同步到站点上
+	self.syncSiteStatus(STATUS_SUCCESS)
+}
+
+func (self *stepMessage) syncSiteStatus(status int) {
+	taskRow, _ := dao.Task.Where(dao.Task.ID.Eq(self.recordId)).First()
+	_, err := dao.Site.Where(dao.Site.ID.Eq(taskRow.SiteID)).Update(dao.Site.Status, status)
+	fmt.Printf("%v \n", taskRow)
+	if err != nil {
+		fmt.Printf("%s", err.Error())
+	}
 }

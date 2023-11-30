@@ -4,23 +4,27 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"io"
 	"log/slog"
 	"math"
+	"time"
 )
 
 const REGISTER_NAME = "containerTask"
 
 func RegisterContainerTask() {
-	err := facade.GetContainer().NamedSingleton(REGISTER_NAME, func() *ContainerTask {
-		obj := &ContainerTask{}
-		obj.QueueCreate = make(chan *CreateMessage)
-		obj.stepLog = make(map[int32]*stepMessage)
-		return obj
-	})
+	err := facade.GetContainer().NamedSingleton(
+		REGISTER_NAME, func() *ContainerTask {
+			obj := &ContainerTask{}
+			obj.QueueCreate = make(chan *CreateMessage, 999)
+			obj.stepLog = make(map[int32]*stepMessage)
+			return obj
+		},
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -36,10 +40,10 @@ func NewContainerTask() *ContainerTask {
 }
 
 type CreateMessage struct {
-	Name       string
-	Image      string
-	TaskLinkId int32
-	RunParams  *ContainerRunParams
+	Name      string
+	Image     string
+	SiteId    int32
+	RunParams *ContainerRunParams
 }
 
 type ContainerTask struct {
@@ -68,11 +72,18 @@ func (self *ContainerTask) CreateLoop() {
 			// 拿到部署任务后，先新建一个任务对象
 			// 用于记录进行状态（数据库中）
 			// 在本单例对象中建立一个map对象，存放过程中的数据，这些数据不入库
-			self.stepLog[message.TaskLinkId] = newStepMessage(message.TaskLinkId)
-			self.stepLog[message.TaskLinkId].step(STEP_IMAGE_PULL)
-			self.pullImage(message)
+			slog.Info(fmt.Sprintf("来任务了 %d", message.SiteId))
+			self.stepLog[message.SiteId] = newStepMessage(message.SiteId)
+			defer slog.Info("我是defer")
+			self.stepLog[message.SiteId].step(STEP_IMAGE_PULL)
+			err = self.pullImage(message)
+			if err != nil {
+				slog.Info("steplog", self.stepLog)
+				self.stepLog[message.SiteId].err(err)
+				break
+			}
 
-			self.stepLog[message.TaskLinkId].step(STEP_CONTAINER_BUILD)
+			self.stepLog[message.SiteId].step(STEP_CONTAINER_BUILD)
 			builder := sdk.GetContainerCreateBuilder()
 			builder.WithImage(message.Image)
 			builder.WithContext(context.Background())
@@ -105,25 +116,28 @@ func (self *ContainerTask) CreateLoop() {
 			response, err := builder.Execute()
 			if err != nil {
 				slog.Error(err.Error())
-				self.stepLog[message.TaskLinkId].err(err)
-				return
+				self.stepLog[message.SiteId].err(err)
+				break
 			}
 			slog.Info("Container id: ", response)
 
-			self.stepLog[message.TaskLinkId].step(STEP_CONTAINER_RUN)
+			self.stepLog[message.SiteId].step(STEP_CONTAINER_RUN)
 			err = sdk.Client.ContainerStart(context.Background(), response.ID, types.ContainerStartOptions{})
 			if err != nil {
 				slog.Error(err.Error())
-				self.stepLog[message.TaskLinkId].err(err)
-				return
+				self.stepLog[message.SiteId].err(err)
+				break
 			}
-			self.stepLog[message.TaskLinkId].success()
-			delete(self.stepLog, message.TaskLinkId)
+			self.stepLog[message.SiteId].success()
+			delete(self.stepLog, message.SiteId)
+		default:
+			slog.Info(fmt.Sprintf("%d", time.Now().Unix()))
+			time.Sleep(time.Second)
 		}
 	}
 }
 
-func (self *ContainerTask) pullImage(message *CreateMessage) {
+func (self *ContainerTask) pullImage(message *CreateMessage) error {
 	type progressDetail struct {
 		Id             string `json:"id"`
 		Status         string `json:"status"`
@@ -140,8 +154,7 @@ func (self *ContainerTask) pullImage(message *CreateMessage) {
 	//尝试拉取镜像
 	reader, err := self.sdk.Client.ImagePull(context.Background(), message.Image, types.ImagePullOptions{})
 	if err != nil {
-		self.stepLog[message.TaskLinkId].error = err
-		return
+		return err
 	}
 	defer reader.Close()
 
@@ -156,8 +169,7 @@ func (self *ContainerTask) pullImage(message *CreateMessage) {
 			pd := &progressDetail{}
 			err = json.Unmarshal([]byte(str), pd)
 			if err != nil {
-				self.stepLog[message.TaskLinkId].error = err
-				return
+				return err
 			}
 			if pd.Status == "Pulling fs layer" {
 				pg[pd.Id] = &progress{
@@ -177,9 +189,10 @@ func (self *ContainerTask) pullImage(message *CreateMessage) {
 			if pd.Status == "Pull complete" {
 				pg[pd.Id].Extracting = 100
 			}
-
 			// 进度信息
-			self.stepLog[message.TaskLinkId].process(pg)
+			self.stepLog[message.SiteId].process(pg)
 		}
 	}
+	return nil
+
 }

@@ -6,6 +6,8 @@ relation:
       - table: ims_container
         foreign_key: container_id
         type: has_one
+      - table: ims_task
+        foreign_key: site_id
   - table: ims_container
   - table: ims_run_env
   - table: ims_task

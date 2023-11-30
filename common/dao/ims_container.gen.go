@@ -29,8 +29,9 @@ func newContainer(db *gorm.DB, opts ...gen.DOOption) container {
 	_container.ALL = field.NewAsterisk(tableName)
 	_container.ID = field.NewInt32(tableName, "id")
 	_container.Image = field.NewString(tableName, "image")
-	_container.Params = field.NewString(tableName, "params")
+	_container.Dockerfile = field.NewString(tableName, "dockerfile")
 	_container.Status = field.NewInt32(tableName, "status")
+	_container.Version = field.NewString(tableName, "version")
 
 	_container.fillFieldMap()
 
@@ -40,11 +41,12 @@ func newContainer(db *gorm.DB, opts ...gen.DOOption) container {
 type container struct {
 	containerDo
 
-	ALL    field.Asterisk
-	ID     field.Int32
-	Image  field.String
-	Params field.String
-	Status field.Int32
+	ALL        field.Asterisk
+	ID         field.Int32
+	Image      field.String
+	Dockerfile field.String
+	Status     field.Int32
+	Version    field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -63,8 +65,9 @@ func (c *container) updateTableName(table string) *container {
 	c.ALL = field.NewAsterisk(table)
 	c.ID = field.NewInt32(table, "id")
 	c.Image = field.NewString(table, "image")
-	c.Params = field.NewString(table, "params")
+	c.Dockerfile = field.NewString(table, "dockerfile")
 	c.Status = field.NewInt32(table, "status")
+	c.Version = field.NewString(table, "version")
 
 	c.fillFieldMap()
 
@@ -81,11 +84,12 @@ func (c *container) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (c *container) fillFieldMap() {
-	c.fieldMap = make(map[string]field.Expr, 4)
+	c.fieldMap = make(map[string]field.Expr, 5)
 	c.fieldMap["id"] = c.ID
 	c.fieldMap["image"] = c.Image
-	c.fieldMap["params"] = c.Params
+	c.fieldMap["dockerfile"] = c.Dockerfile
 	c.fieldMap["status"] = c.Status
+	c.fieldMap["version"] = c.Version
 }
 
 func (c container) clone(db *gorm.DB) container {

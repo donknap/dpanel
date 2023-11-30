@@ -13,7 +13,11 @@ type Site struct {
 	SiteName    string     `gorm:"column:site_name;type:text" json:"siteName"`
 	SiteURL     string     `gorm:"column:site_url;type:text" json:"siteUrl"`
 	ContainerID int32      `gorm:"column:container_id;type:integer" json:"containerId"`
+	SiteURLExt  string     `gorm:"column:site_url_ext;type:text" json:"siteUrlExt"`
+	Env         string     `gorm:"column:env;type:text" json:"env"`
+	Status      int32      `gorm:"column:status;type:integer" json:"status"`
 	Container   *Container `gorm:"foreignKey:container_id" json:"container"`
+	Task        Task       `gorm:"foreignKey:site_id" json:"task"`
 }
 
 // TableName Site's table name

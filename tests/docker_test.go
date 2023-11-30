@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -102,4 +103,11 @@ func TestCreateContainer(t *testing.T) {
 		fmt.Printf("%v \n", err)
 	}
 
+}
+
+func TestCode(t *testing.T) {
+	image := "phpmyadmin:"
+	fmt.Printf("%v \n", strings.Split(image, ":"))
+	a := strings.Split(image, ":")
+	fmt.Printf("%v \n", a[1])
 }
