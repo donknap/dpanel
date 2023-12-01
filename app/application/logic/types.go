@@ -14,11 +14,11 @@ const (
 	STEP_CONTAINER_RUN   = "containerRun"
 )
 
-var StepStatus = map[string]int{
-	STEP_IMAGE_BUILD:     10,
-	STEP_IMAGE_PULL:      20,
-	STEP_CONTAINER_BUILD: 30,
-	STEP_CONTAINER_RUN:   40,
+var StepStatusValue = map[string]int{
+	STEP_IMAGE_BUILD:     1,
+	STEP_IMAGE_PULL:      2,
+	STEP_CONTAINER_BUILD: 3,
+	STEP_CONTAINER_RUN:   4,
 }
 
 type MappingItem struct {
