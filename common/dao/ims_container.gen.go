@@ -32,7 +32,7 @@ func newContainer(db *gorm.DB, opts ...gen.DOOption) container {
 	_container.Dockerfile = field.NewString(tableName, "dockerfile")
 	_container.Status = field.NewInt32(tableName, "status")
 	_container.Version = field.NewString(tableName, "version")
-	_container.ContainerID = field.NewString(tableName, "container_id")
+	_container.ContainerInfo = field.NewString(tableName, "container_info")
 
 	_container.fillFieldMap()
 
@@ -42,13 +42,13 @@ func newContainer(db *gorm.DB, opts ...gen.DOOption) container {
 type container struct {
 	containerDo
 
-	ALL         field.Asterisk
-	ID          field.Int32
-	Image       field.String
-	Dockerfile  field.String
-	Status      field.Int32
-	Version     field.String
-	ContainerID field.String
+	ALL           field.Asterisk
+	ID            field.Int32
+	Image         field.String
+	Dockerfile    field.String
+	Status        field.Int32
+	Version       field.String
+	ContainerInfo field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -70,7 +70,7 @@ func (c *container) updateTableName(table string) *container {
 	c.Dockerfile = field.NewString(table, "dockerfile")
 	c.Status = field.NewInt32(table, "status")
 	c.Version = field.NewString(table, "version")
-	c.ContainerID = field.NewString(table, "container_id")
+	c.ContainerInfo = field.NewString(table, "container_info")
 
 	c.fillFieldMap()
 
@@ -93,7 +93,7 @@ func (c *container) fillFieldMap() {
 	c.fieldMap["dockerfile"] = c.Dockerfile
 	c.fieldMap["status"] = c.Status
 	c.fieldMap["version"] = c.Version
-	c.fieldMap["container_id"] = c.ContainerID
+	c.fieldMap["container_info"] = c.ContainerInfo
 }
 
 func (c container) clone(db *gorm.DB) container {

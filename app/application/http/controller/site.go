@@ -65,7 +65,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		func(tx *dao.Query) error {
 			site, _ := tx.Site.Where(dao.Site.SiteURL.Eq(params.SiteUrl)).First()
 			if site != nil {
-				//return errors.New("站点域名已经绑定其它站，请更换域名")
+				return errors.New("站点域名已经绑定其它站，请更换域名")
 			}
 			if params.Image != "" {
 				imageArr := strings.Split(
@@ -84,9 +84,6 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 			}
 			err = tx.Site.Create(siteRow)
-			siteRow.SiteID = fmt.Sprintf("dpanel-app-%d-%s", siteRow.ID, function.GetRandomString(10))
-			dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Update(dao.Site.SiteID, siteRow.SiteID)
-
 			if err != nil {
 				return err
 			}
@@ -94,11 +91,13 @@ func (self Site) CreateByImage(http *gin.Context) {
 		},
 	)
 
+	siteRow.SiteID = fmt.Sprintf("dpanel-app-%d-%s", siteRow.ID, function.GetRandomString(10))
+	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(siteRow)
+
 	if err_handler.Found(err) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
 	task := logic.NewContainerTask()
 	runTaskRow := &logic.CreateMessage{
 		Name:      siteRow.SiteID,
@@ -147,6 +146,7 @@ func (self Site) GetList(http *gin.Context) {
 		dao.Site.SiteURL,
 		dao.Site.ContainerID,
 		dao.Site.Status,
+		dao.Site.Env,
 	)
 
 	if params.SiteName != "" {
@@ -154,13 +154,12 @@ func (self Site) GetList(http *gin.Context) {
 	}
 	query = query.Order(dao.Site.ID.Desc())
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
-	self.JsonResponseWithoutError(
-		http, gin.H{
-			"total": total,
-			"page":  params.Page,
-			"list":  list,
-		},
-	)
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"total": total,
+		"page":  params.Page,
+		"list":  list,
+	})
 	return
 }
 
@@ -185,11 +184,13 @@ func (self Site) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	containerInfo, err := sdk.ContainerByName("myphpmyadmin")
+	containerInfo, err := sdk.ContainerByField("id", "97b0212d6c15e9c935992bb9ac0b3712a569e9bd26ea296577654434fe0f37dc")
+	str, _ := json.Marshal(containerInfo)
+	fmt.Printf("%v \n", string(str))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fmt.Printf("%v \n", containerInfo)
+	fmt.Printf("%v \n", containerInfo.Ports)
 
 }

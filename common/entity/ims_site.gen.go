@@ -16,7 +16,7 @@ type Site struct {
 	SiteURLExt  string     `gorm:"column:site_url_ext;type:text" json:"siteUrlExt"`
 	Env         string     `gorm:"column:env;type:text" json:"env"`
 	Status      int32      `gorm:"column:status;type:integer" json:"status"`
-	Container   *Container `gorm:"foreignKey:container_id" json:"container"`
+	Container   *Container `gorm:"foreignKey:id;references:container_id" json:"container"`
 	Task        Task       `gorm:"foreignKey:site_id" json:"task"`
 }
 

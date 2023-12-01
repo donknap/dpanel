@@ -117,8 +117,6 @@ func (self *ContainerTask) CreateLoop() {
 				self.stepLog[message.SiteId].err(err)
 				break
 			}
-			self.stepLog[message.SiteId].syncSiteContainerId(response.ID)
-			slog.Info("Container id: ", response)
 
 			self.stepLog[message.SiteId].step(STEP_CONTAINER_RUN)
 			err = sdk.Client.ContainerStart(context.Background(), response.ID, types.ContainerStartOptions{})
@@ -127,6 +125,13 @@ func (self *ContainerTask) CreateLoop() {
 				self.stepLog[message.SiteId].err(err)
 				break
 			}
+			containerInfo, err := sdk.ContainerByField("id", response.ID)
+			if err != nil {
+				slog.Error(err.Error())
+				self.stepLog[message.SiteId].err(err)
+				break
+			}
+			self.stepLog[message.SiteId].syncSiteContainerInfo(containerInfo)
 			self.stepLog[message.SiteId].success(response.ID)
 			delete(self.stepLog, message.SiteId)
 		default:

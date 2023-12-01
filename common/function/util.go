@@ -3,6 +3,7 @@ package function
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"path/filepath"
@@ -98,4 +99,11 @@ func EncodeURIComponent(s string, excluded ...[]byte) string {
 	}
 	b.WriteString(s[written:])
 	return b.String()
+}
+
+func GetInterfaceMap(data interface{}) map[string]interface{} {
+	jsonStr, _ := json.Marshal(data)
+	var jsonStruct map[string]interface{}
+	json.Unmarshal([]byte(jsonStr), &jsonStruct)
+	return jsonStruct
 }

@@ -49,11 +49,11 @@ func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {
 	return builder
 }
 
-// 获取单条容器
-func (self Builder) ContainerByName(name string) (container *types.Container, err error) {
+// ContainerByField 获取单条容器 field 支持 id,name
+func (self Builder) ContainerByField(field string, name string) (container *types.Container, err error) {
 	ctx := context.Background()
 	containerList, err := self.Client.ContainerList(ctx, types.ContainerListOptions{
-		Filters: filters.NewArgs(filters.Arg("name", name)),
+		Filters: filters.NewArgs(filters.Arg(field, name)),
 	})
 	if err != nil {
 		return nil, err

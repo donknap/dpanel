@@ -2,6 +2,11 @@ config:
   tag_json_camel: lower
 relation:
   - table: ims_site
+    column:
+      env:
+        tag:
+          gorm:
+            serializer: json
     relate:
       - table: ims_container
         references: container_id
