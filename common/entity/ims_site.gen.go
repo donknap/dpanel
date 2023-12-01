@@ -9,9 +9,9 @@ const TableNameSite = "ims_site"
 // Site mapped from table <ims_site>
 type Site struct {
 	ID          int32      `gorm:"column:id;type:INTEGER" json:"id"`
-	SiteID      string     `gorm:"column:site_id;type:text" json:"siteId"`
 	SiteName    string     `gorm:"column:site_name;type:text" json:"siteName"`
 	SiteURL     string     `gorm:"column:site_url;type:text" json:"siteUrl"`
+	SiteID      string     `gorm:"column:site_id;type:text" json:"siteId"`
 	ContainerID int32      `gorm:"column:container_id;type:integer" json:"containerId"`
 	SiteURLExt  string     `gorm:"column:site_url_ext;type:text" json:"siteUrlExt"`
 	Env         string     `gorm:"column:env;type:text" json:"env"`

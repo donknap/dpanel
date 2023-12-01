@@ -11,7 +11,6 @@ import (
 	"io"
 	"log/slog"
 	"math"
-	"time"
 )
 
 const REGISTER_NAME = "containerTask"
@@ -72,9 +71,8 @@ func (self *ContainerTask) CreateLoop() {
 			// 拿到部署任务后，先新建一个任务对象
 			// 用于记录进行状态（数据库中）
 			// 在本单例对象中建立一个map对象，存放过程中的数据，这些数据不入库
-			slog.Info(fmt.Sprintf("来任务了 %d", message.SiteId))
+			slog.Info(fmt.Sprintf("run task %d", message.SiteId))
 			self.stepLog[message.SiteId] = newStepMessage(message.SiteId)
-			defer slog.Info("我是defer")
 			self.stepLog[message.SiteId].step(STEP_IMAGE_PULL)
 			err = self.pullImage(message)
 			if err != nil {
@@ -119,6 +117,7 @@ func (self *ContainerTask) CreateLoop() {
 				self.stepLog[message.SiteId].err(err)
 				break
 			}
+			self.stepLog[message.SiteId].syncSiteContainerId(response.ID)
 			slog.Info("Container id: ", response)
 
 			self.stepLog[message.SiteId].step(STEP_CONTAINER_RUN)
@@ -128,11 +127,12 @@ func (self *ContainerTask) CreateLoop() {
 				self.stepLog[message.SiteId].err(err)
 				break
 			}
-			self.stepLog[message.SiteId].success()
+			self.stepLog[message.SiteId].success(response.ID)
 			delete(self.stepLog, message.SiteId)
 		default:
-			slog.Info(fmt.Sprintf("%d", time.Now().Unix()))
-			time.Sleep(time.Second)
+			for key, _ := range self.stepLog {
+				delete(self.stepLog, key)
+			}
 		}
 	}
 }

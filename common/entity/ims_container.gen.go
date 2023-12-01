@@ -8,11 +8,12 @@ const TableNameContainer = "ims_container"
 
 // Container mapped from table <ims_container>
 type Container struct {
-	ID         int32  `gorm:"column:id;type:INTEGER" json:"id"`
-	Image      string `gorm:"column:image;type:text" json:"image"`
-	Dockerfile string `gorm:"column:dockerfile;type:text" json:"dockerfile"`
-	Status     int32  `gorm:"column:status;type:integer" json:"status"`
-	Version    string `gorm:"column:version;type:text" json:"version"`
+	ID          int32  `gorm:"column:id;type:INTEGER" json:"id"`
+	Image       string `gorm:"column:image;type:text" json:"image"`
+	Dockerfile  string `gorm:"column:dockerfile;type:text" json:"dockerfile"`
+	Status      int32  `gorm:"column:status;type:integer" json:"status"`
+	Version     string `gorm:"column:version;type:text" json:"version"`
+	ContainerID string `gorm:"column:container_id;type:text" json:"containerId"`
 }
 
 // TableName Container's table name

@@ -28,9 +28,9 @@ func newSite(db *gorm.DB, opts ...gen.DOOption) site {
 	tableName := _site.siteDo.TableName()
 	_site.ALL = field.NewAsterisk(tableName)
 	_site.ID = field.NewInt32(tableName, "id")
-	_site.SiteID = field.NewString(tableName, "site_id")
 	_site.SiteName = field.NewString(tableName, "site_name")
 	_site.SiteURL = field.NewString(tableName, "site_url")
+	_site.SiteID = field.NewString(tableName, "site_id")
 	_site.ContainerID = field.NewInt32(tableName, "container_id")
 	_site.SiteURLExt = field.NewString(tableName, "site_url_ext")
 	_site.Env = field.NewString(tableName, "env")
@@ -57,9 +57,9 @@ type site struct {
 
 	ALL         field.Asterisk
 	ID          field.Int32
-	SiteID      field.String
 	SiteName    field.String
 	SiteURL     field.String
+	SiteID      field.String
 	ContainerID field.Int32
 	SiteURLExt  field.String
 	Env         field.String
@@ -84,9 +84,9 @@ func (s site) As(alias string) *site {
 func (s *site) updateTableName(table string) *site {
 	s.ALL = field.NewAsterisk(table)
 	s.ID = field.NewInt32(table, "id")
-	s.SiteID = field.NewString(table, "site_id")
 	s.SiteName = field.NewString(table, "site_name")
 	s.SiteURL = field.NewString(table, "site_url")
+	s.SiteID = field.NewString(table, "site_id")
 	s.ContainerID = field.NewInt32(table, "container_id")
 	s.SiteURLExt = field.NewString(table, "site_url_ext")
 	s.Env = field.NewString(table, "env")
@@ -109,9 +109,9 @@ func (s *site) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 func (s *site) fillFieldMap() {
 	s.fieldMap = make(map[string]field.Expr, 10)
 	s.fieldMap["id"] = s.ID
-	s.fieldMap["site_id"] = s.SiteID
 	s.fieldMap["site_name"] = s.SiteName
 	s.fieldMap["site_url"] = s.SiteURL
+	s.fieldMap["site_id"] = s.SiteID
 	s.fieldMap["container_id"] = s.ContainerID
 	s.fieldMap["site_url_ext"] = s.SiteURLExt
 	s.fieldMap["env"] = s.Env

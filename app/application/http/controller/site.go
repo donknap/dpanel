@@ -2,9 +2,13 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/core/err_handler"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
@@ -17,10 +21,9 @@ type Site struct {
 
 func (self Site) CreateByImage(http *gin.Context) {
 	type ParamsValidate struct {
-		SiteName   string `form:"siteName" binding:"required"`
-		SiteId     string `form:"siteId" binding:"required"`
-		SiteDomain string `form:"siteDomain" binding:"required"`
-		Image      string `json:"image" binding:"required"`
+		SiteName string `form:"siteName" binding:"required"`
+		SiteUrl  string `form:"siteUrl" binding:"required,url"`
+		Image    string `json:"image" binding:"required"`
 		logic.ContainerRunParams
 	}
 
@@ -38,64 +41,52 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 	siteEnv, err := json.Marshal(runParams)
 	if err != nil {
-		self.JsonResponseWithError(
-			http,
-			err,
-			500,
-		)
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	siteUrlExt, err := json.Marshal(
 		[]string{
-			params.SiteDomain,
+			params.SiteUrl,
 		},
 	)
 	if err != nil {
-		self.JsonResponseWithError(
-			http,
-			err,
-			500,
-		)
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	siteRow := &entity.Site{
-		SiteID:     params.SiteId,
+		SiteID:     "",
 		SiteName:   params.SiteName,
-		SiteURL:    params.SiteDomain,
+		SiteURL:    params.SiteUrl,
 		SiteURLExt: string(siteUrlExt),
 		Env:        string(siteEnv),
 		Status:     logic.STATUS_STOP,
 	}
 	err = dao.Q.Transaction(
 		func(tx *dao.Query) error {
-			site, _ := tx.Site.Where(dao.Site.SiteID.Eq(params.SiteId)).First()
+			site, _ := tx.Site.Where(dao.Site.SiteURL.Eq(params.SiteUrl)).First()
 			if site != nil {
-				//return errors.New("站点已经存在，请更换标识")
+				//return errors.New("站点域名已经绑定其它站，请更换域名")
 			}
 			if params.Image != "" {
 				imageArr := strings.Split(
 					params.Image+":",
 					":",
 				)
-				containerRow, _ := tx.Container.Where(
-					tx.Container.Image.Eq(imageArr[0]),
-					tx.Container.Version.Eq(imageArr[1]),
-				).First()
-				if containerRow != nil {
-					siteRow.ContainerID = containerRow.ID
-				} else {
-					containerRow = &entity.Container{
-						Image:   imageArr[0],
-						Version: imageArr[1],
-					}
-					err = tx.Container.Create(containerRow)
-					if err != nil {
-						return err
-					}
-					siteRow.ContainerID = containerRow.ID
+				containerRow := &entity.Container{
+					Image:   imageArr[0],
+					Version: imageArr[1],
 				}
+				err = tx.Container.Create(containerRow)
+				if err != nil {
+					return err
+				}
+				siteRow.ContainerID = containerRow.ID
+
 			}
 			err = tx.Site.Create(siteRow)
+			siteRow.SiteID = fmt.Sprintf("dpanel-app-%d-%s", siteRow.ID, function.GetRandomString(10))
+			dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Update(dao.Site.SiteID, siteRow.SiteID)
+
 			if err != nil {
 				return err
 			}
@@ -104,37 +95,22 @@ func (self Site) CreateByImage(http *gin.Context) {
 	)
 
 	if err_handler.Found(err) {
-		self.JsonResponseWithError(
-			http,
-			err,
-			500,
-		)
-		return
-	}
-
-	err = dao.Q.Transaction(
-		func(tx *dao.Query) (err error) {
-			_, err = tx.Task.Where(tx.Task.SiteID.Eq(siteRow.ID)).Delete()
-			if err != nil {
-				return err
-			}
-			task := logic.NewContainerTask()
-			runTaskRow := &logic.CreateMessage{
-				Name:      params.SiteId,
-				SiteId:    siteRow.ID,
-				Image:     params.Image,
-				RunParams: runParams,
-			}
-			task.QueueCreate <- runTaskRow
-			return nil
-		},
-	)
-
-	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
+	task := logic.NewContainerTask()
+	runTaskRow := &logic.CreateMessage{
+		Name:      siteRow.SiteID,
+		SiteId:    siteRow.ID,
+		Image:     params.Image,
+		RunParams: runParams,
+	}
+	task.QueueCreate <- runTaskRow
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	self.JsonResponseWithoutError(http, gin.H{"siteId": siteRow.ID})
 	return
 }
@@ -190,7 +166,7 @@ func (self Site) GetList(http *gin.Context) {
 
 func (self Site) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		SiteId int32 `form:"siteId" binding:"required"`
+		Id int32 `form:"siteId" binding:"required"`
 	}
 
 	params := ParamsValidate{}
@@ -198,17 +174,22 @@ func (self Site) GetDetail(http *gin.Context) {
 		return
 	}
 
-	//siteRow, _ := dao.Site.Where(dao.Site.SiteID.Eq(params.SiteId)).First()
-	//if siteRow == nil {
-	//	self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
-	//	return
-	//}
+	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(params.Id)).First()
+	if siteRow == nil {
+		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
+		return
+	}
 	// 更新容器信息
-	//sdk, err := docker.NewDockerClient()
-	//if err != nil {
-	//	self.JsonResponseWithError(http, err, 500)
-	//	return
-	//}
-	//sdk.ContainerByName()
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	containerInfo, err := sdk.ContainerByName("myphpmyadmin")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fmt.Printf("%v \n", containerInfo)
 
 }

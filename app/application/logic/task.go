@@ -7,6 +7,9 @@ import (
 )
 
 func newStepMessage(siteId int32) *stepMessage {
+	// 清除掉当前站点之前的任务
+	dao.Task.Where(dao.Task.SiteID.Eq(siteId)).Delete()
+
 	task := &stepMessage{}
 	taskRow, _ := dao.Task.Where(dao.Task.SiteID.Eq(siteId)).First()
 	if taskRow == nil {
@@ -18,6 +21,7 @@ func newStepMessage(siteId int32) *stepMessage {
 		dao.Task.Create(taskRow)
 	}
 	task.recordId = taskRow.ID
+	task.siteId = siteId
 	return task
 }
 
@@ -26,6 +30,7 @@ type stepMessage struct {
 	currentStep string      // 当前进行的步骤
 	error       error       // 发生的错误
 	recordId    int32
+	siteId      int32
 }
 
 // 记录任务错误
@@ -60,22 +65,26 @@ func (self *stepMessage) GetProcess() interface{} {
 	return self.progress
 }
 
-func (self *stepMessage) success() {
+func (self *stepMessage) success(containerId string) {
 	query := dao.Task.Where(dao.Task.ID.Eq(self.recordId))
-	query.Updates(
-		entity.Task{
-			Status:  STATUS_SUCCESS,
-			Message: "",
-		},
-	)
+	query.Updates(entity.Task{
+		Status:  STATUS_SUCCESS,
+		Message: "",
+	})
 	//状态同步到站点上
 	self.syncSiteStatus(STATUS_SUCCESS)
 }
 
 func (self *stepMessage) syncSiteStatus(status int) {
-	taskRow, _ := dao.Task.Where(dao.Task.ID.Eq(self.recordId)).First()
-	_, err := dao.Site.Where(dao.Site.ID.Eq(taskRow.SiteID)).Update(dao.Site.Status, status)
-	fmt.Printf("%v \n", taskRow)
+	_, err := dao.Site.Where(dao.Site.ID.Eq(self.siteId)).Update(dao.Site.Status, status)
+	if err != nil {
+		fmt.Printf("%s", err.Error())
+	}
+}
+
+func (self *stepMessage) syncSiteContainerId(containerId string) {
+	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(self.siteId)).First()
+	_, err := dao.Container.Where(dao.Container.ID.Eq(siteRow.ContainerID)).Update(dao.Container.ContainerID, containerId)
 	if err != nil {
 		fmt.Printf("%s", err.Error())
 	}

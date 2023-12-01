@@ -98,15 +98,18 @@ func (self Log) Task(http *gin.Context) {
 	}
 	result["stepStatus"] = stepStatus
 
-	task := logic.NewContainerTask()
-	stepLog := task.GetTaskStepLog(taskRow.SiteID)
-	if stepLog != nil {
-		result[logic.STEP_IMAGE_PULL] = stepLog.GetProcess()
-		if result[logic.STEP_IMAGE_PULL] == nil {
-			if taskRow.Status == logic.STATUS_PROCESSING {
-				result[logic.STEP_IMAGE_PULL] = defaultProgress
-			} else {
-				result[logic.STEP_IMAGE_PULL] = finishProgress
+	// 只有在拉取镜像时，才获取拉取进度
+	if logic.StepStatusValue[taskRow.Step] == 2 {
+		task := logic.NewContainerTask()
+		stepLog := task.GetTaskStepLog(taskRow.SiteID)
+		if stepLog != nil {
+			result[logic.STEP_IMAGE_PULL] = stepLog.GetProcess()
+			if result[logic.STEP_IMAGE_PULL] == nil {
+				if taskRow.Status == logic.STATUS_PROCESSING {
+					result[logic.STEP_IMAGE_PULL] = defaultProgress
+				} else {
+					result[logic.STEP_IMAGE_PULL] = finishProgress
+				}
 			}
 		}
 	}

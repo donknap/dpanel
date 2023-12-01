@@ -4,7 +4,8 @@ relation:
   - table: ims_site
     relate:
       - table: ims_container
-        foreign_key: container_id
+        references: container_id
+        foreign_key: id
         type: has_one
       - table: ims_task
         foreign_key: site_id
