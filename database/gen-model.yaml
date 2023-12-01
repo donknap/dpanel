@@ -14,5 +14,9 @@ relation:
       - table: ims_task
         foreign_key: site_id
   - table: ims_container
+    column:
+      container_info:
+        serializer: json
+        type: ContainerInfoOption
   - table: ims_run_env
   - table: ims_task

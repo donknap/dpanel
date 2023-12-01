@@ -3,6 +3,7 @@ package logic
 import (
 	"fmt"
 	"github.com/docker/docker/api/types"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/goccy/go-json"
@@ -88,8 +89,10 @@ func (self *stepMessage) syncSiteContainerInfo(containerInfo *types.Container) {
 	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(self.siteId)).First()
 	// 同步容器信息
 	str, _ := json.Marshal(containerInfo)
+	var dbContainerInfo accessor.ContainerInfoOption
+	json.Unmarshal(str, &dbContainerInfo)
 	_, err := dao.Container.Where(dao.Container.ID.Eq(siteRow.ContainerID)).Updates(entity.Container{
-		ContainerInfo: string(str),
+		ContainerInfo: &dbContainerInfo,
 	})
 	if err != nil {
 		fmt.Printf("%s", err.Error())

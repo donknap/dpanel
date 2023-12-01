@@ -9,7 +9,6 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/core/err_handler"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
@@ -25,6 +24,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		SiteName string `form:"siteName" binding:"required"`
 		SiteUrl  string `form:"siteUrl" binding:"required,url"`
 		Image    string `json:"image" binding:"required"`
+		IsSystem bool   `json:"isSystem" binding:"required"`
 		accessor.SiteEnvOption
 	}
 
@@ -39,7 +39,10 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Ports:       params.Ports,
 		Links:       params.Links,
 	}
-
+	// 如果是系统组件，域名相关配置可以去掉
+	if params.IsSystem {
+		params.SiteUrl = ""
+	}
 	siteUrlExt, err := json.Marshal(
 		[]string{
 			params.SiteUrl,
@@ -56,13 +59,22 @@ func (self Site) CreateByImage(http *gin.Context) {
 		SiteURLExt: string(siteUrlExt),
 		Env:        &runParams,
 		Status:     logic.STATUS_STOP,
+		IsSystem:   0,
+	}
+	appType := "app"
+	if params.IsSystem {
+		siteRow.IsSystem = 1
+		appType = "system"
 	}
 	err = dao.Q.Transaction(
 		func(tx *dao.Query) error {
-			site, _ := tx.Site.Where(dao.Site.SiteURL.Eq(params.SiteUrl)).First()
-			if site != nil {
-				return errors.New("站点域名已经绑定其它站，请更换域名")
+			if !params.IsSystem {
+				site, _ := tx.Site.Where(dao.Site.SiteURL.Eq(params.SiteUrl)).First()
+				if site != nil {
+					return errors.New("站点域名已经绑定其它站，请更换域名")
+				}
 			}
+
 			if params.Image != "" {
 				imageArr := strings.Split(
 					params.Image+":",
@@ -87,7 +99,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		},
 	)
 
-	siteRow.SiteID = fmt.Sprintf("dpanel-app-%d-%s", siteRow.ID, function.GetRandomString(10))
+	siteRow.SiteID = fmt.Sprintf("dpanel-%s-%d-%s", appType, siteRow.ID, function.GetRandomString(10))
 	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(siteRow)
 	if err_handler.Found(err) {
 		self.JsonResponseWithError(http, err, 500)
@@ -167,24 +179,13 @@ func (self Site) GetDetail(http *gin.Context) {
 		return
 	}
 
-	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(params.Id)).First()
+	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(params.Id)).Preload(dao.Site.Container).First()
 	if siteRow == nil {
 		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 		return
 	}
 	// 更新容器信息
-	sdk, err := docker.NewDockerClient()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	containerInfo, err := sdk.ContainerByField("id", "97b0212d6c15e9c935992bb9ac0b3712a569e9bd26ea296577654434fe0f37dc")
-	str, _ := json.Marshal(containerInfo)
-	fmt.Printf("%v \n", string(str))
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	fmt.Printf("%v \n", containerInfo.Ports)
+	self.JsonResponseWithoutError(http, siteRow)
+	return
 
 }

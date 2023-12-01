@@ -32,7 +32,7 @@ func newContainer(db *gorm.DB, opts ...gen.DOOption) container {
 	_container.Dockerfile = field.NewString(tableName, "dockerfile")
 	_container.Status = field.NewInt32(tableName, "status")
 	_container.Version = field.NewString(tableName, "version")
-	_container.ContainerInfo = field.NewString(tableName, "container_info")
+	_container.ContainerInfo = field.NewField(tableName, "container_info")
 
 	_container.fillFieldMap()
 
@@ -48,7 +48,7 @@ type container struct {
 	Dockerfile    field.String
 	Status        field.Int32
 	Version       field.String
-	ContainerInfo field.String
+	ContainerInfo field.Field
 
 	fieldMap map[string]field.Expr
 }
@@ -70,7 +70,7 @@ func (c *container) updateTableName(table string) *container {
 	c.Dockerfile = field.NewString(table, "dockerfile")
 	c.Status = field.NewInt32(table, "status")
 	c.Version = field.NewString(table, "version")
-	c.ContainerInfo = field.NewString(table, "container_info")
+	c.ContainerInfo = field.NewField(table, "container_info")
 
 	c.fillFieldMap()
 
