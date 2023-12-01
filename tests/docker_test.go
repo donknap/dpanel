@@ -105,6 +105,19 @@ func TestCreateContainer(t *testing.T) {
 
 }
 
+func TestGetContainer(t *testing.T) {
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		fmt.Printf("%v \n", err)
+	}
+	item, err := sdk.ContainerByName("phpmyadmin1")
+	if err != nil {
+		fmt.Printf("%v \n", err)
+		return
+	}
+	fmt.Printf("%v \n", item)
+}
+
 func TestCode(t *testing.T) {
 	image := "phpmyadmin:"
 	fmt.Printf("%v \n", strings.Split(image, ":"))

@@ -33,6 +33,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			// 站点相关
 			cors.POST("/app/site/create-by-image", controller.Site{}.CreateByImage)
 			cors.POST("/app/site/get-list", controller.Site{}.GetList)
+			cors.POST("/app/site/get-detail", controller.Site{}.GetDetail)
 
 			// 日志相关
 			cors.POST("/app/log/task", controller.Log{}.Task)

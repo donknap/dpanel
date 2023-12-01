@@ -25,10 +25,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 	}
 
 	params := ParamsValidate{}
-	if !self.Validate(
-		http,
-		&params,
-	) {
+	if !self.Validate(http, &params) {
 		return
 	}
 
@@ -189,4 +186,29 @@ func (self Site) GetList(http *gin.Context) {
 		},
 	)
 	return
+}
+
+func (self Site) GetDetail(http *gin.Context) {
+	type ParamsValidate struct {
+		SiteId int32 `form:"siteId" binding:"required"`
+	}
+
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	//siteRow, _ := dao.Site.Where(dao.Site.SiteID.Eq(params.SiteId)).First()
+	//if siteRow == nil {
+	//	self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
+	//	return
+	//}
+	// 更新容器信息
+	//sdk, err := docker.NewDockerClient()
+	//if err != nil {
+	//	self.JsonResponseWithError(http, err, 500)
+	//	return
+	//}
+	//sdk.ContainerByName()
+
 }

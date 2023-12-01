@@ -2,7 +2,10 @@ package docker
 
 import (
 	"context"
+	"errors"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -44,4 +47,19 @@ func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {
 	}
 	builder.withSdk(self.Client)
 	return builder
+}
+
+// 获取单条容器
+func (self Builder) ContainerByName(name string) (container *types.Container, err error) {
+	ctx := context.Background()
+	containerList, err := self.Client.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters.NewArgs(filters.Arg("name", name)),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(containerList) != 1 {
+		return nil, errors.New("container not found")
+	}
+	return &containerList[0], nil
 }
