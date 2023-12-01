@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"io"
@@ -42,7 +43,7 @@ type CreateMessage struct {
 	Name      string
 	Image     string
 	SiteId    int32
-	RunParams *ContainerRunParams
+	RunParams *accessor.SiteEnvOption
 }
 
 type ContainerTask struct {

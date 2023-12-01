@@ -4,9 +4,8 @@ relation:
   - table: ims_site
     column:
       env:
-        tag:
-          gorm:
-            serializer: json
+        serializer: json
+        type: SiteEnvOption
     relate:
       - table: ims_container
         references: container_id

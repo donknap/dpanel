@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
@@ -24,7 +25,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		SiteName string `form:"siteName" binding:"required"`
 		SiteUrl  string `form:"siteUrl" binding:"required,url"`
 		Image    string `json:"image" binding:"required"`
-		logic.ContainerRunParams
+		accessor.SiteEnvOption
 	}
 
 	params := ParamsValidate{}
@@ -32,18 +33,13 @@ func (self Site) CreateByImage(http *gin.Context) {
 		return
 	}
 
-	runParams := &logic.ContainerRunParams{
+	runParams := accessor.SiteEnvOption{
 		Environment: params.Environment,
 		Volumes:     params.Volumes,
 		Ports:       params.Ports,
 		Links:       params.Links,
 	}
 
-	siteEnv, err := json.Marshal(runParams)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	siteUrlExt, err := json.Marshal(
 		[]string{
 			params.SiteUrl,
@@ -58,7 +54,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		SiteName:   params.SiteName,
 		SiteURL:    params.SiteUrl,
 		SiteURLExt: string(siteUrlExt),
-		Env:        string(siteEnv),
+		Env:        &runParams,
 		Status:     logic.STATUS_STOP,
 	}
 	err = dao.Q.Transaction(
@@ -93,7 +89,6 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 	siteRow.SiteID = fmt.Sprintf("dpanel-app-%d-%s", siteRow.ID, function.GetRandomString(10))
 	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(siteRow)
-
 	if err_handler.Found(err) {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -103,7 +98,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Name:      siteRow.SiteID,
 		SiteId:    siteRow.ID,
 		Image:     params.Image,
-		RunParams: runParams,
+		RunParams: &runParams,
 	}
 	task.QueueCreate <- runTaskRow
 	if err != nil {
@@ -154,7 +149,6 @@ func (self Site) GetList(http *gin.Context) {
 	}
 	query = query.Order(dao.Site.ID.Desc())
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
-
 	self.JsonResponseWithoutError(http, gin.H{
 		"total": total,
 		"page":  params.Page,

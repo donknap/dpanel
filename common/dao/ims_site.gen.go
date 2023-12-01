@@ -33,7 +33,7 @@ func newSite(db *gorm.DB, opts ...gen.DOOption) site {
 	_site.SiteID = field.NewString(tableName, "site_id")
 	_site.ContainerID = field.NewInt32(tableName, "container_id")
 	_site.SiteURLExt = field.NewString(tableName, "site_url_ext")
-	_site.Env = field.NewString(tableName, "env")
+	_site.Env = field.NewField(tableName, "env")
 	_site.Status = field.NewInt32(tableName, "status")
 	_site.Container = siteHasOneContainer{
 		db: db.Session(&gorm.Session{}),
@@ -62,7 +62,7 @@ type site struct {
 	SiteID      field.String
 	ContainerID field.Int32
 	SiteURLExt  field.String
-	Env         field.String
+	Env         field.Field
 	Status      field.Int32
 	Container   siteHasOneContainer
 
@@ -89,7 +89,7 @@ func (s *site) updateTableName(table string) *site {
 	s.SiteID = field.NewString(table, "site_id")
 	s.ContainerID = field.NewInt32(table, "container_id")
 	s.SiteURLExt = field.NewString(table, "site_url_ext")
-	s.Env = field.NewString(table, "env")
+	s.Env = field.NewField(table, "env")
 	s.Status = field.NewInt32(table, "status")
 
 	s.fillFieldMap()
