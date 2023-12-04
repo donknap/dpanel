@@ -14,6 +14,16 @@ const (
 	STEP_CONTAINER_RUN   = "containerRun"
 )
 
+const (
+	SITE_TYPE_SITE   = "site"
+	SITE_TYPE_SYSTEM = "system"
+)
+
+var SiteTypeValue = map[string]int32{
+	SITE_TYPE_SITE:   10,
+	SITE_TYPE_SYSTEM: 20,
+}
+
 var StepStatusValue = map[string]int{
 	STEP_IMAGE_BUILD:     1,
 	STEP_IMAGE_PULL:      2,

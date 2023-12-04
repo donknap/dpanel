@@ -20,7 +20,7 @@ type Site struct {
 	SiteURLExt  string                  `gorm:"column:site_url_ext;type:text" json:"siteUrlExt"`
 	Env         *accessor.SiteEnvOption `gorm:"column:env;type:text;serializer:json" json:"env"`
 	Status      int32                   `gorm:"column:status;type:integer" json:"status"`
-	IsSystem    int32                   `gorm:"column:is_system;type:integer" json:"isSystem"`
+	Type        int32                   `gorm:"column:type;type:integer" json:"type"`
 	Container   *Container              `gorm:"foreignKey:id;references:container_id" json:"container"`
 	Task        Task                    `gorm:"foreignKey:site_id" json:"task"`
 }

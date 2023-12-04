@@ -6,6 +6,9 @@ relation:
       env:
         serializer: json
         type: SiteEnvOption
+      site_url_ext:
+        serializer: json
+        type: SiteUrlExtOption
     relate:
       - table: ims_container
         references: container_id

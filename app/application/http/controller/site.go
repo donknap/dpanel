@@ -24,7 +24,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		SiteName string `form:"siteName" binding:"required"`
 		SiteUrl  string `form:"siteUrl" binding:"required,url"`
 		Image    string `json:"image" binding:"required"`
-		IsSystem bool   `json:"isSystem" binding:"required"`
+		Type     string `json:"type" binding:"required,oneof=system site"`
 		accessor.SiteEnvOption
 	}
 
@@ -40,7 +40,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Links:       params.Links,
 	}
 	// 如果是系统组件，域名相关配置可以去掉
-	if params.IsSystem {
+	if params.Type == logic.SITE_TYPE_SYSTEM {
 		params.SiteUrl = ""
 	}
 	siteUrlExt, err := json.Marshal(
@@ -59,16 +59,12 @@ func (self Site) CreateByImage(http *gin.Context) {
 		SiteURLExt: string(siteUrlExt),
 		Env:        &runParams,
 		Status:     logic.STATUS_STOP,
-		IsSystem:   0,
+		Type:       logic.SiteTypeValue[params.Type],
 	}
-	appType := "app"
-	if params.IsSystem {
-		siteRow.IsSystem = 1
-		appType = "system"
-	}
+
 	err = dao.Q.Transaction(
 		func(tx *dao.Query) error {
-			if !params.IsSystem {
+			if params.Type == logic.SITE_TYPE_SITE {
 				site, _ := tx.Site.Where(dao.Site.SiteURL.Eq(params.SiteUrl)).First()
 				if site != nil {
 					return errors.New("站点域名已经绑定其它站，请更换域名")
@@ -81,8 +77,10 @@ func (self Site) CreateByImage(http *gin.Context) {
 					":",
 				)
 				containerRow := &entity.Container{
-					Image:   imageArr[0],
-					Version: imageArr[1],
+					Image:         imageArr[0],
+					Version:       imageArr[1],
+					Dockerfile:    "",
+					ContainerInfo: &accessor.ContainerInfoOption{},
 				}
 				err = tx.Container.Create(containerRow)
 				if err != nil {
@@ -99,7 +97,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		},
 	)
 
-	siteRow.SiteID = fmt.Sprintf("dpanel-%s-%d-%s", appType, siteRow.ID, function.GetRandomString(10))
+	siteRow.SiteID = fmt.Sprintf("dpanel-%s-%d-%s", params.Type, siteRow.ID, function.GetRandomString(10))
 	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(siteRow)
 	if err_handler.Found(err) {
 		self.JsonResponseWithError(http, err, 500)
@@ -127,6 +125,7 @@ func (self Site) GetList(http *gin.Context) {
 		PageSize int    `form:"pageSize" binding:"omitempty"`
 		SiteName string `form:"siteName" binding:"omitempty"`
 		Sort     string `form:"sort,default=new" binding:"omitempty,oneof=hot new"`
+		Type     string `form:"type" binding:"oneof=system site"`
 	}
 
 	params := ParamsValidate{}
@@ -145,6 +144,7 @@ func (self Site) GetList(http *gin.Context) {
 			dao.Container.Image,
 			dao.Container.Status,
 			dao.Container.Version,
+			dao.Container.ContainerInfo,
 		),
 	).Select(
 		dao.Site.SiteID,
@@ -153,8 +153,12 @@ func (self Site) GetList(http *gin.Context) {
 		dao.Site.SiteURL,
 		dao.Site.ContainerID,
 		dao.Site.Status,
-		dao.Site.Env,
+		dao.Site.Type,
 	)
+
+	if params.Type != "" {
+		query = query.Where(dao.Site.Type.Eq(logic.SiteTypeValue[params.Type]))
+	}
 
 	if params.SiteName != "" {
 		query = query.Where(dao.Site.SiteName.Like("%" + params.SiteName + "%"))
