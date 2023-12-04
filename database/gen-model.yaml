@@ -11,11 +11,9 @@ relation:
         type: SiteUrlExtOption
     relate:
       - table: ims_container
-        references: container_id
-        foreign_key: id
+        references: id
+        foreign_key: container_id
         type: has_one
-      - table: ims_task
-        foreign_key: site_id
   - table: ims_container
     column:
       container_info:

@@ -110,7 +110,7 @@ func TestGetContainer(t *testing.T) {
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}
-	item, err := sdk.ContainerByName("phpmyadmin1")
+	item, err := sdk.ContainerByField("name", "dpanel-site-50-bDOrc2t6G5", "dpanel-system-48-ULI6AsL1Yw", "dpanel-app-47-xZvGQCce3o")
 	if err != nil {
 		fmt.Printf("%v \n", err)
 		return

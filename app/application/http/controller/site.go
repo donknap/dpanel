@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -9,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/core/err_handler"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
@@ -43,26 +43,20 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if params.Type == logic.SITE_TYPE_SYSTEM {
 		params.SiteUrl = ""
 	}
-	siteUrlExt, err := json.Marshal(
-		[]string{
-			params.SiteUrl,
-		},
-	)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+	siteUrlExt := &accessor.SiteUrlExtOption{}
+	siteUrlExt.Url = append(siteUrlExt.Url, params.SiteUrl)
+
 	siteRow := &entity.Site{
 		SiteID:     "",
 		SiteName:   params.SiteName,
 		SiteURL:    params.SiteUrl,
-		SiteURLExt: string(siteUrlExt),
+		SiteURLExt: siteUrlExt,
 		Env:        &runParams,
 		Status:     logic.STATUS_STOP,
 		Type:       logic.SiteTypeValue[params.Type],
 	}
 
-	err = dao.Q.Transaction(
+	err := dao.Q.Transaction(
 		func(tx *dao.Query) error {
 			if params.Type == logic.SITE_TYPE_SITE {
 				site, _ := tx.Site.Where(dao.Site.SiteURL.Eq(params.SiteUrl)).First()
@@ -82,14 +76,14 @@ func (self Site) CreateByImage(http *gin.Context) {
 					Dockerfile:    "",
 					ContainerInfo: &accessor.ContainerInfoOption{},
 				}
-				err = tx.Container.Create(containerRow)
+				err := tx.Container.Create(containerRow)
 				if err != nil {
 					return err
 				}
 				siteRow.ContainerID = containerRow.ID
 
 			}
-			err = tx.Site.Create(siteRow)
+			err := tx.Site.Create(siteRow)
 			if err != nil {
 				return err
 			}
@@ -138,7 +132,9 @@ func (self Site) GetList(http *gin.Context) {
 	if params.PageSize < 1 {
 		params.PageSize = 10
 	}
-	query := dao.Site.Preload(
+
+	query := dao.Site.Order(dao.Site.ID.Desc())
+	query = query.Preload(
 		dao.Site.Container.Select(
 			dao.Container.ID,
 			dao.Container.Image,
@@ -146,25 +142,37 @@ func (self Site) GetList(http *gin.Context) {
 			dao.Container.Version,
 			dao.Container.ContainerInfo,
 		),
-	).Select(
-		dao.Site.SiteID,
-		dao.Site.ID,
-		dao.Site.SiteName,
-		dao.Site.SiteURL,
-		dao.Site.ContainerID,
-		dao.Site.Status,
-		dao.Site.Type,
 	)
-
 	if params.Type != "" {
 		query = query.Where(dao.Site.Type.Eq(logic.SiteTypeValue[params.Type]))
 	}
-
 	if params.SiteName != "" {
 		query = query.Where(dao.Site.SiteName.Like("%" + params.SiteName + "%"))
 	}
-	query = query.Order(dao.Site.ID.Desc())
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
+
+	if list != nil {
+		sdk, err := docker.NewDockerClient()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
+		var containerNameList []string
+		for _, site := range list {
+			containerNameList = append(containerNameList, site.SiteID)
+		}
+		containerInfoList, err := sdk.ContainerByField("name", containerNameList...)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		for _, site := range list {
+			if item, ok := containerInfoList[site.SiteID]; ok {
+				site.Container.ContainerInfo = (*accessor.ContainerInfoOption)(item)
+			}
+		}
+	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"total": total,
 		"page":  params.Page,

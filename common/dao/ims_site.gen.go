@@ -32,7 +32,7 @@ func newSite(db *gorm.DB, opts ...gen.DOOption) site {
 	_site.SiteURL = field.NewString(tableName, "site_url")
 	_site.SiteID = field.NewString(tableName, "site_id")
 	_site.ContainerID = field.NewInt32(tableName, "container_id")
-	_site.SiteURLExt = field.NewString(tableName, "site_url_ext")
+	_site.SiteURLExt = field.NewField(tableName, "site_url_ext")
 	_site.Env = field.NewField(tableName, "env")
 	_site.Status = field.NewInt32(tableName, "status")
 	_site.Type = field.NewInt32(tableName, "type")
@@ -40,12 +40,6 @@ func newSite(db *gorm.DB, opts ...gen.DOOption) site {
 		db: db.Session(&gorm.Session{}),
 
 		RelationField: field.NewRelation("Container", "entity.Container"),
-	}
-
-	_site.Task = siteTask{
-		db: db.Session(&gorm.Session{}),
-
-		RelationField: field.NewRelation("Task", "entity.Task"),
 	}
 
 	_site.fillFieldMap()
@@ -62,13 +56,11 @@ type site struct {
 	SiteURL     field.String
 	SiteID      field.String
 	ContainerID field.Int32
-	SiteURLExt  field.String
+	SiteURLExt  field.Field
 	Env         field.Field
 	Status      field.Int32
 	Type        field.Int32
 	Container   siteHasOneContainer
-
-	Task siteTask
 
 	fieldMap map[string]field.Expr
 }
@@ -90,7 +82,7 @@ func (s *site) updateTableName(table string) *site {
 	s.SiteURL = field.NewString(table, "site_url")
 	s.SiteID = field.NewString(table, "site_id")
 	s.ContainerID = field.NewInt32(table, "container_id")
-	s.SiteURLExt = field.NewString(table, "site_url_ext")
+	s.SiteURLExt = field.NewField(table, "site_url_ext")
 	s.Env = field.NewField(table, "env")
 	s.Status = field.NewInt32(table, "status")
 	s.Type = field.NewInt32(table, "type")
@@ -110,7 +102,7 @@ func (s *site) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *site) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 11)
+	s.fieldMap = make(map[string]field.Expr, 10)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["site_name"] = s.SiteName
 	s.fieldMap["site_url"] = s.SiteURL
@@ -201,77 +193,6 @@ func (a siteHasOneContainerTx) Clear() error {
 }
 
 func (a siteHasOneContainerTx) Count() int64 {
-	return a.tx.Count()
-}
-
-type siteTask struct {
-	db *gorm.DB
-
-	field.RelationField
-}
-
-func (a siteTask) Where(conds ...field.Expr) *siteTask {
-	if len(conds) == 0 {
-		return &a
-	}
-
-	exprs := make([]clause.Expression, 0, len(conds))
-	for _, cond := range conds {
-		exprs = append(exprs, cond.BeCond().(clause.Expression))
-	}
-	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
-	return &a
-}
-
-func (a siteTask) WithContext(ctx context.Context) *siteTask {
-	a.db = a.db.WithContext(ctx)
-	return &a
-}
-
-func (a siteTask) Session(session *gorm.Session) *siteTask {
-	a.db = a.db.Session(session)
-	return &a
-}
-
-func (a siteTask) Model(m *entity.Site) *siteTaskTx {
-	return &siteTaskTx{a.db.Model(m).Association(a.Name())}
-}
-
-type siteTaskTx struct{ tx *gorm.Association }
-
-func (a siteTaskTx) Find() (result *entity.Task, err error) {
-	return result, a.tx.Find(&result)
-}
-
-func (a siteTaskTx) Append(values ...*entity.Task) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Append(targetValues...)
-}
-
-func (a siteTaskTx) Replace(values ...*entity.Task) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Replace(targetValues...)
-}
-
-func (a siteTaskTx) Delete(values ...*entity.Task) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Delete(targetValues...)
-}
-
-func (a siteTaskTx) Clear() error {
-	return a.tx.Clear()
-}
-
-func (a siteTaskTx) Count() int64 {
 	return a.tx.Count()
 }
 

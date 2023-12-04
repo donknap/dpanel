@@ -1,3 +1,5 @@
 package accessor
 
-type SiteUrlExtOption []string
+type SiteUrlExtOption struct {
+	Url []string `json:"url"`
+}
