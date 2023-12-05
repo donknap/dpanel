@@ -36,6 +36,7 @@ func newSite(db *gorm.DB, opts ...gen.DOOption) site {
 	_site.Env = field.NewField(tableName, "env")
 	_site.Status = field.NewInt32(tableName, "status")
 	_site.Type = field.NewInt32(tableName, "type")
+	_site.ContainerInfo = field.NewField(tableName, "container_info")
 	_site.Container = siteHasOneContainer{
 		db: db.Session(&gorm.Session{}),
 
@@ -50,17 +51,18 @@ func newSite(db *gorm.DB, opts ...gen.DOOption) site {
 type site struct {
 	siteDo
 
-	ALL         field.Asterisk
-	ID          field.Int32
-	SiteName    field.String
-	SiteURL     field.String
-	SiteID      field.String
-	ContainerID field.Int32
-	SiteURLExt  field.Field
-	Env         field.Field
-	Status      field.Int32
-	Type        field.Int32
-	Container   siteHasOneContainer
+	ALL           field.Asterisk
+	ID            field.Int32
+	SiteName      field.String
+	SiteURL       field.String
+	SiteID        field.String
+	ContainerID   field.Int32
+	SiteURLExt    field.Field
+	Env           field.Field
+	Status        field.Int32
+	Type          field.Int32
+	ContainerInfo field.Field
+	Container     siteHasOneContainer
 
 	fieldMap map[string]field.Expr
 }
@@ -86,6 +88,7 @@ func (s *site) updateTableName(table string) *site {
 	s.Env = field.NewField(table, "env")
 	s.Status = field.NewInt32(table, "status")
 	s.Type = field.NewInt32(table, "type")
+	s.ContainerInfo = field.NewField(table, "container_info")
 
 	s.fillFieldMap()
 
@@ -102,7 +105,7 @@ func (s *site) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *site) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 10)
+	s.fieldMap = make(map[string]field.Expr, 11)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["site_name"] = s.SiteName
 	s.fieldMap["site_url"] = s.SiteURL
@@ -112,6 +115,7 @@ func (s *site) fillFieldMap() {
 	s.fieldMap["env"] = s.Env
 	s.fieldMap["status"] = s.Status
 	s.fieldMap["type"] = s.Type
+	s.fieldMap["container_info"] = s.ContainerInfo
 
 }
 

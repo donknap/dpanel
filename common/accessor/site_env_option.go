@@ -15,9 +15,15 @@ type EnvItem struct {
 	Value string `json:"value"`
 }
 
+type ImageItem struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 type SiteEnvOption struct {
 	Environment []EnvItem     `json:"environment"`
 	Links       []LinkItem    `json:"links"`
 	Ports       []MappingItem `json:"ports"`
 	Volumes     []MappingItem `json:"volumes"`
+	Image       ImageItem     `json:"image"`
 }

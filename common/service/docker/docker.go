@@ -80,9 +80,17 @@ func (self Builder) ContainerByField(field string, name ...string) (container ma
 		return nil, errors.New("container not found")
 	}
 	container = make(map[string]*types.Container)
+
+	var key string
 	for _, value := range containerList {
 		temp := value
-		key := strings.Trim(temp.Names[0], "/")
+		if field == "name" {
+			key = strings.Trim(temp.Names[0], "/")
+		} else if field == "id" {
+			key = value.ID
+		} else {
+			key = value.ID
+		}
 		container[key] = &temp
 	}
 	return container, nil

@@ -2,16 +2,14 @@ package logic
 
 import (
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
-	"github.com/goccy/go-json"
 )
 
 func newStepMessage(siteId int32) *stepMessage {
 	// 清除掉当前站点之前的任务
-	dao.Task.Where(dao.Task.SiteID.Eq(siteId)).Delete()
+	// dao.Task.Where(dao.Task.SiteID.Eq(siteId)).Delete()
 
 	task := &stepMessage{}
 	taskRow, _ := dao.Task.Where(dao.Task.SiteID.Eq(siteId)).First()
@@ -68,7 +66,7 @@ func (self *stepMessage) GetProcess() interface{} {
 	return self.progress
 }
 
-func (self *stepMessage) success(containerId string) {
+func (self *stepMessage) success() {
 	query := dao.Task.Where(dao.Task.ID.Eq(self.recordId))
 	query.Updates(entity.Task{
 		Status:  STATUS_SUCCESS,
@@ -85,14 +83,11 @@ func (self *stepMessage) syncSiteStatus(status int) {
 	}
 }
 
-func (self *stepMessage) syncSiteContainerInfo(containerInfo *types.Container) {
-	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(self.siteId)).First()
-	// 同步容器信息
-	str, _ := json.Marshal(containerInfo)
-	var dbContainerInfo accessor.ContainerInfoOption
-	json.Unmarshal(str, &dbContainerInfo)
-	_, err := dao.Container.Where(dao.Container.ID.Eq(siteRow.ContainerID)).Updates(entity.Container{
-		ContainerInfo: &dbContainerInfo,
+func (self *stepMessage) syncSiteContainerInfo(containerInfoId string) {
+	_, err := dao.Site.Where(dao.Site.ID.Eq(self.siteId)).Updates(&entity.Site{
+		ContainerInfo: &accessor.SiteContainerInfoOption{
+			ID: containerInfoId,
+		},
 	})
 	if err != nil {
 		fmt.Printf("%s", err.Error())

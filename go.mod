@@ -99,3 +99,7 @@ require (
 	gorm.io/hints v1.1.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 )
+
+replace (
+	github.com/we7coreteam/gorm-gen-yaml => ../gorm-gen-yaml
+)

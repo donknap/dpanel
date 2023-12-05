@@ -9,15 +9,13 @@ relation:
       site_url_ext:
         serializer: json
         type: SiteUrlExtOption
+      container_info:
+        type: SiteContainerInfoOption
     relate:
       - table: ims_container
         references: id
         foreign_key: container_id
         type: has_one
   - table: ims_container
-    column:
-      container_info:
-        serializer: json
-        type: ContainerInfoOption
   - table: ims_run_env
   - table: ims_task
