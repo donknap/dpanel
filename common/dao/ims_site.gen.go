@@ -37,6 +37,7 @@ func newSite(db *gorm.DB, opts ...gen.DOOption) site {
 	_site.Status = field.NewInt32(tableName, "status")
 	_site.Type = field.NewInt32(tableName, "type")
 	_site.ContainerInfo = field.NewField(tableName, "container_info")
+	_site.DeletedAt = field.NewField(tableName, "deleted_at")
 	_site.Container = siteHasOneContainer{
 		db: db.Session(&gorm.Session{}),
 
@@ -62,6 +63,7 @@ type site struct {
 	Status        field.Int32
 	Type          field.Int32
 	ContainerInfo field.Field
+	DeletedAt     field.Field
 	Container     siteHasOneContainer
 
 	fieldMap map[string]field.Expr
@@ -89,6 +91,7 @@ func (s *site) updateTableName(table string) *site {
 	s.Status = field.NewInt32(table, "status")
 	s.Type = field.NewInt32(table, "type")
 	s.ContainerInfo = field.NewField(table, "container_info")
+	s.DeletedAt = field.NewField(table, "deleted_at")
 
 	s.fillFieldMap()
 
@@ -105,7 +108,7 @@ func (s *site) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *site) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 11)
+	s.fieldMap = make(map[string]field.Expr, 12)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["site_name"] = s.SiteName
 	s.fieldMap["site_url"] = s.SiteURL
@@ -116,6 +119,7 @@ func (s *site) fillFieldMap() {
 	s.fieldMap["status"] = s.Status
 	s.fieldMap["type"] = s.Type
 	s.fieldMap["container_info"] = s.ContainerInfo
+	s.fieldMap["deleted_at"] = s.DeletedAt
 
 }
 

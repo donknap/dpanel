@@ -12,15 +12,12 @@ func newStepMessage(siteId int32) *stepMessage {
 	// dao.Task.Where(dao.Task.SiteID.Eq(siteId)).Delete()
 
 	task := &stepMessage{}
-	taskRow, _ := dao.Task.Where(dao.Task.SiteID.Eq(siteId)).First()
-	if taskRow == nil {
-		taskRow = &entity.Task{
-			SiteID:  siteId,
-			Status:  STATUS_STOP,
-			Message: "",
-		}
-		dao.Task.Create(taskRow)
+	taskRow := &entity.Task{
+		SiteID:  siteId,
+		Status:  STATUS_STOP,
+		Message: "",
 	}
+	dao.Task.Create(taskRow)
 	task.recordId = taskRow.ID
 	task.siteId = siteId
 	return task

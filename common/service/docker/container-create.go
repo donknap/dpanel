@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"strings"
 )
 
 type ContainerCreateBuilder struct {
@@ -60,7 +61,19 @@ func (self *ContainerCreateBuilder) WithPrivileged() *ContainerCreateBuilder {
 
 // 挂载宿主机目录
 func (self *ContainerCreateBuilder) WithVolume(host string, container string) *ContainerCreateBuilder {
-	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s", host, container))
+	//_, err := os.Stat(host)
+	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s:ro", host, container))
+
+	//if os.IsNotExist(err) {
+	//	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s", host, container))
+	//} else {
+	//	self.hostConfig.Mounts = append(self.hostConfig.Mounts, mount.Mount{
+	//		Type:     mount.TypeBind,
+	//		Source:   host,
+	//		Target:   container,
+	//		ReadOnly: false,
+	//	})
+	//}
 	return self
 }
 
@@ -80,6 +93,11 @@ func (self *ContainerCreateBuilder) WithPort(host string, container string) *Con
 }
 
 func (self *ContainerCreateBuilder) WithLink(name string, alise string) *ContainerCreateBuilder {
+	if strings.Contains(name, "::") {
+		nameArr := strings.Split(name, "::")
+		name = nameArr[1]
+		alise = nameArr[1]
+	}
 	self.hostConfig.Links = append(self.hostConfig.Links, fmt.Sprintf("%s:%s", name, alise))
 	return self
 }

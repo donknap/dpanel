@@ -34,6 +34,8 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			cors.POST("/app/site/create-by-image", controller.Site{}.CreateByImage)
 			cors.POST("/app/site/get-list", controller.Site{}.GetList)
 			cors.POST("/app/site/get-detail", controller.Site{}.GetDetail)
+			cors.POST("/app/site/delete", controller.Site{}.Delete)
+			cors.POST("/app/site/re-deploy", controller.Site{}.ReDeploy)
 
 			// 日志相关
 			cors.POST("/app/log/task", controller.Log{}.Task)

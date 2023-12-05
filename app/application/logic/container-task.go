@@ -41,7 +41,6 @@ func NewContainerTask() *ContainerTask {
 
 type CreateMessage struct {
 	Name      string
-	Image     string
 	SiteId    int32
 	RunParams *accessor.SiteEnvOption
 }
@@ -78,13 +77,14 @@ func (self *ContainerTask) CreateLoop() {
 			err = self.pullImage(message)
 			if err != nil {
 				slog.Info("steplog", self.stepLog)
+				slog.Info("steplog", err.Error())
 				self.stepLog[message.SiteId].err(err)
 				break
 			}
 
 			self.stepLog[message.SiteId].step(STEP_CONTAINER_BUILD)
 			builder := sdk.GetContainerCreateBuilder()
-			builder.WithImage(message.Image)
+			builder.WithImage(message.RunParams.Image.GetImage())
 			builder.WithContext(context.Background())
 			builder.WithContainerName(message.Name)
 			if message.RunParams.Ports != nil {
@@ -157,7 +157,7 @@ func (self *ContainerTask) pullImage(message *CreateMessage) error {
 	}
 	slog.Info("pull image ", message)
 	//尝试拉取镜像
-	reader, err := self.sdk.Client.ImagePull(context.Background(), message.Image, types.ImagePullOptions{})
+	reader, err := self.sdk.Client.ImagePull(context.Background(), message.RunParams.Image.GetImage(), types.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,9 @@ func (self *ContainerTask) pullImage(message *CreateMessage) error {
 				pg[pd.Id].Extracting = 100
 			}
 			// 进度信息
-			self.stepLog[message.SiteId].process(pg)
+			if len(pg) > 0 {
+				self.stepLog[message.SiteId].process(pg)
+			}
 		}
 	}
 	return nil

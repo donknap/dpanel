@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"strings"
 )
 
@@ -22,7 +23,7 @@ func NewDockerClient() (*Builder, error) {
 	client, err := client.NewClientWithOpts(
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
-		client.WithHost("unix:///Users/renchao/Library/Containers/com.docker.docker/Data/docker.raw.sock"),
+		client.WithHost(facade.GetConfig().GetString("docker.sock")),
 	)
 	if err != nil {
 		return nil, err

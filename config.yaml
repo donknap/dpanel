@@ -28,4 +28,4 @@ redis:
     password:
     db: 0
 docker:
-  sock: unix:///Users/renchao/Library/Containers/com.docker.docker/Data/docker.raw.sock
+  sock: unix:///Users/renchao/.docker/run/docker.sock

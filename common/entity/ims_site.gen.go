@@ -6,6 +6,7 @@ package entity
 
 import (
 	"github.com/donknap/dpanel/common/accessor"
+	"gorm.io/gorm"
 )
 
 const TableNameSite = "ims_site"
@@ -22,6 +23,7 @@ type Site struct {
 	Status        int32                             `gorm:"column:status;type:integer" json:"status"`
 	Type          int32                             `gorm:"column:type;type:integer" json:"type"`
 	ContainerInfo *accessor.SiteContainerInfoOption `gorm:"column:container_info;type:text" json:"containerInfo"`
+	DeletedAt     gorm.DeletedAt                    `gorm:"column:deleted_at;type:timestamp" json:"deletedAt"`
 	Container     *Container                        `gorm:"foreignKey:container_id;references:id" json:"container"`
 }
 

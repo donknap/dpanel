@@ -111,10 +111,13 @@ func TestGetContainer(t *testing.T) {
 		fmt.Printf("%v \n", err)
 	}
 	item, err := sdk.ContainerByField("name", "dpanel-site-50-bDOrc2t6G5", "dpanel-system-48-ULI6AsL1Yw", "dpanel-app-47-xZvGQCce3o")
-	if err != nil {
-		fmt.Printf("%v \n", err)
-		return
-	}
+	//if err != nil {
+	//	fmt.Printf("%v \n", err)
+	//	return
+	//}
+	//fmt.Printf("%v \n", item)
+
+	item, err = sdk.ContainerByField("publish", "8800", "80/tcp", "8801/tcp")
 	fmt.Printf("%v \n", item)
 }
 

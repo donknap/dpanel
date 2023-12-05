@@ -20,6 +20,14 @@ type ImageItem struct {
 	Version string `json:"version"`
 }
 
+func (self ImageItem) GetImage() string {
+	if self.Version != "" {
+		return self.Name + ":" + self.Version
+	} else {
+		return self.Name
+	}
+}
+
 type SiteEnvOption struct {
 	Environment []EnvItem     `json:"environment"`
 	Links       []LinkItem    `json:"links"`

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/gin-gonic/gin"
@@ -22,7 +23,7 @@ func (self Log) Task(http *gin.Context) {
 		return
 	}
 
-	taskRow, _ := dao.Task.Where(dao.Task.SiteID.Eq(params.SiteId)).First()
+	taskRow, _ := dao.Task.Where(dao.Task.SiteID.Eq(params.SiteId)).Last()
 	if taskRow == nil {
 		self.JsonResponseWithError(http, errors.New("当前没有进行的中任务"), 500)
 		return
@@ -113,7 +114,7 @@ func (self Log) Task(http *gin.Context) {
 			}
 		}
 	}
-
+	fmt.Printf("%v \n", result[logic.STEP_IMAGE_PULL])
 	self.JsonResponseWithoutError(http, result)
 	return
 }
