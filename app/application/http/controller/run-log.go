@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 )
 
-type Log struct {
+type RunLog struct {
 	controller.Abstract
 }
 
-func (self Log) Task(http *gin.Context) {
+func (self RunLog) Task(http *gin.Context) {
 	type ParamsValidate struct {
 		SiteId int32 `form:"siteId" binding:"required,number"`
 	}
@@ -23,7 +24,7 @@ func (self Log) Task(http *gin.Context) {
 		return
 	}
 
-	taskRow, _ := dao.Task.Where(dao.Task.SiteID.Eq(params.SiteId)).Last()
+	taskRow, _ := dao.Task.Where(dao.Task.TaskID.Eq(params.SiteId)).Last()
 	if taskRow == nil {
 		self.JsonResponseWithError(http, errors.New("当前没有进行的中任务"), 500)
 		return
@@ -102,7 +103,7 @@ func (self Log) Task(http *gin.Context) {
 	// 只有在拉取镜像时，才获取拉取进度
 	if logic.StepStatusValue[taskRow.Step] == 2 {
 		task := logic.NewContainerTask()
-		stepLog := task.GetTaskStepLog(taskRow.SiteID)
+		stepLog := task.GetTaskStepLog(taskRow.TaskID)
 		if stepLog != nil {
 			result[logic.STEP_IMAGE_PULL] = stepLog.GetProcess()
 			if result[logic.STEP_IMAGE_PULL] == nil {
@@ -119,6 +120,38 @@ func (self Log) Task(http *gin.Context) {
 	return
 }
 
-func (self Log) Run(http *gin.Context) {
+func (self RunLog) Run(http *gin.Context) {
+	type ParamsValidate struct {
+		Id        int32 `form:"id" binding:"required,number"`
+		LineTotal int   `form:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000"`
+	}
 
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(params.Id)).First()
+	if siteRow == nil {
+		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
+		return
+	}
+
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	builder := sdk.GetContainerLogBuilder()
+	builder.WithContainerId("0bf3c0b9f3d6")
+	builder.WithTail(params.LineTotal)
+	content, err := builder.Execute()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"log": content,
+	})
+	return
 }

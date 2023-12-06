@@ -121,6 +121,19 @@ func TestGetContainer(t *testing.T) {
 	fmt.Printf("%v \n", item)
 }
 
+func TestGetContainerLog(t *testing.T) {
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		fmt.Printf("%v \n", err)
+	}
+	builder := sdk.GetContainerLogBuilder()
+	builder.WithContainerId("0bf3c0b9f3d6")
+	builder.WithTail(0)
+	content, err := builder.Execute()
+	fmt.Printf("%v \n", err)
+	fmt.Printf("%v \n", content)
+}
+
 func TestCode(t *testing.T) {
 	image := "phpmyadmin:"
 	fmt.Printf("%v \n", strings.Split(image, ":"))

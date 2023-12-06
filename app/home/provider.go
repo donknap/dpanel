@@ -22,11 +22,12 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		engine.GET("/home/index", middleware.Home{}.Process, controller.Home{}.Index)
 	})
 
-	// mock数据
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		cors := engine.Group("/", common.CorsMiddleware{}.Process)
 		cors.GET("/home/mock/user-info", middleware.Home{}.Process, controller.Mock{}.UserInfo)
 		cors.GET("/home/mock/error", middleware.Home{}.Process, controller.Mock{}.Error)
+
+		cors.POST("/home/attach/upload", middleware.Home{}.Process, controller.Attach{}.Upload)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

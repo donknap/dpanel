@@ -10,7 +10,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"strings"
 )
 
@@ -23,7 +22,8 @@ func NewDockerClient() (*Builder, error) {
 	client, err := client.NewClientWithOpts(
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
-		client.WithHost(facade.GetConfig().GetString("docker.sock")),
+		//client.WithHost(facade.GetConfig().GetString("docker.sock")),
+		client.WithHost("unix:///Users/renchao/.docker/run/docker.sock"),
 	)
 	if err != nil {
 		return nil, err
@@ -46,6 +46,18 @@ func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {
 		},
 		platform:         &v1.Platform{},
 		networkingConfig: &network.NetworkingConfig{},
+	}
+	builder.withSdk(self.Client)
+	return builder
+}
+
+func (self Builder) GetContainerLogBuilder() *containerLogBuilder {
+	builder := &containerLogBuilder{
+		option: types.ContainerLogsOptions{
+			Timestamps: false,
+			ShowStderr: true,
+			ShowStdout: true,
+		},
 	}
 	builder.withSdk(self.Client)
 	return builder
