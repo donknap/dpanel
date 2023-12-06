@@ -63,6 +63,12 @@ func (self Builder) GetContainerLogBuilder() *containerLogBuilder {
 	return builder
 }
 
+func (self Builder) GetImageBuildBuilder() *imageBuildBuilder {
+	builder := &imageBuildBuilder{}
+	builder.withSdk(self.Client)
+	return builder
+}
+
 // ContainerByField 获取单条容器 field 支持 id,name
 func (self Builder) ContainerByField(field string, name ...string) (container map[string]*types.Container, err error) {
 	ctx := context.Background()

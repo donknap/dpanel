@@ -13,7 +13,7 @@ func newStepMessage(siteId int32) *stepMessage {
 
 	task := &stepMessage{}
 	taskRow := &entity.Task{
-		SiteID:  siteId,
+		TaskID:  siteId,
 		Status:  STATUS_STOP,
 		Message: "",
 	}

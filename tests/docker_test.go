@@ -134,6 +134,18 @@ func TestGetContainerLog(t *testing.T) {
 	fmt.Printf("%v \n", content)
 }
 
+func TestImageBuild(t *testing.T) {
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		fmt.Printf("%v \n", err)
+	}
+	builder := sdk.GetImageBuildBuilder()
+	builder.WithZipFilePath("/Users/renchao/Workspace/open-system/artifact-lskypro/data2.zip")
+	builder.WithDockerFileContent([]byte("adsfasdfsadf111111"))
+	builder.Execute()
+
+}
+
 func TestCode(t *testing.T) {
 	image := "phpmyadmin:"
 	fmt.Printf("%v \n", strings.Split(image, ":"))

@@ -296,7 +296,7 @@ func (self Site) Delete(http *gin.Context) {
 		return
 	}
 	dao.Site.Where(dao.Site.ID.Eq(params.Id)).Delete()
-	dao.Task.Where(dao.Task.SiteID.Eq(params.Id)).Delete()
+	dao.Task.Where(dao.Task.TaskID.Eq(params.Id)).Delete()
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"siteId": params.Id,

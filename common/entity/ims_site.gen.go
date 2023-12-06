@@ -14,16 +14,16 @@ const TableNameSite = "ims_site"
 // Site mapped from table <ims_site>
 type Site struct {
 	ID            int32                             `gorm:"column:id;type:INTEGER" json:"id"`
-	SiteName      string                            `gorm:"column:site_name;type:text" json:"siteName"`
-	SiteURL       string                            `gorm:"column:site_url;type:text" json:"siteUrl"`
-	SiteID        string                            `gorm:"column:site_id;type:text" json:"siteId"`
-	ContainerID   int32                             `gorm:"column:container_id;type:integer" json:"containerId"`
-	SiteURLExt    *accessor.SiteUrlExtOption        `gorm:"column:site_url_ext;type:text;serializer:json" json:"siteUrlExt"`
-	Env           *accessor.SiteEnvOption           `gorm:"column:env;type:text;serializer:json" json:"env"`
-	Status        int32                             `gorm:"column:status;type:integer" json:"status"`
-	Type          int32                             `gorm:"column:type;type:integer" json:"type"`
-	ContainerInfo *accessor.SiteContainerInfoOption `gorm:"column:container_info;type:text" json:"containerInfo"`
-	DeletedAt     gorm.DeletedAt                    `gorm:"column:deleted_at;type:timestamp" json:"deletedAt"`
+	SiteName      string                            `gorm:"column:site_name" json:"siteName"`
+	SiteURL       string                            `gorm:"column:site_url" json:"siteUrl"`
+	SiteID        string                            `gorm:"column:site_id" json:"siteId"`
+	ContainerID   int32                             `gorm:"column:container_id" json:"containerId"`
+	SiteURLExt    *accessor.SiteUrlExtOption        `gorm:"column:site_url_ext;serializer:json" json:"siteUrlExt"`
+	Env           *accessor.SiteEnvOption           `gorm:"column:env;serializer:json" json:"env"`
+	Status        int32                             `gorm:"column:status" json:"status"`
+	Type          int32                             `gorm:"column:type" json:"type"`
+	ContainerInfo *accessor.SiteContainerInfoOption `gorm:"column:container_info" json:"containerInfo"`
+	DeletedAt     gorm.DeletedAt                    `gorm:"column:deleted_at" json:"deletedAt"`
 	Container     *Container                        `gorm:"foreignKey:container_id;references:id" json:"container"`
 }
 

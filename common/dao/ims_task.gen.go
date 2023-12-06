@@ -28,10 +28,11 @@ func newTask(db *gorm.DB, opts ...gen.DOOption) task {
 	tableName := _task.taskDo.TableName()
 	_task.ALL = field.NewAsterisk(tableName)
 	_task.ID = field.NewInt32(tableName, "id")
-	_task.SiteID = field.NewInt32(tableName, "site_id")
+	_task.TaskID = field.NewInt32(tableName, "task_id")
 	_task.Status = field.NewInt32(tableName, "status")
 	_task.Message = field.NewString(tableName, "message")
 	_task.Step = field.NewString(tableName, "step")
+	_task.Type = field.NewString(tableName, "type")
 
 	_task.fillFieldMap()
 
@@ -43,10 +44,11 @@ type task struct {
 
 	ALL     field.Asterisk
 	ID      field.Int32
-	SiteID  field.Int32
+	TaskID  field.Int32
 	Status  field.Int32
 	Message field.String
 	Step    field.String
+	Type    field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -64,10 +66,11 @@ func (t task) As(alias string) *task {
 func (t *task) updateTableName(table string) *task {
 	t.ALL = field.NewAsterisk(table)
 	t.ID = field.NewInt32(table, "id")
-	t.SiteID = field.NewInt32(table, "site_id")
+	t.TaskID = field.NewInt32(table, "task_id")
 	t.Status = field.NewInt32(table, "status")
 	t.Message = field.NewString(table, "message")
 	t.Step = field.NewString(table, "step")
+	t.Type = field.NewString(table, "type")
 
 	t.fillFieldMap()
 
@@ -84,12 +87,13 @@ func (t *task) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (t *task) fillFieldMap() {
-	t.fieldMap = make(map[string]field.Expr, 5)
+	t.fieldMap = make(map[string]field.Expr, 6)
 	t.fieldMap["id"] = t.ID
-	t.fieldMap["site_id"] = t.SiteID
+	t.fieldMap["task_id"] = t.TaskID
 	t.fieldMap["status"] = t.Status
 	t.fieldMap["message"] = t.Message
 	t.fieldMap["step"] = t.Step
+	t.fieldMap["type"] = t.Type
 }
 
 func (t task) clone(db *gorm.DB) task {

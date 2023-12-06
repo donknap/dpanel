@@ -8,17 +8,6 @@ import (
 	"strconv"
 )
 
-type HostInfo struct {
-	EndpointID     int    `json:"EndpointID"`
-	RawOutput      string `json:"RawOutput"`
-	AMT            string `json:"AMT"`
-	UUID           string `json:"UUID"`
-	DNSSuffix      string `json:"DNS Suffix"`
-	BuildNumber    string `json:"Build Number"`
-	ControlMode    string `json:"Control Mode"`
-	ControlModeRaw int    `json:"Control Mode (Raw)"`
-}
-
 type containerLogBuilder struct {
 	option      types.ContainerLogsOptions
 	dockerSdk   *client.Client
