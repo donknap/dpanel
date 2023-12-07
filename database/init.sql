@@ -13,24 +13,29 @@ create table ims_site
     status         integer,
     status_process integer,
     message        text,
+    created_at     integer,
     deleted_at     timestamp
 
 );
 
 create table ims_image
 (
-    id              integer
+    id          integer
         constraint ims_image_pk
             primary key autoincrement,
     name            text,
+    md5             text,
     tag             text,
-    tag_ext         text,
-    git             text,
+    size            text,
+    build_git       text,
     registry        text,
     status          integer,
-    status_process  text,
-    deleted_at       timestamp
+    status_step     text,
+    message         text,
+    created_at      integer,
+    deleted_at      timestamp
 );
+
 
 create table ims_task
 (

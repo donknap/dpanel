@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"github.com/donknap/dpanel/app/application/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/gin-gonic/gin"
@@ -67,9 +68,8 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 
 	imageRow := &entity.Image{
 		Name:       params.Name,
-		Tag:        "",
-		TagExt:     "",
-		Git:        "",
+		Tag:        &accessor.ImageTagOption{},
+		BuildGit:   "",
 		Registry:   "",
 		Status:     logic.STATUS_STOP,
 		StatusStep: "",
@@ -83,6 +83,42 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"imageId": imageRow.ID,
+	})
+	return
+}
+
+func (self Image) GetList(http *gin.Context) {
+	type ParamsValidate struct {
+		Page     int    `form:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize int    `form:"pageSize" binding:"omitempty"`
+		Name     string `form:"name" binding:"omitempty"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if params.Page < 1 {
+		params.Page = 1
+	}
+	if params.PageSize < 1 {
+		params.PageSize = 10
+	}
+
+	go func() {
+		// 同步镜像数据
+		logic.ImageLogic{}.SyncImage()
+	}()
+
+	query := dao.Image.Order(dao.Image.ID.Desc())
+	if params.Name != "" {
+		query = query.Where(dao.Image.Name.Like("%" + params.Name + "%"))
+	}
+	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"total": total,
+		"page":  params.Page,
+		"list":  list,
 	})
 	return
 }

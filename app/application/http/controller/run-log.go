@@ -2,7 +2,6 @@ package controller
 
 import (
 	"errors"
-	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -115,7 +114,6 @@ func (self RunLog) Task(http *gin.Context) {
 			}
 		}
 	}
-	fmt.Printf("%v \n", result[logic.STEP_IMAGE_PULL])
 	self.JsonResponseWithoutError(http, result)
 	return
 }
@@ -157,5 +155,56 @@ func (self RunLog) Run(http *gin.Context) {
 	self.JsonResponseWithoutError(http, gin.H{
 		"log": content,
 	})
+	return
+}
+
+func (self RunLog) ImageBuild(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `form:"id" binding:"required,number"`
+	}
+
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).Last()
+	if imageRow == nil {
+		self.JsonResponseWithError(http, errors.New("当前站点不存在"), 500)
+		return
+	}
+
+	result := gin.H{
+		"status":  imageRow.Status,
+		"step":    imageRow.StatusStep,
+		"message": imageRow.Message,
+	}
+
+	// 只有在拉取镜像时，才获取拉取进度
+	task := logic.NewDockerTask()
+	stepLog := task.GetTaskImageBuildStepLog(imageRow.ID)
+	if stepLog != nil {
+		result["progress"] = stepLog.GetProcess()
+	}
+	//if imageRow.StatusStep == "imageBuildRun" {
+	//
+	//} else {
+	//	result["progress"] = struct {
+	//		StepTotal   string  `json:"stepTotal"`
+	//		StepCurrent string  `json:"stepCurrent"`
+	//		Message     string  `json:"message"`
+	//		Error       string  `json:"error"`
+	//		Downloading float64 `json:"downloading"`
+	//		Extracting  float64 `json:"extracting"`
+	//	}{
+	//		StepTotal:   "100",
+	//		StepCurrent: "100",
+	//		Message:     "",
+	//		Error:       "",
+	//		Downloading: 100,
+	//		Extracting:  100,
+	//	}
+	//}
+	self.JsonResponseWithoutError(http, result)
 	return
 }

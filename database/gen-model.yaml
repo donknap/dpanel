@@ -12,4 +12,8 @@ relation:
       container_info:
         type: SiteContainerInfoOption
   - table: ims_image
+    column:
+      tag:
+        serializer: json
+        type: ImageTagOption
   - table: ims_run_env

@@ -40,10 +40,12 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 
 			// 镜像相关
 			cors.POST("/app/image/create-by-dockerfile", controller.Image{}.CreateByDockerfile)
+			cors.POST("/app/image/get-list", controller.Image{}.GetList)
 
 			// 日志相关
 			cors.POST("/app/log/task", controller.RunLog{}.Task)
 			cors.POST("/app/log/run", controller.RunLog{}.Run)
+			cors.POST("/app/log/image-build", controller.RunLog{}.ImageBuild)
 		},
 	)
 }

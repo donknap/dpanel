@@ -51,6 +51,12 @@ func (self *imageStepMessage) success() {
 	query.Updates(entity.Image{
 		Status:     STATUS_SUCCESS,
 		Message:    "",
-		StatusStep: "",
+		StatusStep: "success",
+	})
+}
+
+func (self *imageStepMessage) sync(md5 string) {
+	dao.Image.Where(dao.Image.ID.Eq(self.ImageId)).Updates(&entity.Image{
+		Md5: md5,
 	})
 }

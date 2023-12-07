@@ -65,3 +65,10 @@ func (self *DockerTask) GetTaskContainerStepLog(taskId int32) *containerStepMess
 	}
 	return nil
 }
+
+func (self *DockerTask) GetTaskImageBuildStepLog(taskId int32) *imageStepMessage {
+	if stepLog, ok := self.imageStepMessage[taskId]; ok {
+		return stepLog
+	}
+	return nil
+}

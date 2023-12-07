@@ -5,6 +5,7 @@
 package entity
 
 import (
+	"github.com/donknap/dpanel/common/accessor"
 	"gorm.io/gorm"
 )
 
@@ -12,16 +13,19 @@ const TableNameImage = "ims_image"
 
 // Image mapped from table <ims_image>
 type Image struct {
-	ID         int32          `gorm:"column:id;type:INTEGER" json:"id"`
-	Name       string         `gorm:"column:name" json:"name"`
-	Tag        string         `gorm:"column:tag" json:"tag"`
-	TagExt     string         `gorm:"column:tag_ext" json:"tagExt"`
-	Git        string         `gorm:"column:git" json:"git"`
-	Registry   string         `gorm:"column:registry" json:"registry"`
-	Status     int32          `gorm:"column:status" json:"status"`
-	StatusStep string         `gorm:"column:status_step" json:"statusStep"`
-	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at" json:"deletedAt"`
-	Message    string         `gorm:"column:message" json:"message"`
+	ID             int32                    `gorm:"column:id;type:INTEGER" json:"id"`
+	Name           string                   `gorm:"column:name" json:"name"`
+	Md5            string                   `gorm:"column:md5" json:"md5"`
+	Tag            *accessor.ImageTagOption `gorm:"column:tag;serializer:json" json:"tag"`
+	Size           string                   `gorm:"column:size" json:"size"`
+	BuildGit       string                   `gorm:"column:build_git" json:"buildGit"`
+	Registry       string                   `gorm:"column:registry" json:"registry"`
+	Status         int32                    `gorm:"column:status" json:"status"`
+	StatusStep     string                   `gorm:"column:status_step" json:"statusStep"`
+	Message        string                   `gorm:"column:message" json:"message"`
+	CreatedAt      int32                    `gorm:"column:created_at" json:"createdAt"`
+	DeletedAt      gorm.DeletedAt           `gorm:"column:deleted_at" json:"deletedAt"`
+	ContainerTotal int32                    `gorm:"column:container_total" json:"containerTotal"`
 }
 
 // TableName Image's table name
