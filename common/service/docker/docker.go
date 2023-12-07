@@ -46,6 +46,7 @@ func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {
 		},
 		platform:         &v1.Platform{},
 		networkingConfig: &network.NetworkingConfig{},
+		ctx:              context.Background(),
 	}
 	builder.withSdk(self.Client)
 	return builder

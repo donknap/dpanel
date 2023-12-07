@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"math"
@@ -74,7 +75,7 @@ func TestPullImage(t *testing.T) {
 				progress[pd.Id].Extracting = 100
 			}
 
-			fmt.Printf("%v \n", progress["249ff3a7bbe6"])
+			fmt.Printf("%v \n", progress)
 		}
 	}
 }
@@ -85,14 +86,15 @@ func TestCreateContainer(t *testing.T) {
 		fmt.Printf("%v \n", err)
 	}
 	builder := sdk.GetContainerCreateBuilder()
-	builder.WithImage("phpmyadmin:latest")
-	builder.WithContainerName("phpmyadmin")
-	builder.WithEnv("PMA_HOST", "localmysql")
-	builder.WithPort("8011", "80")
-	builder.WithLink("localmysql", "localmysql")
+	builder.WithImage("portainer/portainer-ce:latest")
+	builder.WithContainerName("portainer")
+	//builder.WithEnv("PMA_HOST", "localmysql")
+	builder.WithPort("8000", "8000")
+	builder.WithPort("9000", "9000")
+	//builder.WithLink("localmysql", "localmysql")
 	builder.WithAlwaysRestart()
 	builder.WithPrivileged()
-	builder.WithVolume("/Users/renchao/Downloads", "/home/abc")
+	builder.WithVolume("/var/run/docker.sock", "/var/run/docker.sock")
 	response, err := builder.Execute()
 	if err != nil {
 		fmt.Printf("%v \n", err)
@@ -117,7 +119,7 @@ func TestGetContainer(t *testing.T) {
 	//}
 	//fmt.Printf("%v \n", item)
 
-	item, err = sdk.ContainerByField("publish", "8800", "80/tcp", "8801/tcp")
+	item, err = sdk.ContainerByField("publish", "80", "9000")
 	fmt.Printf("%v \n", item)
 }
 
@@ -126,6 +128,15 @@ func TestGetContainerLog(t *testing.T) {
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}
+	filter := filters.NewArgs()
+	filter.Add("desired-state", "running")
+	filter.Add("desired-state", "shutdown")
+	filter.Add("desired-state", "accepted")
+	task, err := sdk.Client.TaskList(context.Background(), types.TaskListOptions{
+		Filters: filter,
+	})
+	fmt.Printf("%v \n", task)
+	return
 	builder := sdk.GetContainerLogBuilder()
 	builder.WithContainerId("0bf3c0b9f3d6")
 	builder.WithTail(0)

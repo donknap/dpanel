@@ -28,21 +28,17 @@ func newSite(db *gorm.DB, opts ...gen.DOOption) site {
 	tableName := _site.siteDo.TableName()
 	_site.ALL = field.NewAsterisk(tableName)
 	_site.ID = field.NewInt32(tableName, "id")
+	_site.SiteTitle = field.NewString(tableName, "site_title")
 	_site.SiteName = field.NewString(tableName, "site_name")
 	_site.SiteURL = field.NewString(tableName, "site_url")
-	_site.SiteID = field.NewString(tableName, "site_id")
-	_site.ContainerID = field.NewInt32(tableName, "container_id")
 	_site.SiteURLExt = field.NewField(tableName, "site_url_ext")
 	_site.Env = field.NewField(tableName, "env")
-	_site.Status = field.NewInt32(tableName, "status")
 	_site.Type = field.NewInt32(tableName, "type")
 	_site.ContainerInfo = field.NewField(tableName, "container_info")
+	_site.Status = field.NewInt32(tableName, "status")
+	_site.StatusStep = field.NewString(tableName, "status_step")
+	_site.Message = field.NewString(tableName, "message")
 	_site.DeletedAt = field.NewField(tableName, "deleted_at")
-	_site.Container = siteHasOneContainer{
-		db: db.Session(&gorm.Session{}),
-
-		RelationField: field.NewRelation("Container", "entity.Container"),
-	}
 
 	_site.fillFieldMap()
 
@@ -54,17 +50,17 @@ type site struct {
 
 	ALL           field.Asterisk
 	ID            field.Int32
+	SiteTitle     field.String
 	SiteName      field.String
 	SiteURL       field.String
-	SiteID        field.String
-	ContainerID   field.Int32
 	SiteURLExt    field.Field
 	Env           field.Field
-	Status        field.Int32
 	Type          field.Int32
 	ContainerInfo field.Field
+	Status        field.Int32
+	StatusStep    field.String
+	Message       field.String
 	DeletedAt     field.Field
-	Container     siteHasOneContainer
 
 	fieldMap map[string]field.Expr
 }
@@ -82,15 +78,16 @@ func (s site) As(alias string) *site {
 func (s *site) updateTableName(table string) *site {
 	s.ALL = field.NewAsterisk(table)
 	s.ID = field.NewInt32(table, "id")
+	s.SiteTitle = field.NewString(table, "site_title")
 	s.SiteName = field.NewString(table, "site_name")
 	s.SiteURL = field.NewString(table, "site_url")
-	s.SiteID = field.NewString(table, "site_id")
-	s.ContainerID = field.NewInt32(table, "container_id")
 	s.SiteURLExt = field.NewField(table, "site_url_ext")
 	s.Env = field.NewField(table, "env")
-	s.Status = field.NewInt32(table, "status")
 	s.Type = field.NewInt32(table, "type")
 	s.ContainerInfo = field.NewField(table, "container_info")
+	s.Status = field.NewInt32(table, "status")
+	s.StatusStep = field.NewString(table, "status_step")
+	s.Message = field.NewString(table, "message")
 	s.DeletedAt = field.NewField(table, "deleted_at")
 
 	s.fillFieldMap()
@@ -110,17 +107,17 @@ func (s *site) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 func (s *site) fillFieldMap() {
 	s.fieldMap = make(map[string]field.Expr, 12)
 	s.fieldMap["id"] = s.ID
+	s.fieldMap["site_title"] = s.SiteTitle
 	s.fieldMap["site_name"] = s.SiteName
 	s.fieldMap["site_url"] = s.SiteURL
-	s.fieldMap["site_id"] = s.SiteID
-	s.fieldMap["container_id"] = s.ContainerID
 	s.fieldMap["site_url_ext"] = s.SiteURLExt
 	s.fieldMap["env"] = s.Env
-	s.fieldMap["status"] = s.Status
 	s.fieldMap["type"] = s.Type
 	s.fieldMap["container_info"] = s.ContainerInfo
+	s.fieldMap["status"] = s.Status
+	s.fieldMap["status_step"] = s.StatusStep
+	s.fieldMap["message"] = s.Message
 	s.fieldMap["deleted_at"] = s.DeletedAt
-
 }
 
 func (s site) clone(db *gorm.DB) site {
@@ -131,77 +128,6 @@ func (s site) clone(db *gorm.DB) site {
 func (s site) replaceDB(db *gorm.DB) site {
 	s.siteDo.ReplaceDB(db)
 	return s
-}
-
-type siteHasOneContainer struct {
-	db *gorm.DB
-
-	field.RelationField
-}
-
-func (a siteHasOneContainer) Where(conds ...field.Expr) *siteHasOneContainer {
-	if len(conds) == 0 {
-		return &a
-	}
-
-	exprs := make([]clause.Expression, 0, len(conds))
-	for _, cond := range conds {
-		exprs = append(exprs, cond.BeCond().(clause.Expression))
-	}
-	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
-	return &a
-}
-
-func (a siteHasOneContainer) WithContext(ctx context.Context) *siteHasOneContainer {
-	a.db = a.db.WithContext(ctx)
-	return &a
-}
-
-func (a siteHasOneContainer) Session(session *gorm.Session) *siteHasOneContainer {
-	a.db = a.db.Session(session)
-	return &a
-}
-
-func (a siteHasOneContainer) Model(m *entity.Site) *siteHasOneContainerTx {
-	return &siteHasOneContainerTx{a.db.Model(m).Association(a.Name())}
-}
-
-type siteHasOneContainerTx struct{ tx *gorm.Association }
-
-func (a siteHasOneContainerTx) Find() (result *entity.Container, err error) {
-	return result, a.tx.Find(&result)
-}
-
-func (a siteHasOneContainerTx) Append(values ...*entity.Container) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Append(targetValues...)
-}
-
-func (a siteHasOneContainerTx) Replace(values ...*entity.Container) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Replace(targetValues...)
-}
-
-func (a siteHasOneContainerTx) Delete(values ...*entity.Container) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Delete(targetValues...)
-}
-
-func (a siteHasOneContainerTx) Clear() error {
-	return a.tx.Clear()
-}
-
-func (a siteHasOneContainerTx) Count() int64 {
-	return a.tx.Count()
 }
 
 type siteDo struct{ gen.DO }

@@ -13,8 +13,8 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go/src/core/err_handler"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"net"
 	"strings"
 )
 
@@ -24,10 +24,10 @@ type Site struct {
 
 func (self Site) CreateByImage(http *gin.Context) {
 	type ParamsValidate struct {
-		SiteName string `form:"siteName" binding:"required"`
-		SiteUrl  string `form:"siteUrl" binding:"required,url"`
-		Image    string `json:"image" binding:"required"`
-		Type     string `json:"type" binding:"required,oneof=system site"`
+		SiteTitle string `form:"siteTitle" binding:"required"`
+		SiteUrl   string `form:"siteUrl" binding:"required,url"`
+		Image     string `json:"image" binding:"required"`
+		Type      string `json:"type" binding:"required,oneof=system site"`
 		accessor.SiteEnvOption
 	}
 
@@ -39,6 +39,13 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if params.Ports != nil {
 		var checkPorts []string
 		for _, port := range params.Ports {
+			// 检测端口是否可以正常绑定
+			listener, err := net.Listen("tcp", "0.0.0.0:"+port.Host)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			listener.Close()
 			checkPorts = append(checkPorts, port.Host)
 		}
 		if checkPorts != nil {
@@ -47,7 +54,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-			item, _ := sdk.ContainerByField("publish", checkPorts...)
+			item, err := sdk.ContainerByField("publish", checkPorts...)
+			fmt.Printf("%v \n", err)
 			if len(item) > 0 {
 				self.JsonResponseWithError(http, errors.New("绑定的外部端口已经被占用，请更换其它端外部端口"), 500)
 				return
@@ -88,8 +96,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 	siteUrlExt.Url = append(siteUrlExt.Url, params.SiteUrl)
 
 	siteRow := &entity.Site{
-		SiteID:     "",
-		SiteName:   params.SiteName,
+		SiteName:   "",
+		SiteTitle:  params.SiteTitle,
 		SiteURL:    params.SiteUrl,
 		SiteURLExt: siteUrlExt,
 		Env:        &runParams,
@@ -104,15 +112,12 @@ func (self Site) CreateByImage(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	siteRow.SiteID = fmt.Sprintf("dpanel-%s-%d-%s", params.Type, siteRow.ID, function.GetRandomString(10))
+	siteRow.SiteName = fmt.Sprintf("dpanel-%s-%d-%s", params.Type, siteRow.ID, function.GetRandomString(10))
 	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(siteRow)
-	if err_handler.Found(err) {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+
 	task := logic.NewContainerTask()
 	runTaskRow := &logic.CreateMessage{
-		Name:      siteRow.SiteID,
+		Name:      siteRow.SiteName,
 		SiteId:    siteRow.ID,
 		RunParams: &runParams,
 	}
@@ -127,12 +132,12 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 func (self Site) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Page     int    `form:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize int    `form:"pageSize" binding:"omitempty"`
-		SiteName string `form:"siteName" binding:"omitempty"`
-		Sort     string `form:"sort,default=new" binding:"omitempty,oneof=hot new"`
-		Type     string `form:"type" binding:"oneof=system site"`
-		Status   int32  `json:"status" binding:"omitempty,oneof=10 20 30"`
+		Page      int    `form:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize  int    `form:"pageSize" binding:"omitempty"`
+		SiteTitle string `form:"siteTitle" binding:"omitempty"`
+		Sort      string `form:"sort,default=new" binding:"omitempty,oneof=hot new"`
+		Type      string `form:"type" binding:"oneof=system site"`
+		Status    int32  `json:"status" binding:"omitempty,oneof=10 20 30"`
 	}
 
 	params := ParamsValidate{}
@@ -153,8 +158,8 @@ func (self Site) GetList(http *gin.Context) {
 	if params.Status != 0 {
 		query = query.Where(dao.Site.Status.Eq(params.Status))
 	}
-	if params.SiteName != "" {
-		query = query.Where(dao.Site.SiteName.Like("%" + params.SiteName + "%"))
+	if params.SiteTitle != "" {
+		query = query.Where(dao.Site.SiteTitle.Like("%" + params.SiteTitle + "%"))
 	}
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
 
@@ -191,7 +196,6 @@ func (self Site) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 		return
 	}
-	// 更新容器信息
 	self.JsonResponseWithoutError(http, siteRow)
 	return
 }
@@ -245,7 +249,7 @@ func (self Site) ReDeploy(http *gin.Context) {
 	}
 	task := logic.NewContainerTask()
 	runTaskRow := &logic.CreateMessage{
-		Name:      siteRow.SiteID,
+		Name:      siteRow.SiteName,
 		SiteId:    siteRow.ID,
 		RunParams: runParams,
 	}
@@ -285,19 +289,19 @@ func (self Site) Delete(http *gin.Context) {
 	if siteRow.ContainerInfo != nil && siteRow.ContainerInfo.ID != "" {
 		ctx := context.Background()
 		sdk.Client.ContainerStop(ctx, siteRow.ContainerInfo.ID, container.StopOptions{})
-		err = sdk.Client.ContainerRemove(context.Background(), siteRow.ContainerInfo.ID, types.ContainerRemoveOptions{
+		err = sdk.Client.ContainerRemove(ctx, siteRow.ContainerInfo.ID, types.ContainerRemoveOptions{
 			RemoveVolumes: params.DeleteVolume,
 			RemoveLinks:   params.DeleteLink,
 		})
-		sdk.Client.ImageRemove(ctx, siteRow.ContainerInfo.Info.ImageID, types.ImageRemoveOptions{})
+		if params.DeleteImage {
+			sdk.Client.ImageRemove(ctx, siteRow.ContainerInfo.Info.ImageID, types.ImageRemoveOptions{})
+		}
 	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	dao.Site.Where(dao.Site.ID.Eq(params.Id)).Delete()
-	dao.Task.Where(dao.Task.TaskID.Eq(params.Id)).Delete()
-
 	self.JsonResponseWithoutError(http, gin.H{
 		"siteId": params.Id,
 	})

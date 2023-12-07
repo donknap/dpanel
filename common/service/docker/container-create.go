@@ -79,7 +79,9 @@ func (self *ContainerCreateBuilder) WithVolume(host string, container string) *C
 
 // 绑定端口
 func (self *ContainerCreateBuilder) WithPort(host string, container string) *ContainerCreateBuilder {
-	port, err := nat.NewPort("tcp", container)
+	hostIp := "0.0.0.0"
+	hostProtocol := "tcp"
+	port, err := nat.NewPort(hostProtocol, container)
 	if err != nil {
 		self.err = err
 		return nil
@@ -87,7 +89,7 @@ func (self *ContainerCreateBuilder) WithPort(host string, container string) *Con
 	self.containerConfig.ExposedPorts[port] = struct{}{}
 	self.hostConfig.PortBindings[port] = make([]nat.PortBinding, 0, 1)
 	self.hostConfig.PortBindings[port] = append(
-		self.hostConfig.PortBindings[port], nat.PortBinding{HostIP: "0.0.0.0", HostPort: host},
+		self.hostConfig.PortBindings[port], nat.PortBinding{HostIP: hostIp, HostPort: host},
 	)
 	return self
 }

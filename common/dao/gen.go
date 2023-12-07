@@ -16,49 +16,44 @@ import (
 )
 
 var (
-	Q         = new(Query)
-	Container *container
-	RunEnv    *runEnv
-	Site      *site
-	Task      *task
+	Q      = new(Query)
+	Image  *image
+	RunEnv *runEnv
+	Site   *site
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
-	Container = &Q.Container
+	Image = &Q.Image
 	RunEnv = &Q.RunEnv
 	Site = &Q.Site
-	Task = &Q.Task
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:        db,
-		Container: newContainer(db, opts...),
-		RunEnv:    newRunEnv(db, opts...),
-		Site:      newSite(db, opts...),
-		Task:      newTask(db, opts...),
+		db:     db,
+		Image:  newImage(db, opts...),
+		RunEnv: newRunEnv(db, opts...),
+		Site:   newSite(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	Container container
-	RunEnv    runEnv
-	Site      site
-	Task      task
+	Image  image
+	RunEnv runEnv
+	Site   site
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:        db,
-		Container: q.Container.clone(db),
-		RunEnv:    q.RunEnv.clone(db),
-		Site:      q.Site.clone(db),
-		Task:      q.Task.clone(db),
+		db:     db,
+		Image:  q.Image.clone(db),
+		RunEnv: q.RunEnv.clone(db),
+		Site:   q.Site.clone(db),
 	}
 }
 
@@ -72,27 +67,24 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:        db,
-		Container: q.Container.replaceDB(db),
-		RunEnv:    q.RunEnv.replaceDB(db),
-		Site:      q.Site.replaceDB(db),
-		Task:      q.Task.replaceDB(db),
+		db:     db,
+		Image:  q.Image.replaceDB(db),
+		RunEnv: q.RunEnv.replaceDB(db),
+		Site:   q.Site.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	Container IContainerDo
-	RunEnv    IRunEnvDo
-	Site      ISiteDo
-	Task      ITaskDo
+	Image  IImageDo
+	RunEnv IRunEnvDo
+	Site   ISiteDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		Container: q.Container.WithContext(ctx),
-		RunEnv:    q.RunEnv.WithContext(ctx),
-		Site:      q.Site.WithContext(ctx),
-		Task:      q.Task.WithContext(ctx),
+		Image:  q.Image.WithContext(ctx),
+		RunEnv: q.RunEnv.WithContext(ctx),
+		Site:   q.Site.WithContext(ctx),
 	}
 }
 

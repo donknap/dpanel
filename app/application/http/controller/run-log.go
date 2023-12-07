@@ -16,7 +16,7 @@ type RunLog struct {
 
 func (self RunLog) Task(http *gin.Context) {
 	type ParamsValidate struct {
-		SiteId int32 `form:"siteId" binding:"required,number"`
+		Id int32 `form:"id" binding:"required,number"`
 	}
 
 	params := ParamsValidate{}
@@ -24,9 +24,9 @@ func (self RunLog) Task(http *gin.Context) {
 		return
 	}
 
-	taskRow, _ := dao.Task.Where(dao.Task.TaskID.Eq(params.SiteId)).Last()
-	if taskRow == nil {
-		self.JsonResponseWithError(http, errors.New("当前没有进行的中任务"), 500)
+	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(params.Id)).Last()
+	if siteRow == nil {
+		self.JsonResponseWithError(http, errors.New("当前站点不存在"), 500)
 		return
 	}
 
@@ -45,9 +45,9 @@ func (self RunLog) Task(http *gin.Context) {
 	}
 
 	result := gin.H{
-		"status":                   taskRow.Status,
-		"step":                     taskRow.Step,
-		"message":                  taskRow.Message,
+		"status":                   siteRow.Status,
+		"step":                     siteRow.StatusStep,
+		"message":                  siteRow.Message,
 		logic.STEP_IMAGE_BUILD:     defaultProgress,
 		logic.STEP_IMAGE_PULL:      defaultProgress,
 		logic.STEP_CONTAINER_BUILD: defaultProgress,
@@ -61,53 +61,53 @@ func (self RunLog) Task(http *gin.Context) {
 		logic.STEP_CONTAINER_RUN:   0,
 	}
 	// 构建镜像状态
-	if logic.StepStatusValue[taskRow.Step] == 1 {
-		stepStatus[logic.STEP_IMAGE_BUILD] = taskRow.Status
-		if taskRow.Status == logic.STATUS_ERROR {
+	if logic.StepStatusValue[siteRow.StatusStep] == 1 {
+		stepStatus[logic.STEP_IMAGE_BUILD] = siteRow.Status
+		if siteRow.Status == logic.STATUS_ERROR {
 			result[logic.STEP_IMAGE_BUILD] = finishProgress
 		}
 	}
-	if logic.StepStatusValue[taskRow.Step] > 1 {
+	if logic.StepStatusValue[siteRow.StatusStep] > 1 {
 		stepStatus[logic.STEP_IMAGE_BUILD] = logic.STATUS_SUCCESS
 		result[logic.STEP_IMAGE_BUILD] = finishProgress
 	}
 	// 拉取镜像状态
-	if logic.StepStatusValue[taskRow.Step] == 2 {
-		stepStatus[logic.STEP_IMAGE_PULL] = taskRow.Status
-		if taskRow.Status == logic.STATUS_ERROR {
+	if logic.StepStatusValue[siteRow.StatusStep] == 2 {
+		stepStatus[logic.STEP_IMAGE_PULL] = siteRow.Status
+		if siteRow.Status == logic.STATUS_ERROR {
 			result[logic.STEP_IMAGE_PULL] = finishProgress
 		}
 	}
-	if logic.StepStatusValue[taskRow.Step] > 2 {
+	if logic.StepStatusValue[siteRow.StatusStep] > 2 {
 		stepStatus[logic.STEP_IMAGE_PULL] = logic.STATUS_SUCCESS
 		result[logic.STEP_IMAGE_PULL] = finishProgress
 	}
 	// 构建容器状态
-	if logic.StepStatusValue[taskRow.Step] == 3 {
-		stepStatus[logic.STEP_CONTAINER_BUILD] = taskRow.Status
-		if taskRow.Status == logic.STATUS_ERROR {
+	if logic.StepStatusValue[siteRow.StatusStep] == 3 {
+		stepStatus[logic.STEP_CONTAINER_BUILD] = siteRow.Status
+		if siteRow.Status == logic.STATUS_ERROR {
 			result[logic.STEP_CONTAINER_BUILD] = finishProgress
 		}
 	}
-	if logic.StepStatusValue[taskRow.Step] > 3 {
+	if logic.StepStatusValue[siteRow.StatusStep] > 3 {
 		stepStatus[logic.STEP_CONTAINER_BUILD] = logic.STATUS_SUCCESS
 		result[logic.STEP_CONTAINER_BUILD] = finishProgress
 	}
 	// 运行容器状态
-	if logic.StepStatusValue[taskRow.Step] == 4 {
-		stepStatus[logic.STEP_CONTAINER_RUN] = taskRow.Status
+	if logic.StepStatusValue[siteRow.StatusStep] == 4 {
+		stepStatus[logic.STEP_CONTAINER_RUN] = siteRow.Status
 		result[logic.STEP_CONTAINER_RUN] = finishProgress
 	}
 	result["stepStatus"] = stepStatus
 
 	// 只有在拉取镜像时，才获取拉取进度
-	if logic.StepStatusValue[taskRow.Step] == 2 {
+	if logic.StepStatusValue[siteRow.StatusStep] == 2 {
 		task := logic.NewContainerTask()
-		stepLog := task.GetTaskStepLog(taskRow.TaskID)
+		stepLog := task.GetTaskStepLog(siteRow.ID)
 		if stepLog != nil {
 			result[logic.STEP_IMAGE_PULL] = stepLog.GetProcess()
 			if result[logic.STEP_IMAGE_PULL] == nil {
-				if taskRow.Status == logic.STATUS_PROCESSING {
+				if siteRow.Status == logic.STATUS_PROCESSING {
 					result[logic.STEP_IMAGE_PULL] = defaultProgress
 				} else {
 					result[logic.STEP_IMAGE_PULL] = finishProgress
@@ -136,6 +136,10 @@ func (self RunLog) Run(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 		return
 	}
+	if siteRow.ContainerInfo == nil {
+		self.JsonResponseWithError(http, errors.New("当前站点并没有部署成功"), 500)
+		return
+	}
 
 	sdk, err := docker.NewDockerClient()
 	if err != nil {
@@ -143,7 +147,7 @@ func (self RunLog) Run(http *gin.Context) {
 		return
 	}
 	builder := sdk.GetContainerLogBuilder()
-	builder.WithContainerId("0bf3c0b9f3d6")
+	builder.WithContainerId(siteRow.ContainerInfo.Info.ID)
 	builder.WithTail(params.LineTotal)
 	content, err := builder.Execute()
 	if err != nil {

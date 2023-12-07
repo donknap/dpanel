@@ -8,18 +8,8 @@ import (
 )
 
 func newStepMessage(siteId int32) *stepMessage {
-	// 清除掉当前站点之前的任务
-	// dao.Task.Where(dao.Task.SiteID.Eq(siteId)).Delete()
-
 	task := &stepMessage{}
-	taskRow := &entity.Task{
-		TaskID:  siteId,
-		Status:  STATUS_STOP,
-		Message: "",
-	}
-	dao.Task.Create(taskRow)
-	task.recordId = taskRow.ID
-	task.siteId = siteId
+	task.SiteId = siteId
 	return task
 }
 
@@ -27,32 +17,27 @@ type stepMessage struct {
 	progress    interface{} // 进度信息 json 格式
 	currentStep string      // 当前进行的步骤
 	error       error       // 发生的错误
-	recordId    int32
-	siteId      int32
+	SiteId      int32       // 信息回存的 site id
 }
 
 // 记录任务错误
 func (self *stepMessage) err(err error) {
-	dao.Task.Where(dao.Task.ID.Eq(self.recordId)).Updates(
-		entity.Task{
+	dao.Site.Where(dao.Site.ID.Eq(self.SiteId)).Updates(
+		entity.Site{
 			Status:  STATUS_ERROR,
 			Message: err.Error(),
 		},
 	)
-	//状态同步到站点上
-	self.syncSiteStatus(STATUS_ERROR)
 }
 
 // 更新任务进度
 func (self *stepMessage) step(step string) {
-	dao.Task.Where(dao.Task.ID.Eq(self.recordId)).Updates(
-		entity.Task{
-			Status: STATUS_PROCESSING,
-			Step:   step,
+	dao.Site.Where(dao.Site.ID.Eq(self.SiteId)).Updates(
+		entity.Site{
+			Status:     STATUS_PROCESSING,
+			StatusStep: step,
 		},
 	)
-	//状态同步到站点上
-	self.syncSiteStatus(STATUS_PROCESSING)
 }
 
 func (self *stepMessage) process(data interface{}) {
@@ -64,24 +49,15 @@ func (self *stepMessage) GetProcess() interface{} {
 }
 
 func (self *stepMessage) success() {
-	query := dao.Task.Where(dao.Task.ID.Eq(self.recordId))
-	query.Updates(entity.Task{
+	query := dao.Site.Where(dao.Site.ID.Eq(self.SiteId))
+	query.Updates(entity.Site{
 		Status:  STATUS_SUCCESS,
 		Message: "",
 	})
-	//状态同步到站点上
-	self.syncSiteStatus(STATUS_SUCCESS)
-}
-
-func (self *stepMessage) syncSiteStatus(status int) {
-	_, err := dao.Site.Where(dao.Site.ID.Eq(self.siteId)).Update(dao.Site.Status, status)
-	if err != nil {
-		fmt.Printf("%s", err.Error())
-	}
 }
 
 func (self *stepMessage) syncSiteContainerInfo(containerInfoId string) {
-	_, err := dao.Site.Where(dao.Site.ID.Eq(self.siteId)).Updates(&entity.Site{
+	_, err := dao.Site.Where(dao.Site.ID.Eq(self.SiteId)).Updates(&entity.Site{
 		ContainerInfo: &accessor.SiteContainerInfoOption{
 			ID: containerInfoId,
 		},
