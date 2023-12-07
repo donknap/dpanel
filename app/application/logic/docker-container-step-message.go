@@ -7,13 +7,13 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 )
 
-func newStepMessage(siteId int32) *stepMessage {
-	task := &stepMessage{}
+func newContainerStepMessage(siteId int32) *containerStepMessage {
+	task := &containerStepMessage{}
 	task.SiteId = siteId
 	return task
 }
 
-type stepMessage struct {
+type containerStepMessage struct {
 	progress    interface{} // 进度信息 json 格式
 	currentStep string      // 当前进行的步骤
 	error       error       // 发生的错误
@@ -21,7 +21,7 @@ type stepMessage struct {
 }
 
 // 记录任务错误
-func (self *stepMessage) err(err error) {
+func (self *containerStepMessage) err(err error) {
 	dao.Site.Where(dao.Site.ID.Eq(self.SiteId)).Updates(
 		entity.Site{
 			Status:  STATUS_ERROR,
@@ -31,7 +31,7 @@ func (self *stepMessage) err(err error) {
 }
 
 // 更新任务进度
-func (self *stepMessage) step(step string) {
+func (self *containerStepMessage) step(step string) {
 	dao.Site.Where(dao.Site.ID.Eq(self.SiteId)).Updates(
 		entity.Site{
 			Status:     STATUS_PROCESSING,
@@ -40,15 +40,15 @@ func (self *stepMessage) step(step string) {
 	)
 }
 
-func (self *stepMessage) process(data interface{}) {
+func (self *containerStepMessage) process(data interface{}) {
 	self.progress = data
 }
 
-func (self *stepMessage) GetProcess() interface{} {
+func (self *containerStepMessage) GetProcess() interface{} {
 	return self.progress
 }
 
-func (self *stepMessage) success() {
+func (self *containerStepMessage) success() {
 	query := dao.Site.Where(dao.Site.ID.Eq(self.SiteId))
 	query.Updates(entity.Site{
 		Status:  STATUS_SUCCESS,
@@ -56,7 +56,7 @@ func (self *stepMessage) success() {
 	})
 }
 
-func (self *stepMessage) syncSiteContainerInfo(containerInfoId string) {
+func (self *containerStepMessage) syncSiteContainerInfo(containerInfoId string) {
 	_, err := dao.Site.Where(dao.Site.ID.Eq(self.SiteId)).Updates(&entity.Site{
 		ContainerInfo: &accessor.SiteContainerInfoOption{
 			ID: containerInfoId,

@@ -65,7 +65,16 @@ func (self Builder) GetContainerLogBuilder() *containerLogBuilder {
 }
 
 func (self Builder) GetImageBuildBuilder() *imageBuildBuilder {
-	builder := &imageBuildBuilder{}
+	builder := &imageBuildBuilder{
+		imageBuildOption: types.ImageBuildOptions{
+			Dockerfile: "Dockerfile", // 默认在根目录
+			Labels:     make(map[string]string),
+			Remove:     true,
+		},
+	}
+	builder.WithLabel("BuildAuthor", "DPanel")
+	builder.WithLabel("BuildDesc", "DPanel is a docker visual management panel")
+	builder.WithLabel("BuildWebSite", "https://phpeye.net")
 	builder.withSdk(self.Client)
 	return builder
 }

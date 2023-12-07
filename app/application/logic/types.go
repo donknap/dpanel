@@ -8,10 +8,12 @@ const (
 )
 
 const (
-	STEP_IMAGE_PULL      = "imagePull"
-	STEP_IMAGE_BUILD     = "imageBuild"
-	STEP_CONTAINER_BUILD = "containerBuild"
-	STEP_CONTAINER_RUN   = "containerRun"
+	STEP_IMAGE_PULL             = "imagePull"      // 拉取镜像中
+	STEP_IMAGE_BUILD            = "imageBuild"     // 开始构建镜像
+	STEP_IMAGE_BUILD_UPLOAD_TAR = "uploadTar"      // 上传构建 tar 包
+	STEP_IMAGE_BUILD_RUN        = "imageBuildRun"  // 开始执行dockerfile
+	STEP_CONTAINER_BUILD        = "containerBuild" // 创建容器
+	STEP_CONTAINER_RUN          = "containerRun"   // 运行容器
 )
 
 const (

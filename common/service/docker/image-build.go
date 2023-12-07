@@ -5,10 +5,8 @@ import (
 	"archive/zip"
 	"context"
 	"errors"
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"github.com/donknap/dpanel/common/function"
 	"io"
 	"os"
 	"strings"
@@ -16,6 +14,7 @@ import (
 
 type imageBuildBuilder struct {
 	//zipFileReader *zip.Reader
+	imageBuildOption  types.ImageBuildOptions
 	zipFilePath       string
 	dockerFileContent []byte
 	dockerSdk         *client.Client
@@ -27,6 +26,22 @@ func (self *imageBuildBuilder) withSdk(sdk *client.Client) {
 
 func (self *imageBuildBuilder) WithDockerFileContent(content []byte) {
 	self.dockerFileContent = content
+}
+
+func (self *imageBuildBuilder) WithGitUrl(git string) {
+	self.imageBuildOption.RemoteContext = git
+}
+
+func (self *imageBuildBuilder) WithLabel(name string, value string) {
+	self.imageBuildOption.Labels[name] = value
+}
+
+func (self *imageBuildBuilder) WithDockerFilePath(path string) {
+	self.imageBuildOption.Dockerfile = path
+}
+
+func (self *imageBuildBuilder) WithTag(name string) {
+	self.imageBuildOption.Tags = append(self.imageBuildOption.Tags, name)
 }
 
 // fileInfo, _ := file.Stat()
@@ -73,13 +88,10 @@ func (self *imageBuildBuilder) makeTarByZip(tarWriter *tar.Writer) (err error) {
 	return nil
 }
 
-func (self *imageBuildBuilder) Execute() (err error) {
-	os.Remove("/Users/renchao/Workspace/open-system/artifact-lskypro/test.tar")
-
-	//tarArchive, err := os.CreateTemp("", "dpanel")
-	tarArchive, err := os.Create("/Users/renchao/Workspace/open-system/artifact-lskypro/test.tar")
+func (self *imageBuildBuilder) Execute() (response types.ImageBuildResponse, err error) {
+	tarArchive, err := os.CreateTemp("", "dpanel")
 	if err != nil {
-		return err
+		return response, err
 	}
 	tarWriter := tar.NewWriter(tarArchive)
 	defer tarWriter.Close()
@@ -87,7 +99,7 @@ func (self *imageBuildBuilder) Execute() (err error) {
 	if self.zipFilePath != "" {
 		err = self.makeTarByZip(tarWriter)
 		if err != nil {
-			return err
+			return response, err
 		}
 	}
 	if self.dockerFileContent != nil {
@@ -100,30 +112,22 @@ func (self *imageBuildBuilder) Execute() (err error) {
 		fileInfo, _ := file.Stat()
 		fileInfoHeader, err := tar.FileInfoHeader(fileInfo, "")
 		if err != nil {
-			return err
+			return response, err
 		}
 		fileInfoHeader.Name = "Dockerfile"
 		err = tarWriter.WriteHeader(fileInfoHeader)
 		if err != nil {
-			return err
+			return response, err
 		}
 		_, err = io.Copy(tarWriter, file)
 		if err != nil {
-			return err
+			return response, err
 		}
 	}
 	tarArchive.Seek(0, io.SeekStart)
-	response, err := self.dockerSdk.ImageBuild(context.Background(), tarArchive, types.ImageBuildOptions{
-		Dockerfile: "Dockerfile",
-		Tags: []string{
-			"test" + function.GetMd5(function.GetRandomString(5)),
-		},
-	})
+	response, err = self.dockerSdk.ImageBuild(context.Background(), tarArchive, self.imageBuildOption)
 	if err != nil {
-		fmt.Printf("%v \n", err)
-		return nil
+		return response, err
 	}
-	io.Copy(os.Stdout, response.Body)
-	fmt.Printf("%v \n", err)
-	return nil
+	return response, nil
 }

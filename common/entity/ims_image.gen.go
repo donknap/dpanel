@@ -12,15 +12,16 @@ const TableNameImage = "ims_image"
 
 // Image mapped from table <ims_image>
 type Image struct {
-	ID            int32          `gorm:"column:id;type:INTEGER" json:"id"`
-	Name          string         `gorm:"column:name" json:"name"`
-	Tag           string         `gorm:"column:tag" json:"tag"`
-	TagExt        string         `gorm:"column:tag_ext" json:"tagExt"`
-	Git           string         `gorm:"column:git" json:"git"`
-	Registry      string         `gorm:"column:registry" json:"registry"`
-	Status        int32          `gorm:"column:status" json:"status"`
-	StatusProcess string         `gorm:"column:status_process" json:"statusProcess"`
-	DeletedAt     gorm.DeletedAt `gorm:"column:deleted_at" json:"deletedAt"`
+	ID         int32          `gorm:"column:id;type:INTEGER" json:"id"`
+	Name       string         `gorm:"column:name" json:"name"`
+	Tag        string         `gorm:"column:tag" json:"tag"`
+	TagExt     string         `gorm:"column:tag_ext" json:"tagExt"`
+	Git        string         `gorm:"column:git" json:"git"`
+	Registry   string         `gorm:"column:registry" json:"registry"`
+	Status     int32          `gorm:"column:status" json:"status"`
+	StatusStep string         `gorm:"column:status_step" json:"statusStep"`
+	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at" json:"deletedAt"`
+	Message    string         `gorm:"column:message" json:"message"`
 }
 
 // TableName Image's table name

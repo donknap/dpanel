@@ -6,59 +6,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types"
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"io"
 	"log/slog"
 	"math"
 )
 
-const REGISTER_NAME = "containerTask"
-
-func RegisterContainerTask() {
-	err := facade.GetContainer().NamedSingleton(
-		REGISTER_NAME, func() *ContainerTask {
-			obj := &ContainerTask{}
-			obj.QueueCreate = make(chan *CreateMessage, 999)
-			obj.stepLog = make(map[int32]*stepMessage)
-			return obj
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
+type progressDetail struct {
+	Id             string `json:"id"`
+	Status         string `json:"status"`
+	ProgressDetail struct {
+		Current float64 `json:"current"`
+		Total   float64 `json:"total"`
+	} `json:"progressDetail"`
+}
+type progress struct {
+	Downloading float64 `json:"downloading"`
+	Extracting  float64 `json:"extracting"`
 }
 
-func NewContainerTask() *ContainerTask {
-	var obj *ContainerTask
-	err := facade.GetContainer().NamedResolve(&obj, REGISTER_NAME)
-	if err != nil {
-		slog.Error(err.Error())
-	}
-	return obj
-}
-
-type CreateMessage struct {
-	Name      string // 站点标识
-	SiteId    int32  // 站点id
-	RunParams *accessor.SiteEnvOption
-}
-
-type ContainerTask struct {
-	QueueCreate chan *CreateMessage
-	stepLog     map[int32]*stepMessage // 用于记录部署任务日志
-	sdk         *docker.Builder
-}
-
-func (self *ContainerTask) GetTaskStepLog(taskId int32) *stepMessage {
-	if stepLog, ok := self.stepLog[taskId]; ok {
-		return stepLog
-	}
-	return nil
-}
-
-func (self *ContainerTask) CreateLoop() {
+func (self *DockerTask) CreateLoop() {
 	sdk, err := docker.NewDockerClient()
 	if err != nil {
 		panic(err)
@@ -72,16 +39,16 @@ func (self *ContainerTask) CreateLoop() {
 			// 用于记录进行状态（数据库中）
 			// 在本单例对象中建立一个map对象，存放过程中的数据，这些数据不入库
 			slog.Info(fmt.Sprintf("run site id %d", message.SiteId))
-			self.stepLog[message.SiteId] = newStepMessage(message.SiteId)
-			self.stepLog[message.SiteId].step(STEP_IMAGE_PULL)
+			self.containerStepMessage[message.SiteId] = newContainerStepMessage(message.SiteId)
+			self.containerStepMessage[message.SiteId].step(STEP_IMAGE_PULL)
 			err = self.pullImage(message)
 			if err != nil {
 				slog.Info("steplog", err.Error())
-				self.stepLog[message.SiteId].err(err)
+				self.containerStepMessage[message.SiteId].err(err)
 				break
 			}
 
-			self.stepLog[message.SiteId].step(STEP_CONTAINER_BUILD)
+			self.containerStepMessage[message.SiteId].step(STEP_CONTAINER_BUILD)
 			builder := sdk.GetContainerCreateBuilder()
 			builder.WithImage(message.RunParams.Image.GetImage())
 			builder.WithContext(context.Background())
@@ -114,46 +81,34 @@ func (self *ContainerTask) CreateLoop() {
 			response, err := builder.Execute()
 			if err != nil {
 				slog.Error(err.Error())
-				self.stepLog[message.SiteId].err(err)
+				self.containerStepMessage[message.SiteId].err(err)
 				break
 			}
-			self.stepLog[message.SiteId].syncSiteContainerInfo(response.ID)
+			self.containerStepMessage[message.SiteId].syncSiteContainerInfo(response.ID)
 
-			self.stepLog[message.SiteId].step(STEP_CONTAINER_RUN)
+			self.containerStepMessage[message.SiteId].step(STEP_CONTAINER_RUN)
 			err = sdk.Client.ContainerStart(context.Background(), response.ID, types.ContainerStartOptions{})
 			if err != nil {
 				slog.Error(err.Error())
-				self.stepLog[message.SiteId].err(err)
+				self.containerStepMessage[message.SiteId].err(err)
 				break
 			}
 			if err != nil {
 				slog.Error(err.Error())
-				self.stepLog[message.SiteId].err(err)
+				self.containerStepMessage[message.SiteId].err(err)
 				break
 			}
-			self.stepLog[message.SiteId].success()
-			delete(self.stepLog, message.SiteId)
+			self.containerStepMessage[message.SiteId].success()
+			delete(self.containerStepMessage, message.SiteId)
 		default:
-			for key, _ := range self.stepLog {
-				delete(self.stepLog, key)
+			for key, _ := range self.containerStepMessage {
+				delete(self.containerStepMessage, key)
 			}
 		}
 	}
 }
 
-func (self *ContainerTask) pullImage(message *CreateMessage) error {
-	type progressDetail struct {
-		Id             string `json:"id"`
-		Status         string `json:"status"`
-		ProgressDetail struct {
-			Current float64 `json:"current"`
-			Total   float64 `json:"total"`
-		} `json:"progressDetail"`
-	}
-	type progress struct {
-		Downloading float64 `json:"downloading"`
-		Extracting  float64 `json:"extracting"`
-	}
+func (self *DockerTask) pullImage(message *CreateMessage) error {
 	slog.Info("pull image ", message)
 	//尝试拉取镜像
 	reader, err := self.sdk.Client.ImagePull(context.Background(), message.RunParams.Image.GetImage(), types.ImagePullOptions{})
@@ -195,7 +150,7 @@ func (self *ContainerTask) pullImage(message *CreateMessage) error {
 			}
 			// 进度信息
 			if len(pg) > 0 {
-				self.stepLog[message.SiteId].process(pg)
+				self.containerStepMessage[message.SiteId].process(pg)
 			}
 		}
 	}

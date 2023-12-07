@@ -14,13 +14,14 @@ type Provider struct {
 }
 
 func (provider *Provider) Register(httpServer *http_server.Server, console console.Console) {
-	logic.RegisterContainerTask()
+	logic.RegisterDockerTask()
 
 	// 注册一个 application:test 命令
 	console.RegisterCommand(new(command.Test))
 
-	task := logic.NewContainerTask()
+	task := logic.NewDockerTask()
 	go task.CreateLoop()
+	go task.ImageBuildLoop()
 
 	// 注册一些路由
 	httpServer.RegisterRouters(

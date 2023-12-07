@@ -115,7 +115,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 	siteRow.SiteName = fmt.Sprintf("dpanel-%s-%d-%s", params.Type, siteRow.ID, function.GetRandomString(10))
 	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(siteRow)
 
-	task := logic.NewContainerTask()
+	task := logic.NewDockerTask()
 	runTaskRow := &logic.CreateMessage{
 		Name:      siteRow.SiteName,
 		SiteId:    siteRow.ID,
@@ -247,7 +247,7 @@ func (self Site) ReDeploy(http *gin.Context) {
 		runParams.Image.Name = imageArr[0]
 		runParams.Image.Version = imageArr[1]
 	}
-	task := logic.NewContainerTask()
+	task := logic.NewDockerTask()
 	runTaskRow := &logic.CreateMessage{
 		Name:      siteRow.SiteName,
 		SiteId:    siteRow.ID,

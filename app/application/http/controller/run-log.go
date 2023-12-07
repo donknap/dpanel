@@ -102,8 +102,8 @@ func (self RunLog) Task(http *gin.Context) {
 
 	// 只有在拉取镜像时，才获取拉取进度
 	if logic.StepStatusValue[siteRow.StatusStep] == 2 {
-		task := logic.NewContainerTask()
-		stepLog := task.GetTaskStepLog(siteRow.ID)
+		task := logic.NewDockerTask()
+		stepLog := task.GetTaskContainerStepLog(siteRow.ID)
 		if stepLog != nil {
 			result[logic.STEP_IMAGE_PULL] = stepLog.GetProcess()
 			if result[logic.STEP_IMAGE_PULL] == nil {

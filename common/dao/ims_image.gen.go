@@ -34,8 +34,9 @@ func newImage(db *gorm.DB, opts ...gen.DOOption) image {
 	_image.Git = field.NewString(tableName, "git")
 	_image.Registry = field.NewString(tableName, "registry")
 	_image.Status = field.NewInt32(tableName, "status")
-	_image.StatusProcess = field.NewString(tableName, "status_process")
+	_image.StatusStep = field.NewString(tableName, "status_step")
 	_image.DeletedAt = field.NewField(tableName, "deleted_at")
+	_image.Message = field.NewString(tableName, "message")
 
 	_image.fillFieldMap()
 
@@ -45,16 +46,17 @@ func newImage(db *gorm.DB, opts ...gen.DOOption) image {
 type image struct {
 	imageDo
 
-	ALL           field.Asterisk
-	ID            field.Int32
-	Name          field.String
-	Tag           field.String
-	TagExt        field.String
-	Git           field.String
-	Registry      field.String
-	Status        field.Int32
-	StatusProcess field.String
-	DeletedAt     field.Field
+	ALL        field.Asterisk
+	ID         field.Int32
+	Name       field.String
+	Tag        field.String
+	TagExt     field.String
+	Git        field.String
+	Registry   field.String
+	Status     field.Int32
+	StatusStep field.String
+	DeletedAt  field.Field
+	Message    field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -78,8 +80,9 @@ func (i *image) updateTableName(table string) *image {
 	i.Git = field.NewString(table, "git")
 	i.Registry = field.NewString(table, "registry")
 	i.Status = field.NewInt32(table, "status")
-	i.StatusProcess = field.NewString(table, "status_process")
+	i.StatusStep = field.NewString(table, "status_step")
 	i.DeletedAt = field.NewField(table, "deleted_at")
+	i.Message = field.NewString(table, "message")
 
 	i.fillFieldMap()
 
@@ -96,7 +99,7 @@ func (i *image) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (i *image) fillFieldMap() {
-	i.fieldMap = make(map[string]field.Expr, 9)
+	i.fieldMap = make(map[string]field.Expr, 10)
 	i.fieldMap["id"] = i.ID
 	i.fieldMap["name"] = i.Name
 	i.fieldMap["tag"] = i.Tag
@@ -104,8 +107,9 @@ func (i *image) fillFieldMap() {
 	i.fieldMap["git"] = i.Git
 	i.fieldMap["registry"] = i.Registry
 	i.fieldMap["status"] = i.Status
-	i.fieldMap["status_process"] = i.StatusProcess
+	i.fieldMap["status_step"] = i.StatusStep
 	i.fieldMap["deleted_at"] = i.DeletedAt
+	i.fieldMap["message"] = i.Message
 }
 
 func (i image) clone(db *gorm.DB) image {

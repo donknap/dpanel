@@ -145,11 +145,36 @@ func TestGetContainerLog(t *testing.T) {
 	fmt.Printf("%v \n", content)
 }
 
+type progressStream struct {
+	Stream string `json:"stream"`
+}
+
+type progressImageBuild struct {
+	StepTotal   string `json:"stepTotal"`
+	StepCurrent string `json:"stepCurrent"`
+	Message     string `json:"message"`
+}
+
 func TestImageBuild(t *testing.T) {
 	sdk, err := docker.NewDockerClient()
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}
+	pg := progressImageBuild{}
+	stream := progressStream{}
+	str := "{\"stream\":\"Step 2/9 : RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories\"}"
+	json.Unmarshal([]byte(str), &stream)
+
+	field := strings.Fields(stream.Stream)
+	if field != nil && field[0] == "Step" {
+		step := strings.Split(field[1], "/")
+		pg.StepTotal = step[1]
+		pg.StepCurrent = step[0]
+	}
+	pg.Message = stream.Stream
+	rs, _ := json.Marshal(pg)
+	fmt.Printf("%v \n", string(rs))
+	return
 	builder := sdk.GetImageBuildBuilder()
 	builder.WithZipFilePath("/Users/renchao/Workspace/open-system/artifact-lskypro/data2.zip")
 	builder.WithDockerFileContent([]byte("adsfasdfsadf111111"))
