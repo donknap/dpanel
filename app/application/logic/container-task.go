@@ -40,8 +40,8 @@ func NewContainerTask() *ContainerTask {
 }
 
 type CreateMessage struct {
-	Name      string
-	SiteId    int32
+	Name      string // 站点标识
+	SiteId    int32  // 站点id
 	RunParams *accessor.SiteEnvOption
 }
 
@@ -71,12 +71,11 @@ func (self *ContainerTask) CreateLoop() {
 			// 拿到部署任务后，先新建一个任务对象
 			// 用于记录进行状态（数据库中）
 			// 在本单例对象中建立一个map对象，存放过程中的数据，这些数据不入库
-			slog.Info(fmt.Sprintf("run task %d", message.SiteId))
+			slog.Info(fmt.Sprintf("run site id %d", message.SiteId))
 			self.stepLog[message.SiteId] = newStepMessage(message.SiteId)
 			self.stepLog[message.SiteId].step(STEP_IMAGE_PULL)
 			err = self.pullImage(message)
 			if err != nil {
-				slog.Info("steplog", self.stepLog)
 				slog.Info("steplog", err.Error())
 				self.stepLog[message.SiteId].err(err)
 				break
