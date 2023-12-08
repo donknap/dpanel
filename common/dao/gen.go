@@ -17,6 +17,7 @@ import (
 
 var (
 	Q        = new(Query)
+	Event    *event
 	Image    *image
 	Registry *registry
 	RunEnv   *runEnv
@@ -25,6 +26,7 @@ var (
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
+	Event = &Q.Event
 	Image = &Q.Image
 	Registry = &Q.Registry
 	RunEnv = &Q.RunEnv
@@ -34,6 +36,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
 		db:       db,
+		Event:    newEvent(db, opts...),
 		Image:    newImage(db, opts...),
 		Registry: newRegistry(db, opts...),
 		RunEnv:   newRunEnv(db, opts...),
@@ -44,6 +47,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 type Query struct {
 	db *gorm.DB
 
+	Event    event
 	Image    image
 	Registry registry
 	RunEnv   runEnv
@@ -55,6 +59,7 @@ func (q *Query) Available() bool { return q.db != nil }
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
 		db:       db,
+		Event:    q.Event.clone(db),
 		Image:    q.Image.clone(db),
 		Registry: q.Registry.clone(db),
 		RunEnv:   q.RunEnv.clone(db),
@@ -73,6 +78,7 @@ func (q *Query) WriteDB() *Query {
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
 		db:       db,
+		Event:    q.Event.replaceDB(db),
 		Image:    q.Image.replaceDB(db),
 		Registry: q.Registry.replaceDB(db),
 		RunEnv:   q.RunEnv.replaceDB(db),
@@ -81,6 +87,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 }
 
 type queryCtx struct {
+	Event    IEventDo
 	Image    IImageDo
 	Registry IRegistryDo
 	RunEnv   IRunEnvDo
@@ -89,6 +96,7 @@ type queryCtx struct {
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
+		Event:    q.Event.WithContext(ctx),
 		Image:    q.Image.WithContext(ctx),
 		Registry: q.Registry.WithContext(ctx),
 		RunEnv:   q.RunEnv.WithContext(ctx),

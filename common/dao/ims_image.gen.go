@@ -40,6 +40,7 @@ func newImage(db *gorm.DB, opts ...gen.DOOption) image {
 	_image.CreatedAt = field.NewInt32(tableName, "created_at")
 	_image.DeletedAt = field.NewField(tableName, "deleted_at")
 	_image.ContainerTotal = field.NewInt32(tableName, "container_total")
+	_image.Type = field.NewInt32(tableName, "type")
 
 	_image.fillFieldMap()
 
@@ -63,6 +64,7 @@ type image struct {
 	CreatedAt      field.Int32
 	DeletedAt      field.Field
 	ContainerTotal field.Int32
+	Type           field.Int32
 
 	fieldMap map[string]field.Expr
 }
@@ -92,6 +94,7 @@ func (i *image) updateTableName(table string) *image {
 	i.CreatedAt = field.NewInt32(table, "created_at")
 	i.DeletedAt = field.NewField(table, "deleted_at")
 	i.ContainerTotal = field.NewInt32(table, "container_total")
+	i.Type = field.NewInt32(table, "type")
 
 	i.fillFieldMap()
 
@@ -108,7 +111,7 @@ func (i *image) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (i *image) fillFieldMap() {
-	i.fieldMap = make(map[string]field.Expr, 13)
+	i.fieldMap = make(map[string]field.Expr, 14)
 	i.fieldMap["id"] = i.ID
 	i.fieldMap["name"] = i.Name
 	i.fieldMap["md5"] = i.Md5
@@ -122,6 +125,7 @@ func (i *image) fillFieldMap() {
 	i.fieldMap["created_at"] = i.CreatedAt
 	i.fieldMap["deleted_at"] = i.DeletedAt
 	i.fieldMap["container_total"] = i.ContainerTotal
+	i.fieldMap["type"] = i.Type
 }
 
 func (i image) clone(db *gorm.DB) image {

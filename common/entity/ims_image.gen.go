@@ -26,6 +26,7 @@ type Image struct {
 	CreatedAt      int32                    `gorm:"column:created_at" json:"createdAt"`
 	DeletedAt      gorm.DeletedAt           `gorm:"column:deleted_at" json:"deletedAt"`
 	ContainerTotal int32                    `gorm:"column:container_total" json:"containerTotal"`
+	Type           int32                    `gorm:"column:type" json:"type"`
 }
 
 // TableName Image's table name

@@ -18,3 +18,4 @@ relation:
         type: ImageTagOption
   - table: ims_run_env
   - table: ims_registry
+  - table: ims_event

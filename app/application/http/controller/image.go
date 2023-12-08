@@ -1,11 +1,13 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"os"
@@ -20,17 +22,22 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	type ParamsValidate struct {
 		DockerFile string `form:"dockerFile" binding:"omitempty"`
 		Name       string `form:"name" binding:"required"`
+		ZipFile    string `form:"zipFile" binding:"omitempty,required_without=DockerFile"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
-	buildImageTask := &logic.BuildImageMessage{
-		Name: params.Name,
+	if params.DockerFile == "" && params.ZipFile == "" {
+		self.JsonResponseWithError(http, errors.New("至少需要指定Dockerfile或是Zip包"), 500)
+		return
 	}
 
 	mustHasZipFile := false
+	buildImageTask := &logic.BuildImageMessage{
+		Name: params.Name,
+	}
 	addStr := []string{
 		"ADD",
 		"COPY",
@@ -42,28 +49,22 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	}
 
 	if mustHasZipFile {
-		fileUploader, fileHeader, _ := http.Request.FormFile("zipFile")
-		if fileHeader == nil {
+		if params.ZipFile == "" {
 			self.JsonResponseWithError(http, errors.New("Dockerfile中包含添加文件操作，请上传对应的zip包"), 500)
 			return
 		}
-		defer fileUploader.Close()
-
-		file, _ := os.CreateTemp("", "dpanel")
-		err := http.SaveUploadedFile(fileHeader, file.Name())
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
+	}
+	if params.ZipFile != "" {
+		path := os.TempDir() + "/" + params.ZipFile
+		_, err := os.Stat(path)
+		if os.IsNotExist(err) {
+			self.JsonResponseWithError(http, errors.New("请先上传压缩包"), 500)
 			return
 		}
-		buildImageTask.ZipPath = file.Name()
+		buildImageTask.ZipPath = path
 	}
 	if params.DockerFile != "" {
 		buildImageTask.DockerFileContent = []byte(params.DockerFile)
-	}
-
-	if buildImageTask.ZipPath == "" && buildImageTask.DockerFileContent == nil {
-		self.JsonResponseWithError(http, errors.New("Dockerfile 和 Zip 至少要指定一项"), 500)
-		return
 	}
 
 	imageRow := &entity.Image{
@@ -74,6 +75,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		Status:     logic.STATUS_STOP,
 		StatusStep: "",
 		Message:    "",
+		Type:       logic.IMAGE_TYPE_SELF,
 	}
 	dao.Image.Create(imageRow)
 	buildImageTask.ImageId = imageRow.ID
@@ -92,6 +94,7 @@ func (self Image) GetList(http *gin.Context) {
 		Page     int    `form:"page,default=1" binding:"omitempty,gt=0"`
 		PageSize int    `form:"pageSize" binding:"omitempty"`
 		Name     string `form:"name" binding:"omitempty"`
+		Type     string `form:"type" binding:"required,oneof=all self build"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -104,12 +107,25 @@ func (self Image) GetList(http *gin.Context) {
 		params.PageSize = 10
 	}
 
-	go func() {
-		// 同步镜像数据
-		logic.ImageLogic{}.SyncImage()
-	}()
+	if params.Type == "all" {
+		go func() {
+			// 同步镜像数据
+			logic.ImageLogic{}.SyncImage()
+		}()
+	}
 
 	query := dao.Image.Order(dao.Image.ID.Desc())
+
+	switch params.Type {
+	case "build":
+		query = query.Where(dao.Image.Status.In(logic.STATUS_STOP, logic.STATUS_PROCESSING, logic.STATUS_ERROR))
+		break
+	case "self":
+		query = query.Where(dao.Image.Status.Eq(logic.STATUS_SUCCESS)).Where(dao.Image.Type.Eq(logic.IMAGE_TYPE_SELF))
+		break
+	case "all":
+		query = query.Where(dao.Image.Status.Eq(logic.STATUS_SUCCESS))
+	}
 	if params.Name != "" {
 		query = query.Where(dao.Image.Name.Like("%" + params.Name + "%"))
 	}
@@ -119,6 +135,43 @@ func (self Image) GetList(http *gin.Context) {
 		"total": total,
 		"page":  params.Page,
 		"list":  list,
+	})
+	return
+}
+
+func (self Image) GetDetail(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `form:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
+	if imageRow == nil {
+		self.JsonResponseWithError(http, errors.New("镜像不存在"), 500)
+		return
+	}
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	layer, err := sdk.Client.ImageHistory(context.Background(), imageRow.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	imageDetail, _, err := sdk.Client.ImageInspectWithRaw(context.Background(), imageRow.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"layer": layer,
+		"info":  imageDetail,
 	})
 	return
 }

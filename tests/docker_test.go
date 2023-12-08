@@ -12,8 +12,10 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"math"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestContainerRemove(t *testing.T) {
@@ -195,6 +197,18 @@ func TestLoginRegistry(t *testing.T) {
 	})
 	fmt.Printf("%v \n", err)
 	fmt.Printf("%v \n", auth)
+
+	messageChan, errorChan := sdk.Client.Events(context.Background(), types.EventsOptions{})
+	for true {
+		select {
+		case messaage := <-messageChan:
+			fmt.Printf("%v \n", messaage)
+			time.Sleep(time.Second)
+		case err := <-errorChan:
+			fmt.Printf("%v \n", err.Error())
+			time.Sleep(time.Second)
+		}
+	}
 }
 
 func TestCode(t *testing.T) {
@@ -202,4 +216,7 @@ func TestCode(t *testing.T) {
 	fmt.Printf("%v \n", strings.Split(image, ":"))
 	a := strings.Split(image, ":")
 	fmt.Printf("%v \n", a[1])
+
+	fmt.Printf("%v \n", os.TempDir())
+
 }

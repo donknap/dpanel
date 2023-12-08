@@ -37,21 +37,21 @@ func (self ImageLogic) SyncImage() (err error) {
 					ContainerTotal: int32(imageSummary.Containers),
 				})
 			} else {
-				rowNew := &entity.Image{
-					Name: "",
-					Md5:  imageSummary.ID,
-					Size: fmt.Sprintf("%d", imageSummary.Size),
-					Tag: &accessor.ImageTagOption{
-						Tag: imageSummary.RepoTags,
-					},
-					ContainerTotal: int32(imageSummary.Containers),
-					CreatedAt:      int32(imageSummary.Created),
-					Status:         STATUS_SUCCESS,
-				}
 				if len(imageSummary.RepoTags) > 0 {
-					rowNew.Name = imageSummary.RepoTags[0]
+					rowNew := &entity.Image{
+						Name: imageSummary.RepoTags[0],
+						Md5:  imageSummary.ID,
+						Size: fmt.Sprintf("%d", imageSummary.Size),
+						Tag: &accessor.ImageTagOption{
+							Tag: imageSummary.RepoTags,
+						},
+						ContainerTotal: int32(imageSummary.Containers),
+						CreatedAt:      int32(imageSummary.Created),
+						Status:         STATUS_SUCCESS,
+						Type:           IMAGE_TYPE_ALL,
+					}
+					dao.Image.Create(rowNew)
 				}
-				dao.Image.Create(rowNew)
 			}
 		}
 	}

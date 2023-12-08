@@ -168,7 +168,7 @@ func (self RunLog) ImageBuild(http *gin.Context) {
 		return
 	}
 
-	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).Last()
+	imageRow, _ := dao.Image.Unscoped().Where(dao.Image.ID.Eq(params.Id)).Last()
 	if imageRow == nil {
 		self.JsonResponseWithError(http, errors.New("当前站点不存在"), 500)
 		return

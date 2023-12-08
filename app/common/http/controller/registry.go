@@ -67,3 +67,26 @@ func (self Registry) Create(http *gin.Context) {
 	})
 	return
 }
+
+func (self Registry) GetList(http *gin.Context) {
+	hasDockerIo := false
+	var list []*entity.Registry
+	list, _ = dao.Registry.Select(dao.Registry.Title, dao.Registry.ServerAddress, dao.Registry.ID).Find()
+	for _, item := range list {
+		if item.ServerAddress == "docker.io" {
+			hasDockerIo = true
+			break
+		}
+	}
+	if !hasDockerIo {
+		list = append(list, &entity.Registry{
+			Title:         "Docker Hub",
+			ServerAddress: "docker.io",
+			Username:      "anonymous",
+		})
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": list,
+	})
+	return
+}

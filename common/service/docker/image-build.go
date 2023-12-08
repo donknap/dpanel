@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 )
@@ -90,11 +91,13 @@ func (self *imageBuildBuilder) makeTarByZip(tarWriter *tar.Writer) (err error) {
 
 func (self *imageBuildBuilder) Execute() (response types.ImageBuildResponse, err error) {
 	tarArchive, err := os.CreateTemp("", "dpanel")
+	slog.Info("tar path ", tarArchive.Name())
 	if err != nil {
 		return response, err
 	}
 	tarWriter := tar.NewWriter(tarArchive)
 	defer tarWriter.Close()
+	defer os.Remove(tarArchive.Name())
 
 	if self.zipFilePath != "" {
 		err = self.makeTarByZip(tarWriter)
