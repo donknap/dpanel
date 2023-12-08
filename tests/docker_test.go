@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"math"
@@ -180,6 +181,20 @@ func TestImageBuild(t *testing.T) {
 	builder.WithDockerFileContent([]byte("adsfasdfsadf111111"))
 	builder.Execute()
 
+}
+
+func TestLoginRegistry(t *testing.T) {
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		fmt.Printf("%v \n", err)
+	}
+	auth, err := sdk.Client.RegistryLogin(context.Background(), registry.AuthConfig{
+		Username:      "100009529522",
+		Password:      "chaoren945RC",
+		ServerAddress: "ccr.ccs.tencentyun.com",
+	})
+	fmt.Printf("%v \n", err)
+	fmt.Printf("%v \n", auth)
 }
 
 func TestCode(t *testing.T) {

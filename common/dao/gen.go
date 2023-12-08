@@ -16,44 +16,49 @@ import (
 )
 
 var (
-	Q      = new(Query)
-	Image  *image
-	RunEnv *runEnv
-	Site   *site
+	Q        = new(Query)
+	Image    *image
+	Registry *registry
+	RunEnv   *runEnv
+	Site     *site
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	Image = &Q.Image
+	Registry = &Q.Registry
 	RunEnv = &Q.RunEnv
 	Site = &Q.Site
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:     db,
-		Image:  newImage(db, opts...),
-		RunEnv: newRunEnv(db, opts...),
-		Site:   newSite(db, opts...),
+		db:       db,
+		Image:    newImage(db, opts...),
+		Registry: newRegistry(db, opts...),
+		RunEnv:   newRunEnv(db, opts...),
+		Site:     newSite(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	Image  image
-	RunEnv runEnv
-	Site   site
+	Image    image
+	Registry registry
+	RunEnv   runEnv
+	Site     site
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:     db,
-		Image:  q.Image.clone(db),
-		RunEnv: q.RunEnv.clone(db),
-		Site:   q.Site.clone(db),
+		db:       db,
+		Image:    q.Image.clone(db),
+		Registry: q.Registry.clone(db),
+		RunEnv:   q.RunEnv.clone(db),
+		Site:     q.Site.clone(db),
 	}
 }
 
@@ -67,24 +72,27 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:     db,
-		Image:  q.Image.replaceDB(db),
-		RunEnv: q.RunEnv.replaceDB(db),
-		Site:   q.Site.replaceDB(db),
+		db:       db,
+		Image:    q.Image.replaceDB(db),
+		Registry: q.Registry.replaceDB(db),
+		RunEnv:   q.RunEnv.replaceDB(db),
+		Site:     q.Site.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	Image  IImageDo
-	RunEnv IRunEnvDo
-	Site   ISiteDo
+	Image    IImageDo
+	Registry IRegistryDo
+	RunEnv   IRunEnvDo
+	Site     ISiteDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		Image:  q.Image.WithContext(ctx),
-		RunEnv: q.RunEnv.WithContext(ctx),
-		Site:   q.Site.WithContext(ctx),
+		Image:    q.Image.WithContext(ctx),
+		Registry: q.Registry.WithContext(ctx),
+		RunEnv:   q.RunEnv.WithContext(ctx),
+		Site:     q.Site.WithContext(ctx),
 	}
 }
 

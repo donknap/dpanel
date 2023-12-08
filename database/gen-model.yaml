@@ -17,3 +17,4 @@ relation:
         serializer: json
         type: ImageTagOption
   - table: ims_run_env
+  - table: ims_registry
