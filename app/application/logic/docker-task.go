@@ -47,7 +47,7 @@ type BuildImageMessage struct {
 	ZipPathUploadFile multipart.File
 	DockerFileContent []byte // 自定义Dockerfile
 	DockerFileInPath  string // Dockerfile 所在路径
-	Name              string // 镜像名称
+	Tag               string // 镜像Tag
 	ImageId           int32
 }
 

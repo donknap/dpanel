@@ -1,7 +1,7 @@
 package logic
 
 import (
-	"github.com/donknap/dpanel/common/accessor"
+	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 )
@@ -56,21 +56,12 @@ func (self *imageStepMessage) success() {
 	})
 }
 
-func (self *imageStepMessage) sync(md5 string) {
-	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(self.ImageId)).First()
-
-	hash, _ := dao.Image.Where(dao.Image.Md5.Eq(md5)).First()
-	if hash != nil {
-		newTag := append(hash.Tag.Tag, imageRow.Name)
-		dao.Image.Where(dao.Image.ID.Eq(hash.ID)).Updates(&entity.Image{
-			Tag: &accessor.ImageTagOption{
-				Tag: newTag,
-			},
-		})
-		dao.Image.Where(dao.Image.ID.Eq(self.ImageId)).Delete()
-	} else {
-		dao.Image.Where(dao.Image.ID.Eq(self.ImageId)).Updates(&entity.Image{
-			Md5: md5,
-		})
+func (self *imageStepMessage) sync(info types.ImageInspect) {
+	oldImageRow, _ := dao.Image.Where(dao.Image.Md5.Eq(info.ID)).First()
+	if oldImageRow != nil {
+		dao.Image.Where(dao.Image.ID.Eq(oldImageRow.ID)).Delete()
 	}
+	dao.Image.Where(dao.Image.ID.Eq(self.ImageId)).Updates(&entity.Image{
+		Md5: info.ID,
+	})
 }

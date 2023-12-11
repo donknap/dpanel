@@ -12,10 +12,10 @@ relation:
       container_info:
         type: SiteContainerInfoOption
   - table: ims_image
-    column:
-      tag:
-        serializer: json
-        type: ImageTagOption
   - table: ims_run_env
   - table: ims_registry
   - table: ims_event
+    column:
+      message:
+        serializer: json
+        type: EventMessageOption

@@ -3,6 +3,7 @@ package logic
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -63,7 +64,7 @@ func (self *DockerTask) ImageBuildLoop() {
 			if message.DockerFileContent != nil {
 				builder.WithDockerFileContent(message.DockerFileContent)
 			}
-			builder.WithTag(message.Name)
+			builder.WithTag(message.Tag)
 			self.imageStepMessage[message.ImageId].step(STEP_IMAGE_BUILD_UPLOAD_TAR)
 			response, err := builder.Execute()
 			if err != nil {
@@ -103,7 +104,12 @@ func (self *DockerTask) ImageBuildLoop() {
 							slog.Error(err.Error())
 							continue
 						}
-						self.imageStepMessage[message.ImageId].sync(stream.Aux.ID)
+						imageInfo, _, err := self.sdk.Client.ImageInspectWithRaw(context.Background(), stream.Aux.ID)
+						if err != nil {
+							self.imageStepMessage[message.ImageId].err(err)
+							continue
+						}
+						self.imageStepMessage[message.ImageId].sync(imageInfo)
 					} else {
 						stream := &progressStream{}
 						fmt.Printf("%v \n", string(str))

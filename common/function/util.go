@@ -3,6 +3,7 @@ package function
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -101,9 +102,27 @@ func EncodeURIComponent(s string, excluded ...[]byte) string {
 	return b.String()
 }
 
-func GetInterfaceMap(data interface{}) map[string]interface{} {
-	jsonStr, _ := json.Marshal(data)
-	var jsonStruct map[string]interface{}
-	json.Unmarshal([]byte(jsonStr), &jsonStruct)
-	return jsonStruct
+func Base64Encode(obj interface{}) string {
+	var buf bytes.Buffer
+	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
+	err := json.NewEncoder(encoder).Encode(obj)
+	if err != nil {
+		return ""
+	}
+	encoder.Close()
+	return buf.String()
+}
+
+func Base64Decode(obj interface{}, enc string) error {
+	return json.NewDecoder(base64.NewDecoder(base64.StdEncoding, strings.NewReader(enc))).Decode(obj)
+}
+
+func IsEmptyArray[T interface{}](v []T) bool {
+	if v == nil {
+		return true
+	}
+	if len(v) == 0 {
+		return true
+	}
+	return false
 }

@@ -29,7 +29,9 @@ func newEvent(db *gorm.DB, opts ...gen.DOOption) event {
 	_event.ALL = field.NewAsterisk(tableName)
 	_event.ID = field.NewInt32(tableName, "id")
 	_event.Type = field.NewString(tableName, "type")
-	_event.Message = field.NewString(tableName, "message")
+	_event.Action = field.NewString(tableName, "action")
+	_event.Message = field.NewField(tableName, "message")
+	_event.Read = field.NewInt32(tableName, "read")
 	_event.CreatedAt = field.NewString(tableName, "created_at")
 
 	_event.fillFieldMap()
@@ -43,7 +45,9 @@ type event struct {
 	ALL       field.Asterisk
 	ID        field.Int32
 	Type      field.String
-	Message   field.String
+	Action    field.String
+	Message   field.Field
+	Read      field.Int32
 	CreatedAt field.String
 
 	fieldMap map[string]field.Expr
@@ -63,7 +67,9 @@ func (e *event) updateTableName(table string) *event {
 	e.ALL = field.NewAsterisk(table)
 	e.ID = field.NewInt32(table, "id")
 	e.Type = field.NewString(table, "type")
-	e.Message = field.NewString(table, "message")
+	e.Action = field.NewString(table, "action")
+	e.Message = field.NewField(table, "message")
+	e.Read = field.NewInt32(table, "read")
 	e.CreatedAt = field.NewString(table, "created_at")
 
 	e.fillFieldMap()
@@ -81,10 +87,12 @@ func (e *event) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (e *event) fillFieldMap() {
-	e.fieldMap = make(map[string]field.Expr, 4)
+	e.fieldMap = make(map[string]field.Expr, 6)
 	e.fieldMap["id"] = e.ID
 	e.fieldMap["type"] = e.Type
+	e.fieldMap["action"] = e.Action
 	e.fieldMap["message"] = e.Message
+	e.fieldMap["read"] = e.Read
 	e.fieldMap["created_at"] = e.CreatedAt
 }
 

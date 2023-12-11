@@ -3,13 +3,18 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/app/application/logic"
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"io"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -20,9 +25,10 @@ type Image struct {
 
 func (self Image) CreateByDockerfile(http *gin.Context) {
 	type ParamsValidate struct {
+		Tag        string `form:"tag" binding:"required"`
 		DockerFile string `form:"dockerFile" binding:"omitempty"`
-		Name       string `form:"name" binding:"required"`
 		ZipFile    string `form:"zipFile" binding:"omitempty,required_without=DockerFile"`
+		Git        string `form:"git" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -36,7 +42,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 
 	mustHasZipFile := false
 	buildImageTask := &logic.BuildImageMessage{
-		Name: params.Name,
+		Tag: params.Tag,
 	}
 	addStr := []string{
 		"ADD",
@@ -68,14 +74,13 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	}
 
 	imageRow := &entity.Image{
-		Name:       params.Name,
-		Tag:        &accessor.ImageTagOption{},
-		BuildGit:   "",
-		Registry:   "",
-		Status:     logic.STATUS_STOP,
-		StatusStep: "",
-		Message:    "",
-		Type:       logic.IMAGE_TYPE_SELF,
+		Tag:             params.Tag,
+		BuildGit:        params.Git,
+		BuildDockerfile: params.DockerFile,
+		BuildZip:        params.ZipFile,
+		Status:          logic.STATUS_STOP,
+		StatusStep:      "",
+		Message:         "",
 	}
 	dao.Image.Create(imageRow)
 	buildImageTask.ImageId = imageRow.ID
@@ -91,10 +96,72 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 
 func (self Image) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Page     int    `form:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize int    `form:"pageSize" binding:"omitempty"`
-		Name     string `form:"name" binding:"omitempty"`
-		Type     string `form:"type" binding:"required,oneof=all self build"`
+		Type string `form:"type" binding:"required,oneof=all self"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	var result []types.ImageSummary
+
+	sdk, _ := docker.NewDockerClient()
+	imageList, err := sdk.Client.ImageList(context.Background(), types.ImageListOptions{
+		All:            false,
+		ContainerCount: true,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	for key, summary := range imageList {
+		if len(summary.RepoTags) == 0 {
+			if len(summary.RepoDigests) != 0 {
+				noneTag := strings.Split(summary.RepoDigests[0], "@")
+				imageList[key].RepoTags = append(summary.RepoTags, noneTag[0]+":none")
+			} else {
+				imageList[key].RepoTags = append(summary.RepoTags, "none")
+			}
+		}
+	}
+
+	if params.Type == "self" {
+		query := dao.Image.Order(dao.Image.ID.Desc())
+		switch params.Type {
+		case "build":
+			query = query.Where(dao.Image.Status.In(logic.STATUS_STOP, logic.STATUS_PROCESSING, logic.STATUS_ERROR))
+			break
+		case "self":
+			query = query.Where(dao.Image.Status.In(logic.STATUS_SUCCESS))
+			break
+		}
+		list, _ := query.Find()
+		if list == nil {
+			self.JsonResponseWithoutError(http, gin.H{
+				"list": list,
+			})
+			return
+		}
+		for _, image := range list {
+			for _, summary := range imageList {
+				if image.Md5 == summary.ID {
+					result = append(result, summary)
+				}
+			}
+		}
+	} else {
+		result = imageList
+	}
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": result,
+	})
+	return
+}
+
+func (self Image) GetListBuild(http *gin.Context) {
+	type ParamsValidate struct {
+		Page     int `form:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize int `form:"pageSize" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -107,30 +174,8 @@ func (self Image) GetList(http *gin.Context) {
 		params.PageSize = 10
 	}
 
-	if params.Type == "all" {
-		go func() {
-			// 同步镜像数据
-			logic.ImageLogic{}.SyncImage()
-		}()
-	}
-
 	query := dao.Image.Order(dao.Image.ID.Desc())
-
-	switch params.Type {
-	case "build":
-		query = query.Where(dao.Image.Status.In(logic.STATUS_STOP, logic.STATUS_PROCESSING, logic.STATUS_ERROR))
-		break
-	case "self":
-		query = query.Where(dao.Image.Status.Eq(logic.STATUS_SUCCESS)).Where(dao.Image.Type.Eq(logic.IMAGE_TYPE_SELF))
-		break
-	case "all":
-		query = query.Where(dao.Image.Status.Eq(logic.STATUS_SUCCESS))
-	}
-	if params.Name != "" {
-		query = query.Where(dao.Image.Name.Like("%" + params.Name + "%"))
-	}
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
-
 	self.JsonResponseWithoutError(http, gin.H{
 		"total": total,
 		"page":  params.Page,
@@ -141,7 +186,41 @@ func (self Image) GetList(http *gin.Context) {
 
 func (self Image) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Id int32 `form:"id" binding:"required"`
+		Id string `form:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	layer, err := sdk.Client.ImageHistory(context.Background(), params.Id)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	imageDetail, _, err := sdk.Client.ImageInspectWithRaw(context.Background(), params.Id)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"layer": layer,
+		"info":  imageDetail,
+	})
+	return
+}
+
+func (self Image) Remote(http *gin.Context) {
+	type ParamsValidate struct {
+		Id   int32  `form:"id" binding:"required"`
+		Tag  string `form:"tag" binding:"required"`
+		Type string `form:"type" binding:"required,oneof=pull push"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -153,25 +232,57 @@ func (self Image) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("镜像不存在"), 500)
 		return
 	}
+	urls, err := url.Parse("https://" + params.Tag)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	registry, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(urls.Host)).First()
+	if registry == nil {
+		self.JsonResponseWithError(http, errors.New(fmt.Sprintf("推送前请先添加 %s 仓库的权限", urls.Host)), 500)
+		return
+	}
 	sdk, err := docker.NewDockerClient()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	layer, err := sdk.Client.ImageHistory(context.Background(), imageRow.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	imageDetail, _, err := sdk.Client.ImageInspectWithRaw(context.Background(), imageRow.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"layer": layer,
-		"info":  imageDetail,
+	password, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registry.Password)
+	authString := function.Base64Encode(struct {
+		Username      string `json:"username"`
+		Password      string `json:"password"`
+		ServerAddress string `json:"serveraddress"`
+	}{
+		Username:      registry.Username,
+		Password:      password,
+		ServerAddress: registry.ServerAddress,
 	})
-	return
+	var out io.ReadCloser
+	if params.Type == "pull" {
+		out, err = sdk.Client.ImagePull(context.Background(), params.Tag, types.ImagePullOptions{
+			RegistryAuth: authString,
+		})
+	} else {
+		out, err = sdk.Client.ImagePush(context.Background(), params.Tag, types.ImagePushOptions{
+			RegistryAuth: authString,
+		})
+	}
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	io.Copy(os.Stdout, out)
+}
+
+func (self Image) Pull(http *gin.Context) {
+
+}
+
+func (self Image) TagDelete(http *gin.Context) {
+
+}
+
+func (self Image) TagAdd(http *gin.Context) {
+
 }

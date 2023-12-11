@@ -28,19 +28,16 @@ func newImage(db *gorm.DB, opts ...gen.DOOption) image {
 	tableName := _image.imageDo.TableName()
 	_image.ALL = field.NewAsterisk(tableName)
 	_image.ID = field.NewInt32(tableName, "id")
-	_image.Name = field.NewString(tableName, "name")
-	_image.Md5 = field.NewString(tableName, "md5")
-	_image.Tag = field.NewField(tableName, "tag")
-	_image.Size = field.NewString(tableName, "size")
+	_image.Tag = field.NewString(tableName, "tag")
 	_image.BuildGit = field.NewString(tableName, "build_git")
-	_image.Registry = field.NewString(tableName, "registry")
+	_image.BuildDockerfile = field.NewString(tableName, "build_dockerfile")
+	_image.BuildZip = field.NewString(tableName, "build_zip")
 	_image.Status = field.NewInt32(tableName, "status")
 	_image.StatusStep = field.NewString(tableName, "status_step")
 	_image.Message = field.NewString(tableName, "message")
 	_image.CreatedAt = field.NewInt32(tableName, "created_at")
 	_image.DeletedAt = field.NewField(tableName, "deleted_at")
-	_image.ContainerTotal = field.NewInt32(tableName, "container_total")
-	_image.Type = field.NewInt32(tableName, "type")
+	_image.Md5 = field.NewString(tableName, "md5")
 
 	_image.fillFieldMap()
 
@@ -50,21 +47,18 @@ func newImage(db *gorm.DB, opts ...gen.DOOption) image {
 type image struct {
 	imageDo
 
-	ALL            field.Asterisk
-	ID             field.Int32
-	Name           field.String
-	Md5            field.String
-	Tag            field.Field
-	Size           field.String
-	BuildGit       field.String
-	Registry       field.String
-	Status         field.Int32
-	StatusStep     field.String
-	Message        field.String
-	CreatedAt      field.Int32
-	DeletedAt      field.Field
-	ContainerTotal field.Int32
-	Type           field.Int32
+	ALL             field.Asterisk
+	ID              field.Int32
+	Tag             field.String
+	BuildGit        field.String
+	BuildDockerfile field.String
+	BuildZip        field.String
+	Status          field.Int32
+	StatusStep      field.String
+	Message         field.String
+	CreatedAt       field.Int32
+	DeletedAt       field.Field
+	Md5             field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -82,19 +76,16 @@ func (i image) As(alias string) *image {
 func (i *image) updateTableName(table string) *image {
 	i.ALL = field.NewAsterisk(table)
 	i.ID = field.NewInt32(table, "id")
-	i.Name = field.NewString(table, "name")
-	i.Md5 = field.NewString(table, "md5")
-	i.Tag = field.NewField(table, "tag")
-	i.Size = field.NewString(table, "size")
+	i.Tag = field.NewString(table, "tag")
 	i.BuildGit = field.NewString(table, "build_git")
-	i.Registry = field.NewString(table, "registry")
+	i.BuildDockerfile = field.NewString(table, "build_dockerfile")
+	i.BuildZip = field.NewString(table, "build_zip")
 	i.Status = field.NewInt32(table, "status")
 	i.StatusStep = field.NewString(table, "status_step")
 	i.Message = field.NewString(table, "message")
 	i.CreatedAt = field.NewInt32(table, "created_at")
 	i.DeletedAt = field.NewField(table, "deleted_at")
-	i.ContainerTotal = field.NewInt32(table, "container_total")
-	i.Type = field.NewInt32(table, "type")
+	i.Md5 = field.NewString(table, "md5")
 
 	i.fillFieldMap()
 
@@ -111,21 +102,18 @@ func (i *image) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (i *image) fillFieldMap() {
-	i.fieldMap = make(map[string]field.Expr, 14)
+	i.fieldMap = make(map[string]field.Expr, 11)
 	i.fieldMap["id"] = i.ID
-	i.fieldMap["name"] = i.Name
-	i.fieldMap["md5"] = i.Md5
 	i.fieldMap["tag"] = i.Tag
-	i.fieldMap["size"] = i.Size
 	i.fieldMap["build_git"] = i.BuildGit
-	i.fieldMap["registry"] = i.Registry
+	i.fieldMap["build_dockerfile"] = i.BuildDockerfile
+	i.fieldMap["build_zip"] = i.BuildZip
 	i.fieldMap["status"] = i.Status
 	i.fieldMap["status_step"] = i.StatusStep
 	i.fieldMap["message"] = i.Message
 	i.fieldMap["created_at"] = i.CreatedAt
 	i.fieldMap["deleted_at"] = i.DeletedAt
-	i.fieldMap["container_total"] = i.ContainerTotal
-	i.fieldMap["type"] = i.Type
+	i.fieldMap["md5"] = i.Md5
 }
 
 func (i image) clone(db *gorm.DB) image {

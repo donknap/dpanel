@@ -2,8 +2,8 @@ package logic
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/docker/docker/api/types"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -22,18 +22,24 @@ func (self EventLogic) MonitorLoop() {
 	for true {
 		select {
 		case message := <-messageChan:
-			actor, _ := json.Marshal(message.Actor.Attributes)
 			dao.Event.Create(&entity.Event{
-				Type:      message.Type,
+				Type:   message.Type,
+				Action: message.Action,
+				Message: &accessor.EventMessageOption{
+					Content: message.Actor.Attributes,
+				},
 				CreatedAt: time.Unix(message.Time, 0).Format("2006-01-02 15:04:05"),
-				Message:   string(actor),
+				Read:      0,
 			})
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 1)
 		case err := <-errorChan:
 			dao.Event.Create(&entity.Event{
-				Type:      "error",
+				Type: "error",
+				Message: &accessor.EventMessageOption{
+					Err: err.Error(),
+				},
 				CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
-				Message:   err.Error(),
+				Read:      0,
 			})
 			time.Sleep(time.Second)
 		}
