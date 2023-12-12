@@ -15,7 +15,6 @@ type Provider struct {
 
 func (provider *Provider) Register(httpServer *http_server.Server, console console.Console) {
 	logic.RegisterDockerTask()
-
 	// 注册一个 application:test 命令
 	console.RegisterCommand(new(command.Test))
 

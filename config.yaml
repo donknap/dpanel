@@ -10,7 +10,7 @@ server:
     port: 8084
 log:
   default:
-    driver: stream
+    driver: ${LOG_DEFAULT_DRIVER-console}
     path: run.log
     level: debug
 database:

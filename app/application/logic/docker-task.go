@@ -49,6 +49,7 @@ type BuildImageMessage struct {
 	DockerFileInPath  string // Dockerfile 所在路径
 	Tag               string // 镜像Tag
 	ImageId           int32
+	Context           string // Dockerfile 所在的目录
 }
 
 type DockerTask struct {

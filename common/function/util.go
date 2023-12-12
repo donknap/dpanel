@@ -2,6 +2,7 @@ package function
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
@@ -123,6 +124,18 @@ func IsEmptyArray[T interface{}](v []T) bool {
 	}
 	if len(v) == 0 {
 		return true
+	}
+	return false
+}
+
+func InArray[T cmp.Ordered](v []T, item T) bool {
+	if v == nil {
+		return false
+	}
+	for _, t := range v {
+		if t == item {
+			return true
+		}
 	}
 	return false
 }

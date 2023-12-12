@@ -1,6 +1,8 @@
 module github.com/donknap/dpanel
 
-go 1.19
+go 1.21
+
+toolchain go1.21.3
 
 require (
 	github.com/docker/docker v24.0.7+incompatible
@@ -10,9 +12,9 @@ require (
 	github.com/gorilla/websocket v1.5.1
 	github.com/opencontainers/image-spec v1.0.2
 	github.com/spf13/cobra v1.8.0
-	github.com/spf13/viper v1.17.0
-	github.com/we7coreteam/w7-rangine-go v1.0.21
-	github.com/we7coreteam/w7-rangine-go-support v1.0.1
+	github.com/spf13/viper v1.18.1
+	github.com/we7coreteam/w7-rangine-go v1.0.24
+	github.com/we7coreteam/w7-rangine-go-support v1.0.2
 	gorm.io/gen v0.3.24
 	gorm.io/gorm v1.25.5
 	gorm.io/plugin/dbresolver v1.5.0
@@ -62,7 +64,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
+	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/redis/go-redis/v9 v9.3.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
@@ -80,9 +82,10 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
+	go.uber.org/zap/exp v0.2.0 // indirect
 	golang.org/x/arch v0.6.0 // indirect
 	golang.org/x/crypto v0.16.0 // indirect
-	golang.org/x/exp v0.0.0-20231127185646-65229373498e // indirect
+	golang.org/x/exp v0.0.0-20231206192017-f3f8817b8deb // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect

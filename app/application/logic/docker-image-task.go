@@ -64,6 +64,9 @@ func (self *DockerTask) ImageBuildLoop() {
 			if message.DockerFileContent != nil {
 				builder.WithDockerFileContent(message.DockerFileContent)
 			}
+			if message.Context != "" {
+				builder.WithDockerFilePath(message.Context)
+			}
 			builder.WithTag(message.Tag)
 			self.imageStepMessage[message.ImageId].step(STEP_IMAGE_BUILD_UPLOAD_TAR)
 			response, err := builder.Execute()

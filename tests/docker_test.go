@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
+	"log/slog"
 	"math"
 	"os"
 	"strings"
@@ -211,6 +212,18 @@ func TestLoginRegistry(t *testing.T) {
 	}
 }
 
+func TestImage(t *testing.T) {
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		fmt.Printf("%v \n", err)
+	}
+	result, _, err := sdk.Client.ImageInspectWithRaw(context.Background(), "dddd:latest")
+	fmt.Printf("%v \n", result)
+	result1, err := sdk.Client.ImageRemove(context.Background(), "phpmyadmin", types.ImageRemoveOptions{})
+	fmt.Printf("%v \n", result1)
+	fmt.Printf("%v \n", err)
+}
+
 func TestCode(t *testing.T) {
 	image := "phpmyadmin:"
 	fmt.Printf("%v \n", strings.Split(image, ":"))
@@ -218,5 +231,6 @@ func TestCode(t *testing.T) {
 	fmt.Printf("%v \n", a[1])
 
 	fmt.Printf("%v \n", os.TempDir())
+	slog.Info("abc", "def", os.TempDir(), "def", os.O_RDWR)
 
 }

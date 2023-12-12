@@ -19,6 +19,7 @@ var (
 	Q        = new(Query)
 	Event    *event
 	Image    *image
+	Notice   *notice
 	Registry *registry
 	RunEnv   *runEnv
 	Site     *site
@@ -28,6 +29,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	Event = &Q.Event
 	Image = &Q.Image
+	Notice = &Q.Notice
 	Registry = &Q.Registry
 	RunEnv = &Q.RunEnv
 	Site = &Q.Site
@@ -38,6 +40,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		db:       db,
 		Event:    newEvent(db, opts...),
 		Image:    newImage(db, opts...),
+		Notice:   newNotice(db, opts...),
 		Registry: newRegistry(db, opts...),
 		RunEnv:   newRunEnv(db, opts...),
 		Site:     newSite(db, opts...),
@@ -49,6 +52,7 @@ type Query struct {
 
 	Event    event
 	Image    image
+	Notice   notice
 	Registry registry
 	RunEnv   runEnv
 	Site     site
@@ -61,6 +65,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		db:       db,
 		Event:    q.Event.clone(db),
 		Image:    q.Image.clone(db),
+		Notice:   q.Notice.clone(db),
 		Registry: q.Registry.clone(db),
 		RunEnv:   q.RunEnv.clone(db),
 		Site:     q.Site.clone(db),
@@ -80,6 +85,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		db:       db,
 		Event:    q.Event.replaceDB(db),
 		Image:    q.Image.replaceDB(db),
+		Notice:   q.Notice.replaceDB(db),
 		Registry: q.Registry.replaceDB(db),
 		RunEnv:   q.RunEnv.replaceDB(db),
 		Site:     q.Site.replaceDB(db),
@@ -89,6 +95,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 type queryCtx struct {
 	Event    IEventDo
 	Image    IImageDo
+	Notice   INoticeDo
 	Registry IRegistryDo
 	RunEnv   IRunEnvDo
 	Site     ISiteDo
@@ -98,6 +105,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
 		Event:    q.Event.WithContext(ctx),
 		Image:    q.Image.WithContext(ctx),
+		Notice:   q.Notice.WithContext(ctx),
 		Registry: q.Registry.WithContext(ctx),
 		RunEnv:   q.RunEnv.WithContext(ctx),
 		Site:     q.Site.WithContext(ctx),

@@ -2,10 +2,7 @@ package common
 
 import (
 	"github.com/donknap/dpanel/app/common/http/controller"
-	"github.com/donknap/dpanel/app/common/http/middleware"
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/entity"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/console"
@@ -20,28 +17,23 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		cors := engine.Group("/", common.CorsMiddleware{}.Process)
 
-		cors.POST("/common/attach/upload", middleware.Home{}.Process, controller.Attach{}.Upload)
+		cors.POST("/common/attach/upload", controller.Attach{}.Upload)
 
 		// 仓库相关
-		cors.POST("/common/registry/create", middleware.Home{}.Process, controller.Registry{}.Create)
-		cors.POST("/common/registry/get-list", middleware.Home{}.Process, controller.Registry{}.GetList)
+		cors.POST("/common/registry/create", controller.Registry{}.Create)
+		cors.POST("/common/registry/get-list", controller.Registry{}.GetList)
 
 		// 全局
-		var lastEvent *entity.Event
-		lastEvent, _ = dao.Event.Where(dao.Event.Read.Eq(0)).First()
-		if lastEvent == nil {
-			lastEvent = &entity.Event{
-				ID: 0,
-			}
-		}
-		cors.POST("/common/event/unread", middleware.Home{}.Process, func(context *gin.Context) {
-			controller.Event{}.Unread(context, lastEvent)
-		})
+		cors.POST("/common/event/unread", controller.Event{}.Unread)
+		cors.POST("/common/event/get-list", controller.Event{}.GetList)
+		cors.POST("/common/event/mark-read", controller.Event{}.MarkRead)
+
+		cors.POST("/common/notice/unread", (&controller.Notice{}).Unread)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
-		engine.GET("/home/index", middleware.Home{}.Process, controller.Home{}.Index)
-		engine.GET("/home/ws", middleware.Home{}.Process, controller.Home{}.Ws)
+		engine.GET("/home/index", controller.Home{}.Index)
+		engine.GET("/home/ws", controller.Home{}.Ws)
 	})
 
 	event := logic.EventLogic{}

@@ -19,3 +19,4 @@ relation:
       message:
         serializer: json
         type: EventMessageOption
+  - table: ims_notice

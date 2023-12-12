@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
@@ -29,6 +30,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		DockerFile string `form:"dockerFile" binding:"omitempty"`
 		ZipFile    string `form:"zipFile" binding:"omitempty,required_without=DockerFile"`
 		Git        string `form:"git" binding:"omitempty"`
+		Context    string `form:"context" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -42,7 +44,8 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 
 	mustHasZipFile := false
 	buildImageTask := &logic.BuildImageMessage{
-		Tag: params.Tag,
+		Tag:     params.Tag,
+		Context: "./" + strings.Trim(strings.Trim(params.Context, "./"), "/") + "/Dockerfile",
 	}
 	addStr := []string{
 		"ADD",
@@ -229,8 +232,8 @@ func (self Image) Remote(http *gin.Context) {
 
 	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
 	if imageRow == nil {
-		self.JsonResponseWithError(http, errors.New("镜像不存在"), 500)
-		return
+		//self.JsonResponseWithError(http, errors.New("镜像不存在"), 500)
+		//return
 	}
 	urls, err := url.Parse("https://" + params.Tag)
 	if err != nil {
@@ -242,6 +245,7 @@ func (self Image) Remote(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New(fmt.Sprintf("推送前请先添加 %s 仓库的权限", urls.Host)), 500)
 		return
 	}
+
 	sdk, err := docker.NewDockerClient()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -257,32 +261,88 @@ func (self Image) Remote(http *gin.Context) {
 		Password:      password,
 		ServerAddress: registry.ServerAddress,
 	})
-	var out io.ReadCloser
-	if params.Type == "pull" {
-		out, err = sdk.Client.ImagePull(context.Background(), params.Tag, types.ImagePullOptions{
-			RegistryAuth: authString,
-		})
-	} else {
-		out, err = sdk.Client.ImagePush(context.Background(), params.Tag, types.ImagePushOptions{
-			RegistryAuth: authString,
-		})
+	go func() {
+		service.Notice{}.Info(params.Type, fmt.Sprintf("开始 %s 镜像 %s", params.Type, params.Tag))
+		var out io.ReadCloser
+		if params.Type == "pull" {
+			out, err = sdk.Client.ImagePull(context.Background(), params.Tag, types.ImagePullOptions{
+				RegistryAuth: authString,
+			})
+		} else {
+			out, err = sdk.Client.ImagePush(context.Background(), params.Tag, types.ImagePushOptions{
+				RegistryAuth: authString,
+			})
+		}
+		if err != nil {
+			service.Notice{}.Error(params.Type, err.Error())
+			return
+		}
+		io.Copy(io.Discard, out)
+		service.Notice{}.Info(params.Type, fmt.Sprintf("镜像 %s %s 成功", params.Tag, params.Type))
+	}()
+	self.JsonResponseWithoutError(http, gin.H{
+		"tag": params.Tag,
+	})
+	return
+}
+
+func (self Image) TagDelete(http *gin.Context) {
+	type ParamsValidate struct {
+		Tag   string `form:"tag" binding:"required"`
+		Force bool   `form:"force" binding:"omitempty"`
 	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	sdk, err := docker.NewDockerClient()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	io.Copy(os.Stdout, out)
-}
-
-func (self Image) Pull(http *gin.Context) {
-
-}
-
-func (self Image) TagDelete(http *gin.Context) {
-
+	_, err = sdk.Client.ImageRemove(context.Background(), params.Tag, types.ImageRemoveOptions{
+		Force: params.Force,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"tag": params.Tag,
+	})
+	return
 }
 
 func (self Image) TagAdd(http *gin.Context) {
-
+	type ParamsValidate struct {
+		Md5 string `form:"md5" binding:"required"`
+		Tag string `form:"tag" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	sdk, err := docker.NewDockerClient()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	imageDetail, _, err := sdk.Client.ImageInspectWithRaw(context.Background(), params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if function.InArray[string](imageDetail.RepoTags, params.Tag) {
+		self.JsonResponseWithError(http, errors.New("该标签已经存在"), 500)
+		return
+	}
+	err = sdk.Client.ImageTag(context.Background(), imageDetail.RepoTags[0], params.Tag)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"tag": params.Tag,
+	})
+	return
 }
