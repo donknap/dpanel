@@ -30,4 +30,5 @@ func (self Home) Ws(http *gin.Context) {
 	}
 	go client.ReadMessage()
 	go client.SendMessage()
+	client.SendMessageQueue <- "welcome DPanel"
 }

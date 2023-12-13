@@ -95,42 +95,49 @@ func (self *imageBuildBuilder) Execute() (response types.ImageBuildResponse, err
 	if err != nil {
 		return response, err
 	}
-	tarWriter := tar.NewWriter(tarArchive)
-	defer tarWriter.Close()
-	defer os.Remove(tarArchive.Name())
+	if self.imageBuildOption.RemoteContext != "" {
+		response, err = Sdk.Client.ImageBuild(context.Background(), tarArchive, self.imageBuildOption)
+		if err != nil {
+			return response, err
+		}
+	} else {
+		tarWriter := tar.NewWriter(tarArchive)
+		defer tarWriter.Close()
+		defer os.Remove(tarArchive.Name())
 
-	if self.zipFilePath != "" {
-		err = self.makeTarByZip(tarWriter)
-		if err != nil {
-			return response, err
+		if self.zipFilePath != "" {
+			err = self.makeTarByZip(tarWriter)
+			if err != nil {
+				return response, err
+			}
 		}
-	}
-	if self.dockerFileContent != nil {
-		file, _ := os.CreateTemp("", "dpanel")
-		defer file.Close()
-		defer os.Remove(file.Name())
+		if self.dockerFileContent != nil {
+			file, _ := os.CreateTemp("", "dpanel")
+			defer file.Close()
+			defer os.Remove(file.Name())
 
-		file.Write(self.dockerFileContent)
-		file.Seek(0, io.SeekStart)
-		fileInfo, _ := file.Stat()
-		fileInfoHeader, err := tar.FileInfoHeader(fileInfo, "")
+			file.Write(self.dockerFileContent)
+			file.Seek(0, io.SeekStart)
+			fileInfo, _ := file.Stat()
+			fileInfoHeader, err := tar.FileInfoHeader(fileInfo, "")
+			if err != nil {
+				return response, err
+			}
+			fileInfoHeader.Name = "Dockerfile"
+			err = tarWriter.WriteHeader(fileInfoHeader)
+			if err != nil {
+				return response, err
+			}
+			_, err = io.Copy(tarWriter, file)
+			if err != nil {
+				return response, err
+			}
+		}
+		tarArchive.Seek(0, io.SeekStart)
+		response, err = Sdk.Client.ImageBuild(context.Background(), tarArchive, self.imageBuildOption)
 		if err != nil {
 			return response, err
 		}
-		fileInfoHeader.Name = "Dockerfile"
-		err = tarWriter.WriteHeader(fileInfoHeader)
-		if err != nil {
-			return response, err
-		}
-		_, err = io.Copy(tarWriter, file)
-		if err != nil {
-			return response, err
-		}
-	}
-	tarArchive.Seek(0, io.SeekStart)
-	response, err = self.dockerSdk.ImageBuild(context.Background(), tarArchive, self.imageBuildOption)
-	if err != nil {
-		return response, err
 	}
 	return response, nil
 }

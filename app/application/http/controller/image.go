@@ -36,11 +36,14 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		return
 	}
 
-	if params.DockerFile == "" && params.ZipFile == "" {
-		self.JsonResponseWithError(http, errors.New("至少需要指定Dockerfile或是Zip包"), 500)
+	if params.DockerFile == "" && params.ZipFile == "" && params.Git == "" {
+		self.JsonResponseWithError(http, errors.New("至少需要指定 Dockerfile、Zip 包或是 Git 地址"), 500)
 		return
 	}
-
+	if params.ZipFile != "" && params.Git != "" {
+		self.JsonResponseWithError(http, errors.New("Zip 包和 Git 地址只需要只定一项"), 500)
+		return
+	}
 	mustHasZipFile := false
 	buildImageTask := &logic.BuildImageMessage{
 		Tag:     params.Tag,
@@ -57,8 +60,8 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	}
 
 	if mustHasZipFile {
-		if params.ZipFile == "" {
-			self.JsonResponseWithError(http, errors.New("Dockerfile中包含添加文件操作，请上传对应的zip包"), 500)
+		if params.ZipFile == "" && params.Git == "" {
+			self.JsonResponseWithError(http, errors.New("Dockerfile中包含添加文件操作，请上传对应的Zip包或是指定Git仓库"), 500)
 			return
 		}
 	}
@@ -73,6 +76,9 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	}
 	if params.DockerFile != "" {
 		buildImageTask.DockerFileContent = []byte(params.DockerFile)
+	}
+	if params.Git != "" {
+		buildImageTask.GitUrl = params.Git
 	}
 
 	imageRow := &entity.Image{

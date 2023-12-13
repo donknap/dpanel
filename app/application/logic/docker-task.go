@@ -5,7 +5,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"log/slog"
-	"mime/multipart"
 )
 
 const REGISTER_NAME = "containerTask"
@@ -46,9 +45,9 @@ type CreateMessage struct {
 
 type BuildImageMessage struct {
 	ZipPath           string // 构建包
-	ZipPathUploadFile multipart.File
 	DockerFileContent []byte // 自定义Dockerfile
 	DockerFileInPath  string // Dockerfile 所在路径
+	GitUrl            string
 	Tag               string // 镜像Tag
 	ImageId           int32
 	Context           string // Dockerfile 所在的目录

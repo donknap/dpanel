@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"io"
 	"log/slog"
 	"strings"
@@ -63,11 +65,19 @@ func (self *DockerTask) ImageBuildLoop() {
 			if message.Context != "" {
 				builder.WithDockerFilePath(message.Context)
 			}
+			if message.GitUrl != "" {
+				builder.WithGitUrl(message.GitUrl)
+			}
 			builder.WithTag(message.Tag)
 			self.imageStepMessage[message.ImageId].step(STEP_IMAGE_BUILD_UPLOAD_TAR)
 			response, err := builder.Execute()
 			if err != nil {
 				slog.Error(err.Error())
+				notice.QueueNoticePushMessage <- &entity.Notice{
+					Type:    "error",
+					Title:   "image.build",
+					Message: err.Error(),
+				}
 				self.imageStepMessage[message.ImageId].err(err)
 				break
 			}
