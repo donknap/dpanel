@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"context"
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -14,11 +13,7 @@ type EventLogic struct {
 }
 
 func (self EventLogic) MonitorLoop() {
-	sdk, err := docker.NewDockerClient()
-	if err != nil {
-		panic(err)
-	}
-	messageChan, errorChan := sdk.Client.Events(context.Background(), types.EventsOptions{})
+	messageChan, errorChan := docker.Sdk.Client.Events(docker.Sdk.Ctx, types.EventsOptions{})
 	for true {
 		select {
 		case message := <-messageChan:
@@ -29,7 +24,6 @@ func (self EventLogic) MonitorLoop() {
 					Content: message.Actor.Attributes,
 				},
 				CreatedAt: time.Unix(message.Time, 0).Format("2006-01-02 15:04:05"),
-				Read:      0,
 			})
 			time.Sleep(time.Second * 1)
 		case err := <-errorChan:
@@ -39,7 +33,6 @@ func (self EventLogic) MonitorLoop() {
 					Err: err.Error(),
 				},
 				CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
-				Read:      0,
 			})
 			time.Sleep(time.Second)
 		}

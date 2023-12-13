@@ -16,7 +16,6 @@ type Event struct {
 	Type      string                       `gorm:"column:type" json:"type"`
 	Action    string                       `gorm:"column:action" json:"action"`
 	Message   *accessor.EventMessageOption `gorm:"column:message;serializer:json" json:"message"`
-	Read      int32                        `gorm:"column:read" json:"read"`
 	CreatedAt string                       `gorm:"column:created_at" json:"createdAt"`
 }
 

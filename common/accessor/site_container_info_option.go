@@ -37,11 +37,7 @@ func (c *SiteContainerInfoOption) Scan(value interface{}) error {
 		c.Status = STATUS_ERROR
 		return nil
 	}
-	sdk, err := docker.NewDockerClient()
-	if err != nil {
-		return nil
-	}
-	containerInfo, err := sdk.ContainerByField("id", id)
+	containerInfo, err := docker.Sdk.ContainerByField("id", id)
 	if err != nil {
 		// 这里容器发生错误
 		c.Err = err.Error()

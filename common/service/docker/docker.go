@@ -13,6 +13,10 @@ import (
 	"strings"
 )
 
+var (
+	Sdk, _ = NewDockerClient()
+)
+
 type Builder struct {
 	Client *client.Client
 	Ctx    context.Context

@@ -139,12 +139,7 @@ func (self RunLog) Run(http *gin.Context) {
 		return
 	}
 
-	sdk, err := docker.NewDockerClient()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	builder := sdk.GetContainerLogBuilder()
+	builder := docker.Sdk.GetContainerLogBuilder()
 	builder.WithContainerId(siteRow.ContainerInfo.Info.ID)
 	builder.WithTail(params.LineTotal)
 	content, err := builder.Execute()

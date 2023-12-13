@@ -26,12 +26,7 @@ type progress struct {
 }
 
 func (self *DockerTask) CreateLoop() {
-	sdk, err := docker.NewDockerClient()
-	if err != nil {
-		panic(err)
-	}
-	self.sdk = sdk
-
+	self.sdk = docker.Sdk
 	for {
 		select {
 		case message := <-self.QueueCreate:
@@ -41,7 +36,7 @@ func (self *DockerTask) CreateLoop() {
 			slog.Info(fmt.Sprintf("run site id %d", message.SiteId))
 			self.containerStepMessage[message.SiteId] = newContainerStepMessage(message.SiteId)
 			self.containerStepMessage[message.SiteId].step(STEP_IMAGE_PULL)
-			err = self.pullImage(message)
+			err := self.pullImage(message)
 			if err != nil {
 				slog.Info("steplog", err.Error())
 				self.containerStepMessage[message.SiteId].err(err)
@@ -49,7 +44,7 @@ func (self *DockerTask) CreateLoop() {
 			}
 
 			self.containerStepMessage[message.SiteId].step(STEP_CONTAINER_BUILD)
-			builder := sdk.GetContainerCreateBuilder()
+			builder := docker.Sdk.GetContainerCreateBuilder()
 			builder.WithImage(message.RunParams.Image.GetImage())
 			builder.WithContext(context.Background())
 			builder.WithContainerName(message.Name)
@@ -87,7 +82,7 @@ func (self *DockerTask) CreateLoop() {
 			self.containerStepMessage[message.SiteId].syncSiteContainerInfo(response.ID)
 
 			self.containerStepMessage[message.SiteId].step(STEP_CONTAINER_RUN)
-			err = sdk.Client.ContainerStart(context.Background(), response.ID, types.ContainerStartOptions{})
+			err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, types.ContainerStartOptions{})
 			if err != nil {
 				slog.Error(err.Error())
 				self.containerStepMessage[message.SiteId].err(err)

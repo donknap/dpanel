@@ -224,6 +224,21 @@ func TestImage(t *testing.T) {
 	fmt.Printf("%v \n", err)
 }
 
+func TestChan(t *testing.T) {
+	messageQueue := make(chan string, 10)
+	ctx := context.WithValue(context.Background(), "message", messageQueue)
+	ctx, canel := context.WithCancel(ctx)
+	messageQueue <- "abc"
+
+	messageChan := ctx.Value("message").(chan string)
+
+	select {
+	case str := <-messageChan:
+		fmt.Printf("%v \n", str)
+	}
+	fmt.Printf("%v \n", canel)
+}
+
 func TestCode(t *testing.T) {
 	image := "phpmyadmin:"
 	fmt.Printf("%v \n", strings.Split(image, ":"))

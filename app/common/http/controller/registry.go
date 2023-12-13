@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"errors"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/dao"
@@ -35,12 +34,7 @@ func (self Registry) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("仓库已经存在"), 500)
 		return
 	}
-	sdk, err := docker.NewDockerClient()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	response, err := sdk.Client.RegistryLogin(context.Background(), registry.AuthConfig{
+	response, err := docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, registry.AuthConfig{
 		Username:      params.Username,
 		Password:      params.Password,
 		ServerAddress: params.ServerAddress,

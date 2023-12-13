@@ -24,11 +24,11 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		cors.POST("/common/registry/get-list", controller.Registry{}.GetList)
 
 		// 全局
-		cors.POST("/common/event/unread", controller.Event{}.Unread)
 		cors.POST("/common/event/get-list", controller.Event{}.GetList)
-		cors.POST("/common/event/mark-read", controller.Event{}.MarkRead)
 
-		cors.POST("/common/notice/unread", (&controller.Notice{}).Unread)
+		cors.POST("/common/notice/unread", controller.Notice{}.Unread)
+		cors.POST("/common/notice/get-list", controller.Notice{}.GetList)
+		cors.POST("/common/notice/delete", controller.Notice{}.Delete)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

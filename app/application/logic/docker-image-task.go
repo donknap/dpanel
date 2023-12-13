@@ -40,11 +40,7 @@ type aux struct {
 }
 
 func (self *DockerTask) ImageBuildLoop() {
-	sdk, err := docker.NewDockerClient()
-	if err != nil {
-		panic(err)
-	}
-	self.sdk = sdk
+	self.sdk = docker.Sdk
 
 	for {
 		select {
@@ -57,7 +53,7 @@ func (self *DockerTask) ImageBuildLoop() {
 			self.imageStepMessage[message.ImageId] = newImageStepMessage(message.ImageId)
 			self.imageStepMessage[message.ImageId].step(STEP_IMAGE_BUILD)
 
-			builder := sdk.GetImageBuildBuilder()
+			builder := docker.Sdk.GetImageBuildBuilder()
 			if message.ZipPath != "" {
 				builder.WithZipFilePath(message.ZipPath)
 			}

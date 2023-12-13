@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types"
@@ -49,12 +48,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			checkPorts = append(checkPorts, port.Host)
 		}
 		if checkPorts != nil {
-			sdk, err := docker.NewDockerClient()
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			item, err := sdk.ContainerByField("publish", checkPorts...)
+			item, err := docker.Sdk.ContainerByField("publish", checkPorts...)
 			fmt.Printf("%v \n", err)
 			if len(item) > 0 {
 				self.JsonResponseWithError(http, errors.New("绑定的外部端口已经被占用，请更换其它端外部端口"), 500)
@@ -216,15 +210,10 @@ func (self Site) ReDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 		return
 	}
-	sdk, err := docker.NewDockerClient()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	if siteRow.ContainerInfo != nil && siteRow.ContainerInfo.ID != "" {
-		ctx := context.Background()
-		sdk.Client.ContainerStop(ctx, siteRow.ContainerInfo.ID, container.StopOptions{})
-		err = sdk.Client.ContainerRemove(ctx, siteRow.ContainerInfo.ID, types.ContainerRemoveOptions{})
+		ctx := docker.Sdk.Ctx
+		docker.Sdk.Client.ContainerStop(ctx, siteRow.ContainerInfo.ID, container.StopOptions{})
+		err := docker.Sdk.Client.ContainerRemove(ctx, siteRow.ContainerInfo.ID, types.ContainerRemoveOptions{})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -254,10 +243,6 @@ func (self Site) ReDeploy(http *gin.Context) {
 		RunParams: runParams,
 	}
 	task.QueueCreate <- runTaskRow
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	self.JsonResponseWithoutError(http, gin.H{"siteId": siteRow.ID})
 
 	return
@@ -281,20 +266,15 @@ func (self Site) Delete(http *gin.Context) {
 		return
 	}
 	var err error
-	sdk, err := docker.NewDockerClient()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	if siteRow.ContainerInfo != nil && siteRow.ContainerInfo.ID != "" {
-		ctx := context.Background()
-		sdk.Client.ContainerStop(ctx, siteRow.ContainerInfo.ID, container.StopOptions{})
-		err = sdk.Client.ContainerRemove(ctx, siteRow.ContainerInfo.ID, types.ContainerRemoveOptions{
+		ctx := docker.Sdk.Ctx
+		docker.Sdk.Client.ContainerStop(ctx, siteRow.ContainerInfo.ID, container.StopOptions{})
+		err = docker.Sdk.Client.ContainerRemove(ctx, siteRow.ContainerInfo.ID, types.ContainerRemoveOptions{
 			RemoveVolumes: params.DeleteVolume,
 			RemoveLinks:   params.DeleteLink,
 		})
 		if params.DeleteImage {
-			sdk.Client.ImageRemove(ctx, siteRow.ContainerInfo.Info.ImageID, types.ImageRemoveOptions{})
+			docker.Sdk.Client.ImageRemove(ctx, siteRow.ContainerInfo.Info.ImageID, types.ImageRemoveOptions{})
 		}
 	}
 	if err != nil {

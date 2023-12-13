@@ -1,52 +1,33 @@
 package controller
 
 import (
-	"fmt"
+	"errors"
+	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/we7coreteam/w7-rangine-go/src/core/err_handler"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
-	"net/http"
 )
 
 type Home struct {
 	controller.Abstract
 }
 
-func (home Home) Index(ctx *gin.Context) {
-	home.JsonResponseWithoutError(ctx, "hello world!")
+func (self Home) Index(ctx *gin.Context) {
+	self.JsonResponseWithoutError(ctx, "hello world!")
 	return
 }
 
-func (home Home) Ws(ctx *gin.Context) {
-	wsServer := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
-	}
-	ws, err := wsServer.Upgrade(ctx.Writer, ctx.Request, nil)
-
-	if err_handler.Found(err) {
-		println(err.Error())
-		home.JsonResponseWithoutError(ctx, err.Error())
+func (self Home) Ws(http *gin.Context) {
+	if !websocket.IsWebSocketUpgrade(http.Request) {
+		self.JsonResponseWithError(http, errors.New("please connect using websocket"), 500)
 		return
 	}
-	defer ws.Close()
 
-	for {
-		mt, message, err := ws.ReadMessage()
-		if err != nil {
-			fmt.Println(err)
-			break
-		}
-		println(string(message))
-		if string(message) == "ping" {
-			message = []byte("pong")
-		}
-		err = ws.WriteMessage(mt, message)
-		if err != nil {
-			fmt.Println(err)
-			break
-		}
+	client, err := logic.NewClientConn(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
+	go client.ReadMessage()
+	go client.SendMessage()
 }
