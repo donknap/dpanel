@@ -93,8 +93,50 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	dao.Image.Create(imageRow)
 	buildImageTask.ImageId = imageRow.ID
 
-	task := logic.NewDockerTask()
-	task.QueueBuildImage <- buildImageTask
+	go func() {
+		builder := docker.Sdk.GetImageBuildBuilder()
+		if buildImageTask.ZipPath != "" {
+			builder.WithZipFilePath(buildImageTask.ZipPath)
+		}
+		if buildImageTask.DockerFileContent != nil {
+			builder.WithDockerFileContent(buildImageTask.DockerFileContent)
+		}
+		if buildImageTask.Context != "" {
+			builder.WithDockerFilePath(buildImageTask.Context)
+		}
+		if buildImageTask.GitUrl != "" {
+			builder.WithGitUrl(buildImageTask.GitUrl)
+		}
+		builder.WithTag(buildImageTask.Tag)
+		response, err := builder.Execute()
+		if err != nil {
+			notice.QueueNoticePushMessage <- &entity.Notice{
+				Type:    "error",
+				Title:   "image.build",
+				Message: err.Error(),
+			}
+			return
+		}
+		defer response.Body.Close()
+		progressChan := docker.Sdk.Progress(response.Body)
+		for {
+			select {
+			case message, ok := <-progressChan:
+				if !ok {
+					notice.Message{}.Success("imageBuild", params.Tag)
+					return
+				}
+				if message.Stream != nil {
+					message.TaskId = 54
+					docker.QueueDockerProgressMessage <- message
+				}
+				if message.Err != nil {
+					notice.Message{}.Error("imageBuild", message.Err.Error())
+					return
+				}
+			}
+		}
+	}()
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"imageId": imageRow.ID,

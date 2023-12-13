@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"encoding/json"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -102,6 +103,12 @@ func (self *Client) SendMessage() {
 		case message := <-notice.QueueNoticePushMessage:
 			data := &RespMessage{
 				Type: "notice",
+				Data: message,
+			}
+			self.conn.WriteMessage(websocket.TextMessage, data.ToJson())
+		case message := <-docker.QueueDockerProgressMessage:
+			data := &RespMessage{
+				Type: "imageBuild",
 				Data: message,
 			}
 			self.conn.WriteMessage(websocket.TextMessage, data.ToJson())

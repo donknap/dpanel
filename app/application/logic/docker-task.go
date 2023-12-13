@@ -19,7 +19,6 @@ func RegisterDockerTask() {
 			obj.QueueBuildImage = make(chan *BuildImageMessage, 999)
 			obj.imageStepMessage = make(map[int32]*imageStepMessage)
 
-			obj.QueueNotice = make(chan *NoticeMessage, 999)
 			return obj
 		},
 	)
@@ -60,7 +59,6 @@ type NoticeMessage struct {
 type DockerTask struct {
 	QueueCreate          chan *CreateMessage             // 用于放置构建容器任务
 	QueueBuildImage      chan *BuildImageMessage         // 用于放置构建镜像任务
-	QueueNotice          chan *NoticeMessage             // 用于放置通知Notice
 	containerStepMessage map[int32]*containerStepMessage // 用于记录部署任务日志
 	imageStepMessage     map[int32]*imageStepMessage     // 用于记录构建镜像中日志
 	sdk                  *docker.Builder

@@ -32,8 +32,3 @@ var StepStatusValue = map[string]int{
 	STEP_CONTAINER_BUILD: 3,
 	STEP_CONTAINER_RUN:   4,
 }
-
-const (
-	IMAGE_TYPE_SELF = 10
-	IMAGE_TYPE_ALL  = 20
-)
