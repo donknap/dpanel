@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
@@ -35,7 +36,6 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-
 	if params.DockerFile == "" && params.ZipFile == "" && params.Git == "" {
 		self.JsonResponseWithError(http, errors.New("至少需要指定 Dockerfile、Zip 包或是 Git 地址"), 500)
 		return
@@ -58,7 +58,6 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 			mustHasZipFile = true
 		}
 	}
-
 	if mustHasZipFile {
 		if params.ZipFile == "" && params.Git == "" {
 			self.JsonResponseWithError(http, errors.New("Dockerfile中包含添加文件操作，请上传对应的Zip包或是指定Git仓库"), 500)
@@ -66,7 +65,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		}
 	}
 	if params.ZipFile != "" {
-		path := os.TempDir() + "/" + params.ZipFile
+		path := storage.Local{}.GetRealPath(params.ZipFile)
 		_, err := os.Stat(path)
 		if os.IsNotExist(err) {
 			self.JsonResponseWithError(http, errors.New("请先上传压缩包"), 500)
@@ -80,64 +79,39 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	if params.Git != "" {
 		buildImageTask.GitUrl = params.Git
 	}
-
-	imageRow := &entity.Image{
+	imageNew := &entity.Image{
 		Tag:             params.Tag,
 		BuildGit:        params.Git,
 		BuildDockerfile: params.DockerFile,
 		BuildZip:        params.ZipFile,
+		BuildRoot:       params.Context,
 		Status:          logic.STATUS_STOP,
-		StatusStep:      "",
 		Message:         "",
 	}
-	dao.Image.Create(imageRow)
+	imageRow, _ := dao.Image.Where(dao.Image.Tag.Eq(params.Tag)).First()
+	if imageRow == nil {
+		imageRow = imageNew
+		dao.Image.Create(imageRow)
+	} else {
+		if params.ZipFile != imageRow.BuildZip {
+			storage.Local{}.Delete(imageRow.BuildZip)
+		}
+		dao.Image.Select(
+			dao.Image.BuildDockerfile,
+			dao.Image.BuildRoot,
+			dao.Image.BuildZip,
+			dao.Image.BuildGit,
+			dao.Image.Status,
+			dao.Image.Message,
+		).Where(dao.Image.ID.Eq(imageRow.ID)).Updates(imageNew)
+	}
 	buildImageTask.ImageId = imageRow.ID
 
-	go func() {
-		builder := docker.Sdk.GetImageBuildBuilder()
-		if buildImageTask.ZipPath != "" {
-			builder.WithZipFilePath(buildImageTask.ZipPath)
-		}
-		if buildImageTask.DockerFileContent != nil {
-			builder.WithDockerFileContent(buildImageTask.DockerFileContent)
-		}
-		if buildImageTask.Context != "" {
-			builder.WithDockerFilePath(buildImageTask.Context)
-		}
-		if buildImageTask.GitUrl != "" {
-			builder.WithGitUrl(buildImageTask.GitUrl)
-		}
-		builder.WithTag(buildImageTask.Tag)
-		response, err := builder.Execute()
-		if err != nil {
-			notice.QueueNoticePushMessage <- &entity.Notice{
-				Type:    "error",
-				Title:   "image.build",
-				Message: err.Error(),
-			}
-			return
-		}
-		defer response.Body.Close()
-		progressChan := docker.Sdk.Progress(response.Body)
-		for {
-			select {
-			case message, ok := <-progressChan:
-				if !ok {
-					notice.Message{}.Success("imageBuild", params.Tag)
-					return
-				}
-				if message.Stream != nil {
-					message.TaskId = 54
-					docker.QueueDockerProgressMessage <- message
-				}
-				if message.Err != nil {
-					notice.Message{}.Error("imageBuild", message.Err.Error())
-					return
-				}
-			}
-		}
-	}()
-
+	err := logic.DockerTask{}.ImageBuild(buildImageTask)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"imageId": imageRow.ID,
 	})
@@ -175,14 +149,7 @@ func (self Image) GetList(http *gin.Context) {
 
 	if params.Type == "self" {
 		query := dao.Image.Order(dao.Image.ID.Desc())
-		switch params.Type {
-		case "build":
-			query = query.Where(dao.Image.Status.In(logic.STATUS_STOP, logic.STATUS_PROCESSING, logic.STATUS_ERROR))
-			break
-		case "self":
-			query = query.Where(dao.Image.Status.In(logic.STATUS_SUCCESS))
-			break
-		}
+		query = query.Where(dao.Image.Status.In(logic.STATUS_SUCCESS))
 		list, _ := query.Find()
 		if list == nil {
 			self.JsonResponseWithoutError(http, gin.H{
@@ -305,7 +272,7 @@ func (self Image) Remote(http *gin.Context) {
 			notice.Message{}.Error(params.Type, err.Error())
 			return
 		}
-		progressChan := docker.Sdk.Progress(out)
+		progressChan := docker.Sdk.Progress(out, params.Tag)
 		for {
 			select {
 			case message, ok := <-progressChan:
@@ -374,6 +341,25 @@ func (self Image) TagAdd(http *gin.Context) {
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"tag": params.Tag,
+	})
+	return
+}
+
+func (self Image) GetImageTask(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `form:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
+	if imageRow == nil {
+		self.JsonResponseWithError(http, errors.New("构建任务不存在"), 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"task": imageRow,
 	})
 	return
 }

@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
@@ -111,7 +112,8 @@ func (self *Client) SendMessage() {
 				Type: "imageBuild",
 				Data: message,
 			}
-			self.conn.WriteMessage(websocket.TextMessage, data.ToJson())
+			err := self.conn.WriteMessage(websocket.TextMessage, data.ToJson())
+			fmt.Printf("%v \n", err)
 		}
 	}
 }

@@ -17,6 +17,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		cors := engine.Group("/", common.CorsMiddleware{}.Process)
 
 		cors.POST("/common/attach/upload", controller.Attach{}.Upload)
+		cors.POST("/common/attach/delete", controller.Attach{}.Delete)
 
 		// 仓库相关
 		cors.POST("/common/registry/create", controller.Registry{}.Create)

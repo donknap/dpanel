@@ -20,7 +20,6 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 
 	task := logic.NewDockerTask()
 	go task.CreateLoop()
-	go task.ImageBuildLoop()
 
 	// 注册一些路由
 	httpServer.RegisterRouters(
@@ -45,11 +44,11 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			cors.POST("/app/image/remote", controller.Image{}.Remote)
 			cors.POST("/app/image/tag-delete", controller.Image{}.TagDelete)
 			cors.POST("/app/image/tag-add", controller.Image{}.TagAdd)
+			cors.POST("/app/image/get-image-task", controller.Image{}.GetImageTask)
 
 			// 日志相关
 			cors.POST("/app/log/task", controller.RunLog{}.Task)
 			cors.POST("/app/log/run", controller.RunLog{}.Run)
-			cors.POST("/app/log/image-build", controller.RunLog{}.ImageBuild)
 		},
 	)
 }

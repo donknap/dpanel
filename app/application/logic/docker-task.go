@@ -17,8 +17,6 @@ func RegisterDockerTask() {
 			obj.containerStepMessage = make(map[int32]*containerStepMessage)
 
 			obj.QueueBuildImage = make(chan *BuildImageMessage, 999)
-			obj.imageStepMessage = make(map[int32]*imageStepMessage)
-
 			return obj
 		},
 	)
@@ -60,19 +58,11 @@ type DockerTask struct {
 	QueueCreate          chan *CreateMessage             // 用于放置构建容器任务
 	QueueBuildImage      chan *BuildImageMessage         // 用于放置构建镜像任务
 	containerStepMessage map[int32]*containerStepMessage // 用于记录部署任务日志
-	imageStepMessage     map[int32]*imageStepMessage     // 用于记录构建镜像中日志
 	sdk                  *docker.Builder
 }
 
 func (self *DockerTask) GetTaskContainerStepLog(taskId int32) *containerStepMessage {
 	if stepLog, ok := self.containerStepMessage[taskId]; ok {
-		return stepLog
-	}
-	return nil
-}
-
-func (self *DockerTask) GetTaskImageBuildStepLog(taskId int32) *imageStepMessage {
-	if stepLog, ok := self.imageStepMessage[taskId]; ok {
 		return stepLog
 	}
 	return nil

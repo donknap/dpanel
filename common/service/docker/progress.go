@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 )
 
-func (self Builder) Progress(out io.ReadCloser) (progressReadChan <-chan *Progress) {
+func (self Builder) Progress(out io.ReadCloser, taskId string) (progressReadChan <-chan *Progress) {
 	progressChan := make(chan *Progress)
 	go func() {
 		defer close(progressChan)
@@ -20,11 +20,13 @@ func (self Builder) Progress(out io.ReadCloser) (progressReadChan <-chan *Progre
 		reader := bufio.NewReaderSize(out, 8192)
 		for {
 			line, _, err := reader.ReadLine()
-			fmt.Printf("%v \n", string(line))
+			slog.Info("image build", "line", string(line))
 			if err == io.EOF {
 				return
 			} else {
-				p := &Progress{}
+				p := &Progress{
+					TaskId: taskId,
+				}
 				if bytes.Contains(line, []byte("errorDetail")) {
 					errorDetail := &progressErrDetail{}
 					err = json.Unmarshal(line, &errorDetail)

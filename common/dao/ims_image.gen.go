@@ -33,11 +33,9 @@ func newImage(db *gorm.DB, opts ...gen.DOOption) image {
 	_image.BuildDockerfile = field.NewString(tableName, "build_dockerfile")
 	_image.BuildZip = field.NewString(tableName, "build_zip")
 	_image.Status = field.NewInt32(tableName, "status")
-	_image.StatusStep = field.NewString(tableName, "status_step")
 	_image.Message = field.NewString(tableName, "message")
-	_image.CreatedAt = field.NewInt32(tableName, "created_at")
-	_image.DeletedAt = field.NewField(tableName, "deleted_at")
 	_image.Md5 = field.NewString(tableName, "md5")
+	_image.BuildRoot = field.NewString(tableName, "build_root")
 
 	_image.fillFieldMap()
 
@@ -54,11 +52,9 @@ type image struct {
 	BuildDockerfile field.String
 	BuildZip        field.String
 	Status          field.Int32
-	StatusStep      field.String
 	Message         field.String
-	CreatedAt       field.Int32
-	DeletedAt       field.Field
 	Md5             field.String
+	BuildRoot       field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -81,11 +77,9 @@ func (i *image) updateTableName(table string) *image {
 	i.BuildDockerfile = field.NewString(table, "build_dockerfile")
 	i.BuildZip = field.NewString(table, "build_zip")
 	i.Status = field.NewInt32(table, "status")
-	i.StatusStep = field.NewString(table, "status_step")
 	i.Message = field.NewString(table, "message")
-	i.CreatedAt = field.NewInt32(table, "created_at")
-	i.DeletedAt = field.NewField(table, "deleted_at")
 	i.Md5 = field.NewString(table, "md5")
+	i.BuildRoot = field.NewString(table, "build_root")
 
 	i.fillFieldMap()
 
@@ -102,18 +96,16 @@ func (i *image) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (i *image) fillFieldMap() {
-	i.fieldMap = make(map[string]field.Expr, 11)
+	i.fieldMap = make(map[string]field.Expr, 9)
 	i.fieldMap["id"] = i.ID
 	i.fieldMap["tag"] = i.Tag
 	i.fieldMap["build_git"] = i.BuildGit
 	i.fieldMap["build_dockerfile"] = i.BuildDockerfile
 	i.fieldMap["build_zip"] = i.BuildZip
 	i.fieldMap["status"] = i.Status
-	i.fieldMap["status_step"] = i.StatusStep
 	i.fieldMap["message"] = i.Message
-	i.fieldMap["created_at"] = i.CreatedAt
-	i.fieldMap["deleted_at"] = i.DeletedAt
 	i.fieldMap["md5"] = i.Md5
+	i.fieldMap["build_root"] = i.BuildRoot
 }
 
 func (i image) clone(db *gorm.DB) image {

@@ -15,7 +15,7 @@ import (
 
 var (
 	Sdk, _                     = NewDockerClient()
-	QueueDockerProgressMessage = make(chan *Progress)
+	QueueDockerProgressMessage = make(chan *Progress, 999)
 )
 
 type Builder struct {

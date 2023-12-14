@@ -43,7 +43,7 @@ type ProgressRemoteImageAux struct {
 }
 
 type Progress struct {
-	TaskId int32 // 用于标识任务进度id
+	TaskId string // 用于标识任务进度id
 	Detail *progressDetail
 	Stream *progressStream
 	Aux    *progressAux

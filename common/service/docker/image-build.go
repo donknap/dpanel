@@ -64,7 +64,6 @@ func (self *imageBuildBuilder) makeTarByZip(tarWriter *tar.Writer) (err error) {
 		return err
 	}
 	defer zipArchive.Close()
-	defer os.Remove(self.zipFilePath)
 
 	for _, zipFile := range zipArchive.File {
 		if strings.HasPrefix(zipFile.Name, "__MACOSX") {
@@ -91,7 +90,7 @@ func (self *imageBuildBuilder) makeTarByZip(tarWriter *tar.Writer) (err error) {
 
 func (self *imageBuildBuilder) Execute() (response types.ImageBuildResponse, err error) {
 	tarArchive, err := os.CreateTemp("", "dpanel")
-	slog.Info("tar path ", tarArchive.Name())
+	slog.Info("build tar", "path", tarArchive.Name())
 	if err != nil {
 		return response, err
 	}

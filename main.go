@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"fmt"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
 	"github.com/donknap/dpanel/common/dao"
@@ -11,10 +12,14 @@ import (
 	app "github.com/we7coreteam/w7-rangine-go/src"
 	"github.com/we7coreteam/w7-rangine-go/src/http"
 	"github.com/we7coreteam/w7-rangine-go/src/http/middleware"
+	"path/filepath"
 )
 
-//go:embed config.yaml
-var ConfigFile []byte
+var (
+	//go:embed config.yaml
+	ConfigFile  []byte
+	RootPath, _ = filepath.Abs("./")
+)
 
 type provider struct {
 	ConfigDefault func(viper *viper.Viper)
@@ -27,7 +32,7 @@ func main() {
 			Name: "w7-rangine-go-skeleton",
 		},
 	)
-
+	fmt.Printf("%v \n", RootPath)
 	// 业务中需要使用 http server，这里需要先实例化
 	httpServer := new(http.Provider).Register(app.GetConfig(), app.GetConsole(), app.GetServerManager()).Export()
 	// 注册一些全局中间件，路由或是其它一些全局操作
