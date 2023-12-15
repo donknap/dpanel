@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -26,6 +27,8 @@ type Image struct {
 
 func (self Image) CreateByDockerfile(http *gin.Context) {
 	type ParamsValidate struct {
+		Id         int32  `form:"id"`
+		Registry   string `form:"registry"`
 		Tag        string `form:"tag" binding:"required"`
 		DockerFile string `form:"dockerFile" binding:"omitempty"`
 		ZipFile    string `form:"zipFile" binding:"omitempty,required_without=DockerFile"`
@@ -46,8 +49,13 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	}
 	mustHasZipFile := false
 	buildImageTask := &logic.BuildImageMessage{
-		Tag:     params.Tag,
-		Context: "./" + strings.Trim(strings.Trim(params.Context, "./"), "/") + "/Dockerfile",
+		Tag: params.Tag,
+	}
+	if params.Registry != "" {
+		buildImageTask.Tag = params.Registry + "/" + params.Tag
+	}
+	if params.Context != "" {
+		buildImageTask.Context = "./" + strings.Trim(strings.Trim(strings.Trim(params.Context, ""), "./"), "/") + "/Dockerfile"
 	}
 	addStr := []string{
 		"ADD",
@@ -80,6 +88,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		buildImageTask.GitUrl = params.Git
 	}
 	imageNew := &entity.Image{
+		Registry:        params.Registry,
 		Tag:             params.Tag,
 		BuildGit:        params.Git,
 		BuildDockerfile: params.DockerFile,
@@ -88,7 +97,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		Status:          logic.STATUS_STOP,
 		Message:         "",
 	}
-	imageRow, _ := dao.Image.Where(dao.Image.Tag.Eq(params.Tag)).First()
+	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
 	if imageRow == nil {
 		imageRow = imageNew
 		dao.Image.Create(imageRow)
@@ -103,6 +112,8 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 			dao.Image.BuildGit,
 			dao.Image.Status,
 			dao.Image.Message,
+			dao.Image.Registry,
+			dao.Image.Tag,
 		).Where(dao.Image.ID.Eq(imageRow.ID)).Updates(imageNew)
 	}
 	buildImageTask.ImageId = imageRow.ID
@@ -121,6 +132,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 func (self Image) GetList(http *gin.Context) {
 	type ParamsValidate struct {
 		Type string `form:"type" binding:"required,oneof=all self"`
+		Tag  string `form:"tag" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -157,11 +169,26 @@ func (self Image) GetList(http *gin.Context) {
 			})
 			return
 		}
+		var tag string
 		for _, image := range list {
 			for _, summary := range imageList {
-				if image.Md5 == summary.ID {
+				if image.Registry != "" {
+					tag = image.Registry + "/" + image.Tag
+				} else {
+					tag = image.Tag
+				}
+				if function.InArray(summary.RepoTags, tag) ||
+					function.InArray(summary.RepoTags, tag+":latest") {
 					result = append(result, summary)
 				}
+			}
+		}
+	} else if params.Tag != "" {
+		for _, summary := range imageList {
+			if function.InArray(summary.RepoTags, params.Tag) ||
+				function.InArray(summary.RepoTags, params.Tag+":latest") ||
+				function.InArray(summary.RepoTags, params.Tag+":none") {
+				result = append(result, summary)
 			}
 		}
 	} else {
@@ -361,5 +388,37 @@ func (self Image) GetImageTask(http *gin.Context) {
 	self.JsonResponseWithoutError(http, gin.H{
 		"task": imageRow,
 	})
+	return
+}
+
+func (self Image) ImageDelete(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5 []string `form:"md5" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	if !function.IsEmptyArray(params.Md5) {
+		for _, sha := range params.Md5 {
+			_, err := docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, sha, types.ImageRemoveOptions{
+				PruneChildren: true,
+			})
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Image) ImagePrune(http *gin.Context) {
+	filter := filters.NewArgs()
+	filter.Add("dangling", "0")
+	docker.Sdk.Client.ImagesPrune(docker.Sdk.Ctx, filter)
+	self.JsonSuccessResponse(http)
 	return
 }

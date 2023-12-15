@@ -36,6 +36,9 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			cors.POST("/app/site/delete", controller.Site{}.Delete)
 			cors.POST("/app/site/re-deploy", controller.Site{}.ReDeploy)
 
+			// 容器相关
+			cors.POST("/app/container/status", controller.Container{}.Status)
+
 			// 镜像相关
 			cors.POST("/app/image/create-by-dockerfile", controller.Image{}.CreateByDockerfile)
 			cors.POST("/app/image/get-list", controller.Image{}.GetList)
@@ -45,6 +48,8 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			cors.POST("/app/image/tag-delete", controller.Image{}.TagDelete)
 			cors.POST("/app/image/tag-add", controller.Image{}.TagAdd)
 			cors.POST("/app/image/get-image-task", controller.Image{}.GetImageTask)
+			cors.POST("/app/image/image-delete", controller.Image{}.ImageDelete)
+			cors.POST("/app/image/image-prune", controller.Image{}.ImagePrune)
 
 			// 日志相关
 			cors.POST("/app/log/task", controller.RunLog{}.Task)

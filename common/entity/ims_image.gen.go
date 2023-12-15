@@ -9,14 +9,15 @@ const TableNameImage = "ims_image"
 // Image mapped from table <ims_image>
 type Image struct {
 	ID              int32  `gorm:"column:id;type:INTEGER" json:"id"`
+	Registry        string `gorm:"column:registry" json:"registry"`
 	Tag             string `gorm:"column:tag" json:"tag"`
+	Md5             string `gorm:"column:md5" json:"md5"`
 	BuildGit        string `gorm:"column:build_git" json:"buildGit"`
 	BuildDockerfile string `gorm:"column:build_dockerfile" json:"buildDockerfile"`
 	BuildZip        string `gorm:"column:build_zip" json:"buildZip"`
+	BuildRoot       string `gorm:"column:build_root" json:"buildRoot"`
 	Status          int32  `gorm:"column:status" json:"status"`
 	Message         string `gorm:"column:message" json:"message"`
-	Md5             string `gorm:"column:md5" json:"md5"`
-	BuildRoot       string `gorm:"column:build_root" json:"buildRoot"`
 }
 
 // TableName Image's table name
