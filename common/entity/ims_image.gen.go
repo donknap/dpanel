@@ -11,13 +11,14 @@ type Image struct {
 	ID              int32  `gorm:"column:id;type:INTEGER" json:"id"`
 	Registry        string `gorm:"column:registry" json:"registry"`
 	Tag             string `gorm:"column:tag" json:"tag"`
-	Md5             string `gorm:"column:md5" json:"md5"`
 	BuildGit        string `gorm:"column:build_git" json:"buildGit"`
 	BuildDockerfile string `gorm:"column:build_dockerfile" json:"buildDockerfile"`
 	BuildZip        string `gorm:"column:build_zip" json:"buildZip"`
 	BuildRoot       string `gorm:"column:build_root" json:"buildRoot"`
 	Status          int32  `gorm:"column:status" json:"status"`
 	Message         string `gorm:"column:message" json:"message"`
+	BuildType       string `gorm:"column:build_type" json:"buildType"`
+	BuildTemplate   string `gorm:"column:build_template" json:"buildTemplate"`
 }
 
 // TableName Image's table name

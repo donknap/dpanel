@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -177,15 +178,23 @@ func (self Site) GetList(http *gin.Context) {
 
 func (self Site) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Id int32 `form:"id" binding:"required"`
+		Id  int32  `form:"id" binding:"required"`
+		Md5 string `form:"md5"`
 	}
-
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
-	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(params.Id)).First()
+	var siteRow *entity.Site
+	if params.Md5 != "" {
+		siteRow, _ = dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
+			ID: params.Md5,
+		})).First()
+	} else {
+		siteRow, _ = dao.Site.Where(dao.Site.ID.Eq(params.Id)).First()
+	}
+
 	if siteRow == nil {
 		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 		return
@@ -284,6 +293,45 @@ func (self Site) Delete(http *gin.Context) {
 	dao.Site.Where(dao.Site.ID.Eq(params.Id)).Delete()
 	self.JsonResponseWithoutError(http, gin.H{
 		"siteId": params.Id,
+	})
+	return
+}
+
+// Deprecated: 暂时无用
+func (self Site) SearchImage(http *gin.Context) {
+	type ParamsValidate struct {
+		Tag      string `form:"tag" binding:"required"`
+		Registry string `form:"registry" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	var list []registry.SearchResult
+	if params.Registry == "docker.io" {
+		list, _ = docker.Sdk.Client.ImageSearch(docker.Sdk.Ctx, params.Tag, types.ImageSearchOptions{
+			Limit: 10,
+		})
+	} else {
+		imageList, _ := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, types.ImageListOptions{
+			All: false,
+		})
+		if !function.IsEmptyArray(imageList) {
+			for _, summary := range imageList {
+				for _, tag := range summary.RepoTags {
+					if strings.Contains(tag, params.Tag) {
+						list = append(list, registry.SearchResult{
+							Name: tag,
+						})
+						break
+					}
+				}
+			}
+
+		}
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": list,
 	})
 	return
 }

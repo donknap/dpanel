@@ -9,7 +9,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/registry"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"math"
@@ -239,5 +238,5 @@ func TestChan(t *testing.T) {
 }
 
 func TestCode(t *testing.T) {
-	fmt.Printf("%v \n", function.GetRootPath())
+
 }

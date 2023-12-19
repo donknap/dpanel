@@ -30,13 +30,14 @@ func newImage(db *gorm.DB, opts ...gen.DOOption) image {
 	_image.ID = field.NewInt32(tableName, "id")
 	_image.Registry = field.NewString(tableName, "registry")
 	_image.Tag = field.NewString(tableName, "tag")
-	_image.Md5 = field.NewString(tableName, "md5")
 	_image.BuildGit = field.NewString(tableName, "build_git")
 	_image.BuildDockerfile = field.NewString(tableName, "build_dockerfile")
 	_image.BuildZip = field.NewString(tableName, "build_zip")
 	_image.BuildRoot = field.NewString(tableName, "build_root")
 	_image.Status = field.NewInt32(tableName, "status")
 	_image.Message = field.NewString(tableName, "message")
+	_image.BuildType = field.NewString(tableName, "build_type")
+	_image.BuildTemplate = field.NewString(tableName, "build_template")
 
 	_image.fillFieldMap()
 
@@ -50,13 +51,14 @@ type image struct {
 	ID              field.Int32
 	Registry        field.String
 	Tag             field.String
-	Md5             field.String
 	BuildGit        field.String
 	BuildDockerfile field.String
 	BuildZip        field.String
 	BuildRoot       field.String
 	Status          field.Int32
 	Message         field.String
+	BuildType       field.String
+	BuildTemplate   field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -76,13 +78,14 @@ func (i *image) updateTableName(table string) *image {
 	i.ID = field.NewInt32(table, "id")
 	i.Registry = field.NewString(table, "registry")
 	i.Tag = field.NewString(table, "tag")
-	i.Md5 = field.NewString(table, "md5")
 	i.BuildGit = field.NewString(table, "build_git")
 	i.BuildDockerfile = field.NewString(table, "build_dockerfile")
 	i.BuildZip = field.NewString(table, "build_zip")
 	i.BuildRoot = field.NewString(table, "build_root")
 	i.Status = field.NewInt32(table, "status")
 	i.Message = field.NewString(table, "message")
+	i.BuildType = field.NewString(table, "build_type")
+	i.BuildTemplate = field.NewString(table, "build_template")
 
 	i.fillFieldMap()
 
@@ -99,17 +102,18 @@ func (i *image) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (i *image) fillFieldMap() {
-	i.fieldMap = make(map[string]field.Expr, 10)
+	i.fieldMap = make(map[string]field.Expr, 11)
 	i.fieldMap["id"] = i.ID
 	i.fieldMap["registry"] = i.Registry
 	i.fieldMap["tag"] = i.Tag
-	i.fieldMap["md5"] = i.Md5
 	i.fieldMap["build_git"] = i.BuildGit
 	i.fieldMap["build_dockerfile"] = i.BuildDockerfile
 	i.fieldMap["build_zip"] = i.BuildZip
 	i.fieldMap["build_root"] = i.BuildRoot
 	i.fieldMap["status"] = i.Status
 	i.fieldMap["message"] = i.Message
+	i.fieldMap["build_type"] = i.BuildType
+	i.fieldMap["build_template"] = i.BuildTemplate
 }
 
 func (i image) clone(db *gorm.DB) image {

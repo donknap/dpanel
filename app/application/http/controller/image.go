@@ -27,23 +27,25 @@ type Image struct {
 
 func (self Image) CreateByDockerfile(http *gin.Context) {
 	type ParamsValidate struct {
-		Id         int32  `form:"id"`
-		Registry   string `form:"registry"`
-		Tag        string `form:"tag" binding:"required"`
-		DockerFile string `form:"dockerFile" binding:"omitempty"`
-		ZipFile    string `form:"zipFile" binding:"omitempty,required_without=DockerFile"`
-		Git        string `form:"git" binding:"omitempty"`
-		Context    string `form:"context" binding:"omitempty"`
+		Id              int32  `form:"id"`
+		Registry        string `form:"registry"`
+		Tag             string `form:"tag" binding:"required"`
+		BuildType       string `form:"buildType" binding:"required"`
+		BuildDockerfile string `form:"buildDockerfile" binding:"omitempty"`
+		BuildGit        string `form:"buildGit" binding:"omitempty"`
+		BuildZip        string `form:"buildZip" binding:"omitempty"`
+		BuildRoot       string `form:"buildRoot" binding:"omitempty"`
+		BuildTemplate   string `form:"buildTemplate" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if params.DockerFile == "" && params.ZipFile == "" && params.Git == "" {
+	if params.BuildDockerfile == "" && params.BuildZip == "" && params.BuildGit == "" {
 		self.JsonResponseWithError(http, errors.New("至少需要指定 Dockerfile、Zip 包或是 Git 地址"), 500)
 		return
 	}
-	if params.ZipFile != "" && params.Git != "" {
+	if params.BuildZip != "" && params.BuildGit != "" {
 		self.JsonResponseWithError(http, errors.New("Zip 包和 Git 地址只需要只定一项"), 500)
 		return
 	}
@@ -54,26 +56,26 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	if params.Registry != "" {
 		buildImageTask.Tag = params.Registry + "/" + params.Tag
 	}
-	if params.Context != "" {
-		buildImageTask.Context = "./" + strings.Trim(strings.Trim(strings.Trim(params.Context, ""), "./"), "/") + "/Dockerfile"
+	if params.BuildRoot != "" {
+		buildImageTask.Context = "./" + strings.Trim(strings.Trim(strings.Trim(params.BuildRoot, ""), "./"), "/") + "/Dockerfile"
 	}
 	addStr := []string{
 		"ADD",
 		"COPY",
 	}
 	for _, str := range addStr {
-		if strings.Contains(strings.ToUpper(params.DockerFile), str) {
+		if strings.Contains(strings.ToUpper(params.BuildDockerfile), str) {
 			mustHasZipFile = true
 		}
 	}
 	if mustHasZipFile {
-		if params.ZipFile == "" && params.Git == "" {
+		if params.BuildZip == "" && params.BuildGit == "" {
 			self.JsonResponseWithError(http, errors.New("Dockerfile中包含添加文件操作，请上传对应的Zip包或是指定Git仓库"), 500)
 			return
 		}
 	}
-	if params.ZipFile != "" {
-		path := storage.Local{}.GetRealPath(params.ZipFile)
+	if params.BuildZip != "" {
+		path := storage.Local{}.GetRealPath(params.BuildZip)
 		_, err := os.Stat(path)
 		if os.IsNotExist(err) {
 			self.JsonResponseWithError(http, errors.New("请先上传压缩包"), 500)
@@ -81,19 +83,21 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		}
 		buildImageTask.ZipPath = path
 	}
-	if params.DockerFile != "" {
-		buildImageTask.DockerFileContent = []byte(params.DockerFile)
+	if params.BuildDockerfile != "" {
+		buildImageTask.DockerFileContent = []byte(params.BuildDockerfile)
 	}
-	if params.Git != "" {
-		buildImageTask.GitUrl = params.Git
+	if params.BuildGit != "" {
+		buildImageTask.GitUrl = params.BuildGit
 	}
 	imageNew := &entity.Image{
 		Registry:        params.Registry,
 		Tag:             params.Tag,
-		BuildGit:        params.Git,
-		BuildDockerfile: params.DockerFile,
-		BuildZip:        params.ZipFile,
-		BuildRoot:       params.Context,
+		BuildGit:        params.BuildGit,
+		BuildDockerfile: params.BuildDockerfile,
+		BuildZip:        params.BuildZip,
+		BuildRoot:       params.BuildRoot,
+		BuildType:       params.BuildType,
+		BuildTemplate:   params.BuildTemplate,
 		Status:          logic.STATUS_STOP,
 		Message:         "",
 	}
@@ -102,7 +106,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		imageRow = imageNew
 		dao.Image.Create(imageRow)
 	} else {
-		if params.ZipFile != imageRow.BuildZip {
+		if params.BuildZip != imageRow.BuildZip {
 			storage.Local{}.Delete(imageRow.BuildZip)
 		}
 		dao.Image.Select(
@@ -229,19 +233,19 @@ func (self Image) GetListBuild(http *gin.Context) {
 
 func (self Image) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Id string `form:"id" binding:"required"`
+		Md5 string `form:"id" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
-	layer, err := docker.Sdk.Client.ImageHistory(docker.Sdk.Ctx, params.Id)
+	layer, err := docker.Sdk.Client.ImageHistory(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	imageDetail, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Id)
+	imageDetail, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
