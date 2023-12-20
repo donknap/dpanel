@@ -14,7 +14,7 @@ type EventLogic struct {
 
 func (self EventLogic) MonitorLoop() {
 	messageChan, errorChan := docker.Sdk.Client.Events(docker.Sdk.Ctx, types.EventsOptions{})
-	for true {
+	for {
 		select {
 		case message := <-messageChan:
 			dao.Event.Create(&entity.Event{

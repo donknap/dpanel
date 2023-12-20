@@ -95,10 +95,6 @@ func (self *DockerTask) CreateLoop() {
 			}
 			self.containerStepMessage[message.SiteId].success()
 			delete(self.containerStepMessage, message.SiteId)
-		default:
-			for key, _ := range self.containerStepMessage {
-				delete(self.containerStepMessage, key)
-			}
 		}
 	}
 }

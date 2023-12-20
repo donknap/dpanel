@@ -198,7 +198,7 @@ func TestLoginRegistry(t *testing.T) {
 	fmt.Printf("%v \n", auth)
 
 	messageChan, errorChan := sdk.Client.Events(context.Background(), types.EventsOptions{})
-	for true {
+	for {
 		select {
 		case messaage := <-messageChan:
 			fmt.Printf("%v \n", messaage)
