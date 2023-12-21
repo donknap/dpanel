@@ -50,3 +50,8 @@ type Progress struct {
 	Status *progressStatus
 	Err    error
 }
+
+type ProgressDownloadImage struct {
+	Downloading float64 `json:"downloading"`
+	Extracting  float64 `json:"extracting"`
+}

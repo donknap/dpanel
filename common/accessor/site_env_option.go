@@ -1,8 +1,9 @@
 package accessor
 
 type MappingItem struct {
-	Host string `json:"host"`
-	Dest string `json:"dest"`
+	Host       string `json:"host"`
+	Dest       string `json:"dest"`
+	Permission string `json:"permission"`
 }
 
 type LinkItem struct {
@@ -13,6 +14,12 @@ type LinkItem struct {
 type EnvItem struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+type PortItem struct {
+	Type string `json:"type"`
+	Host string `json:"host"`
+	Dest string `json:"dest"`
 }
 
 type ImageItem struct {
@@ -29,9 +36,12 @@ func (self ImageItem) GetImage() string {
 }
 
 type SiteEnvOption struct {
-	Environment []EnvItem     `json:"environment"`
-	Links       []LinkItem    `json:"links"`
-	Ports       []MappingItem `json:"ports"`
-	Volumes     []MappingItem `json:"volumes"`
-	Image       ImageItem     `json:"image"`
+	Environment    []EnvItem     `json:"environment"`
+	Links          []LinkItem    `json:"links"`
+	Ports          []PortItem    `json:"ports"`
+	Volumes        []MappingItem `json:"volumes"`
+	VolumesDefault []MappingItem `json:"volumesDefault"`
+	ImageName      string        `json:"imageName"`
+	Privileged     bool          `json:"privileged"`
+	Restart        string        `json:"restart"`
 }

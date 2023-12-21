@@ -3,11 +3,13 @@ package docker
 import (
 	"context"
 	"fmt"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"log/slog"
 	"strings"
 )
 
@@ -27,14 +29,15 @@ func (self *ContainerCreateBuilder) withSdk(sdk *client.Client) *ContainerCreate
 	return self
 }
 
-func (self *ContainerCreateBuilder) WithContext(ctx context.Context) *ContainerCreateBuilder {
-	self.ctx = ctx
-	return self
-}
-
 func (self *ContainerCreateBuilder) WithContainerName(name string) *ContainerCreateBuilder {
 	self.containerConfig.Hostname = fmt.Sprintf("%s.pod.dpanel.local", name)
 	self.containerName = name
+	self.containerConfig.Labels = map[string]string{
+		"BuildAuthor":  BuilderAuthor,
+		"BuildDesc":    BuildDesc,
+		"BuildWebSite": BuildWebSite,
+		"buildVersion": BuildVersion,
+	}
 	return self
 }
 
@@ -48,9 +51,9 @@ func (self *ContainerCreateBuilder) WithImage(image string) *ContainerCreateBuil
 	return self
 }
 
-func (self *ContainerCreateBuilder) WithAlwaysRestart() *ContainerCreateBuilder {
+func (self *ContainerCreateBuilder) WithRestart(restartType string) *ContainerCreateBuilder {
 	self.hostConfig.RestartPolicy = container.RestartPolicy{}
-	self.hostConfig.RestartPolicy.IsAlways()
+	self.hostConfig.RestartPolicy.Name = restartType
 	return self
 }
 
@@ -60,9 +63,9 @@ func (self *ContainerCreateBuilder) WithPrivileged() *ContainerCreateBuilder {
 }
 
 // 挂载宿主机目录
-func (self *ContainerCreateBuilder) WithVolume(host string, container string) *ContainerCreateBuilder {
+func (self *ContainerCreateBuilder) WithVolume(host string, container string, permission string) *ContainerCreateBuilder {
 	//_, err := os.Stat(host)
-	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s:ro", host, container))
+	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s:%s", host, container, permission))
 
 	//if os.IsNotExist(err) {
 	//	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s", host, container))
@@ -77,11 +80,22 @@ func (self *ContainerCreateBuilder) WithVolume(host string, container string) *C
 	return self
 }
 
+func (self *ContainerCreateBuilder) WithDefaultVolume(container string) {
+	volumePath := fmt.Sprintf("%s.%s", self.containerName, strings.Join(strings.Split(container, "/"), "-"))
+	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s:rw", volumePath, container))
+}
+
 // 绑定端口
 func (self *ContainerCreateBuilder) WithPort(host string, container string) *ContainerCreateBuilder {
+	var port nat.Port
+	var err error
 	hostIp := "0.0.0.0"
-	hostProtocol := "tcp"
-	port, err := nat.NewPort(hostProtocol, container)
+	if strings.Contains(container, "/") {
+		portArr := strings.Split(container, "/")
+		port, err = nat.NewPort(portArr[1], portArr[0])
+	} else {
+		port, err = nat.NewPort("tcp", container)
+	}
 	if err != nil {
 		self.err = err
 		return nil
@@ -94,14 +108,28 @@ func (self *ContainerCreateBuilder) WithPort(host string, container string) *Con
 	return self
 }
 
-func (self *ContainerCreateBuilder) WithLink(name string, alise string) *ContainerCreateBuilder {
-	if strings.Contains(name, "::") {
-		nameArr := strings.Split(name, "::")
-		name = nameArr[1]
-		alise = nameArr[1]
-	}
-	self.hostConfig.Links = append(self.hostConfig.Links, fmt.Sprintf("%s:%s", name, alise))
-	return self
+func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
+	// 利用Network关联容器
+
+	//if strings.Contains(name, "::") {
+	//	nameArr := strings.Split(name, "::")
+	//	name = nameArr[1]
+	//	alise = nameArr[1]
+	//}
+	//self.hostConfig.Links = append(self.hostConfig.Links, fmt.Sprintf("%s:%s", name, alise))
+	options := make(map[string]string)
+	options["name"] = self.containerName
+	myNetwork, _ := Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, types.NetworkCreate{
+		CheckDuplicate: true,
+		Driver:         "bridge",
+		Options:        options,
+	})
+	slog.Debug("create network", "name", myNetwork.ID)
+	Sdk.Client.NetworkConnect(Sdk.Ctx, self.containerName, name, &network.EndpointSettings{
+		Aliases: []string{
+			alise,
+		},
+	})
 }
 
 func (self *ContainerCreateBuilder) Execute() (response container.CreateResponse, err error) {

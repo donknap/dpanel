@@ -24,10 +24,9 @@ type Site struct {
 
 func (self Site) CreateByImage(http *gin.Context) {
 	type ParamsValidate struct {
-		SiteTitle string `form:"siteTitle" binding:"required"`
-		SiteUrl   string `form:"siteUrl" binding:"required,url"`
-		Image     string `json:"image" binding:"required"`
-		Type      string `json:"type" binding:"required,oneof=system site"`
+		SiteTitle string `json:"siteTitle" binding:"required"`
+		SiteName  string `json:"siteName" binding:"required"`
+		ImageName string `json:"imageName" binding:"required"`
 		accessor.SiteEnvOption
 	}
 
@@ -39,14 +38,24 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if params.Ports != nil {
 		var checkPorts []string
 		for _, port := range params.Ports {
-			// 检测端口是否可以正常绑定
-			listener, err := net.Listen("tcp", "0.0.0.0:"+port.Host)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
+			if port.Type == "port" {
+				// 检测端口是否可以正常绑定
+				listener, err := net.Listen("tcp", "0.0.0.0:"+port.Host)
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+				listener.Close()
+				checkPorts = append(checkPorts, port.Host)
+			} else if port.Type == "domain" {
+				//site, _ = dao.Site.Where(dao.Site.SiteURL.Eq(port.Host)).First()
+				//if site != nil {
+				//	self.JsonResponseWithError(http, errors.New("站点域名已经绑定其它站，请更换标识"), 500)
+				//}
+			} else {
+				self.JsonResponseWithError(http, errors.New(""), 500)
 				return
 			}
-			listener.Close()
-			checkPorts = append(checkPorts, port.Host)
 		}
 		if checkPorts != nil {
 			item, err := docker.Sdk.ContainerByField("publish", checkPorts...)
@@ -58,65 +67,52 @@ func (self Site) CreateByImage(http *gin.Context) {
 		}
 	}
 
-	if params.Type == logic.SITE_TYPE_SITE {
-		query := dao.Site.Where(dao.Site.SiteURL.Eq(params.SiteUrl))
-		site, _ := query.First()
-		if site != nil {
-			self.JsonResponseWithError(http, errors.New("站点域名已经绑定其它站，请更换域名"), 500)
-		}
-	}
-
 	runParams := accessor.SiteEnvOption{
-		Environment: params.Environment,
-		Volumes:     params.Volumes,
-		Ports:       params.Ports,
-		Links:       params.Links,
-		Image:       accessor.ImageItem{},
+		Environment:    params.Environment,
+		Volumes:        params.Volumes,
+		Ports:          params.Ports,
+		Links:          params.Links,
+		VolumesDefault: params.VolumesDefault,
+		ImageName:      params.ImageName,
+		Restart:        params.Restart,
+		Privileged:     params.Privileged,
 	}
-
-	if params.Image != "" {
-		imageArr := strings.Split(
-			params.Image+":",
-			":",
-		)
-		runParams.Image.Name = imageArr[0]
-		runParams.Image.Version = imageArr[1]
+	var siteRow *entity.Site
+	siteRow, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).First()
+	if siteRow == nil {
+		siteRow = &entity.Site{
+			SiteName:  params.SiteName,
+			SiteTitle: params.SiteTitle,
+			Env:       &runParams,
+			Status:    logic.STATUS_STOP,
+			ContainerInfo: &accessor.SiteContainerInfoOption{
+				ID: "",
+			},
+			Type: 1,
+		}
+		err := dao.Site.Create(siteRow)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	} else {
+		dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).Updates(&entity.Site{
+			SiteTitle: params.SiteTitle,
+			Env:       &runParams,
+			Status:    logic.STATUS_STOP,
+			Message:   "",
+		})
 	}
-
-	// 如果是系统组件，域名相关配置可以去掉
-	if params.Type == logic.SITE_TYPE_SYSTEM {
-		params.SiteUrl = ""
+	runTaskRow := &logic.CreateMessage{
+		SiteName:  siteRow.SiteName,
+		SiteId:    siteRow.ID,
+		RunParams: &runParams,
 	}
-	siteUrlExt := &accessor.SiteUrlExtOption{}
-	siteUrlExt.Url = append(siteUrlExt.Url, params.SiteUrl)
-
-	siteRow := &entity.Site{
-		SiteName:   "",
-		SiteTitle:  params.SiteTitle,
-		SiteURL:    params.SiteUrl,
-		SiteURLExt: siteUrlExt,
-		Env:        &runParams,
-		Status:     logic.STATUS_STOP,
-		ContainerInfo: &accessor.SiteContainerInfoOption{
-			ID: "",
-		},
-		Type: logic.SiteTypeValue[params.Type],
-	}
-	err := dao.Site.Create(siteRow)
+	err := logic.DockerTask{}.ContainerCreate(runTaskRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	siteRow.SiteName = fmt.Sprintf("dpanel-%s-%d-%s", params.Type, siteRow.ID, function.GetRandomString(10))
-	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(siteRow)
-
-	task := logic.NewDockerTask()
-	runTaskRow := &logic.CreateMessage{
-		Name:      siteRow.SiteName,
-		SiteId:    siteRow.ID,
-		RunParams: &runParams,
-	}
-	task.QueueCreate <- runTaskRow
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -131,7 +127,6 @@ func (self Site) GetList(http *gin.Context) {
 		PageSize  int    `form:"pageSize" binding:"omitempty"`
 		SiteTitle string `form:"siteTitle" binding:"omitempty"`
 		Sort      string `form:"sort,default=new" binding:"omitempty,oneof=hot new"`
-		Type      string `form:"type" binding:"oneof=system site"`
 		Status    int32  `json:"status" binding:"omitempty,oneof=10 20 30"`
 	}
 
@@ -147,9 +142,6 @@ func (self Site) GetList(http *gin.Context) {
 	}
 
 	query := dao.Site.Order(dao.Site.ID.Desc())
-	if params.Type != "" {
-		query = query.Where(dao.Site.Type.Eq(logic.SiteTypeValue[params.Type]))
-	}
 	if params.Status != 0 {
 		query = query.Where(dao.Site.Status.Eq(params.Status))
 	}
@@ -230,28 +222,19 @@ func (self Site) ReDeploy(http *gin.Context) {
 
 	}
 
-	runParams := &accessor.SiteEnvOption{
-		Environment: siteRow.Env.Environment,
-		Volumes:     siteRow.Env.Volumes,
-		Ports:       siteRow.Env.Ports,
-		Links:       siteRow.Env.Links,
-		Image:       siteRow.Env.Image,
-	}
-	if params.Image != "" {
-		imageArr := strings.Split(
-			params.Image+":",
-			":",
-		)
-		runParams.Image.Name = imageArr[0]
-		runParams.Image.Version = imageArr[1]
-	}
-	task := logic.NewDockerTask()
-	runTaskRow := &logic.CreateMessage{
-		Name:      siteRow.SiteName,
-		SiteId:    siteRow.ID,
-		RunParams: runParams,
-	}
-	task.QueueCreate <- runTaskRow
+	//runParams := &accessor.SiteEnvOption{
+	//	Environment: siteRow.Env.Environment,
+	//	Volumes:     siteRow.Env.Volumes,
+	//	Ports:       siteRow.Env.Ports,
+	//	Links:       siteRow.Env.Links,
+	//}
+	//task := logic.NewDockerTask()
+	//runTaskRow := &logic.CreateMessage{
+	//	Name:      siteRow.SiteName,
+	//	SiteId:    siteRow.ID,
+	//	RunParams: runParams,
+	//}
+	//task.QueueCreate <- runTaskRow
 	self.JsonResponseWithoutError(http, gin.H{"siteId": siteRow.ID})
 
 	return

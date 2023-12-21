@@ -112,6 +112,13 @@ func (self *Client) SendMessage() {
 				Data: message,
 			}
 			self.conn.WriteMessage(websocket.TextMessage, data.ToJson())
+		case message := <-docker.QueueDockerImageDownloadMessage:
+			data := &RespMessage{
+				Type: "imageDownload",
+				Data: message,
+			}
+			jsonStr := data.ToJson()
+			self.conn.WriteMessage(websocket.TextMessage, jsonStr)
 		}
 	}
 }

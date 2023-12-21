@@ -2,7 +2,6 @@ package controller
 
 import (
 	"errors"
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -10,13 +9,10 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
-	"io"
-	"net/url"
 	"os"
 	"strings"
 )
@@ -266,58 +262,30 @@ func (self Image) Remote(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	urls, err := url.Parse("https://" + params.Tag)
+	var authString string
+	tagArr := strings.Split(params.Tag, "/")
+	registry, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(tagArr[0])).First()
+	if registry != nil {
+		password, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registry.Password)
+		authString = function.Base64Encode(struct {
+			Username      string `json:"username"`
+			Password      string `json:"password"`
+			ServerAddress string `json:"serveraddress"`
+		}{
+			Username:      registry.Username,
+			Password:      password,
+			ServerAddress: registry.ServerAddress,
+		})
+	}
+	err := logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
+		Auth: authString,
+		Type: params.Type,
+		Tag:  params.Tag,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	registry, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(urls.Host)).First()
-	if registry == nil {
-		self.JsonResponseWithError(http, errors.New(fmt.Sprintf("推送前请先添加 %s 仓库的权限", urls.Host)), 500)
-		return
-	}
-	password, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registry.Password)
-	authString := function.Base64Encode(struct {
-		Username      string `json:"username"`
-		Password      string `json:"password"`
-		ServerAddress string `json:"serveraddress"`
-	}{
-		Username:      registry.Username,
-		Password:      password,
-		ServerAddress: registry.ServerAddress,
-	})
-
-	go func() {
-		var out io.ReadCloser
-		if params.Type == "pull" {
-			out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, params.Tag, types.ImagePullOptions{
-				RegistryAuth: authString,
-			})
-		} else {
-			out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, params.Tag, types.ImagePushOptions{
-				RegistryAuth: authString,
-			})
-		}
-		if err != nil {
-			notice.Message{}.Error(params.Type, err.Error())
-			return
-		}
-		progressChan := docker.Sdk.Progress(out, params.Tag)
-		for {
-			select {
-			case message, ok := <-progressChan:
-				if !ok {
-					notice.Message{}.Success(params.Type, params.Tag)
-					return
-				}
-				if message.Err != nil {
-					notice.Message{}.Error(params.Type, message.Err.Error())
-					return
-				}
-			}
-		}
-	}()
 	self.JsonResponseWithoutError(http, gin.H{
 		"tag": params.Tag,
 	})

@@ -3,7 +3,6 @@ package application
 import (
 	"github.com/donknap/dpanel/app/application/command"
 	"github.com/donknap/dpanel/app/application/http/controller"
-	"github.com/donknap/dpanel/app/application/logic"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/console"
@@ -14,12 +13,8 @@ type Provider struct {
 }
 
 func (provider *Provider) Register(httpServer *http_server.Server, console console.Console) {
-	logic.RegisterDockerTask()
 	// 注册一个 application:test 命令
 	console.RegisterCommand(new(command.Test))
-
-	task := logic.NewDockerTask()
-	go task.CreateLoop()
 
 	// 注册一些路由
 	httpServer.RegisterRouters(
@@ -47,10 +42,10 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			cors.POST("/app/image/get-list", controller.Image{}.GetList)
 			cors.POST("/app/image/get-list-build", controller.Image{}.GetListBuild)
 			cors.POST("/app/image/get-detail", controller.Image{}.GetDetail)
+			cors.POST("/app/image/get-image-task", controller.Image{}.GetImageTask)
 			cors.POST("/app/image/remote", controller.Image{}.Remote)
 			cors.POST("/app/image/tag-delete", controller.Image{}.TagDelete)
 			cors.POST("/app/image/tag-add", controller.Image{}.TagAdd)
-			cors.POST("/app/image/get-image-task", controller.Image{}.GetImageTask)
 			cors.POST("/app/image/image-delete", controller.Image{}.ImageDelete)
 			cors.POST("/app/image/image-prune", controller.Image{}.ImagePrune)
 

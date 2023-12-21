@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"io"
 	"log/slog"
 	"os"
@@ -18,11 +17,6 @@ type imageBuildBuilder struct {
 	imageBuildOption  types.ImageBuildOptions
 	zipFilePath       string
 	dockerFileContent []byte
-	dockerSdk         *client.Client
-}
-
-func (self *imageBuildBuilder) withSdk(sdk *client.Client) {
-	self.dockerSdk = sdk
 }
 
 func (self *imageBuildBuilder) WithDockerFileContent(content []byte) {
@@ -31,10 +25,6 @@ func (self *imageBuildBuilder) WithDockerFileContent(content []byte) {
 
 func (self *imageBuildBuilder) WithGitUrl(git string) {
 	self.imageBuildOption.RemoteContext = git
-}
-
-func (self *imageBuildBuilder) WithLabel(name string, value string) {
-	self.imageBuildOption.Labels[name] = value
 }
 
 func (self *imageBuildBuilder) WithDockerFilePath(path string) {

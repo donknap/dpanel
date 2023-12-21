@@ -14,8 +14,13 @@ import (
 )
 
 var (
-	Sdk, _                     = NewDockerClient()
-	QueueDockerProgressMessage = make(chan *Progress, 999)
+	Sdk, _                          = NewDockerClient()
+	QueueDockerProgressMessage      = make(chan *Progress, 999)
+	QueueDockerImageDownloadMessage = make(chan map[string]*ProgressDownloadImage, 999)
+	BuilderAuthor                   = "DPanel"
+	BuildDesc                       = "DPanel is an open source docker web management panel that provides image building and deployment"
+	BuildWebSite                    = "https://github.com/donknap/dpanel, https://phpey.net"
+	BuildVersion                    = "1.0.0"
 )
 
 type Builder struct {
@@ -73,14 +78,15 @@ func (self Builder) GetImageBuildBuilder() *imageBuildBuilder {
 	builder := &imageBuildBuilder{
 		imageBuildOption: types.ImageBuildOptions{
 			Dockerfile: "Dockerfile", // 默认在根目录
-			Labels:     make(map[string]string),
 			Remove:     true,
+			Labels: map[string]string{
+				"BuildAuthor":  BuilderAuthor,
+				"BuildDesc":    BuildDesc,
+				"BuildWebSite": BuildWebSite,
+				"buildVersion": BuildVersion,
+			},
 		},
 	}
-	builder.WithLabel("BuildAuthor", "DPanel")
-	builder.WithLabel("BuildDesc", "DPanel is a docker visual management panel")
-	builder.WithLabel("BuildWebSite", "https://phpeye.net")
-	builder.withSdk(self.Client)
 	return builder
 }
 
