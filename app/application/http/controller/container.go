@@ -19,7 +19,7 @@ type Container struct {
 func (self Container) Status(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5     string `form:"md5" binding:"required"`
-		Operate string `form:"operate" binding:"required,oneof=start stop restart pause"`
+		Operate string `form:"operate" binding:"required,oneof=start stop restart pause unpause"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -42,7 +42,9 @@ func (self Container) Status(http *gin.Context) {
 	case "pause":
 		err = docker.Sdk.Client.ContainerPause(docker.Sdk.Ctx,
 			params.Md5)
-
+	case "unpause":
+		err = docker.Sdk.Client.ContainerUnpause(docker.Sdk.Ctx,
+			params.Md5)
 	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

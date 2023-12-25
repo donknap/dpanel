@@ -2,6 +2,7 @@ package common
 
 import (
 	"github.com/donknap/dpanel/app/common/http/controller"
+	"github.com/donknap/dpanel/app/common/logic"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/console"
@@ -33,9 +34,10 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		engine.GET("/home/index", controller.Home{}.Index)
-		engine.GET("/home/ws", controller.Home{}.Ws)
+		engine.GET("/home/ws/notice", controller.Home{}.WsNotice)
+		engine.GET("/home/ws/console/:id", controller.Home{}.WsConsole)
 	})
 
-	//event := logic.EventLogic{}
-	//go event.MonitorLoop()
+	event := logic.EventLogic{}
+	go event.MonitorLoop()
 }

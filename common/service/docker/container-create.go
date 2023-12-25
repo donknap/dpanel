@@ -6,10 +6,11 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"io"
 	"log/slog"
+	"os"
 	"strings"
 )
 
@@ -20,13 +21,7 @@ type ContainerCreateBuilder struct {
 	platform         *v1.Platform
 	containerName    string
 	err              error
-	dockerSdk        *client.Client
 	ctx              context.Context
-}
-
-func (self *ContainerCreateBuilder) withSdk(sdk *client.Client) *ContainerCreateBuilder {
-	self.dockerSdk = sdk
-	return self
 }
 
 func (self *ContainerCreateBuilder) WithContainerName(name string) *ContainerCreateBuilder {
@@ -46,9 +41,18 @@ func (self *ContainerCreateBuilder) WithEnv(name string, value string) *Containe
 	return self
 }
 
-func (self *ContainerCreateBuilder) WithImage(image string) *ContainerCreateBuilder {
+func (self *ContainerCreateBuilder) WithImage(image string, tryPullImage bool) {
+	// 只尝试从 docker.io 拉取
+	if tryPullImage {
+		reader, err := Sdk.Client.ImagePull(Sdk.Ctx, image, types.ImagePullOptions{})
+		if err != nil {
+			self.err = err
+			return
+		}
+		io.Copy(os.Stdout, reader)
+	}
 	self.containerConfig.Image = image
-	return self
+	return
 }
 
 func (self *ContainerCreateBuilder) WithRestart(restartType string) *ContainerCreateBuilder {
@@ -62,22 +66,27 @@ func (self *ContainerCreateBuilder) WithPrivileged() *ContainerCreateBuilder {
 	return self
 }
 
-// 挂载宿主机目录
+// WithVolume 挂载宿主机目录
 func (self *ContainerCreateBuilder) WithVolume(host string, container string, permission string) *ContainerCreateBuilder {
 	//_, err := os.Stat(host)
 	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s:%s", host, container, permission))
-
-	//if os.IsNotExist(err) {
-	//	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s", host, container))
-	//} else {
-	//	self.hostConfig.Mounts = append(self.hostConfig.Mounts, mount.Mount{
-	//		Type:     mount.TypeBind,
-	//		Source:   host,
-	//		Target:   container,
-	//		ReadOnly: false,
-	//	})
-	//}
 	return self
+}
+
+// WithContainerVolume 挂载某个容器的数据卷
+func (self *ContainerCreateBuilder) WithContainerVolume(fromContainerMd5 string) {
+	//containerInfo, err := Sdk.Client.ContainerInspect(Sdk.Ctx, fromContainerMd5)
+	//if err != nil {
+	//	self.err = err
+	//	return
+	//}
+	//if function.IsEmptyArray(containerInfo.Mounts) {
+	//	return
+	//}
+	//for _, mount := range containerInfo.Mounts {
+	//	self.WithVolume()
+	//}
+	self.hostConfig.VolumesFrom = append(self.hostConfig.VolumesFrom, fromContainerMd5)
 }
 
 func (self *ContainerCreateBuilder) WithDefaultVolume(container string) {
@@ -85,7 +94,7 @@ func (self *ContainerCreateBuilder) WithDefaultVolume(container string) {
 	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s:rw", volumePath, container))
 }
 
-// 绑定端口
+// WithPort 绑定端口
 func (self *ContainerCreateBuilder) WithPort(host string, container string) *ContainerCreateBuilder {
 	var port nat.Port
 	var err error
@@ -110,13 +119,6 @@ func (self *ContainerCreateBuilder) WithPort(host string, container string) *Con
 
 func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
 	// 利用Network关联容器
-
-	//if strings.Contains(name, "::") {
-	//	nameArr := strings.Split(name, "::")
-	//	name = nameArr[1]
-	//	alise = nameArr[1]
-	//}
-	//self.hostConfig.Links = append(self.hostConfig.Links, fmt.Sprintf("%s:%s", name, alise))
 	options := make(map[string]string)
 	options["name"] = self.containerName
 	myNetwork, _ := Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, types.NetworkCreate{
@@ -132,11 +134,15 @@ func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
 	})
 }
 
+func (self *ContainerCreateBuilder) WithAutoRemove() {
+	self.hostConfig.AutoRemove = true
+}
+
 func (self *ContainerCreateBuilder) Execute() (response container.CreateResponse, err error) {
 	if self.err != nil {
 		return response, self.err
 	}
-	return self.dockerSdk.ContainerCreate(
+	return Sdk.Client.ContainerCreate(
 		self.ctx,
 		self.containerConfig,
 		self.hostConfig,

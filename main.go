@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
+	"github.com/donknap/dpanel/app/file_explorer"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
@@ -56,5 +57,6 @@ func main() {
 	// 注册业务 provider，此模块中需要使用 http server 和 console
 	new(common.Provider).Register(httpServer, app.GetConsole())
 	new(application.Provider).Register(httpServer, app.GetConsole())
+	new(file_explorer.Provider).Register(httpServer)
 	app.RunConsole()
 }

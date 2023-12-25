@@ -152,7 +152,7 @@ import (
 func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	go func() {
 		builder := docker.Sdk.GetContainerCreateBuilder()
-		builder.WithImage(task.RunParams.ImageName)
+		builder.WithImage(task.RunParams.ImageName, false)
 		builder.WithContainerName(task.SiteName)
 
 		if task.RunParams.Ports != nil {

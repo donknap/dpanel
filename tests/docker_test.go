@@ -12,6 +12,8 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -88,15 +90,15 @@ func TestCreateContainer(t *testing.T) {
 		fmt.Printf("%v \n", err)
 	}
 	builder := sdk.GetContainerCreateBuilder()
-	builder.WithImage("portainer/portainer-ce:latest")
+	builder.WithImage("portainer/portainer-ce:latest", false)
 	builder.WithContainerName("portainer")
 	//builder.WithEnv("PMA_HOST", "localmysql")
 	builder.WithPort("8000", "8000")
 	builder.WithPort("9000", "9000")
 	//builder.WithLink("localmysql", "localmysql")
-	builder.WithAlwaysRestart()
+	builder.WithRestart("always")
 	builder.WithPrivileged()
-	builder.WithVolume("/var/run/docker.sock", "/var/run/docker.sock")
+	builder.WithVolume("/var/run/docker.sock", "/var/run/docker.sock", "write")
 	response, err := builder.Execute()
 	if err != nil {
 		fmt.Printf("%v \n", err)
@@ -237,6 +239,34 @@ func TestChan(t *testing.T) {
 	fmt.Printf("%v \n", canel)
 }
 
-func TestCode(t *testing.T) {
+type fileItem struct {
+	Name     string `json:"name"`
+	Typeflag byte   `json:"typeFlag"`
+	LinkName string `json:"linkName"`
+	Size     int64  `json:"size"`
+	Mode     int64  `json:"mode"`
+	IsDir    bool   `json:"isDir"`
+	ModTime  string `json:"modTime"`
+}
 
+func TestCode(t *testing.T) {
+	file, _ := os.Open("./fileList.json")
+	jsonStr, _ := io.ReadAll(file)
+
+	var fileList []*fileItem
+	json.Unmarshal(jsonStr, &fileList)
+
+	path := "/home/site"
+	path = strings.TrimSuffix(path, "/") + "/"
+	level := strings.Count(path, "/")
+	fmt.Printf("%v \n", level)
+	for _, item := range fileList {
+		if strings.HasPrefix(item.Name, path) {
+			pathName := strings.TrimSuffix(item.Name, "/")
+			showName := filepath.Base(item.Name)
+			if strings.Count(pathName, "/") == level {
+				fmt.Printf("%v \n", showName)
+			}
+		}
+	}
 }
