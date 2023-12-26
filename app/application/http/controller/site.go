@@ -2,7 +2,6 @@ package controller
 
 import (
 	"errors"
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/registry"
@@ -34,7 +33,6 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-
 	if params.Ports != nil {
 		var checkPorts []string
 		for _, port := range params.Ports {
@@ -58,10 +56,9 @@ func (self Site) CreateByImage(http *gin.Context) {
 			}
 		}
 		if checkPorts != nil {
-			item, err := docker.Sdk.ContainerByField("publish", checkPorts...)
-			fmt.Printf("%v \n", err)
+			item, _ := docker.Sdk.ContainerByField("publish", checkPorts...)
 			if len(item) > 0 {
-				self.JsonResponseWithError(http, errors.New("绑定的外部端口已经被占用，请更换其它端外部端口"), 500)
+				self.JsonResponseWithError(http, errors.New("绑定的外部端口已经被其它容器占用，请更换其它端口"), 500)
 				return
 			}
 		}
@@ -69,13 +66,20 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 	runParams := accessor.SiteEnvOption{
 		Environment:    params.Environment,
-		Volumes:        params.Volumes,
-		Ports:          params.Ports,
 		Links:          params.Links,
+		Ports:          params.Ports,
+		Volumes:        params.Volumes,
 		VolumesDefault: params.VolumesDefault,
 		ImageName:      params.ImageName,
-		Restart:        params.Restart,
 		Privileged:     params.Privileged,
+		Restart:        params.Restart,
+		Cpus:           params.Cpus,
+		Memory:         params.Memory,
+		ShmSize:        params.ShmSize,
+		WorkDir:        params.WorkDir,
+		User:           params.User,
+		Command:        params.Command,
+		Entrypoint:     params.Entrypoint,
 	}
 	var siteRow *entity.Site
 	siteRow, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).First()

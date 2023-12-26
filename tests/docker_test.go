@@ -270,3 +270,36 @@ func TestCode(t *testing.T) {
 		}
 	}
 }
+
+func TestModifyFile(t *testing.T) {
+	//list, err := docker.Sdk.Client.ContainerDiff(docker.Sdk.Ctx, "b5a816fba3f68f01e94482ea8a58d1dd28f7a2b2cc5263c85341bb71bcff696c")
+	//fmt.Printf("%v \n", err)
+	//fmt.Printf("%v \n", list)
+
+	//reader, pathHeader, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, "b5a816fba3f68f01e94482ea8a58d1dd28f7a2b2cc5263c85341bb71bcff696c", "/")
+	//fmt.Printf("%v \n", pathHeader)
+	//fmt.Printf("%v \n", err)
+	//tarReader := tar.NewReader(reader)
+	//for {
+	//	file, err := tarReader.Next()
+	//	if err != nil {
+	//		//break
+	//	}
+	//	fmt.Printf("%v \n", file.Size)
+	//	content := make([]byte, file.Size)
+	//	tarReader.Read(content)
+	//	fmt.Printf("%v \n", string(content))
+	//}
+	//tarReader, err := archive.Tar("./docker", archive.Uncompressed)
+	//fmt.Printf("%v \n", err)
+	//err = docker.Sdk.Client.CopyToContainer(docker.Sdk.Ctx,
+	//	"a662dddbb85b39fcee15195bc21047b27e9e5e24a51e6f9ada682cd03d602733",
+	//	"/docker",
+	//	tarReader,
+	//	types.CopyToContainerOptions{})
+	//fmt.Printf("%v \n", err)
+
+	info, _ := docker.Sdk.Client.Info(docker.Sdk.Ctx)
+	fmt.Printf("%v \n", info)
+
+}

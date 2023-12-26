@@ -1,14 +1,16 @@
 package accessor
 
-type MappingItem struct {
+type VolumeItem struct {
 	Host       string `json:"host"`
 	Dest       string `json:"dest"`
 	Permission string `json:"permission"`
+	InImage    bool   `json:"inImage"`
 }
 
 type LinkItem struct {
-	Name  string `json:"name"`
-	Alise string `json:"alise"`
+	Name   string `json:"name"`
+	Alise  string `json:"alise"`
+	Volume bool   `json:"volume"`
 }
 
 type EnvItem struct {
@@ -36,12 +38,19 @@ func (self ImageItem) GetImage() string {
 }
 
 type SiteEnvOption struct {
-	Environment    []EnvItem     `json:"environment"`
-	Links          []LinkItem    `json:"links"`
-	Ports          []PortItem    `json:"ports"`
-	Volumes        []MappingItem `json:"volumes"`
-	VolumesDefault []MappingItem `json:"volumesDefault"`
-	ImageName      string        `json:"imageName"`
-	Privileged     bool          `json:"privileged"`
-	Restart        string        `json:"restart"`
+	Environment    []EnvItem    `json:"environment"`
+	Links          []LinkItem   `json:"links"`
+	Ports          []PortItem   `json:"ports"`
+	Volumes        []VolumeItem `json:"volumes"`
+	VolumesDefault []VolumeItem `json:"volumesDefault"`
+	ImageName      string       `json:"imageName"`
+	Privileged     bool         `json:"privileged"`
+	Restart        string       `json:"restart"`
+	Cpus           int          `json:"cpus"`
+	Memory         int          `json:"memory"`
+	ShmSize        int          `json:"shmsize"`
+	WorkDir        string       `json:"workDir"`
+	User           string       `json:"user"`
+	Command        string       `json:"command"`
+	Entrypoint     string       `json:"entrypoint"`
 }

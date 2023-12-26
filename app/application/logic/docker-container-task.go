@@ -173,6 +173,9 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 					value.Alise = value.Name
 				}
 				builder.WithLink(value.Name, value.Alise)
+				if value.Volume {
+					builder.WithContainerVolume(value.Name)
+				}
 			}
 		}
 		if !function.IsEmptyArray(task.RunParams.VolumesDefault) {
@@ -195,6 +198,13 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		builder.WithRestart(task.RunParams.Restart)
 		if task.RunParams.Privileged {
 			builder.WithPrivileged()
+		}
+
+		if task.RunParams.Cpus != 0 {
+			builder.WithCpus(task.RunParams.Cpus)
+		}
+		if task.RunParams.Memory != 0 {
+			builder.WithMemory(task.RunParams.Memory)
 		}
 
 		response, err := builder.Execute()

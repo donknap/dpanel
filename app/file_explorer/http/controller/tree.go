@@ -2,11 +2,14 @@ package controller
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"errors"
+	"fmt"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -23,6 +26,7 @@ type fileItem struct {
 	Mode     int64  `json:"mode"`
 	IsDir    bool   `json:"isDir"`
 	ModTime  string `json:"modTime"`
+	Change   int    `json:"change"`
 }
 
 type Tree struct {
@@ -39,7 +43,14 @@ func (self Tree) GetList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
 	if params.InitData {
+		changeFileList, err := docker.Sdk.Client.ContainerDiff(docker.Sdk.Ctx, params.Md5)
 		out, _, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Md5, params.Path)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -52,7 +63,7 @@ func (self Tree) GetList(http *gin.Context) {
 			if err != nil {
 				break
 			}
-			fileList = append(fileList, &fileItem{
+			fileRow := &fileItem{
 				ShowName: filepath.Base(file.Name),
 				Name:     file.Name,
 				LinkName: file.Linkname,
@@ -61,7 +72,25 @@ func (self Tree) GetList(http *gin.Context) {
 				Mode:     file.Mode,
 				ModTime:  file.ModTime.Format(function.YmdHis),
 				Size:     file.Size,
-			})
+				Change:   -1,
+			}
+			if !function.IsEmptyArray(changeFileList) {
+				for _, change := range changeFileList {
+					if strings.TrimSuffix(file.Name, "/") == change.Path {
+						fileRow.Change = int(change.Kind)
+						break
+					}
+				}
+			}
+			if !function.IsEmptyArray(containerInfo.Mounts) {
+				for _, mount := range containerInfo.Mounts {
+					if strings.HasPrefix(file.Name, mount.Destination) {
+						fileRow.Change = 100
+						break
+					}
+				}
+			}
+			fileList = append(fileList, fileRow)
 		}
 		fileTree[params.Md5] = fileList
 	}
@@ -87,4 +116,42 @@ func (self Tree) GetList(http *gin.Context) {
 		"list": fileList,
 	})
 	return
+}
+
+func (self Tree) Export(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5      string   `json:"md5" binding:"required"`
+		FileList []string `json:"fileList" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	out, _, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Md5, "/")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	zipTempFile, _ := os.CreateTemp("", "dpanel")
+	zipWriter := zip.NewWriter(zipTempFile)
+	defer zipWriter.Close()
+	tarArchive := tar.NewReader(out)
+	defer out.Close()
+
+	fmt.Printf("%v \n", zipTempFile.Name())
+	for {
+		file, err := tarArchive.Next()
+		if err != nil {
+			break
+		}
+		for _, rootPath := range params.FileList {
+			if strings.HasPrefix(file.Name, rootPath) {
+				content := make([]byte, file.Size)
+				tarArchive.Read(content)
+				w, _ := zipWriter.Create(file.Name)
+				w.Write(content)
+				continue
+			}
+		}
+	}
 }

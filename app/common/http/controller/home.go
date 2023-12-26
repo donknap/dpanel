@@ -111,3 +111,15 @@ func (self Home) WsConsole(http *gin.Context) {
 		}
 	}()
 }
+
+func (self Home) Info(http *gin.Context) {
+	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"info": info,
+	})
+	return
+}

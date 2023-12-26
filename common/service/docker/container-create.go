@@ -75,17 +75,6 @@ func (self *ContainerCreateBuilder) WithVolume(host string, container string, pe
 
 // WithContainerVolume 挂载某个容器的数据卷
 func (self *ContainerCreateBuilder) WithContainerVolume(fromContainerMd5 string) {
-	//containerInfo, err := Sdk.Client.ContainerInspect(Sdk.Ctx, fromContainerMd5)
-	//if err != nil {
-	//	self.err = err
-	//	return
-	//}
-	//if function.IsEmptyArray(containerInfo.Mounts) {
-	//	return
-	//}
-	//for _, mount := range containerInfo.Mounts {
-	//	self.WithVolume()
-	//}
 	self.hostConfig.VolumesFrom = append(self.hostConfig.VolumesFrom, fromContainerMd5)
 }
 
@@ -136,6 +125,14 @@ func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
 
 func (self *ContainerCreateBuilder) WithAutoRemove() {
 	self.hostConfig.AutoRemove = true
+}
+
+func (self *ContainerCreateBuilder) WithCpus(count int) {
+	self.hostConfig.NanoCPUs = int64(count) * 1000000000
+}
+
+func (self *ContainerCreateBuilder) WithMemory(count int) {
+	self.hostConfig.Memory = int64(count) * 1024 * 1024
 }
 
 func (self *ContainerCreateBuilder) Execute() (response container.CreateResponse, err error) {

@@ -36,6 +36,8 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		engine.GET("/home/index", controller.Home{}.Index)
 		engine.GET("/home/ws/notice", controller.Home{}.WsNotice)
 		engine.GET("/home/ws/console/:id", controller.Home{}.WsConsole)
+
+		engine.POST("/common/home/info", controller.Home{}.Info)
 	})
 
 	event := logic.EventLogic{}
