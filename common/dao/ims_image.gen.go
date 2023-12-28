@@ -38,6 +38,7 @@ func newImage(db *gorm.DB, opts ...gen.DOOption) image {
 	_image.Message = field.NewString(tableName, "message")
 	_image.BuildType = field.NewString(tableName, "build_type")
 	_image.BuildTemplate = field.NewString(tableName, "build_template")
+	_image.ImageInfo = field.NewField(tableName, "image_info")
 
 	_image.fillFieldMap()
 
@@ -59,6 +60,7 @@ type image struct {
 	Message         field.String
 	BuildType       field.String
 	BuildTemplate   field.String
+	ImageInfo       field.Field
 
 	fieldMap map[string]field.Expr
 }
@@ -86,6 +88,7 @@ func (i *image) updateTableName(table string) *image {
 	i.Message = field.NewString(table, "message")
 	i.BuildType = field.NewString(table, "build_type")
 	i.BuildTemplate = field.NewString(table, "build_template")
+	i.ImageInfo = field.NewField(table, "image_info")
 
 	i.fillFieldMap()
 
@@ -102,7 +105,7 @@ func (i *image) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (i *image) fillFieldMap() {
-	i.fieldMap = make(map[string]field.Expr, 11)
+	i.fieldMap = make(map[string]field.Expr, 12)
 	i.fieldMap["id"] = i.ID
 	i.fieldMap["registry"] = i.Registry
 	i.fieldMap["tag"] = i.Tag
@@ -114,6 +117,7 @@ func (i *image) fillFieldMap() {
 	i.fieldMap["message"] = i.Message
 	i.fieldMap["build_type"] = i.BuildType
 	i.fieldMap["build_template"] = i.BuildTemplate
+	i.fieldMap["image_info"] = i.ImageInfo
 }
 
 func (i image) clone(db *gorm.DB) image {

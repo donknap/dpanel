@@ -12,6 +12,9 @@ relation:
       container_info:
         type: SiteContainerInfoOption
   - table: ims_image
+    column:
+      image_info:
+        type: ImageInfoOption
   - table: ims_run_env
   - table: ims_registry
   - table: ims_event

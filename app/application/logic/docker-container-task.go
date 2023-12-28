@@ -183,6 +183,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 				builder.WithDefaultVolume(item.Dest)
 			}
 		}
+
 		if task.RunParams.Volumes != nil {
 			for _, value := range task.RunParams.Volumes {
 				if value.Host == "" || value.Dest == "" {
@@ -216,11 +217,14 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 			notice.Message{}.Error("containerCreate", err.Error())
 			return
 		}
-		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, &network.EndpointSettings{
-			Aliases: []string{
-				task.SiteName,
-			},
-		})
+		// 仅当容器有关联时，才加新建自己的网络
+		if !function.IsEmptyArray(task.RunParams.Links) {
+			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, &network.EndpointSettings{
+				Aliases: []string{
+					task.SiteName,
+				},
+			})
+		}
 		if err != nil {
 			dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{
 				Status:  STATUS_ERROR,

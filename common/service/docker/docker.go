@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -78,6 +79,7 @@ func (self Builder) GetImageBuildBuilder() *imageBuildBuilder {
 		imageBuildOption: types.ImageBuildOptions{
 			Dockerfile: "Dockerfile", // 默认在根目录
 			Remove:     true,
+			NoCache:    true,
 			Labels: map[string]string{
 				"BuildAuthor":  BuilderAuthor,
 				"BuildDesc":    BuildDesc,
@@ -91,7 +93,6 @@ func (self Builder) GetImageBuildBuilder() *imageBuildBuilder {
 
 // ContainerByField 获取单条容器 field 支持 id,name
 func (self Builder) ContainerByField(field string, name ...string) (container map[string]*types.Container, err error) {
-	ctx := context.Background()
 	if len(name) == 0 {
 		return nil, errors.New("Please specify a container name")
 	}
@@ -109,7 +110,7 @@ func (self Builder) ContainerByField(field string, name ...string) (container ma
 	filters.Add("status", "exited")
 	filters.Add("status", "dead")
 
-	containerList, err := self.Client.ContainerList(ctx, types.ContainerListOptions{
+	containerList, err := Sdk.Client.ContainerList(Sdk.Ctx, types.ContainerListOptions{
 		Filters: filters,
 	})
 	if err != nil {
@@ -133,4 +134,16 @@ func (self Builder) ContainerByField(field string, name ...string) (container ma
 		container[key] = &temp
 	}
 	return container, nil
+}
+
+func (self Builder) ContainerInfoState(md5 string) (info *containerInfoState, err error) {
+	_, jsonRaw, err := Sdk.Client.ContainerInspectWithRaw(Sdk.Ctx, md5, true)
+	if err != nil {
+		return info, err
+	}
+	err = json.Unmarshal(jsonRaw, &info)
+	if err != nil {
+		return info, nil
+	}
+	return info, nil
 }

@@ -131,8 +131,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 
 func (self Image) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Type string `form:"type" binding:"required,oneof=all self"`
-		Tag  string `form:"tag" binding:"omitempty"`
+		Tag string `form:"tag" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -159,36 +158,15 @@ func (self Image) GetList(http *gin.Context) {
 		}
 	}
 
-	if params.Type == "self" {
-		query := dao.Image.Order(dao.Image.ID.Desc())
-		query = query.Where(dao.Image.Status.In(logic.STATUS_SUCCESS))
-		list, _ := query.Find()
-		if list == nil {
-			self.JsonResponseWithoutError(http, gin.H{
-				"list": list,
-			})
-			return
-		}
-		var tag string
-		for _, image := range list {
-			for _, summary := range imageList {
-				if image.Registry != "" {
-					tag = image.Registry + "/" + image.Tag
-				} else {
-					tag = image.Tag
-				}
-				if function.InArray(summary.RepoTags, tag) ||
-					function.InArray(summary.RepoTags, tag+":latest") {
-					result = append(result, summary)
-				}
-			}
-		}
-	} else if params.Tag != "" {
+	if params.Tag != "" {
 		for _, summary := range imageList {
-			if function.InArray(summary.RepoTags, params.Tag) ||
-				function.InArray(summary.RepoTags, params.Tag+":latest") ||
-				function.InArray(summary.RepoTags, params.Tag+":none") {
-				result = append(result, summary)
+			if !function.IsEmptyArray(summary.RepoTags) {
+				for _, tag := range summary.RepoTags {
+					if strings.Contains(tag, params.Tag) {
+						result = append(result, summary)
+						break
+					}
+				}
 			}
 		}
 	} else {
@@ -255,8 +233,9 @@ func (self Image) GetDetail(http *gin.Context) {
 
 func (self Image) Remote(http *gin.Context) {
 	type ParamsValidate struct {
-		Tag  string `form:"tag" binding:"required"`
-		Type string `form:"type" binding:"required,oneof=pull push"`
+		Tag      string `json:"tag" binding:"required"`
+		Type     string `json:"type" binding:"required,oneof=pull push"`
+		AsLatest bool   `json:"asLatest"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -276,6 +255,24 @@ func (self Image) Remote(http *gin.Context) {
 			Password:      password,
 			ServerAddress: registry.ServerAddress,
 		})
+	}
+	if params.AsLatest {
+		tag := strings.Split(params.Tag, ":")
+		latestTag := tag[0] + ":latest"
+		err := docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, params.Tag, latestTag)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
+			Auth: authString,
+			Type: params.Type,
+			Tag:  latestTag,
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 	err := logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
 		Auth: authString,

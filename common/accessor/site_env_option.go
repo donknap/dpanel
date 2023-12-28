@@ -44,6 +44,7 @@ type SiteEnvOption struct {
 	Volumes        []VolumeItem `json:"volumes"`
 	VolumesDefault []VolumeItem `json:"volumesDefault"`
 	ImageName      string       `json:"imageName"`
+	ImageId        string       `json:"imageId"`
 	Privileged     bool         `json:"privileged"`
 	Restart        string       `json:"restart"`
 	Cpus           int          `json:"cpus"`

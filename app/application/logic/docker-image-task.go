@@ -3,6 +3,7 @@ package logic
 import (
 	"fmt"
 	"github.com/docker/docker/api/types"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -36,7 +37,6 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
 			notice.Message{}.Error("imageBuild", err.Error())
 			return
 		}
-
 		buildProgressMessage := ""
 
 		defer response.Body.Close()
@@ -46,9 +46,12 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
 			case message, ok := <-progressChan:
 				if !ok {
 					notice.Message{}.Success("imageBuild", buildImageTask.Tag)
-					dao.Image.Select(dao.Image.Message, dao.Image.Status).Where(dao.Image.ID.Eq(buildImageTask.ImageId)).Updates(entity.Image{
+					dao.Image.Select(dao.Image.Message, dao.Image.Status, dao.Image.ImageInfo).Where(dao.Image.ID.Eq(buildImageTask.ImageId)).Updates(entity.Image{
 						Status:  STATUS_SUCCESS,
 						Message: "",
+						ImageInfo: &accessor.ImageInfoOption{
+							Id: buildImageTask.Tag,
+						},
 					})
 					return
 				}
@@ -74,22 +77,22 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
 }
 
 func (self DockerTask) ImageRemote(task *ImageRemoteMessage) error {
+	var err error
+	var out io.ReadCloser
+	if task.Type == "pull" {
+		out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, task.Tag, types.ImagePullOptions{
+			RegistryAuth: task.Auth,
+		})
+	} else {
+		out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, task.Tag, types.ImagePushOptions{
+			RegistryAuth: task.Auth,
+		})
+	}
+	if err != nil {
+		notice.Message{}.Error(task.Type, err.Error())
+		return err
+	}
 	go func() {
-		var err error
-		var out io.ReadCloser
-		if task.Type == "pull" {
-			out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, task.Tag, types.ImagePullOptions{
-				RegistryAuth: task.Auth,
-			})
-		} else {
-			out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, task.Tag, types.ImagePushOptions{
-				RegistryAuth: task.Auth,
-			})
-		}
-		if err != nil {
-			notice.Message{}.Error(task.Type, err.Error())
-			return
-		}
 		pg := make(map[string]*docker.ProgressDownloadImage)
 		progressChan := docker.Sdk.Progress(out, task.Tag)
 		for {

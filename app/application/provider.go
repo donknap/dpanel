@@ -50,7 +50,6 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			cors.POST("/app/image/image-prune", controller.Image{}.ImagePrune)
 
 			// 日志相关
-			cors.POST("/app/log/task", controller.RunLog{}.Task)
 			cors.POST("/app/log/run", controller.RunLog{}.Run)
 		},
 	)

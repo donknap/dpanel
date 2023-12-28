@@ -33,6 +33,11 @@ func (self *ContainerCreateBuilder) WithContainerName(name string) *ContainerCre
 		"BuildWebSite": BuildWebSite,
 		"buildVersion": BuildVersion,
 	}
+	//  防止退出
+	self.containerConfig.AttachStdin = true
+	self.containerConfig.AttachStdout = true
+	self.containerConfig.AttachStderr = true
+	self.containerConfig.Tty = true
 	return self
 }
 
@@ -133,6 +138,11 @@ func (self *ContainerCreateBuilder) WithCpus(count int) {
 
 func (self *ContainerCreateBuilder) WithMemory(count int) {
 	self.hostConfig.Memory = int64(count) * 1024 * 1024
+}
+
+func (self *ContainerCreateBuilder) WithPid(pid ...string) {
+	pidStr := strings.Join(pid, ":")
+	self.hostConfig.PidMode = container.PidMode(pidStr)
 }
 
 func (self *ContainerCreateBuilder) Execute() (response container.CreateResponse, err error) {
