@@ -16,19 +16,13 @@ const (
 	STEP_CONTAINER_RUN          = "containerRun"   // 运行容器
 )
 
-const (
-	SITE_TYPE_SITE   = "site"
-	SITE_TYPE_SYSTEM = "system"
-)
-
-var SiteTypeValue = map[string]int32{
-	SITE_TYPE_SITE:   10,
-	SITE_TYPE_SYSTEM: 20,
-}
-
-var StepStatusValue = map[string]int{
-	STEP_IMAGE_BUILD:     1,
-	STEP_IMAGE_PULL:      2,
-	STEP_CONTAINER_BUILD: 3,
-	STEP_CONTAINER_RUN:   4,
+type fileItem struct {
+	ShowName string `json:"showName"`
+	Name     string `json:"name"`
+	LinkName string `json:"linkName"`
+	Size     string `json:"size"`
+	Mode     string `json:"mode"`
+	IsDir    bool   `json:"isDir"`
+	ModTime  string `json:"modTime"`
+	Change   int    `json:"change"`
 }

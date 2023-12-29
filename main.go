@@ -1,11 +1,10 @@
 package main
 
 import (
+	"embed"
 	_ "embed"
-	"fmt"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
-	"github.com/donknap/dpanel/app/file_explorer"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
@@ -18,7 +17,9 @@ import (
 
 var (
 	//go:embed config.yaml
-	ConfigFile  []byte
+	ConfigFile []byte
+	//go:embed asset
+	Asset       embed.FS
 	RootPath, _ = filepath.Abs("./")
 )
 
@@ -33,7 +34,6 @@ func main() {
 			Name: "w7-rangine-go-skeleton",
 		},
 	)
-	fmt.Printf("%v \n", RootPath)
 	// 业务中需要使用 http server，这里需要先实例化
 	httpServer := new(http.Provider).Register(app.GetConfig(), app.GetConsole(), app.GetServerManager()).Export()
 	// 注册一些全局中间件，路由或是其它一些全局操作
@@ -54,9 +54,13 @@ func main() {
 	}
 	dao.SetDefault(db)
 
+	// 注册资源
+	facade.GetContainer().NamedSingleton("asset", func() embed.FS {
+		return Asset
+	})
+
 	// 注册业务 provider，此模块中需要使用 http server 和 console
 	new(common.Provider).Register(httpServer, app.GetConsole())
 	new(application.Provider).Register(httpServer, app.GetConsole())
-	new(file_explorer.Provider).Register(httpServer)
 	app.RunConsole()
 }

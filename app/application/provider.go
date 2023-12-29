@@ -49,6 +49,13 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			cors.POST("/app/image/image-delete", controller.Image{}.ImageDelete)
 			cors.POST("/app/image/image-prune", controller.Image{}.ImagePrune)
 
+			// 文件相关
+			engine.POST("/app/explorer/export", controller.Explorer{}.Export)
+			engine.POST("/app/explorer/import", controller.Explorer{}.Import)
+			engine.POST("/app/explorer/get-path-list", controller.Explorer{}.GetPathList)
+			engine.POST("/app/explorer/delete", controller.Explorer{}.Delete)
+			engine.POST("/app/explorer/create", controller.Explorer{}.Create)
+
 			// 日志相关
 			cors.POST("/app/log/run", controller.RunLog{}.Run)
 		},

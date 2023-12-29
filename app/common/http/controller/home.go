@@ -6,6 +6,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
@@ -66,6 +67,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		},
 	})
 	if err != nil {
+		notice.Message{}.Error("console", err.Error())
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
