@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
+	"log/slog"
 	"strings"
 )
 
@@ -44,8 +45,10 @@ type explorer struct {
 
 func (self explorer) GetListByPath(path string) (fileList []*fileItem, err error) {
 	path = strings.TrimSuffix(path, "/") + "/"
-	listCmd := fmt.Sprintf("cd %s && ls -AlhX --full-time .%s \n", self.rootPath, path)
+	listCmd := fmt.Sprintf("cd %s && ls -AlhX --full-time %s%s \n", self.rootPath, self.rootPath, path)
+	slog.Debug("explorer", "list", listCmd)
 	out, err := self.commander.Run(listCmd)
+	slog.Debug("explorer", "list", string(out))
 	if err != nil {
 		return fileList, err
 	}
