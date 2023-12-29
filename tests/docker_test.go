@@ -1,7 +1,9 @@
 package tests
 
 import (
+	"archive/tar"
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,11 +11,12 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/registry"
+	"github.com/docker/docker/pkg/archive"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -241,65 +244,79 @@ func TestChan(t *testing.T) {
 
 type fileItem struct {
 	Name     string `json:"name"`
-	Typeflag byte   `json:"typeFlag"`
+	TypeFlag byte   `json:"typeFlag"`
 	LinkName string `json:"linkName"`
-	Size     int64  `json:"size"`
+	Size     string `json:"size"`
 	Mode     int64  `json:"mode"`
 	IsDir    bool   `json:"isDir"`
 	ModTime  string `json:"modTime"`
 }
 
 func TestCode(t *testing.T) {
-	file, _ := os.Open("./fileList.json")
-	jsonStr, _ := io.ReadAll(file)
-
+	file, _ := os.Open("./222")
+	content, _ := io.ReadAll(file)
 	var fileList []*fileItem
-	json.Unmarshal(jsonStr, &fileList)
-
-	path := "/home/site"
-	path = strings.TrimSuffix(path, "/") + "/"
-	level := strings.Count(path, "/")
-	fmt.Printf("%v \n", level)
-	for _, item := range fileList {
-		if strings.HasPrefix(item.Name, path) {
-			pathName := strings.TrimSuffix(item.Name, "/")
-			showName := filepath.Base(item.Name)
-			if strings.Count(pathName, "/") == level {
-				fmt.Printf("%v \n", showName)
+	lines := bytes.Split(content, []byte("\n"))
+	for _, line := range lines {
+		if function.IsEmptyArray(line) {
+			continue
+		}
+		switch line[0] {
+		case 'd', 'l', '-', 'b':
+			row := strings.Fields(string(line))
+			if !function.IsEmptyArray(row) {
+				item := &fileItem{
+					Name:    string(line[strings.LastIndex(string(line), row[8]):]),
+					IsDir:   line[0] == 'd',
+					Size:    row[4],
+					Mode:    -1,
+					ModTime: row[5] + row[6],
+				}
+				if strings.Contains(item.Name, "->") {
+					index := strings.Index(item.Name, "->")
+					item.LinkName = item.Name[index+2:]
+					item.Name = item.Name[0:index]
+				}
+				fileList = append(fileList, item)
 			}
 		}
+	}
+	for _, item := range fileList {
+		fmt.Printf("%v - %v \n", item.Name, item.LinkName)
 	}
 }
 
 func TestModifyFile(t *testing.T) {
-	//list, err := docker.Sdk.Client.ContainerDiff(docker.Sdk.Ctx, "b5a816fba3f68f01e94482ea8a58d1dd28f7a2b2cc5263c85341bb71bcff696c")
-	//fmt.Printf("%v \n", err)
-	//fmt.Printf("%v \n", list)
+	list, err := docker.Sdk.Client.ContainerDiff(docker.Sdk.Ctx, "b5a816fba3f68f01e94482ea8a58d1dd28f7a2b2cc5263c85341bb71bcff696c")
+	fmt.Printf("%v \n", err)
+	fmt.Printf("%v \n", list)
 
-	//reader, pathHeader, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, "b5a816fba3f68f01e94482ea8a58d1dd28f7a2b2cc5263c85341bb71bcff696c", "/")
-	//fmt.Printf("%v \n", pathHeader)
-	//fmt.Printf("%v \n", err)
-	//tarReader := tar.NewReader(reader)
-	//for {
-	//	file, err := tarReader.Next()
-	//	if err != nil {
-	//		//break
-	//	}
-	//	fmt.Printf("%v \n", file.Size)
-	//	content := make([]byte, file.Size)
-	//	tarReader.Read(content)
-	//	fmt.Printf("%v \n", string(content))
-	//}
-	//tarReader, err := archive.Tar("./docker", archive.Uncompressed)
-	//fmt.Printf("%v \n", err)
-	//err = docker.Sdk.Client.CopyToContainer(docker.Sdk.Ctx,
-	//	"a662dddbb85b39fcee15195bc21047b27e9e5e24a51e6f9ada682cd03d602733",
-	//	"/docker",
-	//	tarReader,
-	//	types.CopyToContainerOptions{})
-	//fmt.Printf("%v \n", err)
+	reader, pathHeader, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, "b5a816fba3f68f01e94482ea8a58d1dd28f7a2b2cc5263c85341bb71bcff696c", "/")
+	fmt.Printf("%v \n", pathHeader)
+	fmt.Printf("%v \n", err)
+	tarReader := tar.NewReader(reader)
+	for {
+		file, err := tarReader.Next()
+		if err != nil {
+			//break
+		}
+		fmt.Printf("%v \n", file.Size)
+		content := make([]byte, file.Size)
+		tarReader.Read(content)
+		fmt.Printf("%v \n", string(content))
+	}
+	tarReader1, err := archive.Tar("./docker", archive.Uncompressed)
+	fmt.Printf("%v \n", err)
+	err = docker.Sdk.Client.CopyToContainer(docker.Sdk.Ctx,
+		"a662dddbb85b39fcee15195bc21047b27e9e5e24a51e6f9ada682cd03d602733",
+		"/docker",
+		tarReader1,
+		types.CopyToContainerOptions{})
+	fmt.Printf("%v \n", err)
+}
 
-	info, _ := docker.Sdk.Client.Info(docker.Sdk.Ctx)
+func TestContainerInfo(t *testing.T) {
+	info, err := docker.Builder{}.ContainerInfoState("6e7b59d6f30ceeb92478c4b60c721a82cecf65f2e791782513f2521bcde3f095")
+	fmt.Printf("%v \n", err)
 	fmt.Printf("%v \n", info)
-
 }
