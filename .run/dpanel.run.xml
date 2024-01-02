@@ -1,9 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="rangine" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="dpanel" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="dpanel" />
     <working_directory value="$PROJECT_DIR$" />
     <parameters value="server:start -f config.yaml" />
-<!--    <parameters value="make:model &#45;&#45;yaml-file=./database/gen-model.yaml -f config.yaml" />-->
     <EXTENSION ID="net.ashald.envfile">
       <option name="IS_ENABLED" value="false" />
       <option name="IS_SUBST" value="false" />
