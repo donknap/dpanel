@@ -4,19 +4,15 @@
 
 package entity
 
-import (
-	"github.com/donknap/dpanel/common/accessor"
-)
-
 const TableNameEvent = "ims_event"
 
 // Event mapped from table <ims_event>
 type Event struct {
-	ID        int32                        `gorm:"column:id;type:INTEGER" json:"id"`
-	Type      string                       `gorm:"column:type" json:"type"`
-	Action    string                       `gorm:"column:action" json:"action"`
-	Message   *accessor.EventMessageOption `gorm:"column:message;serializer:json" json:"message"`
-	CreatedAt string                       `gorm:"column:created_at" json:"createdAt"`
+	ID        int32  `gorm:"column:id;type:INTEGER" json:"id"`
+	Type      string `gorm:"column:type" json:"type"`
+	Action    string `gorm:"column:action" json:"action"`
+	Message   string `gorm:"column:message" json:"message"`
+	CreatedAt string `gorm:"column:created_at" json:"createdAt"`
 }
 
 // TableName Event's table name

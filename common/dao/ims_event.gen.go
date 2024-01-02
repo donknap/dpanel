@@ -30,7 +30,7 @@ func newEvent(db *gorm.DB, opts ...gen.DOOption) event {
 	_event.ID = field.NewInt32(tableName, "id")
 	_event.Type = field.NewString(tableName, "type")
 	_event.Action = field.NewString(tableName, "action")
-	_event.Message = field.NewField(tableName, "message")
+	_event.Message = field.NewString(tableName, "message")
 	_event.CreatedAt = field.NewString(tableName, "created_at")
 
 	_event.fillFieldMap()
@@ -45,7 +45,7 @@ type event struct {
 	ID        field.Int32
 	Type      field.String
 	Action    field.String
-	Message   field.Field
+	Message   field.String
 	CreatedAt field.String
 
 	fieldMap map[string]field.Expr
@@ -66,7 +66,7 @@ func (e *event) updateTableName(table string) *event {
 	e.ID = field.NewInt32(table, "id")
 	e.Type = field.NewString(table, "type")
 	e.Action = field.NewString(table, "action")
-	e.Message = field.NewField(table, "message")
+	e.Message = field.NewString(table, "message")
 	e.CreatedAt = field.NewString(table, "created_at")
 
 	e.fillFieldMap()

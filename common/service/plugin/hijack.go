@@ -1,7 +1,9 @@
 package plugin
 
 import (
+	"bytes"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 type Hijacked struct {
@@ -14,19 +16,17 @@ func (self Hijacked) Run(cmd string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	bufLen := 256
-	var out []byte
-	for {
-		buf := make([]byte, bufLen)
-		n, err := self.conn.Conn.Read(buf)
-		if err != nil {
-			break
-		}
-		if n < bufLen {
-			out = append(out, buf[0:n]...)
-			break
-		}
-		out = append(out, buf...)
-	}
+	out := self.Out()
 	return out, nil
+}
+
+func (self Hijacked) Out() []byte {
+	var b bytes.Buffer
+	write := stdcopy.NewStdWriter(&b, stdcopy.Stdout)
+	stdcopy.StdCopy(write, nil, self.conn.Reader)
+	return b.Bytes()
+}
+
+func (self Hijacked) Close() {
+	self.conn.Close()
 }

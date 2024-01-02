@@ -18,8 +18,4 @@ relation:
   - table: ims_run_env
   - table: ims_registry
   - table: ims_event
-    column:
-      message:
-        serializer: json
-        type: EventMessageOption
   - table: ims_notice

@@ -1,39 +1,30 @@
 package plugin
 
 import (
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/common/service/docker"
-)
-
-var (
-	hijackList = make(map[string]*Hijacked)
 )
 
 type Command struct {
 }
 
-func (self Command) Attach(name string, option *AttachOption) (*Hijacked, error) {
-	if item, ok := hijackList[name]; ok {
-		// 检查exec id 是否可用？
-		_, err := docker.Sdk.Client.ContainerExecInspect(docker.Sdk.Ctx, item.Id)
-		if err == nil {
-			return item, nil
-		}
-	}
+// Result 执行一条命令返回结果，适用于查询查，防止两个command结果重复
+func (self Command) Result(name string, cmd string) (out []byte, err error) {
 	execConfig := types.ExecConfig{
 		Privileged:   true,
 		Tty:          false,
-		AttachStdin:  true,
+		AttachStdin:  false,
 		AttachStdout: true,
-		AttachStderr: true,
+		AttachStderr: false,
 		Cmd: []string{
 			"/bin/sh",
+			"-c",
+			cmd,
 		},
 	}
 	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, name, execConfig)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 	o := &Hijacked{
 		Id: exec.ID,
@@ -41,8 +32,6 @@ func (self Command) Attach(name string, option *AttachOption) (*Hijacked, error)
 	o.conn, err = docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, types.ExecStartCheck{
 		Tty: false,
 	})
-	address := o.conn.Conn.RemoteAddr()
-	fmt.Printf("%v \n", address.String())
-	hijackList[name] = o
-	return o, nil
+	defer o.Close()
+	return o.Out(), nil
 }

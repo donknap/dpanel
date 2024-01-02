@@ -16,6 +16,7 @@
     <package value="github.com/donknap/dpanel/explorer" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="$PROJECT_DIR$" />
+    <output_directory value="$PROJECT_DIR$/bin" />
     <method v="2" />
   </configuration>
 </component>

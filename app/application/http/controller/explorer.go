@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"io"
@@ -72,8 +73,10 @@ func (self Explorer) Export(http *gin.Context) {
 func (self Explorer) Import(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5      string `json:"md5" binding:"required"`
-		Unzip    bool   `json:"unzip"`
-		File     string `json:"file" binding:"required"`
+		FileList []struct {
+			Name string `json:"name"`
+			Path string `json:"path"`
+		} `json:"fileList" binding:"required"`
 		DestPath string `json:"destPath" binding:"required"`
 	}
 	params := ParamsValidate{}
@@ -85,7 +88,16 @@ func (self Explorer) Import(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	tarReader, err := archive.Tar(params.File, archive.Uncompressed)
+	uploadTempDir, _ := os.MkdirTemp("", "dpanel")
+	defer os.RemoveAll(uploadTempDir)
+	for _, item := range params.FileList {
+		err = os.Rename(storage.Local{}.GetRealPath(item.Path), uploadTempDir+"/"+item.Name)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	tarReader, err := archive.Tar(uploadTempDir, archive.Uncompressed)
 	err = docker.Sdk.Client.CopyToContainer(docker.Sdk.Ctx,
 		params.Md5,
 		params.DestPath,
@@ -96,17 +108,28 @@ func (self Explorer) Import(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.Unzip {
-		explorer, err := logic.NewExplorer(params.Md5)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		err = explorer.Unzip(params.DestPath, filepath.Base(params.File))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Explorer) Unzip(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5  string `json:"md5" binding:"required"`
+		File string `json:"file" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	explorer, err := logic.NewExplorer(params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = explorer.Unzip(filepath.Dir(params.File), filepath.Base(params.File))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 	self.JsonSuccessResponse(http)
 	return
@@ -205,9 +228,9 @@ func (self Explorer) GetPathList(http *gin.Context) {
 
 func (self Explorer) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5   string `json:"md5" binding:"required"`
-		IsDir bool   `json:"isDir"`
-		Path  string `json:"path" binding:"required"`
+		Md5      string `json:"md5" binding:"required"`
+		DestPath string `json:"destPath" binding:"required"`
+		IsDir    bool   `json:"isDir"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -218,7 +241,31 @@ func (self Explorer) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = explorer.Create(params.Path, params.IsDir)
+	err = explorer.Create(params.DestPath, params.IsDir)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Explorer) Rename(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5     string `json:"md5" binding:"required"`
+		File    string `json:"file" binding:"required"`
+		NewName string `json:"newName" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	explorer, err := logic.NewExplorer(params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = explorer.Rename(params.File, params.NewName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

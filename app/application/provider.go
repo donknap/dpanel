@@ -52,9 +52,11 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			// 文件相关
 			engine.POST("/app/explorer/export", controller.Explorer{}.Export)
 			engine.POST("/app/explorer/import", controller.Explorer{}.Import)
+			engine.POST("/app/explorer/unzip", controller.Explorer{}.Unzip)
 			engine.POST("/app/explorer/get-path-list", controller.Explorer{}.GetPathList)
 			engine.POST("/app/explorer/delete", controller.Explorer{}.Delete)
 			engine.POST("/app/explorer/create", controller.Explorer{}.Create)
+			engine.POST("/app/explorer/rename", controller.Explorer{}.Rename)
 
 			// 日志相关
 			cors.POST("/app/log/run", controller.RunLog{}.Run)

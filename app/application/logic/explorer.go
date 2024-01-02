@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"log/slog"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,38 +18,33 @@ func NewExplorer(md5 string) (*explorer, error) {
 		return nil, err
 	}
 	if containerInfo.State.Pid == 0 {
-		return nil, err
+		return nil, errors.New("please start the container" + md5)
 	}
 	explorerPlugin, err := plugin.NewPlugin("explorer")
 	if err != nil {
 		return nil, err
 	}
-	proxyName, err := explorerPlugin.Create()
-	if err != nil {
-		return nil, err
-	}
-	commander, err := plugin.Command{}.Attach(proxyName, nil)
+	pluginName, err := explorerPlugin.Create()
 	if err != nil {
 		return nil, err
 	}
 	o := &explorer{
-		commander: commander,
-		rootPath:  fmt.Sprintf("/proc/%d/root", containerInfo.State.Pid),
+		rootPath:   fmt.Sprintf("/proc/%d/root", containerInfo.State.Pid),
+		pluginName: pluginName,
 	}
 	return o, nil
 }
 
 type explorer struct {
-	commander *plugin.Hijacked
-	rootPath  string
+	pluginName string
+	rootPath   string
 }
 
 func (self explorer) GetListByPath(path string) (fileList []*fileItem, err error) {
 	path = strings.TrimSuffix(path, "/") + "/"
-	listCmd := fmt.Sprintf("cd %s && ls -AlhX --full-time %s%s \n", self.rootPath, self.rootPath, path)
-	slog.Debug("explorer", "list", listCmd)
-	out, err := self.commander.Run(listCmd)
-	slog.Debug("explorer", "list", string(out))
+	cmd := fmt.Sprintf("ls -AlhX --full-time %s%s \n", self.rootPath, path)
+	slog.Debug("explorer", "cmd", cmd)
+	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return fileList, err
 	}
@@ -86,9 +82,9 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItem, err error
 }
 
 func (self explorer) Unzip(rootPath string, zipName string) error {
-	rootPath = strings.TrimPrefix(rootPath, "/") + "/"
-	listCmd := fmt.Sprintf("cd %s/%s && unzip -o ./%s \n", self.rootPath, rootPath, zipName)
-	out, err := self.commander.Run(listCmd)
+	cmd := fmt.Sprintf("cd %s/%s && unzip -o ./%s \n", self.rootPath, strings.TrimPrefix(rootPath, "/")+"/", zipName)
+	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+
 	if err != nil {
 		return err
 	}
@@ -103,26 +99,45 @@ func (self explorer) DeleteFileList(fileList []string) error {
 	for _, path := range fileList {
 		deleteFileList = append(deleteFileList, self.rootPath+"/"+strings.TrimPrefix(path, "/"))
 	}
-	listCmd := fmt.Sprintf("cd %s && rm -rf %s && pwd \n", self.rootPath, strings.Join(deleteFileList, " "))
-	out, err := self.commander.Run(listCmd)
+	cmd := fmt.Sprintf("cd %s && rm -rf %s \n", self.rootPath, strings.Join(deleteFileList, " "))
+	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%v \n", string(out))
+	slog.Debug("explorer", "out", string(out))
 	return nil
 }
 
 func (self explorer) Create(path string, isDir bool) error {
 	var cmd string
+	currentPath := fmt.Sprintf("%s/%s", self.rootPath, strings.TrimPrefix(path, "/"))
 	if isDir {
-		cmd = fmt.Sprintf("cd %s && mkdir -p %s/%s && pwd \n", self.rootPath, self.rootPath, strings.TrimPrefix(path, "/"))
+		cmd = fmt.Sprintf(
+			`mkdir -p %s/NewFolder$(ls -al %s | grep NewFolder | wc -l | awk '{sub(/^[ \t]+/, ""); print $1+1}') \n`,
+			currentPath,
+			currentPath)
 	} else {
-		cmd = fmt.Sprintf("cd %s && touch %s/%s && pwd \n", self.rootPath, self.rootPath, strings.TrimPrefix(path, "/"))
+		cmd = fmt.Sprintf(
+			`touch %s/NewFile$(ls -al %s | grep NewFile | wc -l | awk '{sub(/^[ \t]+/, ""); print $1+1}') \n`,
+			currentPath,
+			currentPath)
 	}
-	out, err := self.commander.Run(cmd)
+	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%v \n", string(out))
+	slog.Debug("explorer", "out", string(out))
+	return nil
+}
+
+func (self explorer) Rename(file string, newFileName string) error {
+	oldFile := fmt.Sprintf("%s/%s", self.rootPath, strings.TrimPrefix(file, "/"))
+	newFile := fmt.Sprintf("%s/%s", filepath.Dir(oldFile), newFileName)
+	cmd := fmt.Sprintf("mv %s %s \n", oldFile, newFile)
+	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+	if err != nil {
+		return err
+	}
+	slog.Debug("explorer", "out", string(out))
 	return nil
 }
