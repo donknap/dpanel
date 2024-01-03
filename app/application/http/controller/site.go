@@ -36,7 +36,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 	}
 	// 重新部署，先删掉之前的容器
 	if params.Id != 0 {
-		notice.Message{}.Info("containerCreate", "正在停止容器")
+		notice.Message{}.Info("containerCreate", "正在停止旧容器")
 		docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, params.SiteName, container.StopOptions{})
 		err := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, params.SiteName, types.ContainerRemoveOptions{})
 		if err != nil {

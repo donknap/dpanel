@@ -53,7 +53,10 @@ func (self plugin) importImage() error {
 		return nil
 	}
 	imageFile, _ := self.asset.Open(self.setting.Image)
-	reader, _ := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageFile, false)
+	reader, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageFile, false)
+	if err != nil {
+		return err
+	}
 	_, err = io.Copy(io.Discard, reader.Body)
 	if err != nil {
 		return err

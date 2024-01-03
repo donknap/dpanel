@@ -25,9 +25,12 @@ func (self EventLogic) MonitorLoop() {
 				CreatedAt: time.Unix(message.Time, 0).Format("2006-01-02 15:04:05"),
 			}
 			switch eventRow.Type + "/" + eventRow.Action {
-			case "image/tag", "container/stop", "container/start", "image/save",
-				"container/restart", "image/push", "image/pull", "image/load", "container/kill",
-				"image/import", "container/extract-to-dir", "container/die", "image/delete":
+			case "image/tag", "image/save", "image/push", "image/pull", "image/load",
+				"image/import", "image/delete",
+				"container/destroy", "container/create",
+				"container/stop", "container/start", "container/restart",
+				"container/kill", "container/die",
+				"container/extract-to-dir":
 				eventRow.Message += message.Actor.Attributes["name"]
 			case "container/resize":
 				eventRow.Message += fmt.Sprintf("%s: %s-%s", message.Actor.Attributes["name"],

@@ -48,6 +48,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			cors.POST("/app/image/tag-add", controller.Image{}.TagAdd)
 			cors.POST("/app/image/image-delete", controller.Image{}.ImageDelete)
 			cors.POST("/app/image/image-prune", controller.Image{}.ImagePrune)
+			cors.POST("/app/image/export", controller.Image{}.Export)
 
 			// 文件相关
 			engine.POST("/app/explorer/export", controller.Explorer{}.Export)
@@ -57,6 +58,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			engine.POST("/app/explorer/delete", controller.Explorer{}.Delete)
 			engine.POST("/app/explorer/create", controller.Explorer{}.Create)
 			engine.POST("/app/explorer/rename", controller.Explorer{}.Rename)
+			engine.POST("/app/explorer/get-content", controller.Explorer{}.GetContent)
 
 			// 日志相关
 			cors.POST("/app/log/run", controller.RunLog{}.Run)

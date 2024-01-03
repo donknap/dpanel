@@ -273,3 +273,32 @@ func (self Explorer) Rename(http *gin.Context) {
 	self.JsonSuccessResponse(http)
 	return
 }
+
+func (self Explorer) GetContent(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5  string `json:"md5" binding:"required"`
+		File string `json:"file" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	explorer, err := logic.NewExplorer(params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	content, err := explorer.GetContent(params.File)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if content == "" {
+		self.JsonResponseWithError(http, errors.New("该文件类型不支持预览"), 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"content": content,
+	})
+	return
+}

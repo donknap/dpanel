@@ -1,7 +1,7 @@
 {
   "name": "dpanel-plugin-explorer",
-  "imageName": "busybox",
-  "image": "asset/plugin/explorer/busybox.tar",
+  "imageName": "dpanel/explorer",
+  "image": "asset/plugin/explorer/image.tar",
   "env": {
     "pidHost": true,
     "privileged": true,

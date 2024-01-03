@@ -34,7 +34,6 @@ func (self Home) WsNotice(http *gin.Context) {
 	}
 	go client.ReadMessage()
 	go client.SendMessage()
-	client.SendMessageQueue <- []byte("welcome DPanel")
 }
 
 func (self Home) WsConsole(http *gin.Context) {

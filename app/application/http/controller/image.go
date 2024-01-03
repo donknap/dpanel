@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"io"
 	"os"
 	"strings"
 )
@@ -60,7 +61,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		"COPY",
 	}
 	for _, str := range addStr {
-		if strings.Contains(strings.ToUpper(params.BuildDockerfile), str) {
+		if strings.HasPrefix(strings.ToUpper(params.BuildDockerfile), str) {
 			mustHasZipFile = true
 		}
 	}
@@ -389,5 +390,36 @@ func (self Image) ImagePrune(http *gin.Context) {
 	filter.Add("dangling", "0")
 	docker.Sdk.Client.ImagesPrune(docker.Sdk.Ctx, filter)
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Image) Export(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5 string `json:"md5" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	out, err := docker.Sdk.Client.ImageSave(docker.Sdk.Ctx, imageInfo.RepoTags)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer out.Close()
+	tempFile, _ := os.CreateTemp("", "dpanel")
+	defer tempFile.Close()
+	defer os.Remove(tempFile.Name())
+	_, err = io.Copy(tempFile, out)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	http.File(tempFile.Name())
 	return
 }

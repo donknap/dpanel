@@ -13,33 +13,28 @@ import (
 )
 
 func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
+	notice.Message{}.Info("imageBuild", "开始构建镜像", buildImageTask.Tag)
+	builder := docker.Sdk.GetImageBuildBuilder()
+	if buildImageTask.ZipPath != "" {
+		builder.WithZipFilePath(buildImageTask.ZipPath)
+	}
+	if buildImageTask.DockerFileContent != nil {
+		builder.WithDockerFileContent(buildImageTask.DockerFileContent)
+	}
+	if buildImageTask.Context != "" {
+		builder.WithDockerFilePath(buildImageTask.Context)
+	}
+	if buildImageTask.GitUrl != "" {
+		builder.WithGitUrl(buildImageTask.GitUrl)
+	}
+	builder.WithTag(buildImageTask.Tag)
+	response, err := builder.Execute()
+	if err != nil {
+		return err
+	}
 	go func() {
-		builder := docker.Sdk.GetImageBuildBuilder()
-		if buildImageTask.ZipPath != "" {
-			builder.WithZipFilePath(buildImageTask.ZipPath)
-		}
-		if buildImageTask.DockerFileContent != nil {
-			builder.WithDockerFileContent(buildImageTask.DockerFileContent)
-		}
-		if buildImageTask.Context != "" {
-			builder.WithDockerFilePath(buildImageTask.Context)
-		}
-		if buildImageTask.GitUrl != "" {
-			builder.WithGitUrl(buildImageTask.GitUrl)
-		}
-		builder.WithTag(buildImageTask.Tag)
-		response, err := builder.Execute()
-		if err != nil {
-			dao.Image.Where(dao.Image.ID.Eq(buildImageTask.ImageId)).Updates(entity.Image{
-				Status:  STATUS_ERROR,
-				Message: err.Error(),
-			})
-			notice.Message{}.Error("imageBuild", err.Error())
-			return
-		}
-		buildProgressMessage := ""
-
 		defer response.Body.Close()
+		buildProgressMessage := ""
 		progressChan := docker.Sdk.Progress(response.Body, fmt.Sprintf("%d", buildImageTask.ImageId))
 		for {
 			select {
@@ -48,7 +43,7 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
 					notice.Message{}.Success("imageBuild", buildImageTask.Tag)
 					dao.Image.Select(dao.Image.Message, dao.Image.Status, dao.Image.ImageInfo).Where(dao.Image.ID.Eq(buildImageTask.ImageId)).Updates(entity.Image{
 						Status:  STATUS_SUCCESS,
-						Message: "",
+						Message: buildProgressMessage,
 						ImageInfo: &accessor.ImageInfoOption{
 							Id: buildImageTask.Tag,
 						},
@@ -65,8 +60,10 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
 				if message.Err != nil {
 					dao.Image.Where(dao.Image.ID.Eq(buildImageTask.ImageId)).Updates(entity.Image{
 						Status:  STATUS_ERROR,
-						Message: buildProgressMessage,
+						Message: message.Err.Error(),
 					})
+					message.Stream.Stream = message.Err.Error()
+					docker.QueueDockerProgressMessage <- message
 					notice.Message{}.Error("imageBuild", message.Err.Error())
 					return
 				}
@@ -89,7 +86,6 @@ func (self DockerTask) ImageRemote(task *ImageRemoteMessage) error {
 		})
 	}
 	if err != nil {
-		notice.Message{}.Error(task.Type, err.Error())
 		return err
 	}
 	go func() {
