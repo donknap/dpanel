@@ -274,16 +274,18 @@ func (self Image) Remote(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+	} else {
+		err := logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
+			Auth: authString,
+			Type: params.Type,
+			Tag:  params.Tag,
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
-	err := logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
-		Auth: authString,
-		Type: params.Type,
-		Tag:  params.Tag,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"tag": params.Tag,
 	})
@@ -363,7 +365,8 @@ func (self Image) GetImageTask(http *gin.Context) {
 
 func (self Image) ImageDelete(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 []string `form:"md5" binding:"required"`
+		Md5   []string `json:"md5" binding:"required"`
+		Force bool     `json:"force"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -374,6 +377,7 @@ func (self Image) ImageDelete(http *gin.Context) {
 		for _, sha := range params.Md5 {
 			_, err := docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, sha, types.ImageRemoveOptions{
 				PruneChildren: true,
+				Force:         params.Force,
 			})
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)

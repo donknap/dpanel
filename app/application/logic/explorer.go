@@ -118,6 +118,7 @@ func (self explorer) DeleteFileList(fileList []string) error {
 	return nil
 }
 
+// Deprecated: 无用
 func (self explorer) Create(path string, isDir bool) error {
 	path, err := self.getSafePath(path)
 	if err != nil {
@@ -144,6 +145,7 @@ func (self explorer) Create(path string, isDir bool) error {
 	return nil
 }
 
+// Deprecated: 无用
 func (self explorer) Rename(file string, newFileName string) error {
 	if !strings.HasPrefix(file, "/") || strings.Contains(newFileName, "/") {
 		return errors.New("please use absolute address")
@@ -164,7 +166,7 @@ func (self explorer) GetContent(file string) (string, error) {
 		return "", errors.New("please use absolute address")
 	}
 	file = fmt.Sprintf("%s%s", self.rootPath, file)
-	cmd := fmt.Sprintf(`file --mime-type -b %s | grep -q "text" && cat %s \n`, file, file)
+	cmd := fmt.Sprintf(`file --mime-type -b %s | grep -q -e "text" -e "empty" && cat %s \n`, file, file)
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return "", err

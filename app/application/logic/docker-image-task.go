@@ -84,6 +84,12 @@ func (self DockerTask) ImageRemote(task *ImageRemoteMessage) error {
 		out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, task.Tag, types.ImagePushOptions{
 			RegistryAuth: task.Auth,
 		})
+		// push 等待执行完成
+		_, err = io.Copy(io.Discard, out)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 	if err != nil {
 		return err

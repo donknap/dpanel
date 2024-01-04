@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"errors"
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/archive"
@@ -32,7 +33,7 @@ func (self Explorer) Export(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	out, err := docker.Sdk.Client.ContainerExport(docker.Sdk.Ctx, params.Md5)
+	out, _, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Md5, "/")
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -50,7 +51,7 @@ func (self Explorer) Export(http *gin.Context) {
 		switch file.Typeflag {
 		case tar.TypeReg, tar.TypeRegA, tar.TypeDir, tar.TypeGNUSparse:
 			for _, rootPath := range params.FileList {
-				if strings.HasPrefix("/"+file.Name, rootPath) {
+				if strings.HasPrefix(file.Name, rootPath) {
 					zipHeader := &zip.FileHeader{
 						Name:               file.Name,
 						Method:             zip.Deflate,
@@ -68,6 +69,46 @@ func (self Explorer) Export(http *gin.Context) {
 	http.Header("Content-Disposition", "attachment; filename=export.zip")
 	http.File(zipTempFile.Name())
 	return
+}
+
+func (self Explorer) ImportFileContent(http *gin.Context) {
+	type ParamsValidate struct {
+		File     string `json:"file" binding:"required"`
+		Content  string `json:"content"`
+		Md5      string `json:"md5" binding:"required"`
+		DestPath string `json:"destPath" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if !strings.HasPrefix(params.File, "/") || !strings.HasPrefix(params.DestPath, "/") {
+		self.JsonResponseWithError(http, errors.New("请指定绝对路径"), 500)
+		return
+	}
+	tempFileDir, _ := os.MkdirTemp("", "dpanel-explorer")
+	tempFilePath := fmt.Sprintf("%s%s", strings.TrimSuffix(tempFileDir, "/"), params.File)
+	os.MkdirAll(filepath.Dir(tempFilePath), os.ModePerm)
+	fmt.Printf("%v \n", tempFilePath)
+
+	err := os.WriteFile(tempFilePath, []byte(params.Content), 0o666)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer os.RemoveAll(tempFileDir)
+	tarReader, err := archive.Tar(tempFileDir, archive.Uncompressed)
+	err = docker.Sdk.Client.CopyToContainer(docker.Sdk.Ctx,
+		params.Md5,
+		params.DestPath,
+		tarReader,
+		types.CopyToContainerOptions{},
+	)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
 }
 
 func (self Explorer) Import(http *gin.Context) {
@@ -226,54 +267,6 @@ func (self Explorer) GetPathList(http *gin.Context) {
 	return
 }
 
-func (self Explorer) Create(http *gin.Context) {
-	type ParamsValidate struct {
-		Md5      string `json:"md5" binding:"required"`
-		DestPath string `json:"destPath" binding:"required"`
-		IsDir    bool   `json:"isDir"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	explorer, err := logic.NewExplorer(params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	err = explorer.Create(params.DestPath, params.IsDir)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Explorer) Rename(http *gin.Context) {
-	type ParamsValidate struct {
-		Md5     string `json:"md5" binding:"required"`
-		File    string `json:"file" binding:"required"`
-		NewName string `json:"newName" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	explorer, err := logic.NewExplorer(params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	err = explorer.Rename(params.File, params.NewName)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
 func (self Explorer) GetContent(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5  string `json:"md5" binding:"required"`
@@ -291,10 +284,6 @@ func (self Explorer) GetContent(http *gin.Context) {
 	content, err := explorer.GetContent(params.File)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if content == "" {
-		self.JsonResponseWithError(http, errors.New("该文件类型不支持预览"), 500)
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{

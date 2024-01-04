@@ -14,6 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"log/slog"
 	"net"
 	"strings"
 )
@@ -41,7 +42,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		err := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, params.SiteName, types.ContainerRemoveOptions{})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
-			return
+			slog.Debug("remove container", "name", params.SiteName, "error", err.Error())
 		}
 	}
 	if params.Ports != nil {

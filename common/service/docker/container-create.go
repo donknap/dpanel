@@ -121,11 +121,19 @@ func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
 		Options:        options,
 	})
 	slog.Debug("create network", "name", myNetwork.ID)
-	Sdk.Client.NetworkConnect(Sdk.Ctx, self.containerName, name, &network.EndpointSettings{
+	// 关联网络时，重新退出加入
+	err := Sdk.Client.NetworkDisconnect(Sdk.Ctx, self.containerName, name, true)
+	if err != nil {
+		slog.Debug("disconnect network", "name", myNetwork.ID, "error", err.Error())
+	}
+	err = Sdk.Client.NetworkConnect(Sdk.Ctx, self.containerName, name, &network.EndpointSettings{
 		Aliases: []string{
 			alise,
 		},
 	})
+	if err != nil {
+		slog.Debug("join network", "name", myNetwork.ID, "error", err.Error())
+	}
 }
 
 func (self *ContainerCreateBuilder) WithAutoRemove() {
