@@ -14,7 +14,7 @@ const (
 
 type SiteContainerInfoOption struct {
 	ID     string
-	Info   *types.Container
+	Info   *types.ContainerJSON
 	Err    string
 	Status int32
 }
@@ -37,20 +37,21 @@ func (c *SiteContainerInfoOption) Scan(value interface{}) error {
 		c.Status = STATUS_ERROR
 		return nil
 	}
-	containerInfo, err := docker.Sdk.ContainerByField("id", id)
+	containerInfo, _, err := docker.Sdk.Client.ContainerInspectWithRaw(docker.Sdk.Ctx, id, true)
 	if err != nil {
 		// 这里容器发生错误
 		c.Err = err.Error()
 		c.Status = STATUS_ERROR
 		return nil
 	}
-	if item, ok := containerInfo[id]; ok {
-		c.Info = item
-		if item.State == "running" || item.State == "paused" {
+	if containerInfo.ID != "" {
+		c.Info = &containerInfo
+
+		if containerInfo.State.Running || containerInfo.State.Paused {
 			c.Status = STATUS_SUCCESS
 		} else {
 			c.Status = STATUS_ERROR
-			c.Err = item.Status
+			c.Err = containerInfo.State.Status
 		}
 
 	} else {

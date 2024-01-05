@@ -203,9 +203,19 @@ func (self Site) GetDetail(http *gin.Context) {
 			ID: params.Md5,
 		})).First()
 	}
+	// 站点不存在，返回容器那部分
 	if siteRow == nil {
-		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
-		return
+		info, _, err := docker.Sdk.Client.ContainerInspectWithRaw(docker.Sdk.Ctx, params.Md5, true)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		siteRow = &entity.Site{
+			ContainerInfo: &accessor.SiteContainerInfoOption{
+				ID:   params.Md5,
+				Info: &info,
+			},
+		}
 	}
 	self.JsonResponseWithoutError(http, siteRow)
 	return
@@ -283,7 +293,7 @@ func (self Site) Delete(http *gin.Context) {
 			RemoveLinks:   params.DeleteLink,
 		})
 		if params.DeleteImage {
-			docker.Sdk.Client.ImageRemove(ctx, siteRow.ContainerInfo.Info.ImageID, types.ImageRemoveOptions{})
+			docker.Sdk.Client.ImageRemove(ctx, siteRow.ContainerInfo.Info.Image, types.ImageRemoveOptions{})
 		}
 	}
 	if err != nil {

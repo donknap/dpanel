@@ -56,7 +56,10 @@ func (self Container) Status(http *gin.Context) {
 
 func (self Container) GetList(http *gin.Context) {
 	var list []types.Container
-	list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, types.ContainerListOptions{})
+	list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, types.ContainerListOptions{
+		All:    true,
+		Latest: true,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
