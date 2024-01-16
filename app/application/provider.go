@@ -29,8 +29,6 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			cors.POST("/app/site/get-list", controller.Site{}.GetList)
 			cors.POST("/app/site/get-detail", controller.Site{}.GetDetail)
 			cors.POST("/app/site/delete", controller.Site{}.Delete)
-			cors.POST("/app/site/redeploy", controller.Site{}.ReDeploy)
-			cors.POST("/app/site/search-image", controller.Site{}.SearchImage)
 
 			// 容器相关
 			cors.POST("/app/container/status", controller.Container{}.Status)

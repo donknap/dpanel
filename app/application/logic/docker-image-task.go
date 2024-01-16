@@ -84,57 +84,47 @@ func (self DockerTask) ImageRemote(task *ImageRemoteMessage) error {
 		out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, task.Tag, types.ImagePushOptions{
 			RegistryAuth: task.Auth,
 		})
-		// push 等待执行完成
-		_, err = io.Copy(io.Discard, out)
-		if err != nil {
-			return err
-		}
-		return nil
 	}
 	if err != nil {
 		return err
 	}
-	go func() {
-		pg := make(map[string]*docker.ProgressDownloadImage)
-		progressChan := docker.Sdk.Progress(out, task.Tag)
-		for {
-			select {
-			case message, ok := <-progressChan:
-				if !ok {
-					notice.Message{}.Success(task.Type, task.Tag)
-					return
+	pg := make(map[string]*docker.ProgressDownloadImage)
+	progressChan := docker.Sdk.Progress(out, task.Tag)
+	for {
+		select {
+		case message, ok := <-progressChan:
+			if !ok {
+				return nil
+			}
+			if message.Detail != nil && message.Detail.Id != "" {
+				pd := message.Detail
+				if pd.Status == "Pulling fs layer" {
+					pg[pd.Id] = &docker.ProgressDownloadImage{
+						Extracting:  0,
+						Downloading: 0,
+					}
 				}
-				if message.Detail != nil && message.Detail.Id != "" {
-					pd := message.Detail
-					if pd.Status == "Pulling fs layer" {
-						pg[pd.Id] = &docker.ProgressDownloadImage{
-							Extracting:  0,
-							Downloading: 0,
-						}
-					}
-					if pd.ProgressDetail.Total > 0 && pd.Status == "Downloading" {
-						pg[pd.Id].Downloading = math.Floor((pd.ProgressDetail.Current / pd.ProgressDetail.Total) * 100)
-					}
-					if pd.ProgressDetail.Total > 0 && pd.Status == "Extracting" {
-						pg[pd.Id].Extracting = math.Floor((pd.ProgressDetail.Current / pd.ProgressDetail.Total) * 100)
-					}
-					if pd.Status == "Download complete" {
-						pg[pd.Id].Downloading = 100
-					}
-					if pd.Status == "Pull complete" {
-						pg[pd.Id].Extracting = 100
-					}
-					if pd.ProgressDetail.Total > 0 {
-						docker.QueueDockerImageDownloadMessage <- pg
-					}
-
+				if pd.ProgressDetail.Total > 0 && pd.Status == "Downloading" {
+					pg[pd.Id].Downloading = math.Floor((pd.ProgressDetail.Current / pd.ProgressDetail.Total) * 100)
 				}
-				if message.Err != nil {
-					notice.Message{}.Error(task.Type, message.Err.Error())
-					return
+				if pd.ProgressDetail.Total > 0 && pd.Status == "Extracting" {
+					pg[pd.Id].Extracting = math.Floor((pd.ProgressDetail.Current / pd.ProgressDetail.Total) * 100)
+				}
+				if pd.Status == "Download complete" {
+					pg[pd.Id].Downloading = 100
+				}
+				if pd.Status == "Pull complete" {
+					pg[pd.Id].Extracting = 100
+					docker.QueueDockerImageDownloadMessage <- pg
+				}
+				if pd.ProgressDetail.Total > 0 {
+					docker.QueueDockerImageDownloadMessage <- pg
 				}
 			}
+			if message.Err != nil {
+				return message.Err
+			}
 		}
-	}()
+	}
 	return nil
 }

@@ -4,19 +4,16 @@ import (
 	"errors"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"log/slog"
 	"net"
-	"strings"
 )
 
 type Site struct {
@@ -226,70 +223,20 @@ func (self Site) GetDetail(http *gin.Context) {
 	return
 }
 
-func (self Site) ReDeploy(http *gin.Context) {
-	type ParamsValidate struct {
-		Id  int32  `form:"id" binding:"required"`
-		Md5 string `form:"md5" binding:"required"`
-	}
-
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-
-	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(params.Id)).First()
-	if siteRow == nil {
-		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
-		return
-	}
-	if siteRow.ContainerInfo != nil && siteRow.ContainerInfo.ID != "" {
-		notice.Message{}.Info("containerCreate", "正在停止容器")
-		docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, siteRow.ContainerInfo.ID, container.StopOptions{})
-		err := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, siteRow.ContainerInfo.ID, types.ContainerRemoveOptions{})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-	// 重新部署不更改原镜像
-	siteRow.Env.ImageName = siteRow.Env.ImageId
-
-	runTaskRow := &logic.CreateMessage{
-		SiteName:  siteRow.SiteName,
-		SiteId:    siteRow.ID,
-		RunParams: siteRow.Env,
-	}
-
-	err := logic.DockerTask{}.ContainerCreate(runTaskRow)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	siteRow, _ = dao.Site.Where(dao.Site.ID.Eq(params.Id)).First()
-	self.JsonResponseWithoutError(http, gin.H{
-		"siteId": siteRow.ID,
-		"md5":    siteRow.ContainerInfo.ID,
-	})
-	return
-}
-
 func (self Site) Delete(http *gin.Context) {
 	type ParamsValidate struct {
-		Id           int32 `form:"id" binding:"required"`
-		DeleteImage  bool  `form:"deleteImage" binding:"omitempty"`
-		DeleteVolume bool  `form:"deleteVolume" binding:"omitempty"`
-		DeleteLink   bool  `form:"deleteLink" binding:"omitempty"`
+		Md5          string `json:"md5" binding:"required"`
+		DeleteImage  bool   `json:"deleteImage" binding:"omitempty"`
+		DeleteVolume bool   `json:"deleteVolume" binding:"omitempty"`
+		DeleteLink   bool   `json:"deleteLink" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	siteRow, _ := dao.Site.Where(dao.Site.ID.Eq(params.Id)).First()
-	if siteRow == nil {
-		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
-		return
-	}
+	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
+		ID: params.Md5,
+	})).First()
 	var err error
 	if siteRow.ContainerInfo != nil && siteRow.ContainerInfo.ID != "" {
 		ctx := docker.Sdk.Ctx
@@ -306,48 +253,16 @@ func (self Site) Delete(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	dao.Site.Where(dao.Site.ID.Eq(params.Id)).Delete()
-	self.JsonResponseWithoutError(http, gin.H{
-		"siteId": params.Id,
-	})
-	return
-}
-
-// Deprecated: 暂时无用
-func (self Site) SearchImage(http *gin.Context) {
-	type ParamsValidate struct {
-		Tag      string `form:"tag" binding:"required"`
-		Registry string `form:"registry" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	var list []registry.SearchResult
-	if params.Registry == "docker.io" {
-		list, _ = docker.Sdk.Client.ImageSearch(docker.Sdk.Ctx, params.Tag, types.ImageSearchOptions{
-			Limit: 10,
+	if siteRow != nil {
+		dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
+		self.JsonResponseWithoutError(http, gin.H{
+			"siteId": siteRow.ID,
+			"md5":    params.Md5,
 		})
 	} else {
-		imageList, _ := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, types.ImageListOptions{
-			All: false,
+		self.JsonResponseWithoutError(http, gin.H{
+			"md5": params.Md5,
 		})
-		if !function.IsEmptyArray(imageList) {
-			for _, summary := range imageList {
-				for _, tag := range summary.RepoTags {
-					if strings.Contains(tag, params.Tag) {
-						list = append(list, registry.SearchResult{
-							Name: tag,
-						})
-						break
-					}
-				}
-			}
-
-		}
 	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"list": list,
-	})
 	return
 }

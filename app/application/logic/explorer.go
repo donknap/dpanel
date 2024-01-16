@@ -118,6 +118,30 @@ func (self explorer) DeleteFileList(fileList []string) error {
 	return nil
 }
 
+func (self explorer) GetContent(file string) (string, error) {
+	if !strings.HasPrefix(file, "/") {
+		return "", errors.New("please use absolute address")
+	}
+	file = fmt.Sprintf("%s%s", self.rootPath, file)
+	cmd := fmt.Sprintf(`file --mime-type -b %s | grep -q -e "text" -e "empty" && cat %s \n`, file, file)
+	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+	if err != nil {
+		return "", err
+	}
+	slog.Debug("explorer", "out", string(out))
+	if len(out) <= 8 {
+		return "", nil
+	}
+	return string(out[8:]), nil
+}
+
+func (self explorer) getSafePath(path string) (string, error) {
+	if !strings.HasPrefix(path, "/") {
+		return "", errors.New("please use absolute address")
+	}
+	return strings.TrimSuffix(path, "/") + "/", nil
+}
+
 // Deprecated: 无用
 func (self explorer) Create(path string, isDir bool) error {
 	path, err := self.getSafePath(path)
@@ -159,28 +183,4 @@ func (self explorer) Rename(file string, newFileName string) error {
 	}
 	slog.Debug("explorer", "out", string(out))
 	return nil
-}
-
-func (self explorer) GetContent(file string) (string, error) {
-	if !strings.HasPrefix(file, "/") {
-		return "", errors.New("please use absolute address")
-	}
-	file = fmt.Sprintf("%s%s", self.rootPath, file)
-	cmd := fmt.Sprintf(`file --mime-type -b %s | grep -q -e "text" -e "empty" && cat %s \n`, file, file)
-	out, err := plugin.Command{}.Result(self.pluginName, cmd)
-	if err != nil {
-		return "", err
-	}
-	slog.Debug("explorer", "out", string(out))
-	if len(out) <= 8 {
-		return "", nil
-	}
-	return string(out[8:]), nil
-}
-
-func (self explorer) getSafePath(path string) (string, error) {
-	if !strings.HasPrefix(path, "/") {
-		return "", errors.New("please use absolute address")
-	}
-	return strings.TrimSuffix(path, "/") + "/", nil
 }
