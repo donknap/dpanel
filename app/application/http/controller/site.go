@@ -29,6 +29,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		SiteName  string `json:"siteName" binding:"required"`
 		ImageName string `json:"imageName" binding:"required"`
 		Id        int    `json:"id"`
+		Md5       string `json:"md5"`
 		accessor.SiteEnvOption
 	}
 	params := ParamsValidate{}
@@ -36,7 +37,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		return
 	}
 	// 重新部署，先删掉之前的容器
-	if params.Id != 0 {
+	if params.Id != 0 || params.Md5 != "" {
 		notice.Message{}.Info("containerCreate", "正在停止旧容器")
 		docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, params.SiteName, container.StopOptions{})
 		err := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, params.SiteName, types.ContainerRemoveOptions{})
@@ -203,9 +204,9 @@ func (self Site) GetDetail(http *gin.Context) {
 			ID: params.Md5,
 		})).First()
 	}
-	// 站点不存在，返回容器那部分
+	// 站点不存在，返回容器那部分，并建立 env 字段的内容
 	if siteRow == nil {
-		info, _, err := docker.Sdk.Client.ContainerInspectWithRaw(docker.Sdk.Ctx, params.Md5, true)
+		info, err := docker.Sdk.ContainerInfo(params.Md5)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -215,7 +216,11 @@ func (self Site) GetDetail(http *gin.Context) {
 				ID:   params.Md5,
 				Info: &info,
 			},
+			SiteTitle: info.Name,
+			SiteName:  info.Name,
 		}
+		runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
+		siteRow.Env = &runOption
 	}
 	self.JsonResponseWithoutError(http, siteRow)
 	return
@@ -223,7 +228,8 @@ func (self Site) GetDetail(http *gin.Context) {
 
 func (self Site) ReDeploy(http *gin.Context) {
 	type ParamsValidate struct {
-		Id int32 `form:"id" binding:"required"`
+		Id  int32  `form:"id" binding:"required"`
+		Md5 string `form:"md5" binding:"required"`
 	}
 
 	params := ParamsValidate{}

@@ -3,9 +3,6 @@ package controller
 import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/donknap/dpanel/common/accessor"
-	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
@@ -81,25 +78,35 @@ func (self Container) GetDetail(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	detail, err := docker.Sdk.ContainerInfo(params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	// 查询关联站点信息
-	var siteRow *entity.Site
-	siteRow, _ = dao.Site.Select(
-		dao.Site.ID,
-		dao.Site.SiteTitle,
-		dao.Site.SiteName,
-	).Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-		ID: params.Md5,
-	})).First()
-
 	self.JsonResponseWithoutError(http, gin.H{
 		"info": detail,
-		"site": siteRow,
 	})
 	return
+}
 
+func (self Container) Update(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5     string `json:"md5" binding:"required"`
+		Restart string `json:"restart" binding:"required,oneof=no on-failure unless-stopped always"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	restartPolicy := container.RestartPolicy{
+		Name: params.Restart,
+	}
+	if params.Restart == "on-failure" {
+		restartPolicy.MaximumRetryCount = 5
+	}
+	docker.Sdk.Client.ContainerUpdate(docker.Sdk.Ctx, params.Md5, container.UpdateConfig{
+		RestartPolicy: restartPolicy,
+	})
+	self.JsonSuccessResponse(http)
+	return
 }

@@ -66,8 +66,13 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	if task.RunParams.Cpus != 0 {
 		builder.WithCpus(task.RunParams.Cpus)
 	}
+
 	if task.RunParams.Memory != 0 {
 		builder.WithMemory(task.RunParams.Memory)
+	}
+
+	if task.RunParams.ShmSize != 0 {
+		builder.WithShmSize(task.RunParams.ShmSize)
 	}
 
 	response, err := builder.Execute()

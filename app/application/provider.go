@@ -36,6 +36,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			cors.POST("/app/container/status", controller.Container{}.Status)
 			cors.POST("/app/container/get-list", controller.Container{}.GetList)
 			cors.POST("/app/container/get-detail", controller.Container{}.GetDetail)
+			cors.POST("/app/container/update", controller.Container{}.Update)
 
 			// 镜像相关
 			cors.POST("/app/image/create-by-dockerfile", controller.Image{}.CreateByDockerfile)

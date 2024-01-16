@@ -2,7 +2,6 @@ package docker
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -136,14 +135,11 @@ func (self Builder) ContainerByField(field string, name ...string) (container ma
 	return container, nil
 }
 
-func (self Builder) ContainerInfoState(md5 string) (info *containerInfoState, err error) {
-	_, jsonRaw, err := Sdk.Client.ContainerInspectWithRaw(Sdk.Ctx, md5, true)
+func (self Builder) ContainerInfo(md5 string) (info types.ContainerJSON, err error) {
+	info, _, err = Sdk.Client.ContainerInspectWithRaw(Sdk.Ctx, md5, true)
 	if err != nil {
 		return info, err
 	}
-	err = json.Unmarshal(jsonRaw, &info)
-	if err != nil {
-		return info, nil
-	}
+	info.Name = strings.TrimPrefix(info.Name, "/")
 	return info, nil
 }

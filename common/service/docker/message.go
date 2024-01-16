@@ -1,7 +1,5 @@
 package docker
 
-import "time"
-
 type progressStatus struct {
 	Status string
 }
@@ -56,20 +54,4 @@ type Progress struct {
 type ProgressDownloadImage struct {
 	Downloading float64 `json:"downloading"`
 	Extracting  float64 `json:"extracting"`
-}
-
-type containerInfoState struct {
-	State struct {
-		Status     string    `json:"Status"`
-		Running    bool      `json:"Running"`
-		Paused     bool      `json:"Paused"`
-		Restarting bool      `json:"Restarting"`
-		OOMKilled  bool      `json:"OOMKilled"`
-		Dead       bool      `json:"Dead"`
-		Pid        int       `json:"Pid"`
-		ExitCode   int       `json:"ExitCode"`
-		Error      string    `json:"Error"`
-		StartedAt  time.Time `json:"StartedAt"`
-		FinishedAt time.Time `json:"FinishedAt"`
-	} `json:"State"`
 }

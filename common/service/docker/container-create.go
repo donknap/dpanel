@@ -148,6 +148,10 @@ func (self *ContainerCreateBuilder) WithMemory(count int) {
 	self.hostConfig.Memory = int64(count) * 1024 * 1024
 }
 
+func (self *ContainerCreateBuilder) WithShmSize(size int) {
+	self.hostConfig.ShmSize = int64(size)
+}
+
 func (self *ContainerCreateBuilder) WithPid(pid ...string) {
 	pidStr := strings.Join(pid, ":")
 	self.hostConfig.PidMode = container.PidMode(pidStr)
