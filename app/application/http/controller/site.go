@@ -41,6 +41,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			slog.Debug("remove container", "name", params.SiteName, "error", err.Error())
+			return
 		}
 	}
 	if params.Ports != nil {
