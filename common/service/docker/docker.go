@@ -63,7 +63,7 @@ func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {
 
 func (self Builder) GetContainerLogBuilder() *containerLogBuilder {
 	builder := &containerLogBuilder{
-		option: types.ContainerLogsOptions{
+		option: container.LogsOptions{
 			Timestamps: false,
 			ShowStderr: true,
 			ShowStdout: true,
@@ -142,4 +142,18 @@ func (self Builder) ContainerInfo(md5 string) (info types.ContainerJSON, err err
 	}
 	info.Name = strings.TrimPrefix(info.Name, "/")
 	return info, nil
+}
+
+func (self Builder) GetRestartPolicyByString(restartType string) (mode container.RestartPolicyMode) {
+	restartPolicyMap := map[string]container.RestartPolicyMode{
+		"always":         container.RestartPolicyAlways,
+		"no":             container.RestartPolicyDisabled,
+		"unless-stopped": container.RestartPolicyUnlessStopped,
+		"on-failure":     container.RestartPolicyOnFailure,
+	}
+	if mode, ok := restartPolicyMap[restartType]; ok {
+		return mode
+	} else {
+		return container.RestartPolicyDisabled
+	}
 }

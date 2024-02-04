@@ -93,7 +93,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 		}
 	}
 
-	envOption.Restart = info.HostConfig.RestartPolicy.Name
+	envOption.Restart = string(info.HostConfig.RestartPolicy.Name)
 	envOption.ImageName = info.Config.Image
 	envOption.ImageId = info.Image
 	envOption.Privileged = info.HostConfig.Privileged

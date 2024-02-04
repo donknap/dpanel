@@ -30,10 +30,7 @@ func newSite(db *gorm.DB, opts ...gen.DOOption) site {
 	_site.ID = field.NewInt32(tableName, "id")
 	_site.SiteTitle = field.NewString(tableName, "site_title")
 	_site.SiteName = field.NewString(tableName, "site_name")
-	_site.SiteURL = field.NewString(tableName, "site_url")
-	_site.SiteURLExt = field.NewField(tableName, "site_url_ext")
 	_site.Env = field.NewField(tableName, "env")
-	_site.Type = field.NewInt32(tableName, "type")
 	_site.ContainerInfo = field.NewField(tableName, "container_info")
 	_site.Status = field.NewInt32(tableName, "status")
 	_site.StatusStep = field.NewString(tableName, "status_step")
@@ -52,10 +49,7 @@ type site struct {
 	ID            field.Int32
 	SiteTitle     field.String
 	SiteName      field.String
-	SiteURL       field.String
-	SiteURLExt    field.Field
 	Env           field.Field
-	Type          field.Int32
 	ContainerInfo field.Field
 	Status        field.Int32
 	StatusStep    field.String
@@ -80,10 +74,7 @@ func (s *site) updateTableName(table string) *site {
 	s.ID = field.NewInt32(table, "id")
 	s.SiteTitle = field.NewString(table, "site_title")
 	s.SiteName = field.NewString(table, "site_name")
-	s.SiteURL = field.NewString(table, "site_url")
-	s.SiteURLExt = field.NewField(table, "site_url_ext")
 	s.Env = field.NewField(table, "env")
-	s.Type = field.NewInt32(table, "type")
 	s.ContainerInfo = field.NewField(table, "container_info")
 	s.Status = field.NewInt32(table, "status")
 	s.StatusStep = field.NewString(table, "status_step")
@@ -105,14 +96,11 @@ func (s *site) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *site) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 12)
+	s.fieldMap = make(map[string]field.Expr, 9)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["site_title"] = s.SiteTitle
 	s.fieldMap["site_name"] = s.SiteName
-	s.fieldMap["site_url"] = s.SiteURL
-	s.fieldMap["site_url_ext"] = s.SiteURLExt
 	s.fieldMap["env"] = s.Env
-	s.fieldMap["type"] = s.Type
 	s.fieldMap["container_info"] = s.ContainerInfo
 	s.fieldMap["status"] = s.Status
 	s.fieldMap["status_step"] = s.StatusStep

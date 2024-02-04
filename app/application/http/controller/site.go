@@ -8,10 +8,12 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"gorm.io/gorm"
 	"log/slog"
 	"net"
 )
@@ -97,6 +99,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Command:        params.Command,
 		Entrypoint:     params.Entrypoint,
 	}
+	dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
+
 	var siteRow *entity.Site
 	siteRow, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).First()
 	if siteRow == nil {
@@ -108,7 +112,6 @@ func (self Site) CreateByImage(http *gin.Context) {
 			ContainerInfo: &accessor.SiteContainerInfoOption{
 				ID: "",
 			},
-			Type: 1,
 		}
 		err := dao.Site.Create(siteRow)
 		if err != nil {
@@ -116,11 +119,12 @@ func (self Site) CreateByImage(http *gin.Context) {
 			return
 		}
 	} else {
-		dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).Updates(&entity.Site{
+		dao.Site.Select(dao.Site.ALL).Where(dao.Site.SiteName.Eq(params.SiteName)).Updates(&entity.Site{
 			SiteTitle: params.SiteTitle,
 			Env:       &runParams,
 			Status:    logic.STATUS_STOP,
 			Message:   "",
+			DeletedAt: gorm.DeletedAt{},
 		})
 	}
 	runTaskRow := &logic.CreateMessage{
@@ -139,11 +143,11 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 func (self Site) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Page      int    `form:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize  int    `form:"pageSize" binding:"omitempty"`
-		SiteTitle string `form:"siteTitle" binding:"omitempty"`
-		Sort      string `form:"sort,default=new" binding:"omitempty,oneof=hot new"`
+		Page      int    `json:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize  int    `json:"pageSize" binding:"omitempty"`
+		SiteTitle string `json:"siteTitle" binding:"omitempty"`
 		Status    int32  `json:"status" binding:"omitempty,oneof=10 20 30"`
+		IsDelete  bool   `json:"isDelete"`
 	}
 
 	params := ParamsValidate{}
@@ -164,18 +168,11 @@ func (self Site) GetList(http *gin.Context) {
 	if params.SiteTitle != "" {
 		query = query.Where(dao.Site.SiteTitle.Like("%" + params.SiteTitle + "%"))
 	}
+	if params.IsDelete {
+		query = query.Unscoped().Where(dao.Site.DeletedAt.IsNotNull())
+	}
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
 
-	// 列表数据，如果容器状态有问题，需要再次更新状态
-	if list != nil {
-		for _, site := range list {
-			// 有容器信息后，站点的状态跟随容器状态
-			if site.Status > logic.STATUS_PROCESSING && site.ContainerInfo != nil {
-				dao.Site.Where(dao.Site.ID.Eq(site.ID)).Update(dao.Site.Status, site.ContainerInfo.Status)
-				site.Status = site.ContainerInfo.Status
-			}
-		}
-	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"total": total,
 		"page":  params.Page,
@@ -196,7 +193,7 @@ func (self Site) GetDetail(http *gin.Context) {
 
 	var siteRow *entity.Site
 	if params.Id != 0 {
-		siteRow, _ = dao.Site.Where(dao.Site.ID.Eq(params.Id)).First()
+		siteRow, _ = dao.Site.Unscoped().Where(dao.Site.ID.Eq(params.Id)).First()
 	} else {
 		siteRow, _ = dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
 			ID: params.Md5,
@@ -235,26 +232,44 @@ func (self Site) Delete(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-		ID: params.Md5,
-	})).First()
 	var err error
-	if siteRow.ContainerInfo != nil && siteRow.ContainerInfo.ID != "" {
-		ctx := docker.Sdk.Ctx
-		docker.Sdk.Client.ContainerStop(ctx, siteRow.ContainerInfo.ID, container.StopOptions{})
-		err = docker.Sdk.Client.ContainerRemove(ctx, siteRow.ContainerInfo.ID, types.ContainerRemoveOptions{
-			RemoveVolumes: params.DeleteVolume,
-			RemoveLinks:   params.DeleteLink,
-		})
-		if params.DeleteImage {
-			docker.Sdk.Client.ImageRemove(ctx, siteRow.ContainerInfo.Info.Image, types.ImageRemoveOptions{})
-		}
+	containerInfo, err := docker.Sdk.ContainerInfo(params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if !function.IsEmptyArray(containerInfo.HostConfig.Links) {
+		params.DeleteLink = true
+	} else {
+		params.DeleteLink = false
+	}
+
+	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.ID, container.StopOptions{})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.ID, types.ContainerRemoveOptions{
+		RemoveVolumes: params.DeleteVolume,
+		RemoveLinks:   params.DeleteLink,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.DeleteImage {
+		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, containerInfo.Image, types.ImageRemoveOptions{})
 	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
+		ID: params.Md5,
+	})).First()
+
 	if siteRow != nil {
+		docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, siteRow.SiteName)
 		dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
 		self.JsonResponseWithoutError(http, gin.H{
 			"siteId": siteRow.ID,

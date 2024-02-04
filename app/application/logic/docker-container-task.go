@@ -59,6 +59,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		}
 	}
 	builder.WithRestart(task.RunParams.Restart)
+
 	if task.RunParams.Privileged {
 		builder.WithPrivileged()
 	}

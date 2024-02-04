@@ -62,7 +62,7 @@ func (self *ContainerCreateBuilder) WithImage(image string, tryPullImage bool) {
 
 func (self *ContainerCreateBuilder) WithRestart(restartType string) *ContainerCreateBuilder {
 	self.hostConfig.RestartPolicy = container.RestartPolicy{}
-	self.hostConfig.RestartPolicy.Name = restartType
+	self.hostConfig.RestartPolicy.Name = Sdk.GetRestartPolicyByString(restartType)
 	return self
 }
 

@@ -23,6 +23,9 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		// 仓库相关
 		cors.POST("/common/registry/create", controller.Registry{}.Create)
 		cors.POST("/common/registry/get-list", controller.Registry{}.GetList)
+		cors.POST("/common/registry/get-detail", controller.Registry{}.GetDetail)
+		cors.POST("/common/registry/update", controller.Registry{}.Update)
+		cors.POST("/common/registry/delete", controller.Registry{}.Delete)
 
 		// 全局
 		cors.POST("/common/event/get-list", controller.Event{}.GetList)

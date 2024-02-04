@@ -10,8 +10,16 @@ server:
     port: 8086
 log:
   default:
-    driver: ${LOG_DEFAULT_DRIVER-console}
+    driver: stack
+    channels:
+      - file
+      - console
+  file:
+    driver: file
     path: run.log
+    level: info
+  console:
+    driver: console
     level: debug
 database:
   default:

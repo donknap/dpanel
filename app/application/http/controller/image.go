@@ -183,7 +183,7 @@ func (self Image) GetList(http *gin.Context) {
 func (self Image) GetListBuild(http *gin.Context) {
 	type ParamsValidate struct {
 		Page     int `form:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize int `form:"pageSize" binding:"omitempty"`
+		PageSize int `form:"pageSize" binding:"omitempty,gt=1"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

@@ -19,8 +19,8 @@ func (self EventLogic) MonitorLoop() {
 		select {
 		case message := <-messageChan:
 			eventRow := &entity.Event{
-				Type:      message.Type,
-				Action:    message.Action,
+				Type:      string(message.Type),
+				Action:    string(message.Action),
 				Message:   "",
 				CreatedAt: time.Unix(message.Time, 0).Format("2006-01-02 15:04:05"),
 			}
