@@ -63,6 +63,9 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 
 			// 网络相关
 			cors.POST("/app/network/get-detail", controller.Network{}.GetDetail)
+
+			// 存储相关
+			cors.POST("/app/volume/get-list", controller.Volume{}.GetList)
 		},
 	)
 }
