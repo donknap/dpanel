@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -43,7 +44,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		return
 	}
 	if params.BuildZip != "" && params.BuildGit != "" {
-		self.JsonResponseWithError(http, errors.New("Zip 包和 Git 地址只需要只定一项"), 500)
+		self.JsonResponseWithError(http, errors.New("zip 包和 git 地址只需要只定一项"), 500)
 		return
 	}
 	mustHasZipFile := false
@@ -95,7 +96,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		BuildRoot:       params.BuildRoot,
 		BuildType:       params.BuildType,
 		BuildTemplate:   params.BuildTemplate,
-		Status:          logic.STATUS_STOP,
+		Status:          logic.StatusStop,
 		Message:         "",
 	}
 	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
@@ -138,7 +139,7 @@ func (self Image) GetList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	var result []types.ImageSummary
+	var result []image.Summary
 
 	imageList, err := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, types.ImageListOptions{
 		All:            false,

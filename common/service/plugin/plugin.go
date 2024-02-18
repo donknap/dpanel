@@ -3,7 +3,7 @@ package plugin
 import (
 	"embed"
 	"encoding/json"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"io"
@@ -83,7 +83,7 @@ func (self plugin) runContainer() error {
 	if err != nil {
 		return err
 	}
-	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, types.ContainerStartOptions{})
+	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
 	if err != nil {
 		return err
 	}

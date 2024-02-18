@@ -5,14 +5,13 @@ import (
 	"github.com/donknap/dpanel/app/common/logic"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go-support/src/console"
 	http_server "github.com/we7coreteam/w7-rangine-go/src/http/server"
 )
 
 type Provider struct {
 }
 
-func (provider *Provider) Register(httpServer *http_server.Server, console console.Console) {
+func (provider *Provider) Register(httpServer *http_server.Server) {
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		cors := engine.Group("/", common.CorsMiddleware{}.Process)

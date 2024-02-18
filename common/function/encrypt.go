@@ -10,10 +10,10 @@ import (
 	"strings"
 )
 
-const COMMON_KEY = "DPanelCommonAseKey20231208"
+const CommonKey = "DPanelCommonAseKey20231208"
 
 func AseEncode(key string, str string) (result string, err error) {
-	key = GetMd5(COMMON_KEY + key)
+	key = GetMd5(CommonKey + key)
 	cipher, err := aes.NewCipher([]byte(key))
 	if err != nil {
 		return result, err
@@ -29,7 +29,7 @@ func AseEncode(key string, str string) (result string, err error) {
 
 func AseDecode(key string, str string) (result string, err error) {
 	decodeStr, err := hex.DecodeString(str)
-	key = GetMd5(COMMON_KEY + key)
+	key = GetMd5(CommonKey + key)
 	cipher, err := aes.NewCipher([]byte(key))
 	if err != nil {
 		return result, err

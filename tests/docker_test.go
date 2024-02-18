@@ -314,9 +314,3 @@ func TestModifyFile(t *testing.T) {
 		types.CopyToContainerOptions{})
 	fmt.Printf("%v \n", err)
 }
-
-func TestContainerInfo(t *testing.T) {
-	info, err := docker.Builder{}.ContainerInfoState("6e7b59d6f30ceeb92478c4b60c721a82cecf65f2e791782513f2521bcde3f095")
-	fmt.Printf("%v \n", err)
-	fmt.Printf("%v \n", info)
-}

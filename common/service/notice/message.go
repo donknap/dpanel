@@ -14,24 +14,24 @@ var (
 )
 
 const (
-	NOTICE_TYPE_ERROR   = "error"
-	NOTICE_TYPE_INFO    = "info"
-	NOTICE_TYPE_SUCCESS = "success"
+	TypeError   = "error"
+	TypeInfo    = "info"
+	TypeSuccess = "success"
 )
 
 type Message struct {
 }
 
 func (self Message) Error(title string, message ...string) error {
-	return self.push(NOTICE_TYPE_ERROR, title, message)
+	return self.push(TypeError, title, message)
 }
 
 func (self Message) Info(title string, message ...string) error {
-	return self.push(NOTICE_TYPE_INFO, title, message)
+	return self.push(TypeInfo, title, message)
 }
 
 func (self Message) Success(title string, message ...string) error {
-	return self.push(NOTICE_TYPE_SUCCESS, title, message)
+	return self.push(TypeSuccess, title, message)
 }
 
 func (self Message) push(level string, title string, message []string) error {

@@ -2,14 +2,14 @@ package docker
 
 import (
 	"context"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"io"
 	"strconv"
 )
 
 type containerLogBuilder struct {
-	option      types.ContainerLogsOptions
+	option      container.LogsOptions
 	dockerSdk   *client.Client
 	ctx         context.Context
 	containerId string

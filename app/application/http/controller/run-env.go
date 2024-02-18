@@ -16,30 +16,30 @@ func (self RunEnv) Create(http *gin.Context) {
 
 func (self RunEnv) SupportRunEnv(http *gin.Context) {
 	env := make(map[string][]string)
-	env[logic.LANG_PHP] = []string{
+	env[logic.LangPhp] = []string{
 		"php56",
 		"php72", // alpine:3.9
 		"php74", // alpine:3.15
 		"php81", // alpine:3.18
 	}
-	env[logic.LANG_JAVA] = []string{
+	env[logic.LangJava] = []string{
 		"jdk8",
 		"jdk12",
 		"jdk18",
 	}
-	env[logic.LANG_GOLANG] = []string{
+	env[logic.LangGolang] = []string{
 		"go",
 	}
-	env[logic.LANG_NODE] = []string{
+	env[logic.LangNode] = []string{
 		"node12",
 		"node14",
 		"node18", // node:14-alpine
 		"node20",
 	}
-	env[logic.LANG_HTML] = []string{
+	env[logic.LangHtml] = []string{
 		"nginx",
 	}
-	env[logic.LANG_OTHER] = []string{
+	env[logic.LangOther] = []string{
 		"alpine",
 		"ubuntu",
 	}

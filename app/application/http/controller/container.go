@@ -38,7 +38,7 @@ func (self Container) Status(http *gin.Context) {
 	case "start":
 		err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx,
 			params.Md5,
-			types.ContainerStartOptions{})
+			container.StartOptions{})
 	case "pause":
 		err = docker.Sdk.Client.ContainerPause(docker.Sdk.Ctx,
 			params.Md5)
@@ -56,7 +56,7 @@ func (self Container) Status(http *gin.Context) {
 
 func (self Container) GetList(http *gin.Context) {
 	var list []types.Container
-	list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, types.ContainerListOptions{
+	list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
 		All:    true,
 		Latest: true,
 	})
@@ -79,12 +79,12 @@ func (self Container) GetList(http *gin.Context) {
 			dao.Site.ID,
 		).Where(dao.Site.ContainerInfo.In(md5List...)).Find()
 
-		for i, container := range list {
+		for i, item := range list {
 			has := false
 			for _, site := range siteList {
-				if function.InArray(container.Names, "/"+site.SiteName) {
+				if function.InArray(item.Names, "/"+site.SiteName) {
 					list[i].Names = []string{
-						container.Names[0],
+						item.Names[0],
 						site.SiteTitle,
 					}
 					has = true
@@ -93,7 +93,7 @@ func (self Container) GetList(http *gin.Context) {
 			}
 			if !has {
 				list[i].Names = []string{
-					container.Names[0],
+					item.Names[0],
 				}
 			}
 		}
@@ -140,9 +140,14 @@ func (self Container) Update(http *gin.Context) {
 		if params.Restart == "on-failure" {
 			restartPolicy.MaximumRetryCount = 5
 		}
-		docker.Sdk.Client.ContainerUpdate(docker.Sdk.Ctx, params.Md5, container.UpdateConfig{
+		_, err := docker.Sdk.Client.ContainerUpdate(docker.Sdk.Ctx, params.Md5, container.UpdateConfig{
 			RestartPolicy: restartPolicy,
 		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
 	}
 	if params.Name != "" {
 		err := docker.Sdk.Client.ContainerRename(docker.Sdk.Ctx, params.Md5, params.Name)

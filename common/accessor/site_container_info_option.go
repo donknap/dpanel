@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	STATUS_ERROR   = 20 // 有错误
-	STATUS_SUCCESS = 30 // 部署成功
+	StatusError   = 20 // 有错误
+	StatusSuccess = 30 // 部署成功
 )
 
 type SiteContainerInfoOption struct {
@@ -34,29 +34,29 @@ func (c *SiteContainerInfoOption) Scan(value interface{}) error {
 	}
 	if id == "" {
 		c.Err = "container not found"
-		c.Status = STATUS_ERROR
+		c.Status = StatusError
 		return nil
 	}
 	containerInfo, _, err := docker.Sdk.Client.ContainerInspectWithRaw(docker.Sdk.Ctx, id, true)
 	if err != nil {
 		// 这里容器发生错误
 		c.Err = err.Error()
-		c.Status = STATUS_ERROR
+		c.Status = StatusError
 		return nil
 	}
 	if containerInfo.ID != "" {
 		c.Info = &containerInfo
 
 		if containerInfo.State.Running || containerInfo.State.Paused {
-			c.Status = STATUS_SUCCESS
+			c.Status = StatusSuccess
 		} else {
-			c.Status = STATUS_ERROR
+			c.Status = StatusError
 			c.Err = containerInfo.State.Status
 		}
 
 	} else {
 		c.Err = "container not found"
-		c.Status = STATUS_ERROR
+		c.Status = StatusError
 	}
 	c.ID = id
 	return nil

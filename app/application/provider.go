@@ -1,21 +1,16 @@
 package application
 
 import (
-	"github.com/donknap/dpanel/app/application/command"
 	"github.com/donknap/dpanel/app/application/http/controller"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go-support/src/console"
 	http_server "github.com/we7coreteam/w7-rangine-go/src/http/server"
 )
 
 type Provider struct {
 }
 
-func (provider *Provider) Register(httpServer *http_server.Server, console console.Console) {
-	// 注册一个 application:test 命令
-	console.RegisterCommand(new(command.Test))
-
+func (provider *Provider) Register(httpServer *http_server.Server) {
 	// 注册一些路由
 	httpServer.RegisterRouters(
 		func(engine *gin.Engine) {

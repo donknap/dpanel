@@ -29,7 +29,7 @@ type Builder struct {
 }
 
 func NewDockerClient() (*Builder, error) {
-	client, err := client.NewClientWithOpts(
+	obj, err := client.NewClientWithOpts(
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
 		//client.WithHost(facade.GetConfig().GetString("docker.sock")),
@@ -40,7 +40,7 @@ func NewDockerClient() (*Builder, error) {
 	}
 
 	return &Builder{
-		Client: client,
+		Client: obj,
 		Ctx:    context.Background(),
 	}, nil
 }
@@ -91,26 +91,26 @@ func (self Builder) GetImageBuildBuilder() *imageBuildBuilder {
 }
 
 // ContainerByField 获取单条容器 field 支持 id,name
-func (self Builder) ContainerByField(field string, name ...string) (container map[string]*types.Container, err error) {
+func (self Builder) ContainerByField(field string, name ...string) (result map[string]*types.Container, err error) {
 	if len(name) == 0 {
-		return nil, errors.New("Please specify a container name")
+		return nil, errors.New("please specify a container name")
 	}
-	filters := filters.NewArgs()
+	filtersArgs := filters.NewArgs()
 
 	for _, value := range name {
-		filters.Add(field, value)
+		filtersArgs.Add(field, value)
 	}
 
-	filters.Add("status", "created")
-	filters.Add("status", "restarting")
-	filters.Add("status", "running")
-	filters.Add("status", "removing")
-	filters.Add("status", "paused")
-	filters.Add("status", "exited")
-	filters.Add("status", "dead")
+	filtersArgs.Add("status", "created")
+	filtersArgs.Add("status", "restarting")
+	filtersArgs.Add("status", "running")
+	filtersArgs.Add("status", "removing")
+	filtersArgs.Add("status", "paused")
+	filtersArgs.Add("status", "exited")
+	filtersArgs.Add("status", "dead")
 
-	containerList, err := Sdk.Client.ContainerList(Sdk.Ctx, types.ContainerListOptions{
-		Filters: filters,
+	containerList, err := Sdk.Client.ContainerList(Sdk.Ctx, container.ListOptions{
+		Filters: filtersArgs,
 	})
 	if err != nil {
 		return nil, err
@@ -118,7 +118,7 @@ func (self Builder) ContainerByField(field string, name ...string) (container ma
 	if len(containerList) == 0 {
 		return nil, errors.New("container not found")
 	}
-	container = make(map[string]*types.Container)
+	result = make(map[string]*types.Container)
 
 	var key string
 	for _, value := range containerList {
@@ -130,9 +130,9 @@ func (self Builder) ContainerByField(field string, name ...string) (container ma
 		} else {
 			key = value.ID
 		}
-		container[key] = &temp
+		result[key] = &temp
 	}
-	return container, nil
+	return result, nil
 }
 
 func (self Builder) ContainerInfo(md5 string) (info types.ContainerJSON, err error) {

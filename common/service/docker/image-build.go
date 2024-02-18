@@ -47,7 +47,7 @@ func (self *imageBuildBuilder) WithZipFilePath(path string) {
 
 func (self *imageBuildBuilder) makeTarByZip(tarWriter *tar.Writer) (err error) {
 	if self.zipFilePath == "" {
-		return errors.New("Invalid zip path")
+		return errors.New("invalid zip path")
 	}
 	zipArchive, err := zip.OpenReader(self.zipFilePath)
 	if err != nil {

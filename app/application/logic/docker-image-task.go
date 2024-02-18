@@ -42,7 +42,7 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
 				if !ok {
 					notice.Message{}.Success("imageBuild", buildImageTask.Tag)
 					dao.Image.Select(dao.Image.Message, dao.Image.Status, dao.Image.ImageInfo).Where(dao.Image.ID.Eq(buildImageTask.ImageId)).Updates(entity.Image{
-						Status:  STATUS_SUCCESS,
+						Status:  StatusSuccess,
 						Message: buildProgressMessage,
 						ImageInfo: &accessor.ImageInfoOption{
 							Id: buildImageTask.Tag,
@@ -59,7 +59,7 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
 				}
 				if message.Err != nil {
 					dao.Image.Where(dao.Image.ID.Eq(buildImageTask.ImageId)).Updates(entity.Image{
-						Status:  STATUS_ERROR,
+						Status:  StatusError,
 						Message: message.Err.Error(),
 					})
 					message.Stream.Stream = message.Err.Error()
@@ -126,5 +126,4 @@ func (self DockerTask) ImageRemote(task *ImageRemoteMessage) error {
 			}
 		}
 	}
-	return nil
 }

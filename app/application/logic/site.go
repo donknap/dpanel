@@ -8,12 +8,12 @@ import (
 )
 
 const (
-	LANG_PHP    = "php"
-	LANG_JAVA   = "java"
-	LANG_NODE   = "node"
-	LANG_GOLANG = "golang"
-	LANG_HTML   = "html"
-	LANG_OTHER  = "other"
+	LangPhp    = "php"
+	LangJava   = "java"
+	LangNode   = "node"
+	LangGolang = "golang"
+	LangHtml   = "html"
+	LangOther  = "other"
 )
 
 type Site struct {

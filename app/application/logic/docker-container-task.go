@@ -1,7 +1,7 @@
 package logic
 
 import (
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -79,7 +79,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	response, err := builder.Execute()
 	if err != nil {
 		dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{
-			Status:  STATUS_ERROR,
+			Status:  StatusError,
 			Message: err.Error(),
 		})
 		//notice.Message{}.Error("containerCreate", err.Error())
@@ -95,16 +95,16 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	}
 	if err != nil {
 		dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{
-			Status:  STATUS_ERROR,
+			Status:  StatusError,
 			Message: err.Error(),
 		})
 		//notice.Message{}.Error("containerCreate", err.Error())
 		return err
 	}
-	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, types.ContainerStartOptions{})
+	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
 	if err != nil {
 		dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{
-			Status:  STATUS_ERROR,
+			Status:  StatusError,
 			Message: err.Error(),
 		})
 		//notice.Message{}.Error("containerCreate", err.Error())
@@ -114,7 +114,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		ContainerInfo: &accessor.SiteContainerInfoOption{
 			ID: response.ID,
 		},
-		Status:  STATUS_SUCCESS,
+		Status:  StatusSuccess,
 		Message: "",
 	})
 	notice.Message{}.Success("containerCreate", task.SiteName)

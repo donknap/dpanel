@@ -39,7 +39,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if params.Id != 0 || params.Md5 != "" {
 		notice.Message{}.Info("containerCreate", "正在停止旧容器")
 		docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, params.SiteName, container.StopOptions{})
-		err := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, params.SiteName, types.ContainerRemoveOptions{})
+		err := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, params.SiteName, container.RemoveOptions{})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			slog.Debug("remove container", "name", params.SiteName, "error", err.Error())
@@ -108,7 +108,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			SiteName:  params.SiteName,
 			SiteTitle: params.SiteTitle,
 			Env:       &runParams,
-			Status:    logic.STATUS_STOP,
+			Status:    logic.StatusStop,
 			ContainerInfo: &accessor.SiteContainerInfoOption{
 				ID: "",
 			},
@@ -122,7 +122,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		dao.Site.Select(dao.Site.ALL).Where(dao.Site.SiteName.Eq(params.SiteName)).Updates(&entity.Site{
 			SiteTitle: params.SiteTitle,
 			Env:       &runParams,
-			Status:    logic.STATUS_STOP,
+			Status:    logic.StatusStop,
 			Message:   "",
 			DeletedAt: gorm.DeletedAt{},
 		})
@@ -249,7 +249,7 @@ func (self Site) Delete(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.ID, types.ContainerRemoveOptions{
+	err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.ID, container.RemoveOptions{
 		RemoveVolumes: params.DeleteVolume,
 		RemoveLinks:   params.DeleteLink,
 	})

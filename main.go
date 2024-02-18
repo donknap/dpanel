@@ -7,26 +7,18 @@ import (
 	"github.com/donknap/dpanel/app/common"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	app "github.com/we7coreteam/w7-rangine-go/src"
 	"github.com/we7coreteam/w7-rangine-go/src/http"
 	"github.com/we7coreteam/w7-rangine-go/src/http/middleware"
-	"path/filepath"
 )
 
 var (
 	//go:embed config.yaml
 	ConfigFile []byte
 	//go:embed asset
-	Asset       embed.FS
-	RootPath, _ = filepath.Abs("./")
+	Asset embed.FS
 )
-
-type provider struct {
-	ConfigDefault func(viper *viper.Viper)
-	EventDault    func()
-}
 
 func main() {
 	app := app.NewApp(
@@ -60,7 +52,7 @@ func main() {
 	})
 
 	// 注册业务 provider，此模块中需要使用 http server 和 console
-	new(common.Provider).Register(httpServer, app.GetConsole())
-	new(application.Provider).Register(httpServer, app.GetConsole())
+	new(common.Provider).Register(httpServer)
+	new(application.Provider).Register(httpServer)
 	app.RunConsole()
 }
