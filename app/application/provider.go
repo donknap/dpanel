@@ -58,9 +58,19 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 			// 网络相关
 			cors.POST("/app/network/get-detail", controller.Network{}.GetDetail)
+			cors.POST("/app/network/get-list", controller.Network{}.GetList)
+			cors.POST("/app/network/prune", controller.Network{}.Prune)
+			cors.POST("/app/network/create", controller.Network{}.Create)
+			cors.POST("/app/network/delete", controller.Network{}.Delete)
+			cors.POST("/app/network/disconnect", controller.Network{}.Disconnect)
+			cors.POST("/app/network/connect", controller.Network{}.Connect)
 
 			// 存储相关
 			cors.POST("/app/volume/get-list", controller.Volume{}.GetList)
+			cors.POST("/app/volume/get-detail", controller.Volume{}.GetDetail)
+			cors.POST("/app/volume/prune", controller.Volume{}.Prune)
+			cors.POST("/app/volume/create", controller.Volume{}.Create)
+			cors.POST("/app/volume/delete", controller.Volume{}.Delete)
 		},
 	)
 }

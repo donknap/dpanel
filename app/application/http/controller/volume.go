@@ -1,11 +1,13 @@
 package controller
 
 import (
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"strings"
 )
 
 type Volume struct {
@@ -31,9 +33,150 @@ func (self Volume) GetList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	var inUseVolume []string
+	containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+		All:    true,
+		Latest: true,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	for _, item := range containerList {
+		for _, mount := range item.Mounts {
+			if mount.Name != "" {
+				inUseVolume = append(inUseVolume, mount.Name)
+			}
+		}
+	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"list":    volumeList.Volumes,
 		"warning": volumeList.Warnings,
+		"inUse":   inUseVolume,
 	})
+	return
+}
+
+func (self Volume) GetDetail(http *gin.Context) {
+	type ParamsValidate struct {
+		Name string `json:"name" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	volumeInfo, err := docker.Sdk.Client.VolumeInspect(docker.Sdk.Ctx, params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	type useContainer struct {
+		Id    string
+		Name  string
+		Mount string
+		RW    bool
+	}
+	var inUseContainer []useContainer
+	containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+		All:    true,
+		Latest: true,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	for _, item := range containerList {
+		for _, mount := range item.Mounts {
+			if mount.Name != "" && mount.Name == params.Name {
+				inUseContainer = append(inUseContainer, useContainer{
+					Name:  item.Names[0],
+					Mount: mount.Destination,
+					RW:    mount.RW,
+					Id:    item.ID,
+				})
+			}
+		}
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"info":           volumeInfo,
+		"inUseContainer": inUseContainer,
+	})
+	return
+}
+
+func (self Volume) Create(http *gin.Context) {
+	type ParamsValidate struct {
+		Name          string   `json:"name" binding:"required"`
+		Driver        string   `json:"driver" binding:"omitempty,oneof=local"`
+		Type          string   `json:"type" binding:"omitempty,oneof=default tmpfs nfs nfs4 other"`
+		NfsUrl        string   `json:"nfsUrl"`
+		NfsMountPoint string   `json:"nfsMountPoint"`
+		NfsOptions    string   `json:"nfsOptions"`
+		TmpfsOptions  string   `json:"tmpfsOptions"`
+		OtherOptions  []string `json:"otherOptions"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	options := make(map[string]string)
+	switch params.Type {
+	case "tmpfs":
+		options["type"] = "tmpfs"
+		options["device"] = "tmpfs"
+		options["o"] = params.TmpfsOptions
+	case "nfs", "nfs4":
+		options["type"] = params.Type
+		options["device"] = ":" + strings.TrimPrefix(params.NfsMountPoint, ":")
+		options["o"] = params.NfsUrl + "," + params.NfsOptions
+	case "other":
+		for _, row := range params.OtherOptions {
+			item := strings.Split(row, "\n")
+			options[item[0]] = item[1]
+		}
+	}
+	volume, err := docker.Sdk.Client.VolumeCreate(docker.Sdk.Ctx, volume.CreateOptions{
+		Driver:     params.Driver,
+		Name:       params.Name,
+		DriverOpts: options,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"info": volume,
+	})
+	return
+
+}
+
+func (self Volume) Prune(http *gin.Context) {
+	filter := filters.NewArgs()
+	_, err := docker.Sdk.Client.VolumesPrune(docker.Sdk.Ctx, filter)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Volume) Delete(http *gin.Context) {
+	type ParamsValidate struct {
+		Name []string `json:"name" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	for _, name := range params.Name {
+		err := docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, name, false)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	self.JsonSuccessResponse(http)
 	return
 }
