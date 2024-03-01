@@ -64,6 +64,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/network/delete", controller.Network{}.Delete)
 			cors.POST("/app/network/disconnect", controller.Network{}.Disconnect)
 			cors.POST("/app/network/connect", controller.Network{}.Connect)
+			cors.POST("/app/network/get-container-list", controller.Network{}.GetContainerList)
 
 			// 存储相关
 			cors.POST("/app/volume/get-list", controller.Volume{}.GetList)

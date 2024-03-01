@@ -99,16 +99,15 @@ func (self Network) Create(http *gin.Context) {
 		DriverOptionValue string `json:"driverOptionValue"`
 	}
 	type ParamsValidate struct {
-		Name              string         `json:"name" binding:"required"`
-		Driver            string         `json:"driver" binding:"required,oneof=bridge macvlan ipvlan overlay"`
-		MacvlanParentCard string         `json:"macvlanParentCard"`
-		IpSubnet          string         `json:"ipSubnet"`
-		IpGateway         string         `json:"ipGateway"`
-		IpRange           string         `json:"ipRange"`
-		IpAux             []ipAux        `json:"ipAux"`
-		DriverOption      []driverOption `json:"driverOption"`
-		Internal          bool           `json:"internal"`
-		Attachable        bool           `json:"attachable"`
+		Name         string         `json:"name" binding:"required"`
+		Driver       string         `json:"driver" binding:"required,oneof=bridge macvlan ipvlan overlay"`
+		IpSubnet     string         `json:"ipSubnet"`
+		IpGateway    string         `json:"ipGateway"`
+		IpRange      string         `json:"ipRange"`
+		IpAux        []ipAux        `json:"ipAux"`
+		DriverOption []driverOption `json:"driverOption"`
+		Internal     bool           `json:"internal"`
+		Attachable   bool           `json:"attachable"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -208,5 +207,53 @@ func (self Network) Connect(http *gin.Context) {
 		return
 	}
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Network) GetContainerList(http *gin.Context) {
+	type ParamsValidate struct {
+		Name []string `json:"name" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	type containerListResult struct {
+		Key           string                 `json:"key"`
+		Id            string                 `json:"id"`
+		NetworkName   string                 `json:"networkName"`
+		ContainerName string                 `json:"containerName"`
+		NetworkInfo   types.EndpointResource `json:"networkInfo"`
+		HostName      []string               `json:"hostName"`
+		Children      []containerListResult  `json:"children"`
+	}
+
+	var result []containerListResult
+	i := 0
+	for _, name := range params.Name {
+		networkInfo, _ := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, name, types.NetworkInspectOptions{})
+		item := containerListResult{
+			NetworkName: name,
+			Key:         name,
+		}
+		for id, resource := range networkInfo.Containers {
+			temp := containerListResult{
+				Id:          id,
+				NetworkInfo: resource,
+			}
+			containerRow, _ := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, id)
+			if networkSetting, ok := containerRow.NetworkSettings.Networks[name]; ok {
+				temp.HostName = networkSetting.Aliases
+			}
+			temp.ContainerName = containerRow.Name
+			temp.Key = name + ":" + temp.ContainerName
+			item.Children = append(item.Children, temp)
+		}
+		result = append(result, item)
+		i++
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": result,
+	})
 	return
 }
