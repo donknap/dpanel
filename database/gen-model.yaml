@@ -19,3 +19,4 @@ relation:
   - table: ims_registry
   - table: ims_event
   - table: ims_notice
+  - table: ims_site_domain

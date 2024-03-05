@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"embed"
 	"errors"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -13,13 +12,10 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"gorm.io/gorm"
-	"html/template"
 	"log/slog"
 	"net"
-	"os"
 )
 
 type Site struct {
@@ -280,61 +276,4 @@ func (self Site) Delete(http *gin.Context) {
 		})
 	}
 	return
-}
-
-func (self Site) CreateDomain(http *gin.Context) {
-	type ParamsValidate struct {
-		ContainerId               string `json:"containerId" binding:"required"`
-		Domain                    string `json:"domain" binding:"required"`
-		Schema                    string `json:"schema" binding:"omitempty,oneof=http https"`
-		Port                      int    `json:"port" binding:"required"`
-		EnableBlockCommonExploits bool   `json:"enableBlockCommonExploits"`
-		EnableAssetCache          bool   `json:"enableAssetCache"`
-		EnableWs                  bool   `json:"enableWs"`
-		ExtraNginx                string `json:"extraNginx"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	containerRow, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	var asset embed.FS
-	err = facade.GetContainer().NamedResolve(&asset, "asset")
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	confRootPath := "/Users/renchao/Workspace/data/dpanel/nginx/proxy_host"
-	vhostFile, err := os.OpenFile(confRootPath+"/"+params.Domain+".conf", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
-	defer vhostFile.Close()
-
-	type tplParams struct {
-		ServerAddress             string
-		Port                      int
-		ServerName                string
-		EnableBlockCommonExploits bool
-		EnableAssetCache          bool
-		EnableWs                  bool
-		ExtraNginx                string
-	}
-	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
-	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", tplParams{
-		ServerAddress:             containerRow.NetworkSettings.DefaultNetworkSettings.IPAddress,
-		Port:                      params.Port,
-		ServerName:                params.Domain,
-		EnableBlockCommonExploits: params.EnableBlockCommonExploits,
-		EnableWs:                  params.EnableWs,
-		EnableAssetCache:          params.EnableAssetCache,
-		ExtraNginx:                params.ExtraNginx,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
 }

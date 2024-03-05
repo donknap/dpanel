@@ -16,13 +16,14 @@ import (
 )
 
 var (
-	Q        = new(Query)
-	Event    *event
-	Image    *image
-	Notice   *notice
-	Registry *registry
-	RunEnv   *runEnv
-	Site     *site
+	Q          = new(Query)
+	Event      *event
+	Image      *image
+	Notice     *notice
+	Registry   *registry
+	RunEnv     *runEnv
+	Site       *site
+	SiteDomain *siteDomain
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
@@ -33,42 +34,46 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	Registry = &Q.Registry
 	RunEnv = &Q.RunEnv
 	Site = &Q.Site
+	SiteDomain = &Q.SiteDomain
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:       db,
-		Event:    newEvent(db, opts...),
-		Image:    newImage(db, opts...),
-		Notice:   newNotice(db, opts...),
-		Registry: newRegistry(db, opts...),
-		RunEnv:   newRunEnv(db, opts...),
-		Site:     newSite(db, opts...),
+		db:         db,
+		Event:      newEvent(db, opts...),
+		Image:      newImage(db, opts...),
+		Notice:     newNotice(db, opts...),
+		Registry:   newRegistry(db, opts...),
+		RunEnv:     newRunEnv(db, opts...),
+		Site:       newSite(db, opts...),
+		SiteDomain: newSiteDomain(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	Event    event
-	Image    image
-	Notice   notice
-	Registry registry
-	RunEnv   runEnv
-	Site     site
+	Event      event
+	Image      image
+	Notice     notice
+	Registry   registry
+	RunEnv     runEnv
+	Site       site
+	SiteDomain siteDomain
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:       db,
-		Event:    q.Event.clone(db),
-		Image:    q.Image.clone(db),
-		Notice:   q.Notice.clone(db),
-		Registry: q.Registry.clone(db),
-		RunEnv:   q.RunEnv.clone(db),
-		Site:     q.Site.clone(db),
+		db:         db,
+		Event:      q.Event.clone(db),
+		Image:      q.Image.clone(db),
+		Notice:     q.Notice.clone(db),
+		Registry:   q.Registry.clone(db),
+		RunEnv:     q.RunEnv.clone(db),
+		Site:       q.Site.clone(db),
+		SiteDomain: q.SiteDomain.clone(db),
 	}
 }
 
@@ -82,33 +87,36 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:       db,
-		Event:    q.Event.replaceDB(db),
-		Image:    q.Image.replaceDB(db),
-		Notice:   q.Notice.replaceDB(db),
-		Registry: q.Registry.replaceDB(db),
-		RunEnv:   q.RunEnv.replaceDB(db),
-		Site:     q.Site.replaceDB(db),
+		db:         db,
+		Event:      q.Event.replaceDB(db),
+		Image:      q.Image.replaceDB(db),
+		Notice:     q.Notice.replaceDB(db),
+		Registry:   q.Registry.replaceDB(db),
+		RunEnv:     q.RunEnv.replaceDB(db),
+		Site:       q.Site.replaceDB(db),
+		SiteDomain: q.SiteDomain.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	Event    IEventDo
-	Image    IImageDo
-	Notice   INoticeDo
-	Registry IRegistryDo
-	RunEnv   IRunEnvDo
-	Site     ISiteDo
+	Event      IEventDo
+	Image      IImageDo
+	Notice     INoticeDo
+	Registry   IRegistryDo
+	RunEnv     IRunEnvDo
+	Site       ISiteDo
+	SiteDomain ISiteDomainDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		Event:    q.Event.WithContext(ctx),
-		Image:    q.Image.WithContext(ctx),
-		Notice:   q.Notice.WithContext(ctx),
-		Registry: q.Registry.WithContext(ctx),
-		RunEnv:   q.RunEnv.WithContext(ctx),
-		Site:     q.Site.WithContext(ctx),
+		Event:      q.Event.WithContext(ctx),
+		Image:      q.Image.WithContext(ctx),
+		Notice:     q.Notice.WithContext(ctx),
+		Registry:   q.Registry.WithContext(ctx),
+		RunEnv:     q.RunEnv.WithContext(ctx),
+		Site:       q.Site.WithContext(ctx),
+		SiteDomain: q.SiteDomain.WithContext(ctx),
 	}
 }
 
