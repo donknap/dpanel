@@ -38,6 +38,8 @@ func (self EventLogic) MonitorLoop() {
 			case "volume/mount":
 				eventRow.Message += fmt.Sprintf("%s, %s:%s, %s", message.Actor.Attributes["container"],
 					message.Actor.Attributes["driver"], message.Actor.Attributes["destination"], message.Actor.Attributes["read/write"])
+			case "volume/destroy":
+				eventRow.Message += fmt.Sprintf("%s", message.Actor.ID)
 			case "network/disconnect", "network/connect":
 				eventRow.Message += fmt.Sprintf("%s %s", message.Actor.Attributes["name"],
 					message.Actor.Attributes["type"])
