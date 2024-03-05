@@ -4,12 +4,14 @@ import (
 	"database/sql/driver"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"strings"
 )
 
 type Container struct {
@@ -55,15 +57,30 @@ func (self Container) Status(http *gin.Context) {
 }
 
 func (self Container) GetList(http *gin.Context) {
+	type ParamsValidate struct {
+		Tag       string `json:"tag"`
+		SiteTitle string `json:"siteTitle"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
 	var list []types.Container
+	filter := filters.NewArgs()
+	if params.Tag != "" {
+		filter.Add("name", params.Tag)
+	}
 	list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
-		All:    true,
-		Latest: true,
+		All:     true,
+		Latest:  true,
+		Filters: filter,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	if function.IsEmptyArray(list) {
 		list = make([]types.Container, 0)
 	} else {
@@ -80,11 +97,18 @@ func (self Container) GetList(http *gin.Context) {
 		).Where(dao.Site.ContainerInfo.In(md5List...)).Find()
 
 		for i, item := range list {
+			tagName := item.Names[0]
+			for _, name := range item.Names {
+				if strings.Count(name, "/") == 1 {
+					tagName = name
+					break
+				}
+			}
 			has := false
 			for _, site := range siteList {
 				if function.InArray(item.Names, "/"+site.SiteName) {
 					list[i].Names = []string{
-						item.Names[0],
+						tagName,
 						site.SiteTitle,
 					}
 					has = true
@@ -93,14 +117,26 @@ func (self Container) GetList(http *gin.Context) {
 			}
 			if !has {
 				list[i].Names = []string{
-					item.Names[0],
+					tagName,
 				}
 			}
 		}
+		if params.SiteTitle != "" {
+			temp := make([]types.Container, 0)
+			for _, item := range list {
+				if len(item.Names) > 1 && strings.Contains(item.Names[1], params.SiteTitle) {
+					temp = append(temp, item)
+				}
+			}
+			self.JsonResponseWithoutError(http, gin.H{
+				"list": temp,
+			})
+		} else {
+			self.JsonResponseWithoutError(http, gin.H{
+				"list": list,
+			})
+		}
 	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"list": list,
-	})
 	return
 }
 

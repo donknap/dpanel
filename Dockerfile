@@ -11,4 +11,6 @@ ADD ./docker/nginx/include /dpanel/nginx/include
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/entrypoint.sh /dpanel/entrypoint.sh
 
+EXPOSE 80
+
 ENTRYPOINT ["sh", "/dpanel/entrypoint.sh"]

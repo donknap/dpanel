@@ -62,13 +62,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 				}
 				listener.Close()
 				checkPorts = append(checkPorts, port.Host)
-			} else if port.Type == "domain" {
-				//site, _ = dao.Site.Where(dao.Site.SiteURL.Eq(port.Host)).First()
-				//if site != nil {
-				//	self.JsonResponseWithError(http, errors.New("站点域名已经绑定其它站，请更换标识"), 500)
-				//}
 			} else {
-				self.JsonResponseWithError(http, errors.New(""), 500)
+				self.JsonResponseWithError(http, errors.New("不支持的暴露类型"), 500)
 				return
 			}
 		}
