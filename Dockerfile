@@ -10,8 +10,8 @@ RUN mkdir -p /dpanel/nginx/default_host /dpanel/nginx/proxy_host \
 
 ADD ./docker/nginx/include /dpanel/nginx/include
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY ./docker/entrypoint.sh /dpanel/entrypoint.sh
+COPY ./docker/entrypoint.sh /docker/entrypoint.sh
 
 EXPOSE 80
 
-ENTRYPOINT ["sh", "/dpanel/entrypoint.sh"]
+ENTRYPOINT ["sh", "/docker/entrypoint.sh"]
