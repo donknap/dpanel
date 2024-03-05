@@ -121,6 +121,7 @@ func (self Container) GetList(http *gin.Context) {
 				}
 			}
 		}
+
 		if params.SiteTitle != "" {
 			temp := make([]types.Container, 0)
 			for _, item := range list {

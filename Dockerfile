@@ -5,7 +5,8 @@ RUN apk --no-cache add nginx
 
 RUN mkdir -p /dpanel/nginx/default_host /dpanel/nginx/proxy_host \
      /dpanel/nginx/redirection_host /dpanel/nginx/dead_host \
-     /dpanel/nginx/temp
+     /dpanel/nginx/temp \
+    /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private
 
 ADD ./docker/nginx/include /dpanel/nginx/include
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
