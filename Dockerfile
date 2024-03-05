@@ -1,7 +1,7 @@
 FROM alpine:3.18
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories
-RUN apk --no-cache add nginx
+RUN apk --no-cache add nginx inotify-tools
 
 RUN mkdir -p /dpanel/nginx/default_host /dpanel/nginx/proxy_host \
      /dpanel/nginx/redirection_host /dpanel/nginx/dead_host \

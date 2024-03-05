@@ -12,11 +12,11 @@ server {
 
   {{if .EnableAssetCache}}
   # Asset Caching
-  include conf.d/include/assets.conf;
+  include /dpanel/nginx/include/assets.conf;
   {{end}}
   {{if .EnableBlockCommonExploits}}
   # Block Exploits
-  include conf.d/include/block-exploits.conf;
+  include /dpanel/nginx/include/block-exploits.conf;
   {{end}}
 
   {{if .EnableWs}}

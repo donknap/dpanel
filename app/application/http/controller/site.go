@@ -297,13 +297,19 @@ func (self Site) CreateDomain(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	var asset embed.FS
-	err := facade.GetContainer().NamedResolve(&asset, "asset")
+	containerRow, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	confRootPath := "/Users/renchao/Workspace/data/dpanel"
+
+	var asset embed.FS
+	err = facade.GetContainer().NamedResolve(&asset, "asset")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	confRootPath := "/Users/renchao/Workspace/data/dpanel/nginx/proxy_host"
 	vhostFile, err := os.OpenFile(confRootPath+"/"+params.Domain+".conf", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	defer vhostFile.Close()
 
@@ -318,9 +324,9 @@ func (self Site) CreateDomain(http *gin.Context) {
 	}
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
 	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", tplParams{
-		ServerAddress:             "127.0.0.1",
-		Port:                      80,
-		ServerName:                "test3.phpeye.net",
+		ServerAddress:             containerRow.NetworkSettings.DefaultNetworkSettings.IPAddress,
+		Port:                      params.Port,
+		ServerName:                params.Domain,
 		EnableBlockCommonExploits: params.EnableBlockCommonExploits,
 		EnableWs:                  params.EnableWs,
 		EnableAssetCache:          params.EnableAssetCache,
