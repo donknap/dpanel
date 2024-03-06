@@ -11,7 +11,13 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
+)
+
+var (
+	wsCollect = make(map[string]*Client)
+	lock      = sync.RWMutex{}
 )
 
 type ClientOptions struct {
@@ -40,7 +46,10 @@ func NewClientConn(ctx *gin.Context, options *ClientOptions) (*Client, error) {
 	}
 	client.SendMessageQueue = make(chan []byte)
 	client.readMessageHandler = options.MessageHandler
-	slog.Info("ws connect", "fd", client.Id, "goroutine", runtime.NumGoroutine())
+
+	wsCollect[client.Id] = client
+
+	slog.Info("ws connect", "fd", client.Id, "goroutine", runtime.NumGoroutine(), "total", len(wsCollect))
 	return client, nil
 }
 
@@ -119,33 +128,47 @@ func (self *Client) SendMessage() {
 				Type: "event",
 				Data: message,
 			}
-			self.Conn.WriteMessage(websocket.TextMessage, data.ToJson())
+			self.sendMessage(data)
 		case message := <-notice.QueueNoticePushMessage:
 			data := &respMessage{
 				Type: "notice",
 				Data: message,
 			}
-			self.Conn.WriteMessage(websocket.TextMessage, data.ToJson())
+			self.sendMessage(data)
 		case message := <-docker.QueueDockerProgressMessage:
 			data := &respMessage{
 				Type: "imageBuild",
 				Data: message,
 			}
-			self.Conn.WriteMessage(websocket.TextMessage, data.ToJson())
+			self.sendMessage(data)
 		case message := <-docker.QueueDockerImageDownloadMessage:
 			data := &respMessage{
 				Type: "imageDownload",
 				Data: message,
 			}
-			jsonStr := data.ToJson()
-			self.Conn.WriteMessage(websocket.TextMessage, jsonStr)
+			self.sendMessage(data)
 		}
 	}
+}
+
+/* 抢到chan里消息的ws发送消息时都给所有客户端发送 */
+func (self *Client) sendMessage(message *respMessage) {
+	lock.Lock()
+	for _, client := range wsCollect {
+		err := client.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
+		if err != nil {
+			slog.Error("ws send message error", "fd", self.Id, "error", err.Error())
+		}
+	}
+	lock.Unlock()
 }
 
 func (self *Client) Close() error {
 	if self.closeHandler != nil {
 		self.closeHandler()
+	}
+	if _, ok := wsCollect[self.Id]; ok {
+		delete(wsCollect, self.Id)
 	}
 	self.Conn.CloseHandler()(websocket.ClosePolicyViolation, "close repeat login")
 	self.Conn.Close()

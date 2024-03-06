@@ -37,15 +37,18 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			// 镜像相关
 			cors.POST("/app/image/create-by-dockerfile", controller.Image{}.CreateByDockerfile)
 			cors.POST("/app/image/get-list", controller.Image{}.GetList)
-			cors.POST("/app/image/get-list-build", controller.Image{}.GetListBuild)
 			cors.POST("/app/image/get-detail", controller.Image{}.GetDetail)
-			cors.POST("/app/image/get-image-task", controller.Image{}.GetImageTask)
-			cors.POST("/app/image/remote", controller.Image{}.Remote)
-			cors.POST("/app/image/tag-delete", controller.Image{}.TagDelete)
-			cors.POST("/app/image/tag-add", controller.Image{}.TagAdd)
 			cors.POST("/app/image/image-delete", controller.Image{}.ImageDelete)
 			cors.POST("/app/image/image-prune", controller.Image{}.ImagePrune)
 			cors.POST("/app/image/export", controller.Image{}.Export)
+
+			cors.POST("/app/image/tag-remote", controller.Image{}.TagRemote)
+			cors.POST("/app/image/tag-delete", controller.Image{}.TagDelete)
+			cors.POST("/app/image/tag-add", controller.Image{}.TagAdd)
+
+			cors.POST("/app/image/get-list-build", controller.Image{}.GetListBuild)
+			cors.POST("/app/image/get-build-task", controller.Image{}.GetBuildTask)
+			cors.POST("/app/image/delete-build-task", controller.Image{}.DeleteBuildTask)
 
 			// 文件相关
 			engine.POST("/app/explorer/export", controller.Explorer{}.Export)
