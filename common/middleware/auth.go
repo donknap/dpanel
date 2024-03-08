@@ -18,7 +18,7 @@ type AuthMiddleware struct {
 func (self AuthMiddleware) Process(http *gin.Context) {
 	if function.InArray([]string{
 		"/home/ws/notice",
-		"/home/user/login",
+		"/common/user/login",
 	}, http.Request.URL.Path) {
 		http.Next()
 		return
