@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
@@ -119,8 +120,26 @@ func (self Home) Info(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	dataUsage, err := docker.Sdk.Client.DiskUsage(docker.Sdk.Ctx, types.DiskUsageOptions{
+		Types: []types.DiskUsageObject{
+			types.ContainerObject,
+			types.ImageObject,
+			types.VolumeObject,
+			types.BuildCacheObject,
+		},
+	})
+	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, types.NetworkListOptions{})
+	containerTask, _ := dao.Site.Where(dao.Site.DeletedAt.IsNull()).Count()
+	imageTask, _ := dao.Image.Count()
 	self.JsonResponseWithoutError(http, gin.H{
-		"info": info,
+		"info":       info,
+		"usage":      dataUsage,
+		"sdkVersion": docker.Sdk.Client.ClientVersion(),
+		"total": map[string]int{
+			"network":       len(networkRow),
+			"containerTask": int(containerTask),
+			"imageTask":     int(imageTask),
+		},
 	})
 	return
 }

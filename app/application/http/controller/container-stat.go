@@ -32,3 +32,23 @@ func (self Container) GetStatInfo(http *gin.Context) {
 	return
 
 }
+
+func (self Container) GetProcessInfo(http *gin.Context) {
+	type ParamsValidate struct {
+		Id string `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	psInfo, err := docker.Sdk.Client.ContainerTop(docker.Sdk.Ctx, params.Id, nil)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": psInfo,
+	})
+	return
+}

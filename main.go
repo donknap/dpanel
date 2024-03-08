@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
 	"github.com/donknap/dpanel/common/dao"
+	common2 "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	app "github.com/we7coreteam/w7-rangine-go/src"
@@ -50,6 +51,9 @@ func main() {
 	facade.GetContainer().NamedSingleton("asset", func() embed.FS {
 		return Asset
 	})
+
+	// 全局登录判断
+	httpServer.Use(common2.AuthMiddleware{}.Process)
 
 	// 注册业务 provider，此模块中需要使用 http server 和 console
 	new(common.Provider).Register(httpServer)

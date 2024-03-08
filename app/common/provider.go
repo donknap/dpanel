@@ -32,6 +32,9 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/notice/unread", controller.Notice{}.Unread)
 		cors.POST("/common/notice/get-list", controller.Notice{}.GetList)
 		cors.POST("/common/notice/delete", controller.Notice{}.Delete)
+
+		// 用户
+		cors.POST("/common/user/login", controller.User{}.Login)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
