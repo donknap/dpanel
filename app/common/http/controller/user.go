@@ -23,13 +23,20 @@ func (self User) Login(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	var expireAddTime time.Duration
+	if params.AutoLogin {
+		expireAddTime = time.Hour * 24 * 30
+	} else {
+		expireAddTime = time.Hour * 24
+	}
+
 	if params.Username == "admin" && params.Password == "123456" {
 		jwtSecret := logic.User{}.GetJwtSecret()
 		jwt := jwt.NewWithClaims(jwt.SigningMethodHS256, logic.UserToken{
 			UserId:       1,
 			RoleIdentity: "founder",
 			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(expireAddTime)),
 			},
 		})
 		code, err := jwt.SignedString(jwtSecret)
