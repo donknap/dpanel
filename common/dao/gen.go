@@ -21,7 +21,7 @@ var (
 	Image      *image
 	Notice     *notice
 	Registry   *registry
-	RunEnv     *runEnv
+	Setting    *setting
 	Site       *site
 	SiteDomain *siteDomain
 )
@@ -32,7 +32,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	Image = &Q.Image
 	Notice = &Q.Notice
 	Registry = &Q.Registry
-	RunEnv = &Q.RunEnv
+	Setting = &Q.Setting
 	Site = &Q.Site
 	SiteDomain = &Q.SiteDomain
 }
@@ -44,7 +44,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Image:      newImage(db, opts...),
 		Notice:     newNotice(db, opts...),
 		Registry:   newRegistry(db, opts...),
-		RunEnv:     newRunEnv(db, opts...),
+		Setting:    newSetting(db, opts...),
 		Site:       newSite(db, opts...),
 		SiteDomain: newSiteDomain(db, opts...),
 	}
@@ -57,7 +57,7 @@ type Query struct {
 	Image      image
 	Notice     notice
 	Registry   registry
-	RunEnv     runEnv
+	Setting    setting
 	Site       site
 	SiteDomain siteDomain
 }
@@ -71,7 +71,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Image:      q.Image.clone(db),
 		Notice:     q.Notice.clone(db),
 		Registry:   q.Registry.clone(db),
-		RunEnv:     q.RunEnv.clone(db),
+		Setting:    q.Setting.clone(db),
 		Site:       q.Site.clone(db),
 		SiteDomain: q.SiteDomain.clone(db),
 	}
@@ -92,7 +92,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Image:      q.Image.replaceDB(db),
 		Notice:     q.Notice.replaceDB(db),
 		Registry:   q.Registry.replaceDB(db),
-		RunEnv:     q.RunEnv.replaceDB(db),
+		Setting:    q.Setting.replaceDB(db),
 		Site:       q.Site.replaceDB(db),
 		SiteDomain: q.SiteDomain.replaceDB(db),
 	}
@@ -103,7 +103,7 @@ type queryCtx struct {
 	Image      IImageDo
 	Notice     INoticeDo
 	Registry   IRegistryDo
-	RunEnv     IRunEnvDo
+	Setting    ISettingDo
 	Site       ISiteDo
 	SiteDomain ISiteDomainDo
 }
@@ -114,7 +114,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Image:      q.Image.WithContext(ctx),
 		Notice:     q.Notice.WithContext(ctx),
 		Registry:   q.Registry.WithContext(ctx),
-		RunEnv:     q.RunEnv.WithContext(ctx),
+		Setting:    q.Setting.WithContext(ctx),
 		Site:       q.Site.WithContext(ctx),
 		SiteDomain: q.SiteDomain.WithContext(ctx),
 	}

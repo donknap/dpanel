@@ -28,6 +28,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 		// 全局
 		cors.POST("/common/event/get-list", controller.Event{}.GetList)
+		cors.POST("/common/event/prune", controller.Event{}.Prune)
 
 		cors.POST("/common/notice/unread", controller.Notice{}.Unread)
 		cors.POST("/common/notice/get-list", controller.Notice{}.GetList)
@@ -35,6 +36,12 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 		// 用户
 		cors.POST("/common/user/login", controller.User{}.Login)
+		cors.POST("/common/user/get-user-info", controller.User{}.GetUserInfo)
+
+		// 配置
+		cors.POST("/common/setting/save", controller.Setting{}.Save)
+		cors.POST("/common/setting/founder", controller.Setting{}.Founder)
+		cors.POST("/common/setting/get-setting", controller.Setting{}.GetSetting)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

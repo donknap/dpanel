@@ -30,11 +30,18 @@ func (self User) Login(http *gin.Context) {
 		expireAddTime = time.Hour * 24
 	}
 
-	if params.Username == "admin" && params.Password == "123456" {
+	currentUser, err := logic.Setting{}.GetValue(logic.SettingUser, logic.SettingUserFounder)
+	if err != nil {
+		self.JsonResponseWithError(http, errors.New("创始人配置不存在，请重新安装"), 500)
+		return
+	}
+	password := logic.User{}.GetMd5Password(params.Password, params.Username)
+	if params.Username == (*currentUser.Value)["username"] && (*currentUser.Value)["password"] == password {
 		jwtSecret := logic.User{}.GetJwtSecret()
-		jwt := jwt.NewWithClaims(jwt.SigningMethodHS256, logic.UserToken{
-			UserId:       1,
-			RoleIdentity: "founder",
+		jwt := jwt.NewWithClaims(jwt.SigningMethodHS256, logic.UserInfo{
+			UserId:       currentUser.ID,
+			Username:     (*currentUser.Value)["username"],
+			RoleIdentity: currentUser.Name,
 			RegisteredClaims: jwt.RegisteredClaims{
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(expireAddTime)),
 			},
@@ -52,4 +59,18 @@ func (self User) Login(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("用户名密码错误"), 500)
 		return
 	}
+}
+
+func (self User) GetUserInfo(http *gin.Context) {
+	data, exists := http.Get("userInfo")
+	if !exists {
+		self.JsonResponseWithError(http, errors.New("请先登录"), 401)
+		http.AbortWithStatus(401)
+		return
+	}
+	userInfo := data.(logic.UserInfo)
+	self.JsonResponseWithoutError(http, gin.H{
+		"user": userInfo,
+	})
+	return
 }

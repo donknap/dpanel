@@ -15,7 +15,11 @@ relation:
     column:
       image_info:
         type: ImageInfoOption
-  - table: ims_run_env
+  - table: ims_setting
+    column:
+      value:
+        serializer: json
+        type: SettingValueOption
   - table: ims_registry
   - table: ims_event
   - table: ims_notice

@@ -2,7 +2,6 @@ package common
 
 import (
 	"errors"
-	"fmt"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/gin-gonic/gin"
@@ -17,27 +16,32 @@ type AuthMiddleware struct {
 
 func (self AuthMiddleware) Process(http *gin.Context) {
 	if function.InArray([]string{
-		"/home/ws/notice",
 		"/common/user/login",
 	}, http.Request.URL.Path) {
 		http.Next()
 		return
 	}
-	if http.GetHeader("Authorization") == "" {
+	var authToken = ""
+	if strings.Contains(http.Request.URL.Path, "/home/ws") {
+		authToken = "Bearer " + http.Query("token")
+	} else {
+		authToken = http.GetHeader("Authorization")
+	}
+
+	if authToken == "" {
 		self.JsonResponseWithError(http, errors.New("请先登录"), 401)
 		http.AbortWithStatus(401)
 		return
 	}
-	authCode := strings.Split(http.GetHeader("Authorization"), "Bearer ")
-
+	authCode := strings.Split(authToken, "Bearer ")
 	if len(authCode) != 2 {
 		self.JsonResponseWithError(http, errors.New("请先登录"), 401)
 		http.AbortWithStatus(401)
 		return
 	}
 
+	myUserInfo := logic.UserInfo{}
 	jwtSecret := logic.User{}.GetJwtSecret()
-	myUserInfo := logic.UserToken{}
 	token, err := jwt.ParseWithClaims(authCode[1], &myUserInfo, func(t *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
 	}, jwt.WithValidMethods([]string{"HS256"}))
@@ -47,7 +51,13 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		return
 	}
 	if token.Valid {
-		fmt.Printf("%v \n", myUserInfo)
+		_, err := logic.Setting{}.GetValueById(myUserInfo.UserId)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 401)
+			http.AbortWithStatus(401)
+			return
+		}
+		http.Set("userInfo", myUserInfo)
 		http.Next()
 		return
 	}

@@ -17,11 +17,11 @@ var (
 	confRootPath = "/Users/renchao/Workspace/data/dpanel/nginx/proxy_host"
 )
 
-type Domain struct {
+type SiteDomain struct {
 	controller.Abstract
 }
 
-func (self Domain) Create(http *gin.Context) {
+func (self SiteDomain) Create(http *gin.Context) {
 	type ParamsValidate struct {
 		ContainerId               string `json:"containerId" binding:"required"`
 		ServerName                string `json:"serverName" binding:"required"`
@@ -95,12 +95,13 @@ func (self Domain) Create(http *gin.Context) {
 	return
 }
 
-func (self Domain) GetList(http *gin.Context) {
+func (self SiteDomain) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		ServerName string `json:"serverName"`
-		Port       int32  `json:"port"`
-		Page       int    `json:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize   int    `json:"pageSize" binding:"omitempty"`
+		ContainerId string `json:"containerId" binding:"required"`
+		ServerName  string `json:"serverName"`
+		Port        int32  `json:"port"`
+		Page        int    `json:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize    int    `json:"pageSize" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -113,7 +114,7 @@ func (self Domain) GetList(http *gin.Context) {
 		params.PageSize = 10
 	}
 
-	query := dao.SiteDomain.Order(dao.SiteDomain.ID.Desc())
+	query := dao.SiteDomain.Order(dao.SiteDomain.ID.Desc()).Where(dao.SiteDomain.ContainerID.Eq(params.ContainerId))
 	if params.ServerName != "" {
 		query = query.Where(dao.SiteDomain.ServerName.Like("%" + params.ServerName + "%"))
 	}
@@ -130,7 +131,7 @@ func (self Domain) GetList(http *gin.Context) {
 	return
 }
 
-func (self Domain) Delete(http *gin.Context) {
+func (self SiteDomain) Delete(http *gin.Context) {
 	type ParamsValidate struct {
 		Id []int32 `json:"id" binding:"required"`
 	}

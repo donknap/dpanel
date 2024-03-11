@@ -24,9 +24,9 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/site/get-list", controller.Site{}.GetList)
 			cors.POST("/app/site/get-detail", controller.Site{}.GetDetail)
 			cors.POST("/app/site/delete", controller.Site{}.Delete)
-			cors.POST("/app/site/create-domain", controller.Domain{}.Create)
-			cors.POST("/app/site/get-domain-list", controller.Domain{}.GetList)
-			cors.POST("/app/site/delete-domain", controller.Domain{}.Delete)
+			cors.POST("/app/site/create-domain", controller.SiteDomain{}.Create)
+			cors.POST("/app/site/get-domain-list", controller.SiteDomain{}.GetList)
+			cors.POST("/app/site/delete-domain", controller.SiteDomain{}.Delete)
 
 			// 容器相关
 			cors.POST("/app/container/status", controller.Container{}.Status)

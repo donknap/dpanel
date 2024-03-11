@@ -39,3 +39,10 @@ func (self Event) GetList(http *gin.Context) {
 	})
 	return
 }
+
+func (self Event) Prune(http *gin.Context) {
+	oldRow, _ := dao.Event.Last()
+	dao.Event.Where(dao.Event.ID.Lte(oldRow.ID)).Delete()
+	self.JsonSuccessResponse(http)
+	return
+}
