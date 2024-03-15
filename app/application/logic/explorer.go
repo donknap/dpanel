@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
@@ -55,6 +56,12 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItem, err error
 	for _, line := range lines {
 		if function.IsEmptyArray(line) {
 			continue
+		}
+		if len(line) > 8 {
+			switch stdcopy.StdType(line[0]) {
+			case stdcopy.Stdin, stdcopy.Stdout, stdcopy.Stderr, stdcopy.Systemerr:
+				line = line[8:]
+			}
 		}
 		switch line[0] {
 		case 'd', 'l', '-', 'b':

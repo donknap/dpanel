@@ -62,7 +62,6 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
 						Status:  StatusError,
 						Message: message.Err.Error(),
 					})
-					message.Stream.Stream = message.Err.Error()
 					docker.QueueDockerProgressMessage <- message
 					notice.Message{}.Error("imageBuild", message.Err.Error())
 					return

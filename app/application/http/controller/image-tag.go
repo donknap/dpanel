@@ -24,6 +24,9 @@ func (self Image) TagRemote(http *gin.Context) {
 	}
 	var authString string
 	tagArr := strings.Split(params.Tag, "/")
+	if !strings.Contains(tagArr[0], ".") {
+		tagArr[0] = "docker.io"
+	}
 	registry, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(tagArr[0])).First()
 	if registry != nil {
 		password, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registry.Password)

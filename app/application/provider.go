@@ -16,9 +16,6 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		func(engine *gin.Engine) {
 			cors := engine.Group("/", common.CorsMiddleware{}.Process)
 
-			cors.POST("/app/run-env/source-env", controller.RunEnv{}.SupportRunEnv)
-			cors.POST("/app/run-env/php-ext", controller.RunEnv{}.PhpExt)
-
 			// 站点相关
 			cors.POST("/app/site/create-by-image", controller.Site{}.CreateByImage)
 			cors.POST("/app/site/get-list", controller.Site{}.GetList)
@@ -33,6 +30,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/container/get-list", controller.Container{}.GetList)
 			cors.POST("/app/container/get-detail", controller.Container{}.GetDetail)
 			cors.POST("/app/container/update", controller.Container{}.Update)
+			cors.POST("/app/container/prune", controller.Container{}.Prune)
 
 			cors.POST("/app/container/get-stat-info", controller.Container{}.GetStatInfo)
 			cors.POST("/app/container/get-process-info", controller.Container{}.GetProcessInfo)
@@ -43,7 +41,11 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/image/get-detail", controller.Image{}.GetDetail)
 			cors.POST("/app/image/image-delete", controller.Image{}.ImageDelete)
 			cors.POST("/app/image/image-prune", controller.Image{}.ImagePrune)
+			cors.POST("/app/image/build-prune", controller.Image{}.BuildPrune)
 			cors.POST("/app/image/export", controller.Image{}.Export)
+
+			cors.POST("/app/image/get-template-list", controller.Image{}.GetTemplateList)
+			cors.POST("/app/image/get-template-dockerfile", controller.Image{}.GetTemplateDockerfile)
 
 			cors.POST("/app/image/tag-remote", controller.Image{}.TagRemote)
 			cors.POST("/app/image/tag-delete", controller.Image{}.TagDelete)

@@ -245,6 +245,18 @@ func (self Image) ImagePrune(http *gin.Context) {
 	return
 }
 
+func (self Image) BuildPrune(http *gin.Context) {
+	_, err := docker.Sdk.Client.BuildCachePrune(docker.Sdk.Ctx, types.BuildCachePruneOptions{
+		All: true,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
 func (self Image) Export(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5 string `json:"md5" binding:"required"`

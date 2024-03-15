@@ -196,3 +196,10 @@ func (self Container) Update(http *gin.Context) {
 	self.JsonSuccessResponse(http)
 	return
 }
+
+func (self Container) Prune(http *gin.Context) {
+	filter := filters.NewArgs()
+	docker.Sdk.Client.ContainersPrune(docker.Sdk.Ctx, filter)
+	self.JsonSuccessResponse(http)
+	return
+}
