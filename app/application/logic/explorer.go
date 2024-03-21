@@ -74,6 +74,8 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItem, err error
 					Mode:     row[0],
 					Change:   -1,
 					ModTime:  row[5] + row[6],
+					Owner:    row[2],
+					Group:    row[3],
 				}
 				if strings.Contains(item.ShowName, "->") {
 					index := strings.Index(item.ShowName, "->")
@@ -168,6 +170,48 @@ func (self explorer) Create(path string, isDir bool) error {
 			currentPath,
 			currentPath)
 	}
+	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+	if err != nil {
+		return err
+	}
+	slog.Debug("explorer", "out", string(out))
+	return nil
+}
+
+func (self explorer) Chmod(fileList []string, mod int, hasChildren bool) error {
+	var changeFileList []string
+	for _, path := range fileList {
+		if !strings.HasPrefix(path, "/") {
+			return errors.New("please use absolute address")
+		}
+		changeFileList = append(changeFileList, self.rootPath+path)
+	}
+	flag := ""
+	if hasChildren {
+		flag += " -R "
+	}
+	cmd := fmt.Sprintf("cd %s && chmod %s %d %s \n", self.rootPath, flag, mod, strings.Join(changeFileList, " "))
+	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+	if err != nil {
+		return err
+	}
+	slog.Debug("explorer", "out", string(out))
+	return nil
+}
+
+func (self explorer) Chown(fileList []string, owner string, hasChildren bool) error {
+	var changeFileList []string
+	for _, path := range fileList {
+		if !strings.HasPrefix(path, "/") {
+			return errors.New("please use absolute address")
+		}
+		changeFileList = append(changeFileList, self.rootPath+path)
+	}
+	flag := ""
+	if hasChildren {
+		flag += " -R "
+	}
+	cmd := fmt.Sprintf("cd %s && chown %s %s %s \n", self.rootPath, flag, owner, strings.Join(changeFileList, " "))
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return err

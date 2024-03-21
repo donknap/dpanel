@@ -291,3 +291,37 @@ func (self Explorer) GetContent(http *gin.Context) {
 	})
 	return
 }
+
+func (self Explorer) Chmod(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5         string   `json:"md5" binding:"required"`
+		FileList    []string `json:"fileList" binding:"required"`
+		Mod         int      `json:"mod" binding:"required"`
+		HasChildren bool     `json:"hasChildren"`
+		Owner       string   `json:"owner"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	explorer, err := logic.NewExplorer(params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = explorer.Chmod(params.FileList, params.Mod, params.HasChildren)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.Owner != "" {
+		err = explorer.Chown(params.FileList, params.Owner, params.HasChildren)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	self.JsonSuccessResponse(http)
+	return
+}

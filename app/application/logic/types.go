@@ -25,4 +25,6 @@ type fileItem struct {
 	IsDir    bool   `json:"isDir"`
 	ModTime  string `json:"modTime"`
 	Change   int    `json:"change"`
+	Group    string `json:"group"`
+	Owner    string `json:"owner"`
 }

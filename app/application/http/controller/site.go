@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -16,6 +17,7 @@ import (
 	"gorm.io/gorm"
 	"log/slog"
 	"net"
+	"strings"
 )
 
 type Site struct {
@@ -259,6 +261,7 @@ func (self Site) Delete(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
 		ID: params.Md5,
 	})).First()
@@ -266,6 +269,16 @@ func (self Site) Delete(http *gin.Context) {
 	if siteRow != nil {
 		docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, siteRow.SiteName)
 		dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
+
+		if params.DeleteVolume {
+			volumeList, _ := docker.Sdk.Client.VolumeList(docker.Sdk.Ctx, volume.ListOptions{})
+			for _, volueItem := range volumeList.Volumes {
+				if strings.HasPrefix(volueItem.Name, siteRow.SiteName) {
+					docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, volueItem.Name, false)
+				}
+			}
+		}
+
 		self.JsonResponseWithoutError(http, gin.H{
 			"siteId": siteRow.ID,
 			"md5":    params.Md5,
