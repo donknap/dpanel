@@ -51,19 +51,14 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if params.Ports != nil {
 		var checkPorts []string
 		for _, port := range params.Ports {
-			if port.Type == "port" {
-				// 检测端口是否可以正常绑定
-				listener, err := net.Listen("tcp", "0.0.0.0:"+port.Host)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
-				}
-				listener.Close()
-				checkPorts = append(checkPorts, port.Host)
-			} else {
-				self.JsonResponseWithError(http, errors.New("不支持的暴露类型"), 500)
+			// 检测端口是否可以正常绑定
+			listener, err := net.Listen("tcp", "0.0.0.0:"+port.Host)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
 				return
 			}
+			listener.Close()
+			checkPorts = append(checkPorts, port.Host)
 		}
 		if checkPorts != nil {
 			item, _ := docker.Sdk.ContainerByField("publish", checkPorts...)
