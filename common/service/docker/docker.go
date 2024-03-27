@@ -32,8 +32,7 @@ func NewDockerClient() (*Builder, error) {
 	obj, err := client.NewClientWithOpts(
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
-		//client.WithHost(facade.GetConfig().GetString("docker.sock")),
-		client.WithHost("unix:///Users/renchao/.docker/run/docker.sock"),
+		//client.WithHost("unix:///var/run/docker.sock"),
 	)
 	if err != nil {
 		return nil, err

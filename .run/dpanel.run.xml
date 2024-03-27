@@ -3,6 +3,10 @@
     <module name="dpanel" />
     <working_directory value="$PROJECT_DIR$" />
     <parameters value="server:start -f config.yaml" />
+    <envs>
+      <env name="DB_DATABASE" value="./dpanel.db" />
+      <env name="DOCKER_HOST" value="unix:///Users/renchao/.docker/run/docker.sock" />
+    </envs>
     <EXTENSION ID="net.ashald.envfile">
       <option name="IS_ENABLED" value="false" />
       <option name="IS_SUBST" value="false" />

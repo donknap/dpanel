@@ -26,14 +26,6 @@ database:
     driver: sqlite
     user_name: ${DB_USERNAME-root}
     password: ${DB_PASSWORD-123456}
-    db_name: ${DB_DATABASE-./dpanel.db}
+    db_name: ${DB_DATABASE-/dpanel/dpanel.db}
     charset: utf8mb4
     prefix: ims_
-redis:
-  default:
-    host: 127.0.0.1
-    port: 6379
-    password:
-    db: 0
-docker:
-  sock: unix:///Users/renchao/.docker/run/docker.sock

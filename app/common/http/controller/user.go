@@ -32,7 +32,7 @@ func (self User) Login(http *gin.Context) {
 
 	currentUser, err := logic.Setting{}.GetValue(logic.SettingUser, logic.SettingUserFounder)
 	if err != nil {
-		self.JsonResponseWithError(http, errors.New("创始人配置不存在，请重新安装"), 500)
+		self.JsonResponseWithError(http, errors.New("创始人配置不存在，请重新安装"+err.Error()), 500)
 		return
 	}
 	password := logic.User{}.GetMd5Password(params.Password, params.Username)

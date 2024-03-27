@@ -66,7 +66,7 @@ func (self ImageTemplate) GetSupportEnv() map[string]env {
 			{
 				Name:      "go1.21",
 				Version:   "1.21",
-				BaseImage: "alpine:3.18",
+				BaseImage: "donknap/dpanel:go-1.21|1.21",
 			},
 		},
 	}

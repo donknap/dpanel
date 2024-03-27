@@ -44,7 +44,7 @@ func NewClientConn(ctx *gin.Context, options *ClientOptions) (*Client, error) {
 		CtxCancelFunc: ctxWsCancel,
 		closeHandler:  options.CloseHandler,
 	}
-	client.SendMessageQueue = make(chan []byte)
+	client.SendMessageQueue = make(chan string)
 	client.readMessageHandler = options.MessageHandler
 
 	wsCollect[client.Id] = client
@@ -59,7 +59,7 @@ type Client struct {
 	Conn               *websocket.Conn // 当前 ws 连接
 	CtxCancelFunc      context.CancelFunc
 	CtxContext         context.Context
-	SendMessageQueue   chan []byte
+	SendMessageQueue   chan string
 	readMessageHandler map[string]func(message []byte)
 	closeHandler       func()
 }
@@ -105,7 +105,7 @@ func (self *Client) ReadMessage() {
 				RecvAt:     time.Now().Unix(),
 			}
 			if bytes.Equal(message.ContentStr, []byte("ping")) {
-				self.SendMessageQueue <- []byte("ping")
+				self.SendMessageQueue <- "pong"
 				continue
 			}
 			content := recvMessageContent{}
