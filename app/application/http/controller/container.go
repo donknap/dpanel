@@ -5,6 +5,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
@@ -201,5 +202,78 @@ func (self Container) Prune(http *gin.Context) {
 	filter := filters.NewArgs()
 	docker.Sdk.Client.ContainersPrune(docker.Sdk.Ctx, filter)
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Container) Delete(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5          string `json:"md5" binding:"required"`
+		DeleteImage  bool   `json:"deleteImage" binding:"omitempty"`
+		DeleteVolume bool   `json:"deleteVolume" binding:"omitempty"`
+		DeleteLink   bool   `json:"deleteLink" binding:"omitempty"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	var err error
+	containerInfo, err := docker.Sdk.ContainerInfo(params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if !function.IsEmptyArray(containerInfo.HostConfig.Links) {
+		params.DeleteLink = true
+	} else {
+		params.DeleteLink = false
+	}
+
+	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.ID, container.StopOptions{})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.ID, container.RemoveOptions{
+		RemoveVolumes: params.DeleteVolume,
+		RemoveLinks:   params.DeleteLink,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.DeleteImage {
+		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, containerInfo.Image, types.ImageRemoveOptions{})
+	}
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
+		ID: params.Md5,
+	})).First()
+
+	if siteRow != nil {
+		docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, siteRow.SiteName)
+		dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
+
+		if params.DeleteVolume {
+			volumeList, _ := docker.Sdk.Client.VolumeList(docker.Sdk.Ctx, volume.ListOptions{})
+			for _, volueItem := range volumeList.Volumes {
+				if strings.HasPrefix(volueItem.Name, siteRow.SiteName) {
+					docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, volueItem.Name, false)
+				}
+			}
+		}
+
+		self.JsonResponseWithoutError(http, gin.H{
+			"siteId": siteRow.ID,
+			"md5":    params.Md5,
+		})
+	} else {
+		self.JsonResponseWithoutError(http, gin.H{
+			"md5": params.Md5,
+		})
+	}
 	return
 }

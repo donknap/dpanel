@@ -2,12 +2,8 @@ package storage
 
 import (
 	"fmt"
+	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"os"
-	"path/filepath"
-)
-
-var (
-	RootPath, _ = filepath.Abs("./")
 )
 
 type Local struct {
@@ -19,7 +15,7 @@ func (self Local) Delete(name string) error {
 }
 
 func (self Local) GetSaveRootPath() string {
-	return fmt.Sprintf("%s/storage/", RootPath)
+	return fmt.Sprintf("%s/storage/", facade.GetConfig().Get("storage.local.path"))
 }
 
 func (self Local) GetSavePath(name string) string {
@@ -27,5 +23,5 @@ func (self Local) GetSavePath(name string) string {
 }
 
 func (self Local) GetRealPath(name string) string {
-	return fmt.Sprintf("%s%s", RootPath, name)
+	return fmt.Sprintf("%s/storage/%s", facade.GetConfig().Get("storage.local.path"), name)
 }

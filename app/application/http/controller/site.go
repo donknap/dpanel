@@ -2,14 +2,11 @@ package controller
 
 import (
 	"errors"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
@@ -17,7 +14,6 @@ import (
 	"gorm.io/gorm"
 	"log/slog"
 	"net"
-	"strings"
 )
 
 type Site struct {
@@ -138,6 +134,7 @@ func (self Site) GetList(http *gin.Context) {
 		Page      int    `json:"page,default=1" binding:"omitempty,gt=0"`
 		PageSize  int    `json:"pageSize" binding:"omitempty"`
 		SiteTitle string `json:"siteTitle" binding:"omitempty"`
+		SiteName  string `json:"siteName"`
 		Status    int32  `json:"status" binding:"omitempty,oneof=10 20 30"`
 		IsDelete  bool   `json:"isDelete"`
 	}
@@ -159,6 +156,9 @@ func (self Site) GetList(http *gin.Context) {
 	}
 	if params.SiteTitle != "" {
 		query = query.Where(dao.Site.SiteTitle.Like("%" + params.SiteTitle + "%"))
+	}
+	if params.SiteName != "" {
+		query = query.Where(dao.Site.SiteName.Like("%" + params.SiteName + "%"))
 	}
 	if params.IsDelete {
 		query = query.Unscoped().Where(dao.Site.DeletedAt.IsNotNull())
@@ -215,73 +215,17 @@ func (self Site) GetDetail(http *gin.Context) {
 
 func (self Site) Delete(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5          string `json:"md5" binding:"required"`
-		DeleteImage  bool   `json:"deleteImage" binding:"omitempty"`
-		DeleteVolume bool   `json:"deleteVolume" binding:"omitempty"`
-		DeleteLink   bool   `json:"deleteLink" binding:"omitempty"`
+		Id []int32 `json:"id" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	var err error
-	containerInfo, err := docker.Sdk.ContainerInfo(params.Md5)
+	_, err := dao.Site.Unscoped().Where(dao.Site.ID.In(params.Id...)).Delete()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if !function.IsEmptyArray(containerInfo.HostConfig.Links) {
-		params.DeleteLink = true
-	} else {
-		params.DeleteLink = false
-	}
-
-	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.ID, container.StopOptions{})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.ID, container.RemoveOptions{
-		RemoveVolumes: params.DeleteVolume,
-		RemoveLinks:   params.DeleteLink,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if params.DeleteImage {
-		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, containerInfo.Image, types.ImageRemoveOptions{})
-	}
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-		ID: params.Md5,
-	})).First()
-
-	if siteRow != nil {
-		docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, siteRow.SiteName)
-		dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
-
-		if params.DeleteVolume {
-			volumeList, _ := docker.Sdk.Client.VolumeList(docker.Sdk.Ctx, volume.ListOptions{})
-			for _, volueItem := range volumeList.Volumes {
-				if strings.HasPrefix(volueItem.Name, siteRow.SiteName) {
-					docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, volueItem.Name, false)
-				}
-			}
-		}
-
-		self.JsonResponseWithoutError(http, gin.H{
-			"siteId": siteRow.ID,
-			"md5":    params.Md5,
-		})
-	} else {
-		self.JsonResponseWithoutError(http, gin.H{
-			"md5": params.Md5,
-		})
-	}
+	self.JsonSuccessResponse(http)
 	return
 }

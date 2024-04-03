@@ -29,3 +29,6 @@ database:
     db_name: ${DB_DATABASE-/dpanel/dpanel.db}
     charset: utf8mb4
     prefix: ims_
+storage:
+  local:
+    path: ${STORAGE_LOCAL_PATH-/dpanel}

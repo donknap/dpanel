@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
@@ -31,7 +32,7 @@ func (self Attach) Upload(http *gin.Context) {
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"path": storage.Local{}.GetSavePath(filepath.Base(file.Name())),
+		"path": filepath.Base(file.Name()),
 	})
 	return
 }
@@ -45,6 +46,7 @@ func (self Attach) Delete(http *gin.Context) {
 		return
 	}
 	path := storage.Local{}.GetRealPath(params.Path)
+	fmt.Printf("%v \n", path)
 	_, err := os.Stat(path)
 	if err == nil {
 		os.Remove(path)

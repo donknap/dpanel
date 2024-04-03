@@ -31,6 +31,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/container/get-detail", controller.Container{}.GetDetail)
 			cors.POST("/app/container/update", controller.Container{}.Update)
 			cors.POST("/app/container/prune", controller.Container{}.Prune)
+			cors.POST("/app/container/delete", controller.Container{}.Delete)
 
 			cors.POST("/app/container/get-stat-info", controller.Container{}.GetStatInfo)
 			cors.POST("/app/container/get-process-info", controller.Container{}.GetProcessInfo)

@@ -101,9 +101,9 @@ func (self ImageTemplate) GetSupportEnv() map[string]env {
 		Name: LangHtml,
 		Env: []envItem{
 			{
-				Name:      "universal",
+				Name:      "common",
 				Version:   "1.0.0",
-				BaseImage: "alpine:3.18",
+				BaseImage: "donknap/dpanel:html-common",
 			},
 		},
 	}
