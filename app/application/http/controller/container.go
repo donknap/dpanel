@@ -84,6 +84,9 @@ func (self Container) GetList(http *gin.Context) {
 
 	if function.IsEmptyArray(list) {
 		list = make([]types.Container, 0)
+		self.JsonResponseWithoutError(http, gin.H{
+			"list": list,
+		})
 	} else {
 		var md5List []driver.Valuer
 		for _, item := range list {
