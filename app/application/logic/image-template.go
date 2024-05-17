@@ -45,17 +45,17 @@ func (self ImageTemplate) GetSupportEnv() map[string]env {
 			{
 				Name:      "jdk8",
 				Version:   "8",
-				BaseImage: "alpine:3.18",
+				BaseImage: "donknap/dpanel:java-8",
+			},
+			{
+				Name:      "jdk11",
+				Version:   "11",
+				BaseImage: "donknap/dpanel:java-11",
 			},
 			{
 				Name:      "jdk12",
 				Version:   "12",
-				BaseImage: "alpine:3.18",
-			},
-			{
-				Name:      "jdk18",
-				Version:   "18",
-				BaseImage: "alpine:3.18",
+				BaseImage: "donknap/dpanel:java-12",
 			},
 		},
 	}
@@ -77,22 +77,22 @@ func (self ImageTemplate) GetSupportEnv() map[string]env {
 			{
 				Name:      "node12",
 				Version:   "12",
-				BaseImage: "node:12.22.12-alpine",
+				BaseImage: "donknap/dpanel:node-12",
 			},
 			{
 				Name:      "node14",
 				Version:   "14",
-				BaseImage: "node:14.21-alpine",
+				BaseImage: "donknap/dpanel:node-14",
+			},
+			{
+				Name:      "node16",
+				Version:   "16",
+				BaseImage: "donknap/dpanel:node-16",
 			},
 			{
 				Name:      "node18",
 				Version:   "18",
-				BaseImage: "node:18.19-alpine",
-			},
-			{
-				Name:      "node20",
-				Version:   "20",
-				BaseImage: "node:20.11-alpine",
+				BaseImage: "donknap/dpanel:node-18",
 			},
 		},
 	}
