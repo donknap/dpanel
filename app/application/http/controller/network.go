@@ -242,10 +242,15 @@ func (self Network) GetContainerList(http *gin.Context) {
 				NetworkInfo: resource,
 			}
 			containerRow, _ := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, id)
-			if networkSetting, ok := containerRow.NetworkSettings.Networks[name]; ok {
-				temp.HostName = networkSetting.Aliases
+			if containerRow.NetworkSettings != nil {
+				if networkSetting, ok := containerRow.NetworkSettings.Networks[name]; ok {
+					temp.HostName = networkSetting.Aliases
+				}
 			}
-			temp.ContainerName = containerRow.Name
+			if containerRow.Name != "" {
+				temp.ContainerName = containerRow.Name
+			}
+
 			temp.Key = name + ":" + temp.ContainerName
 			item.Children = append(item.Children, temp)
 		}
