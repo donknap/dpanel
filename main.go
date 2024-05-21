@@ -5,7 +5,10 @@ import (
 	_ "embed"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
+	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/entity"
 	common2 "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
@@ -46,6 +49,31 @@ func main() {
 		panic(err)
 	}
 	dao.SetDefault(db)
+
+	// 同步数据库
+	db.Migrator().AutoMigrate(
+		&entity.Event{},
+		&entity.Image{},
+		&entity.Notice{},
+		&entity.Registry{},
+		&entity.Setting{},
+		&entity.Site{},
+		&entity.SiteDomain{},
+	)
+	// 如果没有管理配置新建一条
+	founderSetting, _ := dao.Setting.
+		Where(dao.Setting.GroupName.Eq(logic.SettingUser)).
+		Where(dao.Setting.Name.Eq(logic.SettingUserFounder)).First()
+	if founderSetting == nil {
+		dao.Setting.Create(&entity.Setting{
+			GroupName: logic.SettingUser,
+			Name:      logic.SettingUserFounder,
+			Value: &accessor.SettingValueOption{
+				"password": "f6fdffe48c908deb0f4c3bd36c032e72",
+				"username": "admin",
+			},
+		})
+	}
 
 	// 注册资源
 	facade.GetContainer().NamedSingleton("asset", func() embed.FS {

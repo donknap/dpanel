@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -22,6 +23,8 @@ func (self Attach) Upload(http *gin.Context) {
 	}
 	defer fileUploader.Close()
 	file, err := os.CreateTemp(storage.Local{}.GetSaveRootPath(), "dpanel-upload")
+	slog.Debug("update temp path", file.Name())
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
