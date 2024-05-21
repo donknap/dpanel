@@ -11,7 +11,12 @@ Docker 可视化面板系统，提供完善的 docker 管理功能。
 docker run -it --name dpanel -p 8807:80 -v /var/run/docker.sock:/var/run/docker.sock ccr.ccs.tencentyun.com/donknap/dpanel:latest
 ```
 
+### 默认帐号
+
+admin / admin
+
 # 演示
+
 
 ### 相关仓库
 
