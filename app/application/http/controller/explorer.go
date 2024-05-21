@@ -132,7 +132,22 @@ func (self Explorer) Import(http *gin.Context) {
 	uploadTempDir, _ := os.MkdirTemp("", "dpanel")
 	defer os.RemoveAll(uploadTempDir)
 	for _, item := range params.FileList {
-		err = os.Rename(storage.Local{}.GetRealPath(item.Path), uploadTempDir+"/"+item.Name)
+		sourceFile, err := os.Open(storage.Local{}.GetRealPath(item.Path))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer sourceFile.Close()
+		os.Remove(sourceFile.Name())
+
+		destFile, err := os.Create(uploadTempDir + "/" + item.Name)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer destFile.Close()
+
+		_, err = io.Copy(destFile, sourceFile)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
