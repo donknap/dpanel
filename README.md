@@ -8,7 +8,7 @@ Docker 可视化面板系统，提供完善的 docker 管理功能。
 > ln -s -f /Users/用户/.docker/run/docker.sock  /var/run/docker.sock
 
 ```
-docker run -it --name dpanel -p 8807:80 -v /var/run/docker.sock:/var/run/docker.sock ccr.ccs.tencentyun.com/donknap/dpanel:v1.0.0
+docker run -it --name dpanel -p 8807:80 -v /var/run/docker.sock:/var/run/docker.sock ccr.ccs.tencentyun.com/donknap/dpanel:latest
 ```
 
 # 演示
