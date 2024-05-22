@@ -19,9 +19,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 
 	if task.RunParams.Ports != nil {
 		for _, value := range task.RunParams.Ports {
-			if value.Type == "port" {
-				builder.WithPort(value.Host, value.Dest)
-			}
+			builder.WithPort(value.Host, value.Dest)
 		}
 	}
 	if task.RunParams.Environment != nil {
@@ -74,6 +72,22 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 
 	if task.RunParams.ShmSize != 0 {
 		builder.WithShmSize(task.RunParams.ShmSize)
+	}
+
+	if task.RunParams.WorkDir != "" {
+		builder.WithWorkDir(task.RunParams.WorkDir)
+	}
+
+	if task.RunParams.User != "" {
+		builder.WithWorkDir(task.RunParams.WorkDir)
+	}
+
+	if task.RunParams.Command != "" {
+		builder.WithCommand(task.RunParams.Command)
+	}
+
+	if task.RunParams.Entrypoint != "" {
+		builder.WithEntrypoint(task.RunParams.Entrypoint)
 	}
 
 	response, err := builder.Execute()

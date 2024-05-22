@@ -152,6 +152,22 @@ func (self *ContainerCreateBuilder) WithShmSize(size int) {
 	self.hostConfig.ShmSize = int64(size)
 }
 
+func (self *ContainerCreateBuilder) WithWorkDir(path string) {
+	self.containerConfig.WorkingDir = path
+}
+
+func (self *ContainerCreateBuilder) WithUser(user string) {
+	self.containerConfig.User = user
+}
+
+func (self *ContainerCreateBuilder) WithCommand(cmd string) {
+	self.containerConfig.Cmd = strings.Split(cmd, " ")
+}
+
+func (self *ContainerCreateBuilder) WithEntrypoint(cmd string) {
+	self.containerConfig.Entrypoint = strings.Split(cmd, " ")
+}
+
 func (self *ContainerCreateBuilder) WithPid(pid ...string) {
 	pidStr := strings.Join(pid, ":")
 	self.hostConfig.PidMode = container.PidMode(pidStr)
