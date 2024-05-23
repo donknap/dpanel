@@ -15,8 +15,9 @@ docker run -it --name dpanel -p 8807:80 -v /var/run/docker.sock:/var/run/docker.
 
 admin / admin
 
-# 演示
+# 使用手册
 
+https://donknap.github.io/dpanel-docs
 
 ### 相关仓库
 
