@@ -25,7 +25,7 @@ import (
 func TestContainerRemove(t *testing.T) {
 	sdk, _ := docker.NewDockerClient()
 	err := sdk.Client.ContainerStop(context.Background(), "phpmyadmin", container.StopOptions{})
-	err = sdk.Client.ContainerRemove(context.Background(), "phpmyadmin", types.ContainerRemoveOptions{})
+	err = sdk.Client.ContainerRemove(context.Background(), "phpmyadmin", container.RemoveOptions{})
 	fmt.Printf("%v \n", err)
 
 }
@@ -107,7 +107,7 @@ func TestCreateContainer(t *testing.T) {
 		fmt.Printf("%v \n", err)
 	}
 	fmt.Printf("%v \n", response.ID)
-	err = sdk.Client.ContainerStart(context.Background(), response.ID, types.ContainerStartOptions{})
+	err = sdk.Client.ContainerStart(context.Background(), response.ID, container.StartOptions{})
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}
@@ -313,4 +313,14 @@ func TestModifyFile(t *testing.T) {
 		tarReader1,
 		types.CopyToContainerOptions{})
 	fmt.Printf("%v \n", err)
+}
+
+func TestExportContainer(t *testing.T) {
+	reader, err := docker.Sdk.Client.ContainerExport(docker.Sdk.Ctx, "0592bfae3b604b6ed03fa95b4cab5d35606d4d7484e1ccebfefa30f156f545db")
+	if err != nil {
+		fmt.Printf("%v \n", err)
+		return
+	}
+	content, _ := io.ReadAll(reader)
+	fmt.Printf("%v \n", string(content))
 }

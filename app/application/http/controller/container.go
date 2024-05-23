@@ -12,6 +12,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"io"
 	"strings"
 )
 
@@ -278,5 +279,32 @@ func (self Container) Delete(http *gin.Context) {
 			"md5": params.Md5,
 		})
 	}
+	return
+}
+
+func (self Container) Export(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5 string `json:"md5" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	out, err := docker.Sdk.Client.ContainerExport(docker.Sdk.Ctx, params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer out.Close()
+
+	data, err := io.ReadAll(out)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	http.Header("Content-Type", "application/tar")
+	http.Header("Content-Disposition", "attachment; filename="+params.Md5+".tar")
+	http.Data(200, "application/tar", data)
 	return
 }
