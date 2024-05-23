@@ -19,7 +19,15 @@ admin / admin
 
 https://donknap.github.io/dpanel-docs
 
-### 相关仓库
+#### 相关仓库
 
 - 镜像构建基础模板 https://github.com/donknap/dpanel-base-image 
 - DPanel镜像 https://github.com/donknap/dpanel-image
+- 文档 https://github.com/donknap/dpanel-docs
+
+#### 相关组件
+
+- Rangine 开发框架 https://github.com/we7coreteam/w7-rangine-go-skeleton
+- Docker Sdk https://github.com/docker/docker
+- React & UmiJs
+- Ant Design & Ant Design Pro & Ant Design Charts
