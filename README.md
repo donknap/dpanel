@@ -21,7 +21,7 @@ https://donknap.github.io/dpanel-docs
 
 #### 交流群
 
-[!qq群](https://github.com/donknap/dpanel-docs/blob/master/storage/image/qq.png?raw=true)
+![qq群](https://github.com/donknap/dpanel-docs/blob/master/storage/image/qq.png?raw=true)
 
 #### 相关仓库
 
