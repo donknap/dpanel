@@ -19,6 +19,10 @@ admin / admin
 
 https://donknap.github.io/dpanel-docs
 
+#### 交流群
+
+<img src="https://github.com/donknap/dpanel-docs/blob/master/storage/image/qq.png?raw=true =300x300" wdith="300" />
+
 #### 相关仓库
 
 - 镜像构建基础模板 https://github.com/donknap/dpanel-base-image 
