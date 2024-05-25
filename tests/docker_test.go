@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/donknap/dpanel/common/function"
@@ -316,11 +317,6 @@ func TestModifyFile(t *testing.T) {
 }
 
 func TestExportContainer(t *testing.T) {
-	reader, err := docker.Sdk.Client.ContainerExport(docker.Sdk.Ctx, "0592bfae3b604b6ed03fa95b4cab5d35606d4d7484e1ccebfefa30f156f545db")
-	if err != nil {
-		fmt.Printf("%v \n", err)
-		return
-	}
-	content, _ := io.ReadAll(reader)
-	fmt.Printf("%v \n", string(content))
+
+	docker.Sdk.Client.ImageImport(docker.Sdk.Ctx, types.ImageImportSource{}, "", image.ImportOptions{})
 }

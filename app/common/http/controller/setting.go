@@ -92,7 +92,13 @@ func (self Setting) GetSetting(http *gin.Context) {
 	}
 	row, err := logic.Setting{}.GetValue(params.GroupName, params.Name)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		self.JsonResponseWithoutError(http, gin.H{
+			"setting": &entity.Setting{
+				GroupName: params.GroupName,
+				Name:      params.Name,
+				Value:     &accessor.SettingValueOption{},
+			},
+		})
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{

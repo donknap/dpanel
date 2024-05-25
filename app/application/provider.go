@@ -45,6 +45,8 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/image/image-prune", controller.Image{}.ImagePrune)
 			cors.POST("/app/image/build-prune", controller.Image{}.BuildPrune)
 			cors.POST("/app/image/export", controller.Image{}.Export)
+			cors.POST("/app/image/import-by-container-tar", controller.Image{}.ImportByContainerTar)
+			cors.POST("/app/image/import-by-image-tar", controller.Image{}.ImportByImageTar)
 
 			cors.POST("/app/image/get-template-list", controller.Image{}.GetTemplateList)
 			cors.POST("/app/image/get-template-dockerfile", controller.Image{}.GetTemplateDockerfile)

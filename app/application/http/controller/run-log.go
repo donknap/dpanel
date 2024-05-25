@@ -1,9 +1,6 @@
 package controller
 
 import (
-	"errors"
-	"github.com/donknap/dpanel/common/accessor"
-	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
@@ -24,20 +21,8 @@ func (self RunLog) Run(http *gin.Context) {
 		return
 	}
 
-	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-		ID: params.Md5,
-	})).First()
-	if siteRow == nil {
-		self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
-		return
-	}
-	if siteRow.ContainerInfo == nil {
-		self.JsonResponseWithError(http, errors.New("当前站点并没有部署成功"), 500)
-		return
-	}
-
 	builder := docker.Sdk.GetContainerLogBuilder()
-	builder.WithContainerId(siteRow.ContainerInfo.Info.ID)
+	builder.WithContainerId(params.Md5)
 	builder.WithTail(params.LineTotal)
 	content, err := builder.Execute()
 	if err != nil {

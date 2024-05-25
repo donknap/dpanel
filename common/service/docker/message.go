@@ -1,7 +1,7 @@
 package docker
 
 type progressStatus struct {
-	Status string
+	Status string `json:"status"`
 }
 
 type progressErrDetail struct {
@@ -26,6 +26,10 @@ type progressStream struct {
 		Total   string `json:"total"`
 		Current string `json:"current"`
 	} `json:"step"`
+}
+
+type progressLoadImage struct {
+	ImageName string `json:"stream"`
 }
 
 type progressAux struct {

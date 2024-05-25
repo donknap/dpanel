@@ -22,6 +22,110 @@ type Image struct {
 	controller.Abstract
 }
 
+func (self Image) ImportByContainerTar(http *gin.Context) {
+	type ParamsValidate struct {
+		Tar      string `json:"tar" binding:"required"`
+		Tag      string `json:"tag" binding:"required"`
+		Registry string `json:"registry"`
+		Cmd      string `json:"cmd" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	imageName := logic.Image{}.GetImageName(&logic.ImageNameOption{
+		Registry: params.Registry,
+		Name:     params.Tag,
+	})
+	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
+	if imageInfo.ID != "" {
+		self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
+		return
+	}
+	containerTar, err := os.Open(storage.Local{}.GetRealPath(params.Tar))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	out, err := docker.Sdk.Client.ImageImport(docker.Sdk.Ctx, types.ImageImportSource{
+		Source:     containerTar,
+		SourceName: "-",
+	}, imageName, image.ImportOptions{
+		Changes: []string{
+			"CMD " + params.Cmd,
+		},
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer out.Close()
+
+	_, err = io.Copy(os.Stdout, out)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	_ = os.Remove(storage.Local{}.GetRealPath(params.Tar))
+
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Image) ImportByImageTar(http *gin.Context) {
+	type ParamsValidate struct {
+		Tar      string `json:"tar" binding:"required"`
+		Tag      string `json:"tag" binding:"required"`
+		Registry string `json:"registry"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	imageName := logic.Image{}.GetImageName(&logic.ImageNameOption{
+		Registry: params.Registry,
+		Name:     params.Tag,
+	})
+	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
+	if imageInfo.ID != "" {
+		self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
+		return
+	}
+	imageTar, err := os.Open(storage.Local{}.GetRealPath(params.Tar))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	out, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageTar, false)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	progressChan := docker.Sdk.Progress(out.Body, imageName)
+	for {
+		select {
+		case message, ok := <-progressChan:
+			if !ok {
+				if err != nil {
+					self.JsonResponseWithError(http, message.Err, 500)
+					return
+				}
+			}
+			if message.Stream != nil && strings.Contains(message.Stream.Stream, "Loaded image:") {
+				importImageName := strings.Split(message.Stream.Stream, "Loaded image:")[1]
+				err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, strings.TrimSpace(importImageName), imageName)
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+				_ = os.Remove(storage.Local{}.GetRealPath(params.Tar))
+				self.JsonSuccessResponse(http)
+				return
+			}
+		}
+	}
+}
+
 func (self Image) CreateByDockerfile(http *gin.Context) {
 	type ParamsValidate struct {
 		Id              int32  `form:"id"`
@@ -145,7 +249,7 @@ func (self Image) GetList(http *gin.Context) {
 	}
 	var result []image.Summary
 
-	imageList, err := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, types.ImageListOptions{
+	imageList, err := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, image.ListOptions{
 		All:            false,
 		ContainerCount: true,
 	})
