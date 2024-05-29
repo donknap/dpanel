@@ -75,6 +75,7 @@ func (self *imageBuildBuilder) makeTarByZip(tarWriter *tar.Writer) (err error) {
 			return err
 		}
 	}
+	os.Remove(self.zipFilePath)
 	return nil
 }
 
