@@ -61,6 +61,7 @@ func (self Container) Status(http *gin.Context) {
 func (self Container) GetList(http *gin.Context) {
 	type ParamsValidate struct {
 		Tag       string `json:"tag"`
+		Md5       string `json:"md5"`
 		SiteTitle string `json:"siteTitle"`
 	}
 	params := ParamsValidate{}
@@ -72,6 +73,9 @@ func (self Container) GetList(http *gin.Context) {
 	filter := filters.NewArgs()
 	if params.Tag != "" {
 		filter.Add("name", params.Tag)
+	}
+	if params.Md5 != "" {
+		filter.Add("id", params.Md5)
 	}
 	list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
 		All:     true,

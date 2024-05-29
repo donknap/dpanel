@@ -12,7 +12,7 @@ build: clean
 	cp ${GO_BIN}/${PROJECT_NAME} ${TARGET_DIR}/server
 	cp ${GO_BASE}/config.yaml ${TARGET_DIR}/server
 	cd ${JS_DIR} && npm run build && cp -r $(JS_DIR)/dist/* ${TARGET_DIR}/html
-	cd ${TARGET_DIR} && git commit -a -m "update" && git push
+	cd ${TARGET_DIR} && git add . && git commit -a -m "update" && git push
 build-windows: clean
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o ${GO_BIN}/${PROJECT_NAME}.exe ${SOURCE_FILES}
 test: clean

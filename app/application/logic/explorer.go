@@ -132,7 +132,7 @@ func (self explorer) GetContent(file string) (string, error) {
 		return "", errors.New("please use absolute address")
 	}
 	file = fmt.Sprintf("%s%s", self.rootPath, file)
-	cmd := fmt.Sprintf(`file --mime-type -b %s | grep -q -e "text" -e "empty" && cat %s \n`, file, file)
+	cmd := fmt.Sprintf(`file --mime-type -b %s | grep -q -e "text" -e "empty" -e "javascript" -e "json" && cat %s \n`, file, file)
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return "", err

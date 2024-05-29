@@ -24,10 +24,14 @@ type Image struct {
 
 func (self Image) ImportByContainerTar(http *gin.Context) {
 	type ParamsValidate struct {
-		Tar      string `json:"tar" binding:"required"`
-		Tag      string `json:"tag" binding:"required"`
-		Registry string `json:"registry"`
-		Cmd      string `json:"cmd" binding:"required"`
+		Tar      string   `json:"tar" binding:"required"`
+		Tag      string   `json:"tag" binding:"required"`
+		Registry string   `json:"registry"`
+		Cmd      string   `json:"cmd" binding:"required"`
+		WorkDir  string   `json:"workDir"`
+		Expose   []string `json:"expose"`
+		Env      []string `json:"env"`
+		Volume   []string `json:"volume"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -47,13 +51,24 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	change := []string{
+		"CMD " + params.Cmd,
+		"WORKDIR " + params.WorkDir,
+	}
+	for _, port := range params.Expose {
+		change = append(change, "EXPOSE "+port)
+	}
+	for _, env := range params.Env {
+		change = append(change, "ENV "+env)
+	}
+	for _, volume := range params.Volume {
+		change = append(change, "VOLUME "+volume)
+	}
 	out, err := docker.Sdk.Client.ImageImport(docker.Sdk.Ctx, types.ImageImportSource{
 		Source:     containerTar,
 		SourceName: "-",
 	}, imageName, image.ImportOptions{
-		Changes: []string{
-			"CMD " + params.Cmd,
-		},
+		Changes: change,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
