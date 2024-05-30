@@ -21,6 +21,7 @@ var (
 	BuildDesc                       = "DPanel is an open source docker web management panel that provides image building and deployment"
 	BuildWebSite                    = "https://github.com/donknap/dpanel, https://phpey.net"
 	BuildVersion                    = "1.0.0"
+	HostnameTemplate                = "%s.pod.dpanel.local"
 )
 
 type Builder struct {
