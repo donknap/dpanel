@@ -10,11 +10,11 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"html"
 	"io"
 	"math"
 	"os"
@@ -318,5 +318,6 @@ func TestModifyFile(t *testing.T) {
 
 func TestExportContainer(t *testing.T) {
 
-	docker.Sdk.Client.ImageImport(docker.Sdk.Ctx, types.ImageImportSource{}, "", image.ImportOptions{})
+	//docker.Sdk.Client.ImageImport(docker.Sdk.Ctx, types.ImageImportSource{}, "", image.ImportOptions{})
+	fmt.Printf("%v \n", html.UnescapeString("&#34;&#34;"))
 }

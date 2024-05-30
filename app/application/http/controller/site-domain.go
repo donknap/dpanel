@@ -95,7 +95,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		EnableBlockCommonExploits bool
 		EnableAssetCache          bool
 		EnableWs                  bool
-		ExtraNginx                string
+		ExtraNginx                template.HTML
 	}
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
 	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", tplParams{
@@ -105,7 +105,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		EnableBlockCommonExploits: params.EnableBlockCommonExploits,
 		EnableWs:                  params.EnableWs,
 		EnableAssetCache:          params.EnableAssetCache,
-		ExtraNginx:                params.ExtraNginx,
+		ExtraNginx:                template.HTML(params.ExtraNginx),
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

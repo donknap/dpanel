@@ -2,10 +2,12 @@ map $scheme $hsts_header {
     https   "max-age=63072000; preload";
 }
 
+upstream target {
+  server {{.ServerAddress}}:{{.Port}};
+}
+
 server {
   set $forward_scheme http;
-  set $server         "{{.ServerAddress}}";
-  set $port           {{.Port}};
   listen 80;
   listen [::]:80;
   server_name {{.ServerName}};
@@ -38,7 +40,7 @@ server {
     proxy_set_header X-Forwarded-Proto  $scheme;
     proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
     proxy_set_header X-Real-IP          $remote_addr;
-    proxy_pass       $forward_scheme://$server:$port$request_uri;
+    proxy_pass       $forward_scheme://target$request_uri;
   }
 
   {{.ExtraNginx}}
