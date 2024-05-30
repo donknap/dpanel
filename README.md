@@ -7,8 +7,18 @@ Docker 可视化面板系统，提供完善的 docker 管理功能。
 > macos 下需要先将 docker.sock 文件 link 到 /var/run/docker.sock 目录中 \
 > ln -s -f /Users/用户/.docker/run/docker.sock  /var/run/docker.sock
 
+##### 新建 DPanel 默认网络
+
 ```
-docker run -it -d --name dpanel -p 8807:8080 -p 80:80 --network dpanel-local -v /var/run/docker.sock:/var/run/docker.sock donknap/dpanel:latest
+docker network create dpanel-local
+```
+
+##### 启动容器
+
+> 如果不需要设置容器的域名转发功能，可不暴露 80 端口
+
+```
+docker run -it -d --name dpanel -p 80:80 -p 8807:8080 --network dpanel-local -v /var/run/docker.sock:/var/run/docker.sock donknap/dpanel:latest
 ```
 
 ### 默认帐号
