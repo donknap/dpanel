@@ -36,6 +36,8 @@ func (self SiteDomain) Create(http *gin.Context) {
 		EnableAssetCache          bool   `json:"enableAssetCache"`
 		EnableWs                  bool   `json:"enableWs"`
 		ExtraNginx                string `json:"extraNginx"`
+		SslCrt                    string `json:"sslCrt"`
+		SslKey                    string `json:"sslKey"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -55,7 +57,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 	// 将当前容器加入到默认 dpanel-local 网络中，并指定 Hostname 用于 Nginx 反向代理
 	_, err = docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, defaultNetworkName, types.NetworkInspectOptions{})
 	if err != nil {
-		self.JsonResponseWithError(http, errors.New("DPanel 默认网络不存在，请重新安装或是新建 "+defaultNetworkName+" 网络"), 500)
+		self.JsonResponseWithError(http, errors.New("DPanel 默认网络不存在，请重新安装或是新建&加入 "+defaultNetworkName+" 网络"), 500)
 		return
 	}
 	hostname := fmt.Sprintf(docker.HostnameTemplate, strings.Trim(containerRow.Name, "/"))
@@ -86,6 +88,16 @@ func (self SiteDomain) Create(http *gin.Context) {
 		return
 	}
 
+	err = os.WriteFile(self.getNginxCertPath()+"/"+params.ServerName+".pem", []byte(params.SslCrt), 0666)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = os.WriteFile(self.getNginxCertPath()+"/"+params.ServerName+"-key.pem", []byte(params.SslKey), 0666)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	defer vhostFile.Close()
 
 	type tplParams struct {
@@ -96,6 +108,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		EnableAssetCache          bool
 		EnableWs                  bool
 		ExtraNginx                template.HTML
+		EnableSSL                 bool
 	}
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
 	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", tplParams{
@@ -106,6 +119,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		EnableWs:                  params.EnableWs,
 		EnableAssetCache:          params.EnableAssetCache,
 		ExtraNginx:                template.HTML(params.ExtraNginx),
+		EnableSSL:                 params.Schema == "https",
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -200,4 +214,8 @@ func (self SiteDomain) Delete(http *gin.Context) {
 
 func (self SiteDomain) getNginxSettingPath() string {
 	return fmt.Sprintf("%s/nginx/proxy_host/", facade.GetConfig().Get("storage.local.path"))
+}
+
+func (self SiteDomain) getNginxCertPath() string {
+	return fmt.Sprintf("%s/nginx/cert/", facade.GetConfig().Get("storage.local.path"))
 }

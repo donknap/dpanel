@@ -6,11 +6,33 @@ upstream target {
   server {{.ServerAddress}}:{{.Port}};
 }
 
+{{if .EnableSSL}}
+server {
+    listen 80;
+    server_name {{.ServerName}};
+    rewrite ^(.*) https://$server_name$1 permanent;
+}
+{{end}}
+
 server {
   set $forward_scheme http;
+  {{if .EnableSSL}}
+  listen 443 ssl;
+  {{else}}
   listen 80;
-  listen [::]:80;
+  {{end}}
+
   server_name {{.ServerName}};
+
+  {{if .EnableSSL}}
+  ssl_certificate /dpanel/nginx/cert/{{.ServerName}}.pem;
+  ssl_certificate_key /dpanel/nginx/cert/{{.ServerName}}-key.pem;
+  ssl_session_cache shared:SSL:1m;
+  ssl_session_timeout 5m;
+  ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE:ECDH:AES:HIGH:!NULL:!aNULL:!MD5:!ADH:!RC4;
+  ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
+  ssl_prefer_server_ciphers on;
+  {{end}}
 
   {{if .EnableAssetCache}}
   # Asset Caching
