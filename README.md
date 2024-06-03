@@ -2,11 +2,6 @@
 
 Docker 可视化面板系统，提供完善的 docker 管理功能。
 
-# 运行
-
-> macos 下需要先将 docker.sock 文件 link 到 /var/run/docker.sock 目录中 \
-> ln -s -f /Users/用户/.docker/run/docker.sock  /var/run/docker.sock
-
 ##### 新建 DPanel 默认网络
 
 ```
@@ -15,8 +10,8 @@ docker network create dpanel-local
 
 ##### 启动容器
 
-> 如果不需要设置容器的域名转发功能，可不暴露 80 及 443 端口 \
-> 也可以暴露到其它端口，比如 8808:80。则通过 http://域名:8808 进行转发
+> macos 下需要先将 docker.sock 文件 link 到 /var/run/docker.sock 目录中 \
+> ln -s -f /Users/用户/.docker/run/docker.sock  /var/run/docker.sock
 
 ```
 docker run -it -d --name dpanel \
