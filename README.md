@@ -19,7 +19,11 @@ docker network create dpanel-local
 > 也可以暴露到其它端口，比如 8808:80。则通过 http://域名:8808 进行转发
 
 ```
-docker run -it -d --name dpanel -p 80:80 -p 443:443 -p 8807:8080 --network dpanel-local -v /var/run/docker.sock:/var/run/docker.sock donknap/dpanel:latest
+docker run -it -d --name dpanel \
+ -p 80:80 -p 443:443 -p 8807:8080 --network dpanel-local \
+ -v /var/run/docker.sock:/var/run/docker.sock \
+ -v dpanel:/dpanel
+ donknap/dpanel:latest
 ```
 
 ### 默认帐号
