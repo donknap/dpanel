@@ -162,8 +162,12 @@ func (self SiteDomain) GetList(http *gin.Context) {
 	if params.PageSize < 1 {
 		params.PageSize = 10
 	}
-
-	query := dao.SiteDomain.Order(dao.SiteDomain.ID.Desc()).Where(dao.SiteDomain.ContainerID.Eq(params.ContainerId))
+	containerRow, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	query := dao.SiteDomain.Order(dao.SiteDomain.ID.Desc()).Where(dao.SiteDomain.ContainerID.Eq(strings.Trim(containerRow.Name, "/")))
 	if params.ServerName != "" {
 		query = query.Where(dao.SiteDomain.ServerName.Like("%" + params.ServerName + "%"))
 	}
