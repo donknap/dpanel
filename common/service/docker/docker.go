@@ -54,9 +54,11 @@ func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {
 			PortBindings: make(nat.PortMap),
 			NetworkMode:  "default",
 		},
-		platform:         &v1.Platform{},
-		networkingConfig: &network.NetworkingConfig{},
-		ctx:              context.Background(),
+		platform: &v1.Platform{},
+		networkingConfig: &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{},
+		},
+		ctx: context.Background(),
 	}
 	return builder
 }

@@ -38,6 +38,15 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 			}
 		}
 	}
+
+	if !function.IsEmptyArray(task.RunParams.Network) {
+		for _, value := range task.RunParams.Network {
+			for _, aliseName := range value.Alise {
+				builder.WithNetwork(value.Name, aliseName)
+			}
+		}
+	}
+
 	if !function.IsEmptyArray(task.RunParams.VolumesDefault) {
 		for _, item := range task.RunParams.VolumesDefault {
 			builder.WithDefaultVolume(item.Dest)

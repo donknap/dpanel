@@ -116,9 +116,8 @@ func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
 	options := make(map[string]string)
 	options["name"] = self.containerName
 	myNetwork, _ := Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, types.NetworkCreate{
-		CheckDuplicate: true,
-		Driver:         "bridge",
-		Options:        options,
+		Driver:  "bridge",
+		Options: options,
 	})
 	slog.Debug("create network", "name", myNetwork.ID)
 	// 关联网络时，重新退出加入
@@ -133,6 +132,15 @@ func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
 	})
 	if err != nil {
 		slog.Debug("join network", "name", myNetwork.ID, "error", err.Error())
+	}
+}
+
+func (self ContainerCreateBuilder) WithNetwork(name string, alise string) {
+	self.networkingConfig.EndpointsConfig[name] = &network.EndpointSettings{
+		NetworkID: name,
+		Aliases: []string{
+			alise,
+		},
 	}
 }
 
