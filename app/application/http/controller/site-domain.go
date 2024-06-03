@@ -20,9 +20,9 @@ import (
 
 var (
 	defaultNetworkName = "dpanel-local"
-	certFileName       = "/%s.pem"
-	keyFileName        = "/%s-key.pem"
-	vhostFileName      = "/%s.conf"
+	certFileName       = "%s.pem"
+	keyFileName        = "%s-key.pem"
+	vhostFileName      = "%s.conf"
 )
 
 type SiteDomain struct {
@@ -236,10 +236,9 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	}
 	list, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
 	for _, item := range list {
-		confFile := self.getNginxSettingPath() + fmt.Sprintf(vhostFileName, item.ServerName)
-		_ = os.Remove(confFile)
-		_ = os.Remove(self.getNginxCertPath() + fmt.Sprintf(certFileName, item.ServerName))
-		_ = os.Remove(self.getNginxCertPath() + fmt.Sprintf(keyFileName, item.ServerName))
+		go os.Remove(self.getNginxSettingPath() + fmt.Sprintf(vhostFileName, item.ServerName))
+		go os.Remove(self.getNginxCertPath() + fmt.Sprintf(certFileName, item.ServerName))
+		go os.Remove(self.getNginxCertPath() + fmt.Sprintf(keyFileName, item.ServerName))
 	}
 	_, err := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Delete()
 	if err != nil {
