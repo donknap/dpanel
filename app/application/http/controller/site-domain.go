@@ -20,6 +20,9 @@ import (
 
 var (
 	defaultNetworkName = "dpanel-local"
+	certFileName       = "/%s.pem"
+	keyFileName        = "/%s-key.pem"
+	vhostFileName      = "/%s.conf"
 )
 
 type SiteDomain struct {
@@ -82,18 +85,18 @@ func (self SiteDomain) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	vhostFile, err := os.OpenFile(self.getNginxSettingPath()+"/"+params.ServerName+".conf", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+	vhostFile, err := os.OpenFile(self.getNginxSettingPath()+fmt.Sprintf(vhostFileName, params.ServerName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
 		self.JsonResponseWithError(http, errors.New("nginx 配置目录不存在aqk"), 500)
 		return
 	}
 
-	err = os.WriteFile(self.getNginxCertPath()+"/"+params.ServerName+".pem", []byte(params.SslCrt), 0666)
+	err = os.WriteFile(self.getNginxCertPath()+fmt.Sprintf(certFileName, params.ServerName), []byte(params.SslCrt), 0666)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = os.WriteFile(self.getNginxCertPath()+"/"+params.ServerName+"-key.pem", []byte(params.SslKey), 0666)
+	err = os.WriteFile(self.getNginxCertPath()+fmt.Sprintf(keyFileName, params.ServerName), []byte(params.SslKey), 0666)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -177,6 +180,52 @@ func (self SiteDomain) GetList(http *gin.Context) {
 	return
 }
 
+func (self SiteDomain) GetDetail(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	domainRow, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(params.Id)).First()
+	if domainRow == nil {
+		self.JsonResponseWithError(http, errors.New("域名不存在"), 500)
+		return
+	}
+
+	vhost, err := os.ReadFile(self.getNginxSettingPath() + fmt.Sprintf(vhostFileName, domainRow.ServerName))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	var sslCert []byte
+	var sslKey []byte
+
+	if domainRow.Schema == "https" {
+		sslCert, err = os.ReadFile(self.getNginxCertPath() + fmt.Sprintf(certFileName, domainRow.ServerName))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		sslKey, err = os.ReadFile(self.getNginxCertPath() + fmt.Sprintf(keyFileName, domainRow.ServerName))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"domain":  domainRow,
+		"vhost":   string(vhost),
+		"sslCert": string(sslCert),
+		"sslKey":  string(sslKey),
+	})
+	return
+}
+
 func (self SiteDomain) Delete(http *gin.Context) {
 	type ParamsValidate struct {
 		Id []int32 `json:"id" binding:"required"`
@@ -187,8 +236,10 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	}
 	list, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
 	for _, item := range list {
-		confFile := self.getNginxSettingPath() + "/" + item.ServerName + ".conf"
+		confFile := self.getNginxSettingPath() + fmt.Sprintf(vhostFileName, item.ServerName)
 		_ = os.Remove(confFile)
+		_ = os.Remove(self.getNginxCertPath() + fmt.Sprintf(certFileName, item.ServerName))
+		_ = os.Remove(self.getNginxCertPath() + fmt.Sprintf(keyFileName, item.ServerName))
 	}
 	_, err := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Delete()
 	if err != nil {
