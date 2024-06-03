@@ -132,7 +132,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 	err = dao.SiteDomain.Create(&entity.SiteDomain{
 		ServerName:  params.ServerName,
 		Port:        params.Port,
-		ContainerID: containerRow.ID,
+		ContainerID: strings.Trim(containerRow.Name, "/"),
 		Schema:      params.Schema,
 	})
 	if err != nil {
