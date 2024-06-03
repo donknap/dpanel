@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -46,17 +47,17 @@ func (self *ContainerCreateBuilder) WithEnv(name string, value string) *Containe
 	return self
 }
 
-func (self *ContainerCreateBuilder) WithImage(image string, tryPullImage bool) {
+func (self *ContainerCreateBuilder) WithImage(imageName string, tryPullImage bool) {
 	// 只尝试从 docker.io 拉取
 	if tryPullImage {
-		reader, err := Sdk.Client.ImagePull(Sdk.Ctx, image, types.ImagePullOptions{})
+		reader, err := Sdk.Client.ImagePull(Sdk.Ctx, imageName, image.PullOptions{})
 		if err != nil {
 			self.err = err
 			return
 		}
 		io.Copy(os.Stdout, reader)
 	}
-	self.containerConfig.Image = image
+	self.containerConfig.Image = imageName
 	return
 }
 
