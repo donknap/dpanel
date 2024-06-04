@@ -5,6 +5,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -13,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"io"
+	"log/slog"
 	"strings"
 )
 
@@ -250,11 +252,10 @@ func (self Container) Delete(http *gin.Context) {
 		return
 	}
 	if params.DeleteImage {
-		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, containerInfo.Image, types.ImageRemoveOptions{})
-	}
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, containerInfo.Image, image.RemoveOptions{
+			Force:         true,
+			PruneChildren: true,
+		})
 	}
 
 	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
@@ -269,7 +270,8 @@ func (self Container) Delete(http *gin.Context) {
 			volumeList, _ := docker.Sdk.Client.VolumeList(docker.Sdk.Ctx, volume.ListOptions{})
 			for _, volueItem := range volumeList.Volumes {
 				if strings.HasPrefix(volueItem.Name, siteRow.SiteName) {
-					docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, volueItem.Name, false)
+					err = docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, volueItem.Name, false)
+					slog.Debug("remove container volume", err.Error())
 				}
 			}
 		}
