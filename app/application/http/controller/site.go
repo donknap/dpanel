@@ -192,6 +192,10 @@ func (self Site) GetDetail(http *gin.Context) {
 			ID: params.Md5,
 		})).First()
 	}
+	if params.Md5 == "" {
+		self.JsonResponseWithoutError(http, siteRow)
+		return
+	}
 	runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
