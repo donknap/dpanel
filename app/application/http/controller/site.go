@@ -192,6 +192,11 @@ func (self Site) GetDetail(http *gin.Context) {
 			ID: params.Md5,
 		})).First()
 	}
+	runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	// 站点不存在，返回容器那部分，并建立 env 字段的内容
 	if siteRow == nil {
 		info, err := docker.Sdk.ContainerInfo(params.Md5)
@@ -207,9 +212,14 @@ func (self Site) GetDetail(http *gin.Context) {
 			SiteTitle: info.Name,
 			SiteName:  info.Name,
 		}
-		runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
+
+		runOption.Command = ""
+		runOption.Entrypoint = ""
+		runOption.WorkDir = ""
 		siteRow.Env = &runOption
 	}
+	siteRow.Env.Network = runOption.Network
+
 	self.JsonResponseWithoutError(http, siteRow)
 	return
 }

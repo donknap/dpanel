@@ -22,11 +22,13 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 			builder.WithPort(value.Host, value.Dest)
 		}
 	}
+
 	if task.RunParams.Environment != nil {
 		for _, value := range task.RunParams.Environment {
 			builder.WithEnv(value.Name, value.Value)
 		}
 	}
+
 	if !function.IsEmptyArray(task.RunParams.Links) {
 		for _, value := range task.RunParams.Links {
 			if value.Alise == "" {
@@ -35,14 +37,6 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 			builder.WithLink(value.Name, value.Alise)
 			if value.Volume {
 				builder.WithContainerVolume(value.Name)
-			}
-		}
-	}
-
-	if !function.IsEmptyArray(task.RunParams.Network) {
-		for _, value := range task.RunParams.Network {
-			for _, aliseName := range value.Alise {
-				builder.WithNetwork(value.Name, aliseName)
 			}
 		}
 	}
@@ -108,6 +102,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		//notice.Message{}.Error("containerCreate", err.Error())
 		return err
 	}
+
 	// 仅当容器有关联时，才加新建自己的网络
 	if !function.IsEmptyArray(task.RunParams.Links) {
 		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, &network.EndpointSettings{
@@ -116,6 +111,24 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 			},
 		})
 	}
+
+	// 网络需要在创建好容器后统一 connect 否则 bridge 网络会消失。当网络变更后了，可能绑定的端口无法使用。
+	// 如果同时绑定多个网络，会以自定义的网络优先，默认的 bridge 网络将不会绑定
+	if !function.IsEmptyArray(task.RunParams.Network) {
+		for _, value := range task.RunParams.Network {
+			if value.Name == task.SiteName {
+				continue
+			}
+			for _, aliseName := range value.Alise {
+				err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, value.Name, response.ID, &network.EndpointSettings{
+					Aliases: []string{
+						aliseName,
+					},
+				})
+			}
+		}
+	}
+
 	if err != nil {
 		dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{
 			Status:  StatusError,
@@ -124,6 +137,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		//notice.Message{}.Error("containerCreate", err.Error())
 		return err
 	}
+
 	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
 	if err != nil {
 		dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{
@@ -133,6 +147,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		//notice.Message{}.Error("containerCreate", err.Error())
 		return err
 	}
+
 	dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(&entity.Site{
 		ContainerInfo: &accessor.SiteContainerInfoOption{
 			ID: response.ID,
@@ -140,6 +155,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		Status:  StatusSuccess,
 		Message: "",
 	})
+
 	notice.Message{}.Success("containerCreate", task.SiteName)
 	return nil
 }
