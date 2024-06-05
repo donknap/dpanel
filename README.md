@@ -14,7 +14,7 @@ docker network create dpanel-local
 > ln -s -f /Users/用户/.docker/run/docker.sock  /var/run/docker.sock
 
 ```
-docker run -it -d --name dpanel \
+docker run -it -d --name dpanel --restart=always \
  -p 80:80 -p 443:443 -p 8807:8080 --network dpanel-local \
  -v /var/run/docker.sock:/var/run/docker.sock \
  donknap/dpanel:latest
