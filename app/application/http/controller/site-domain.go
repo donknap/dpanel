@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
@@ -112,6 +113,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		EnableWs                  bool
 		ExtraNginx                template.HTML
 		EnableSSL                 bool
+		TargetName                string
 	}
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
 	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", tplParams{
@@ -123,6 +125,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		EnableAssetCache:          params.EnableAssetCache,
 		ExtraNginx:                template.HTML(params.ExtraNginx),
 		EnableSSL:                 params.Schema == "https",
+		TargetName:                function.GetMd5(hostname),
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

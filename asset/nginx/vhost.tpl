@@ -2,7 +2,7 @@ map $scheme $hsts_header {
     https   "max-age=63072000; preload";
 }
 
-upstream target {
+upstream {{.TargetName}} {
   server {{.ServerAddress}}:{{.Port}};
 }
 
@@ -49,6 +49,8 @@ server {
   proxy_http_version 1.1;
   {{end}}
 
+ {{.ExtraNginx}}
+
   location / {
     {{if .EnableWs}}
     proxy_set_header Upgrade $http_upgrade;
@@ -62,8 +64,7 @@ server {
     proxy_set_header X-Forwarded-Proto  $scheme;
     proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
     proxy_set_header X-Real-IP          $remote_addr;
-    proxy_pass       $forward_scheme://target$request_uri;
+    proxy_pass       $forward_scheme://{{.TargetName}}$request_uri;
   }
 
-  {{.ExtraNginx}}
 }
