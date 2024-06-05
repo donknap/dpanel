@@ -32,6 +32,11 @@ https://donknap.github.io/dpanel-docs
 
 <img src="https://github.com/donknap/dpanel-docs/blob/master/storage/image/qq.png?raw=true" width="300" />
 
+#### 界面预览
+
+![home.png](https://s2.loli.net/2024/05/22/Q14SEiR7z2uOHTX.png)
+![app-list.png](https://s2.loli.net/2024/05/25/P1RTvFtiwYOB6Hn.png)
+
 #### 相关仓库
 
 - 镜像构建基础模板 https://github.com/donknap/dpanel-base-image 
