@@ -16,7 +16,7 @@ docker network create dpanel-local
 ```
 docker run -it -d --name dpanel \
  -p 80:80 -p 443:443 -p 8807:8080 --network dpanel-local \
- -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
+ -v /var/run/docker.sock:/var/run/docker.sock \
  donknap/dpanel:latest
 ```
 
