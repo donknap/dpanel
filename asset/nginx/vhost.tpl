@@ -56,8 +56,9 @@ server {
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $http_connection;
     proxy_http_version 1.1;
-    add_header       X-Served-By $host;
     {{end}}
+
+    add_header       X-Served-By $host;
 
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Scheme $scheme;
