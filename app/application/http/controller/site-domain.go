@@ -125,7 +125,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		EnableAssetCache:          params.EnableAssetCache,
 		ExtraNginx:                template.HTML(params.ExtraNginx),
 		EnableSSL:                 params.Schema == "https",
-		TargetName:                function.GetMd5(hostname),
+		TargetName:                function.GetMd5(params.ServerName),
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
