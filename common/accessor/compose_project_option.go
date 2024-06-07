@@ -1,5 +1,5 @@
 package accessor
 
 type ComposeProjectOption struct {
-	Project []string
+	List map[string]string `json:"list"`
 }

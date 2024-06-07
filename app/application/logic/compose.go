@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/creack/pty"
+	"github.com/donknap/dpanel/common/service/docker"
 	"gopkg.in/yaml.v3"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 )
@@ -23,18 +25,15 @@ type ComposeTask struct {
 	DeleteImage bool
 }
 
-type composeProgress struct {
-	Step string `json:"step"`
-}
-type Compose struct {
-}
-
 type writer struct {
 }
 
-func (w *writer) Write(p []byte) (n int, err error) {
-	fmt.Printf("%v \n", string(p))
+func (self *writer) Write(p []byte) (n int, err error) {
+	docker.QueueDockerComposeMessage <- string(p)
 	return len(p), nil
+}
+
+type Compose struct {
 }
 
 func (self Compose) GetYaml(yamlStr string) (*dockerComposeYamlV2, error) {
@@ -46,47 +45,32 @@ func (self Compose) GetYaml(yamlStr string) (*dockerComposeYamlV2, error) {
 	return yamlObj, nil
 }
 
-func (self Compose) Deploy(task *ComposeTask) (*composeProgress, error) {
+func (self Compose) Deploy(task *ComposeTask) error {
+	myWrite := &writer{}
 	yamlFile, _ := os.CreateTemp("", "dpanel-compose")
 	err := os.WriteFile(yamlFile.Name(), []byte(task.Yaml), 0666)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer os.Remove(yamlFile.Name())
-
-	cmd := exec.Command("docker-compose", []string{
-		"-f",
-		yamlFile.Name(),
-		"-p",
-		task.SiteName,
-		"--progress",
-		"tty",
-		"up",
-		"-d",
-	}...)
-	f, err := pty.Start(cmd)
-
-	myWrite := &writer{}
-	io.Copy(myWrite, f)
-	//progressOut, err := cmd.StderrPipe()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//cmd.Start()
-	//result := &composeProgress{}
-	//reader := bufio.NewReaderSize(progressOut, 8192)
-	//for {
-	//	line, _, err := reader.ReadLine()
-	//	if err == io.EOF {
-	//		return result, nil
-	//	} else {
-	//		fmt.Printf("%v \n", string(line))
-	//	}
-	//}
-	//cmd.Wait()
-	//
-	return nil, nil
+	go func() {
+		cmd := exec.Command("docker-compose", []string{
+			"-f",
+			yamlFile.Name(),
+			"-p",
+			task.SiteName,
+			"--progress",
+			"tty",
+			"up",
+			"-d",
+		}...)
+		out, err := pty.Start(cmd)
+		if err != nil {
+			slog.Debug("docker-compose up", err.Error())
+		}
+		io.Copy(myWrite, out)
+		os.Remove(yamlFile.Name())
+	}()
+	return nil
 }
 
 func (self Compose) Uninstall(task *ComposeTask) error {

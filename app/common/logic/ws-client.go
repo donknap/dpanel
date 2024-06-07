@@ -129,6 +129,12 @@ func (self *Client) SendMessage() {
 				Data: message,
 			}
 			self.sendMessage(data)
+		case message := <-docker.QueueDockerComposeMessage:
+			data := &respMessage{
+				Type: "composeUp",
+				Data: message,
+			}
+			self.sendMessage(data)
 		case message := <-notice.QueueNoticePushMessage:
 			data := &respMessage{
 				Type: "notice",

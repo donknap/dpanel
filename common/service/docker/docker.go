@@ -17,6 +17,7 @@ var (
 	Sdk, _                          = NewDockerClient()
 	QueueDockerProgressMessage      = make(chan *Progress, 999)
 	QueueDockerImageDownloadMessage = make(chan map[string]*ProgressDownloadImage, 999)
+	QueueDockerComposeMessage       = make(chan string, 999)
 	BuilderAuthor                   = "DPanel"
 	BuildDesc                       = "DPanel is an open source docker web management panel that provides image building and deployment"
 	BuildWebSite                    = "https://github.com/donknap/dpanel, https://phpey.net"
