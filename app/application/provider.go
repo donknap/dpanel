@@ -89,6 +89,12 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/volume/prune", controller.Volume{}.Prune)
 			cors.POST("/app/volume/create", controller.Volume{}.Create)
 			cors.POST("/app/volume/delete", controller.Volume{}.Delete)
+
+			// Compose 相关
+			cors.POST("/app/compose/create", controller.Compose{}.Create)
+			cors.POST("/app/compose/deploy", controller.Compose{}.Deploy)
+			cors.POST("/app/compose/uninstall", controller.Compose{}.Uninstall)
+			cors.POST("/app/compose/get-list", controller.Compose{}.GetList)
 		},
 	)
 }
