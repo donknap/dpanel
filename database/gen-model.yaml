@@ -6,9 +6,6 @@ relation:
       env:
         serializer: json
         type: SiteEnvOption
-      site_url_ext:
-        serializer: json
-        type: SiteUrlExtOption
       container_info:
         type: SiteContainerInfoOption
   - table: ims_image
@@ -24,3 +21,8 @@ relation:
   - table: ims_event
   - table: ims_notice
   - table: ims_site_domain
+  - table: ims_compose
+    column:
+      project:
+        serializer: json
+        type: ComposeProjectOption
