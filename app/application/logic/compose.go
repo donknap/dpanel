@@ -1,8 +1,6 @@
 package logic
 
 import (
-	"bufio"
-	"fmt"
 	"github.com/creack/pty"
 	"github.com/donknap/dpanel/common/service/docker"
 	"gopkg.in/yaml.v3"
@@ -52,61 +50,52 @@ func (self Compose) Deploy(task *ComposeTask) error {
 	if err != nil {
 		return err
 	}
-	go func() {
-		cmd := exec.Command("docker-compose", []string{
-			"-f",
-			yamlFile.Name(),
-			"-p",
-			task.SiteName,
-			"--progress",
-			"tty",
-			"up",
-			"-d",
-		}...)
-		out, err := pty.Start(cmd)
-		if err != nil {
-			slog.Debug("docker-compose up", err.Error())
-		}
-		io.Copy(myWrite, out)
-		os.Remove(yamlFile.Name())
-	}()
+
+	cmd := exec.Command("docker-compose", []string{
+		"-f",
+		yamlFile.Name(),
+		"-p",
+		task.SiteName,
+		"--progress",
+		"tty",
+		"up",
+		"-d",
+	}...)
+	out, err := pty.Start(cmd)
+	if err != nil {
+		slog.Debug("docker-compose up", err.Error())
+	}
+	io.Copy(myWrite, out)
+	os.Remove(yamlFile.Name())
 	return nil
 }
 
 func (self Compose) Uninstall(task *ComposeTask) error {
+	myWrite := &writer{}
 	yamlFile, _ := os.CreateTemp("", "dpanel-compose")
 	err := os.WriteFile(yamlFile.Name(), []byte(task.Yaml), 0666)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(yamlFile.Name())
 
 	command := []string{
 		"-f",
 		yamlFile.Name(),
 		"-p",
 		task.SiteName,
+		"--progress",
+		"tty",
 		"down",
 	}
 	if task.DeleteImage {
 		command = append(command, "--rmi", "all")
 	}
 	cmd := exec.Command("docker-compose", command...)
-
-	progressOut, err := cmd.StderrPipe()
+	out, err := pty.Start(cmd)
 	if err != nil {
-		return err
+		slog.Debug("docker-compose up", err.Error())
 	}
-	cmd.Start()
-	reader := bufio.NewReaderSize(progressOut, 8192)
-	for {
-		line, _, err := reader.ReadLine()
-		if err == io.EOF {
-			return nil
-		} else {
-			fmt.Printf("%v \n", string(line))
-		}
-	}
-	cmd.Wait()
+	io.Copy(myWrite, out)
+	os.Remove(yamlFile.Name())
 	return nil
 }

@@ -4,18 +4,14 @@
 
 package entity
 
-import (
-	"github.com/donknap/dpanel/common/accessor"
-)
-
 const TableNameCompose = "ims_compose"
 
 // Compose mapped from table <ims_compose>
 type Compose struct {
-	ID      int32                          `gorm:"column:id;type:INTEGER" json:"id"`
-	Title   string                         `gorm:"column:title" json:"title"`
-	Yaml    string                         `gorm:"column:yaml" json:"yaml"`
-	Project *accessor.ComposeProjectOption `gorm:"column:project;serializer:json" json:"project"`
+	ID    int32  `gorm:"column:id;type:INTEGER" json:"id"`
+	Title string `gorm:"column:title" json:"title"`
+	Yaml  string `gorm:"column:yaml" json:"yaml"`
+	Name  string `gorm:"column:name" json:"name"`
 }
 
 // TableName Compose's table name

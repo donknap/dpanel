@@ -95,6 +95,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/compose/deploy", controller.Compose{}.Deploy)
 			cors.POST("/app/compose/uninstall", controller.Compose{}.Uninstall)
 			cors.POST("/app/compose/get-list", controller.Compose{}.GetList)
+			cors.POST("/app/compose/get-detail", controller.Compose{}.GetDetail)
 		},
 	)
 }

@@ -30,7 +30,7 @@ func newCompose(db *gorm.DB, opts ...gen.DOOption) compose {
 	_compose.ID = field.NewInt32(tableName, "id")
 	_compose.Title = field.NewString(tableName, "title")
 	_compose.Yaml = field.NewString(tableName, "yaml")
-	_compose.Project = field.NewField(tableName, "project")
+	_compose.Name = field.NewString(tableName, "name")
 
 	_compose.fillFieldMap()
 
@@ -40,11 +40,11 @@ func newCompose(db *gorm.DB, opts ...gen.DOOption) compose {
 type compose struct {
 	composeDo
 
-	ALL     field.Asterisk
-	ID      field.Int32
-	Title   field.String
-	Yaml    field.String
-	Project field.Field
+	ALL   field.Asterisk
+	ID    field.Int32
+	Title field.String
+	Yaml  field.String
+	Name  field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -64,7 +64,7 @@ func (c *compose) updateTableName(table string) *compose {
 	c.ID = field.NewInt32(table, "id")
 	c.Title = field.NewString(table, "title")
 	c.Yaml = field.NewString(table, "yaml")
-	c.Project = field.NewField(table, "project")
+	c.Name = field.NewString(table, "name")
 
 	c.fillFieldMap()
 
@@ -85,7 +85,7 @@ func (c *compose) fillFieldMap() {
 	c.fieldMap["id"] = c.ID
 	c.fieldMap["title"] = c.Title
 	c.fieldMap["yaml"] = c.Yaml
-	c.fieldMap["project"] = c.Project
+	c.fieldMap["name"] = c.Name
 }
 
 func (c compose) clone(db *gorm.DB) compose {

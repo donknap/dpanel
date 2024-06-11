@@ -22,7 +22,3 @@ relation:
   - table: ims_notice
   - table: ims_site_domain
   - table: ims_compose
-    column:
-      project:
-        serializer: json
-        type: ComposeProjectOption

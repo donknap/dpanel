@@ -3,7 +3,6 @@ package controller
 import (
 	"errors"
 	"github.com/donknap/dpanel/app/application/logic"
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/gin-gonic/gin"
@@ -17,6 +16,7 @@ type Compose struct {
 func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
 		Title string `json:"title" binding:"required"`
+		Name  string `json:"name" binding:"required"`
 		Yaml  string `json:"yaml" binding:"required"`
 		Id    int32  `json:"id"`
 	}
@@ -24,22 +24,30 @@ func (self Compose) Create(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+
+	if params.Id > 0 {
+		yamlRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+		if yamlRow == nil {
+			self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
+			return
+		}
+	} else {
+		yamlExist, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
+		if yamlExist != nil {
+			self.JsonResponseWithError(http, errors.New("站点标识已经存在，请更换"), 500)
+			return
+		}
+	}
+
 	_, err := logic.Compose{}.GetYaml(params.Yaml)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.Id > 0 {
-		yamlRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
-		if yamlRow == nil {
-			self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
-			return
-		}
-
-	}
 	yamlRow := &entity.Compose{
 		Title: params.Title,
 		Yaml:  params.Yaml,
+		Name:  params.Name,
 	}
 	if params.Id > 0 {
 		_, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).Updates(yamlRow)
@@ -54,8 +62,7 @@ func (self Compose) Create(http *gin.Context) {
 
 func (self Compose) Deploy(http *gin.Context) {
 	type ParamsValidate struct {
-		Id       int32  `json:"id" binding:"required"`
-		SiteName string `json:"siteName" binding:"required"`
+		Id int32 `json:"id" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -67,27 +74,8 @@ func (self Compose) Deploy(http *gin.Context) {
 		return
 	}
 
-	if composeRow.Project == nil {
-		composeRow.Project = &accessor.ComposeProjectOption{
-			List: make(map[string]string),
-		}
-	}
-
-	if _, ok := composeRow.Project.List[params.SiteName]; ok {
-		self.JsonResponseWithError(http, errors.New("站点已经存在，请更新标识"), 500)
-		return
-	}
-	composeRow.Project.List[params.SiteName] = "true"
-
-	// 添加一个构建项目
-	dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).Updates(&entity.Compose{
-		Project: &accessor.ComposeProjectOption{
-			List: composeRow.Project.List,
-		},
-	})
-
 	err := logic.Compose{}.Deploy(&logic.ComposeTask{
-		SiteName: params.SiteName,
+		SiteName: composeRow.Name,
 		Yaml:     composeRow.Yaml,
 	})
 	if err != nil {
@@ -100,9 +88,8 @@ func (self Compose) Deploy(http *gin.Context) {
 
 func (self Compose) Uninstall(http *gin.Context) {
 	type ParamsValidate struct {
-		Id          int32  `json:"id" binding:"required"`
-		SiteName    string `json:"siteName" binding:"required"`
-		DeleteImage bool   `json:"deleteImage"`
+		Id          int32 `json:"id" binding:"required"`
+		DeleteImage bool  `json:"deleteImage"`
 	}
 
 	params := ParamsValidate{}
@@ -115,11 +102,17 @@ func (self Compose) Uninstall(http *gin.Context) {
 		return
 	}
 
-	logic.Compose{}.Uninstall(&logic.ComposeTask{
-		SiteName:    params.SiteName,
+	err := logic.Compose{}.Uninstall(&logic.ComposeTask{
+		SiteName:    composeRow.Name,
 		Yaml:        composeRow.Yaml,
 		DeleteImage: params.DeleteImage,
 	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
+	return
 }
 
 func (self Compose) GetList(http *gin.Context) {
@@ -151,5 +144,22 @@ func (self Compose) GetList(http *gin.Context) {
 		"page":  params.Page,
 		"list":  list,
 	})
+	return
+}
+
+func (self Compose) GetDetail(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	yamlRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	if yamlRow == nil {
+		self.JsonResponseWithError(http, errors.New("站点标识已经存在，请更换"), 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, yamlRow)
 	return
 }
