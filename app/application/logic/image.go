@@ -1,5 +1,7 @@
 package logic
 
+import "strings"
+
 type Image struct {
 }
 
@@ -14,6 +16,14 @@ func (self Image) GetImageName(option *ImageNameOption) (imageName string) {
 	if option.Name == "" {
 		return imageName
 	}
+	if strings.Contains(imageName, ":") {
+		s := strings.Split(imageName, ":")
+		if option.Version == "" {
+			option.Version = s[1]
+		}
+		imageName = s[0]
+	}
+
 	if option.Registry != "" {
 		imageName = option.Registry + "/" + option.Name
 	}

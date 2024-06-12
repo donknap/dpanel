@@ -2,7 +2,7 @@ package logic
 
 import (
 	"fmt"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -76,11 +76,11 @@ func (self DockerTask) ImageRemote(task *ImageRemoteMessage) error {
 	var err error
 	var out io.ReadCloser
 	if task.Type == "pull" {
-		out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, task.Tag, types.ImagePullOptions{
+		out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, task.Tag, image.PullOptions{
 			RegistryAuth: task.Auth,
 		})
 	} else {
-		out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, task.Tag, types.ImagePushOptions{
+		out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, task.Tag, image.PushOptions{
 			RegistryAuth: task.Auth,
 		})
 	}

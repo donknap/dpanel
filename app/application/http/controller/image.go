@@ -222,7 +222,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
 	if imageRow == nil {
 		imageRow = imageNew
-		dao.Image.Create(imageRow)
+
 	} else {
 		// 如果已经构建过，先查找一下旧镜像，新加一个标签，避免变成 none 标签
 		_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
@@ -246,6 +246,9 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	dao.Image.Create(imageRow)
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"imageId": imageRow.ID,
 	})

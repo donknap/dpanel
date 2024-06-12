@@ -10,6 +10,8 @@ import (
 	"os/exec"
 )
 
+var cmd *exec.Cmd
+
 type dockerComposeYamlV2 struct {
 	Service map[string]struct {
 		Image string `yaml:"image"`
@@ -114,10 +116,16 @@ func (self Compose) Ls(projectName string) error {
 	return nil
 }
 
+func (self Compose) Kill() error {
+	if cmd != nil {
+		return cmd.Process.Kill()
+	}
+	return nil
+}
+
 func (self Compose) runCommand(command []string) {
 	myWrite := &writer{}
-
-	cmd := exec.Command("docker-compose", command...)
+	cmd = exec.Command("docker-compose", command...)
 	out, err := pty.Start(cmd)
 	if err != nil {
 		slog.Debug("docker-compose up", err.Error())

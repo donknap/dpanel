@@ -89,3 +89,13 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 	self.JsonSuccessResponse(http)
 	return
 }
+
+func (self Compose) ContainerProcessKill(http *gin.Context) {
+	err := logic.Compose{}.Kill()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
