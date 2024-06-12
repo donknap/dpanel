@@ -60,72 +60,19 @@ func (self Compose) Create(http *gin.Context) {
 	return
 }
 
-func (self Compose) Deploy(http *gin.Context) {
-	type ParamsValidate struct {
-		Id int32 `json:"id" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	composeRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
-	if composeRow == nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
-		return
-	}
-
-	err := logic.Compose{}.Deploy(&logic.ComposeTask{
-		SiteName: composeRow.Name,
-		Yaml:     composeRow.Yaml,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Compose) Uninstall(http *gin.Context) {
-	type ParamsValidate struct {
-		Id          int32 `json:"id" binding:"required"`
-		DeleteImage bool  `json:"deleteImage"`
-	}
-
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	composeRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
-	if composeRow == nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
-		return
-	}
-
-	err := logic.Compose{}.Uninstall(&logic.ComposeTask{
-		SiteName:    composeRow.Name,
-		Yaml:        composeRow.Yaml,
-		DeleteImage: params.DeleteImage,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
 func (self Compose) GetList(http *gin.Context) {
 	type ParamsValidate struct {
 		Page     int    `json:"page,default=1" binding:"omitempty,gt=0"`
 		PageSize int    `json:"pageSize" binding:"omitempty"`
 		Title    string `json:"title"`
+		Name     string `json:"name"`
 	}
 
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+
 	if params.Page < 1 {
 		params.Page = 1
 	}
@@ -136,6 +83,9 @@ func (self Compose) GetList(http *gin.Context) {
 	query := dao.Compose.Order(dao.Compose.ID.Desc())
 	if params.Title != "" {
 		query = query.Where(dao.Compose.Title.Like("%" + params.Title + "%"))
+	}
+	if params.Name != "" {
+		query = query.Where(dao.Compose.Name.Like("%" + params.Name + "%"))
 	}
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
 
@@ -161,5 +111,22 @@ func (self Compose) GetDetail(http *gin.Context) {
 		return
 	}
 	self.JsonResponseWithoutError(http, yamlRow)
+	return
+}
+
+func (self Compose) Delete(http *gin.Context) {
+	type ParamsValidate struct {
+		Id []int32 `form:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	_, err := dao.Compose.Where(dao.Compose.ID.In(params.Id...)).Delete()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
 	return
 }
