@@ -30,7 +30,7 @@ func (self Registry) Create(http *gin.Context) {
 		return
 	}
 
-	if params.Id == 0 {
+	if params.Id <= 0 {
 		registryRow, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(params.ServerAddress)).First()
 		if registryRow != nil {
 			self.JsonResponseWithError(http, errors.New("仓库已经存在"), 500)
@@ -69,7 +69,7 @@ func (self Registry) Create(http *gin.Context) {
 	code, _ := function.AseEncode(key, params.Password)
 	registryNew.Password = code
 
-	if params.Id == 0 {
+	if params.Id <= 0 {
 		dao.Registry.Create(registryNew)
 	} else {
 		dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).Updates(registryNew)
