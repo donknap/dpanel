@@ -30,6 +30,8 @@ https://donknap.github.io/dpanel-docs
 
 #### 交流群
 
+QQ: 837583876
+
 <img src="https://github.com/donknap/dpanel-docs/blob/master/storage/image/qq.png?raw=true" width="300" />
 
 #### 界面预览
