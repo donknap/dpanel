@@ -44,14 +44,12 @@ func (self Compose) GetYaml(yamlStr string) (*dockerComposeYamlV2, error) {
 }
 
 func (self Compose) Deploy(task *ComposeTask) error {
-	myWrite := &writer{}
 	yamlFile, _ := os.CreateTemp("", "dpanel-compose")
 	err := os.WriteFile(yamlFile.Name(), []byte(task.Yaml), 0666)
 	if err != nil {
 		return err
 	}
-
-	cmd := exec.Command("docker-compose", []string{
+	self.runCommand([]string{
 		"-f",
 		yamlFile.Name(),
 		"-p",
@@ -60,24 +58,16 @@ func (self Compose) Deploy(task *ComposeTask) error {
 		"tty",
 		"up",
 		"-d",
-	}...)
-	out, err := pty.Start(cmd)
-	if err != nil {
-		slog.Debug("docker-compose up", err.Error())
-	}
-	io.Copy(myWrite, out)
+	})
 	os.Remove(yamlFile.Name())
 	return nil
 }
 
-func (self Compose) Uninstall(task *ComposeTask) error {
-	myWrite := &writer{}
-	yamlFile, _ := os.CreateTemp("", "dpanel-compose")
-	err := os.WriteFile(yamlFile.Name(), []byte(task.Yaml), 0666)
+func (self Compose) Destroy(task *ComposeTask) error {
+	yamlFile, err := self.getYamlFile(task.Yaml)
 	if err != nil {
 		return err
 	}
-
 	command := []string{
 		"-f",
 		yamlFile.Name(),
@@ -90,12 +80,56 @@ func (self Compose) Uninstall(task *ComposeTask) error {
 	if task.DeleteImage {
 		command = append(command, "--rmi", "all")
 	}
+	self.runCommand(command)
+	os.Remove(yamlFile.Name())
+	return nil
+}
+
+func (self Compose) Ctrl(task *ComposeTask, op string) error {
+	yamlFile, err := self.getYamlFile(task.Yaml)
+	if err != nil {
+		return err
+	}
+	command := []string{
+		"-f",
+		yamlFile.Name(),
+		"-p",
+		task.SiteName,
+		"--progress",
+		"tty",
+		op,
+	}
+	self.runCommand(command)
+	os.Remove(yamlFile.Name())
+	return nil
+}
+
+func (self Compose) Ls(projectName string) error {
+	command := []string{
+		"ls",
+		"--filter",
+		"name=" + projectName,
+	}
+	self.runCommand(command)
+	return nil
+}
+
+func (self Compose) runCommand(command []string) {
+	myWrite := &writer{}
+
 	cmd := exec.Command("docker-compose", command...)
 	out, err := pty.Start(cmd)
 	if err != nil {
 		slog.Debug("docker-compose up", err.Error())
 	}
 	io.Copy(myWrite, out)
-	os.Remove(yamlFile.Name())
-	return nil
+}
+
+func (self Compose) getYamlFile(yamlContent string) (*os.File, error) {
+	yamlFile, _ := os.CreateTemp("", "dpanel-compose")
+	err := os.WriteFile(yamlFile.Name(), []byte(yamlContent), 0666)
+	if err != nil {
+		return nil, err
+	}
+	return yamlFile, nil
 }

@@ -110,6 +110,7 @@ func (self Compose) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("站点标识已经存在，请更换"), 500)
 		return
 	}
+	logic.Compose{}.Ls(yamlRow.Name)
 	self.JsonResponseWithoutError(http, yamlRow)
 	return
 }
