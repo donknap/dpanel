@@ -59,6 +59,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/image/get-list-build", controller.Image{}.GetListBuild)
 			cors.POST("/app/image/get-build-task", controller.Image{}.GetBuildTask)
 			cors.POST("/app/image/delete-build-task", controller.Image{}.DeleteBuildTask)
+			cors.POST("/app/image/update-title", controller.Image{}.UpdateTitle)
 
 			// 文件相关
 			engine.POST("/app/explorer/export", controller.Explorer{}.Export)
@@ -92,10 +93,12 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 			// Compose 相关
 			cors.POST("/app/compose/create", controller.Compose{}.Create)
-			cors.POST("/app/compose/deploy", controller.Compose{}.Deploy)
-			cors.POST("/app/compose/uninstall", controller.Compose{}.Uninstall)
 			cors.POST("/app/compose/get-list", controller.Compose{}.GetList)
 			cors.POST("/app/compose/get-detail", controller.Compose{}.GetDetail)
+			cors.POST("/app/compose/delete", controller.Compose{}.Delete)
+
+			cors.POST("/app/compose/container-deploy", controller.Compose{}.ContainerDeploy)
+			cors.POST("/app/compose/container-destroy", controller.Compose{}.ContainerDestroy)
 		},
 	)
 }

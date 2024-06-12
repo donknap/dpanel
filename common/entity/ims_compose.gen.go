@@ -8,7 +8,7 @@ const TableNameCompose = "ims_compose"
 
 // Compose mapped from table <ims_compose>
 type Compose struct {
-	ID    int32  `gorm:"column:id;type:INTEGER" json:"id"`
+	ID    int32  `gorm:"column:id;primaryKey" json:"id"`
 	Title string `gorm:"column:title" json:"title"`
 	Yaml  string `gorm:"column:yaml" json:"yaml"`
 	Name  string `gorm:"column:name" json:"name"`

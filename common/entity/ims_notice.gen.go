@@ -12,7 +12,7 @@ const TableNameNotice = "ims_notice"
 
 // Notice mapped from table <ims_notice>
 type Notice struct {
-	ID        int32     `gorm:"column:id;type:INTEGER" json:"id"`
+	ID        int32     `gorm:"column:id;primaryKey" json:"id"`
 	Type      string    `gorm:"column:type" json:"type"`
 	Title     string    `gorm:"column:title" json:"title"`
 	Message   string    `gorm:"column:message" json:"message"`

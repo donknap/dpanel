@@ -13,7 +13,7 @@ const TableNameSite = "ims_site"
 
 // Site mapped from table <ims_site>
 type Site struct {
-	ID            int32                             `gorm:"column:id;type:INTEGER" json:"id"`
+	ID            int32                             `gorm:"column:id;primaryKey" json:"id"`
 	SiteTitle     string                            `gorm:"column:site_title" json:"siteTitle"`
 	SiteName      string                            `gorm:"column:site_name" json:"siteName"`
 	Env           *accessor.SiteEnvOption           `gorm:"column:env;serializer:json" json:"env"`

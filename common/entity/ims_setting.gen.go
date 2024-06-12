@@ -12,7 +12,7 @@ const TableNameSetting = "ims_setting"
 
 // Setting mapped from table <ims_setting>
 type Setting struct {
-	ID        int32                        `gorm:"column:id;type:INTEGER" json:"id"`
+	ID        int32                        `gorm:"column:id;primaryKey" json:"id"`
 	GroupName string                       `gorm:"column:group_name" json:"groupName"`
 	Name      string                       `gorm:"column:name" json:"name"`
 	Value     *accessor.SettingValueOption `gorm:"column:value;serializer:json" json:"value"`

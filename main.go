@@ -52,14 +52,14 @@ func main() {
 
 	// 同步数据库
 	db.Migrator().AutoMigrate(
-		&entity.Event{},
-		&entity.Image{},
-		&entity.Notice{},
-		&entity.Registry{},
-		&entity.Setting{},
-		&entity.Site{},
-		&entity.SiteDomain{},
-		&entity.Compose{},
+	//&entity.Event{},
+	//&entity.Image{},
+	//&entity.Notice{},
+	//&entity.Registry{},
+	//&entity.Setting{},
+	//&entity.Site{},
+	//&entity.SiteDomain{},
+	//&entity.Compose{},
 	)
 	// 如果没有管理配置新建一条
 	founderSetting, _ := dao.Setting.

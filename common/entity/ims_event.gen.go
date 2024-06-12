@@ -8,7 +8,7 @@ const TableNameEvent = "ims_event"
 
 // Event mapped from table <ims_event>
 type Event struct {
-	ID        int32  `gorm:"column:id;type:INTEGER" json:"id"`
+	ID        int32  `gorm:"column:id;primaryKey" json:"id"`
 	Type      string `gorm:"column:type" json:"type"`
 	Action    string `gorm:"column:action" json:"action"`
 	Message   string `gorm:"column:message" json:"message"`

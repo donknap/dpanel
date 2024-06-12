@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/entity"
 	"github.com/gin-gonic/gin"
 )
 
@@ -44,8 +45,9 @@ func (self Image) DeleteBuildTask(http *gin.Context) {
 
 func (self Image) GetListBuild(http *gin.Context) {
 	type ParamsValidate struct {
-		Page     int `form:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize int `form:"pageSize" binding:"omitempty,gt=1"`
+		Page     int  `form:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize int  `form:"pageSize" binding:"omitempty,gt=1"`
+		All      bool `json:"all"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -59,11 +61,39 @@ func (self Image) GetListBuild(http *gin.Context) {
 	}
 
 	query := dao.Image.Order(dao.Image.ID.Desc())
+	if !params.All {
+		query = query.Where(dao.Image.BuildType.Neq("pull"))
+	}
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
 	self.JsonResponseWithoutError(http, gin.H{
 		"total": total,
 		"page":  params.Page,
 		"list":  list,
 	})
+	return
+}
+
+func (self Image) UpdateTitle(http *gin.Context) {
+	type ParamsValidate struct {
+		Tag   string `json:"tag" binding:"required"`
+		Title string `json:"title" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	imageBuildRow, _ := dao.Image.Where(dao.Image.Tag.Eq(params.Tag)).First()
+	if imageBuildRow != nil {
+		dao.Image.Where(dao.Image.Tag.Eq(params.Tag)).Updates(&entity.Image{
+			Title: params.Title,
+		})
+	} else {
+		dao.Image.Create(&entity.Image{
+			Title:     params.Title,
+			Tag:       params.Tag,
+			BuildType: "pull",
+		})
+	}
+	self.JsonSuccessResponse(http)
 	return
 }

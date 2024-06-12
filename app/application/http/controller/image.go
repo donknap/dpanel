@@ -146,12 +146,12 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		Id              int32  `form:"id"`
 		Registry        string `form:"registry"`
 		Tag             string `form:"tag" binding:"required"`
+		Title           string `json:"title"`
 		BuildType       string `form:"buildType" binding:"required"`
 		BuildDockerfile string `form:"buildDockerfile" binding:"omitempty"`
 		BuildGit        string `form:"buildGit" binding:"omitempty"`
 		BuildZip        string `form:"buildZip" binding:"omitempty"`
 		BuildRoot       string `form:"buildRoot" binding:"omitempty"`
-		BuildTemplate   string `form:"buildTemplate" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -165,12 +165,15 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("zip 包和 git 地址只需要只定一项"), 500)
 		return
 	}
+
+	imageName := logic.Image{}.GetImageName(&logic.ImageNameOption{
+		Registry: params.Registry,
+		Name:     params.Tag,
+	})
+
 	mustHasZipFile := false
 	buildImageTask := &logic.BuildImageMessage{
-		Tag: params.Tag,
-	}
-	if params.Registry != "" {
-		buildImageTask.Tag = params.Registry + "/" + params.Tag
+		Tag: imageName,
 	}
 	if params.BuildRoot != "" {
 		buildImageTask.Context = "./" + strings.Trim(strings.Trim(strings.Trim(params.BuildRoot, ""), "./"), "/") + "/Dockerfile"
@@ -207,13 +210,12 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	}
 	imageNew := &entity.Image{
 		Registry:        params.Registry,
-		Tag:             params.Tag,
+		Tag:             imageName,
+		Title:           params.Title,
 		BuildGit:        params.BuildGit,
 		BuildDockerfile: params.BuildDockerfile,
-		BuildZip:        params.BuildZip,
 		BuildRoot:       params.BuildRoot,
 		BuildType:       params.BuildType,
-		BuildTemplate:   params.BuildTemplate,
 		Status:          logic.StatusStop,
 		Message:         "",
 	}
@@ -223,17 +225,13 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		dao.Image.Create(imageRow)
 	} else {
 		// 如果已经构建过，先查找一下旧镜像，新加一个标签，避免变成 none 标签
-		_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Tag)
+		_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
 		if err == nil {
-			_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, params.Tag, params.Tag+":deprecated-"+function.GetRandomString(6))
-		}
-		if params.BuildZip != imageRow.BuildZip {
-			storage.Local{}.Delete(imageRow.BuildZip)
+			_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, imageName, imageName+"-deprecated-"+function.GetRandomString(6))
 		}
 		dao.Image.Select(
 			dao.Image.BuildDockerfile,
 			dao.Image.BuildRoot,
-			dao.Image.BuildZip,
 			dao.Image.BuildGit,
 			dao.Image.Status,
 			dao.Image.Message,
