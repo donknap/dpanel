@@ -2,13 +2,12 @@ package controller
 
 import (
 	"errors"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"strings"
 )
 
@@ -23,23 +22,18 @@ func (self Image) TagRemote(http *gin.Context) {
 		return
 	}
 	var authString string
-	tagArr := strings.Split(params.Tag, "/")
-	if !strings.Contains(tagArr[0], ".") {
-		tagArr[0] = "docker.io"
+	tagDetail := logic.Image{}.GetImageTagDetail(params.Tag)
+	registry, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(tagDetail.Registry)).Find()
+	for _, registryRow := range registry {
+		if registryRow.Username == tagDetail.Namespace {
+			authString = logic.Image{}.GetRegistryAuthString(registryRow.ServerAddress, registryRow.Username, registryRow.Password)
+		}
 	}
-	registry, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(tagArr[0])).First()
-	if registry != nil {
-		password, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registry.Password)
-		authString = function.Base64Encode(struct {
-			Username      string `json:"username"`
-			Password      string `json:"password"`
-			ServerAddress string `json:"serveraddress"`
-		}{
-			Username:      registry.Username,
-			Password:      password,
-			ServerAddress: registry.ServerAddress,
-		})
+
+	if authString == "" && registry != nil {
+		authString = logic.Image{}.GetRegistryAuthString(registry[0].ServerAddress, registry[0].Username, registry[0].Password)
 	}
+
 	if params.AsLatest {
 		tag := strings.Split(params.Tag, ":")
 		latestTag := tag[0] + ":latest"
@@ -58,6 +52,7 @@ func (self Image) TagRemote(http *gin.Context) {
 			return
 		}
 	} else {
+		// 从官方仓库拉取镜像不用权限
 		err := logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
 			Auth: authString,
 			Type: params.Type,
@@ -84,7 +79,7 @@ func (self Image) TagDelete(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	_, err := docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, params.Tag, types.ImageRemoveOptions{
+	_, err := docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, params.Tag, image.RemoveOptions{
 		Force: params.Force,
 	})
 	if err != nil {

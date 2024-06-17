@@ -64,7 +64,7 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 	for _, volume := range params.Volume {
 		change = append(change, "VOLUME "+volume)
 	}
-	out, err := docker.Sdk.Client.ImageImport(docker.Sdk.Ctx, types.ImageImportSource{
+	out, err := docker.Sdk.Client.ImageImport(docker.Sdk.Ctx, image.ImportSource{
 		Source:     containerTar,
 		SourceName: "-",
 	}, imageName, image.ImportOptions{
@@ -175,8 +175,9 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	buildImageTask := &logic.BuildImageMessage{
 		Tag: imageName,
 	}
+
 	if params.BuildRoot != "" {
-		buildImageTask.Context = "./" + strings.Trim(strings.Trim(strings.Trim(params.BuildRoot, ""), "./"), "/") + "/Dockerfile"
+		buildImageTask.Context = "./" + strings.Trim(strings.Trim(strings.Trim(params.BuildRoot, ""), "./"), "/")
 	}
 	addStr := []string{
 		"ADD",
@@ -257,14 +258,23 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 
 func (self Image) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Tag string `form:"tag" binding:"omitempty"`
+		Tag   string `form:"tag" binding:"omitempty"`
+		Title string `json:"title"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	var result []image.Summary
 
+	var filterTagList []string
+	if params.Title != "" {
+		_ = dao.Image.Where(dao.Image.Title.Like("%"+params.Title+"%")).Pluck(dao.Image.Tag, &filterTagList)
+	}
+	if params.Tag != "" {
+		filterTagList = append(filterTagList, params.Tag)
+	}
+
+	var result []image.Summary
 	imageList, err := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, image.ListOptions{
 		All:            false,
 		ContainerCount: true,
@@ -284,11 +294,11 @@ func (self Image) GetList(http *gin.Context) {
 		}
 	}
 
-	if params.Tag != "" {
+	if !function.IsEmptyArray(filterTagList) {
 		for _, summary := range imageList {
-			if !function.IsEmptyArray(summary.RepoTags) {
-				for _, tag := range summary.RepoTags {
-					if strings.Contains(tag, params.Tag) {
+			for _, tag := range summary.RepoTags {
+				for _, s := range filterTagList {
+					if strings.Contains(tag, s) {
 						result = append(result, summary)
 						break
 					}
@@ -343,7 +353,7 @@ func (self Image) ImageDelete(http *gin.Context) {
 
 	if !function.IsEmptyArray(params.Md5) {
 		for _, sha := range params.Md5 {
-			_, err := docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, sha, types.ImageRemoveOptions{
+			_, err := docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, sha, image.RemoveOptions{
 				PruneChildren: true,
 				Force:         params.Force,
 			})

@@ -140,6 +140,10 @@ func (self Home) Info(http *gin.Context) {
 			"containerTask": int(containerTask),
 			"imageTask":     int(imageTask),
 		},
+		"dpanel": map[string]string{
+			"version": "1.0.0-beta",
+			"release": "202406014",
+		},
 	})
 	return
 }

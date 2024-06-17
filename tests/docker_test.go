@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/donknap/dpanel/common/function"
@@ -48,7 +49,7 @@ type pullImageProgress struct {
 func TestPullImage(t *testing.T) {
 	sdk, _ := docker.NewDockerClient()
 	//尝试拉取镜像
-	reader, err := sdk.Client.ImagePull(context.Background(), "phpmyadmin", types.ImagePullOptions{})
+	reader, err := sdk.Client.ImagePull(context.Background(), "phpmyadmin", image.PullOptions{})
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}
@@ -223,7 +224,7 @@ func TestImage(t *testing.T) {
 	}
 	result, _, err := sdk.Client.ImageInspectWithRaw(context.Background(), "dddd:latest")
 	fmt.Printf("%v \n", result)
-	result1, err := sdk.Client.ImageRemove(context.Background(), "phpmyadmin", types.ImageRemoveOptions{})
+	result1, err := sdk.Client.ImageRemove(context.Background(), "phpmyadmin", image.RemoveOptions{})
 	fmt.Printf("%v \n", result1)
 	fmt.Printf("%v \n", err)
 }

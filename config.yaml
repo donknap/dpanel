@@ -1,5 +1,5 @@
 app:
-  name: rangine
+  name: ${APP_NAME-dpanel}
   env: debug
   server: http
   cors:

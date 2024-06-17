@@ -8,6 +8,7 @@
       <env name="DB_DATABASE" value="/Users/renchao/Workspace/go/dpanel/dpanel.db" />
       <env name="STORAGE_LOCAL_PATH" value="/Users/renchao/Workspace/go/dpanel" />
       <env name="DOCKER_HOST" value="unix:///Users/renchao/.docker/run/docker.sock" />
+<!--      <env name="DOCKER_HOST" value="tcp://172.16.1.198:2375" />-->
     </envs>
     <EXTENSION ID="net.ashald.envfile">
       <option name="IS_ENABLED" value="false" />

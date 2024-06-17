@@ -16,6 +16,8 @@ build: clean
 	cd ${TARGET_DIR} && git push
 build-windows: clean
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o ${GO_BIN}/${PROJECT_NAME}.exe ${SOURCE_FILES}
+build-arm: clean
+	GOARM=7 GOARCH=arm64 GOOS=linux go build -v
 test: clean
 	go run ${SOURCE_FILES} make:module --name=attach
 clean:
