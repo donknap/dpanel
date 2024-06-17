@@ -26,6 +26,7 @@ func (self Image) GetImageName(option *ImageNameOption) (imageName string) {
 			option.Version = s[1]
 		}
 		option.Name = s[0]
+		imageName = s[0]
 	}
 
 	if option.Registry != "" {

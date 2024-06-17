@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 )
 
@@ -141,8 +142,8 @@ func (self Home) Info(http *gin.Context) {
 			"imageTask":     int(imageTask),
 		},
 		"dpanel": map[string]string{
-			"version": "1.0.0-beta",
-			"release": "202406014",
+			"version": facade.GetConfig().GetString("app.version"),
+			"release": "",
 		},
 	})
 	return
