@@ -55,6 +55,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/image/tag-remote", controller.Image{}.TagRemote)
 			cors.POST("/app/image/tag-delete", controller.Image{}.TagDelete)
 			cors.POST("/app/image/tag-add", controller.Image{}.TagAdd)
+			cors.POST("/app/image/tag-sync", controller.Image{}.TagSync)
 
 			cors.POST("/app/image/get-list-build", controller.Image{}.GetListBuild)
 			cors.POST("/app/image/get-build-task", controller.Image{}.GetBuildTask)
