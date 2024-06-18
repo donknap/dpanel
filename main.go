@@ -15,6 +15,7 @@ import (
 	app "github.com/we7coreteam/w7-rangine-go/src"
 	"github.com/we7coreteam/w7-rangine-go/src/http"
 	"github.com/we7coreteam/w7-rangine-go/src/http/middleware"
+	"os"
 )
 
 var (
@@ -74,6 +75,18 @@ func main() {
 				"username": "admin",
 			},
 		})
+	}
+	// 初始化挂载目录
+	for _, path := range []string{
+		"nginx/default_host",
+		"nginx/proxy_host",
+		"nginx/redirection_host",
+		"nginx/dead_host",
+		"nginx/temp",
+		"nginx/cert",
+		"storage",
+	} {
+		os.MkdirAll(facade.GetConfig().GetString("storage.local.path")+"/"+path, os.ModePerm)
 	}
 
 	// 注册资源

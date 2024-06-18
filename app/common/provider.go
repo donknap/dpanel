@@ -50,6 +50,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		engine.GET("/home/ws/console/:id", controller.Home{}.WsConsole)
 
 		engine.POST("/common/home/info", controller.Home{}.Info)
+		engine.POST("/common/home/upgrade-script", controller.Home{}.UpgradeScript)
 	})
 
 	event := logic.EventLogic{}

@@ -148,3 +148,15 @@ func (self Home) Info(http *gin.Context) {
 	})
 	return
 }
+
+func (self Home) UpgradeScript(http *gin.Context) {
+	containerRow, err := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
+	if err != nil {
+		self.JsonResponseWithError(http, errors.New("您创建的面板容器名称非默认的 dpanel 无法获取更新脚本，请通过环境变量 APP_NAME 指定名称。"), 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"info": containerRow,
+	})
+	return
+}
