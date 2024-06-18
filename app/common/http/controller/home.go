@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -57,7 +59,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		return
 	}
 
-	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, params.Id, types.ExecConfig{
+	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, params.Id, container.ExecOptions{
 		Privileged:   true,
 		Tty:          true,
 		AttachStdin:  true,
@@ -72,7 +74,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	shell, err := docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, types.ExecStartCheck{
+	shell, err := docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, container.ExecStartOptions{
 		Tty: true,
 	})
 	if err != nil {
@@ -129,7 +131,7 @@ func (self Home) Info(http *gin.Context) {
 			types.BuildCacheObject,
 		},
 	})
-	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, types.NetworkListOptions{})
+	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, network.ListOptions{})
 	containerTask, _ := dao.Site.Where(dao.Site.DeletedAt.IsNull()).Count()
 	imageTask, _ := dao.Image.Count()
 	self.JsonResponseWithoutError(http, gin.H{
