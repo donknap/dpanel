@@ -144,6 +144,9 @@ func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error 
 	}
 
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
+	if err != nil {
+		return err
+	}
 	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", setting)
 	if err != nil {
 		return err

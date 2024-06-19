@@ -11,6 +11,9 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
+	"github.com/go-acme/lego/v4/certificate"
+	"github.com/go-acme/lego/v4/lego"
+	"github.com/go-acme/lego/v4/registration"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"html/template"
 	"os"
@@ -215,4 +218,51 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	self.JsonSuccessResponse(http)
 	return
 
+}
+
+func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
+	type ParamsValidate struct {
+		Id    int32  `json:"id" binding:"required"`
+		Email string `json:"email" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	domain, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(params.Id)).First()
+	if domain == nil {
+		self.JsonResponseWithError(http, errors.New("域名不存在"), 500)
+		return
+	}
+	acmeUser, err := logic.NewAcmeUser(params.Email)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	client, err := lego.NewClient(lego.NewConfig(acmeUser))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = client.Challenge.SetHTTP01Provider(logic.NewAcmeNginxProvider())
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	reg, err := client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	acmeUser.Registration = reg
+	request := certificate.ObtainRequest{
+		Domains: []string{domain.ServerName},
+		Bundle:  true,
+	}
+	certificates, err := client.Certificate.Obtain(request)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fmt.Printf("%v \n", string(certificates.Certificate))
 }

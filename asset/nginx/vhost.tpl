@@ -32,15 +32,17 @@ server {
   ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE:ECDH:AES:HIGH:!NULL:!aNULL:!MD5:!ADH:!RC4;
   ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
   ssl_prefer_server_ciphers on;
+  {{else}}
+  include /etc/nginx/conf.d/include/challenge.conf;
   {{end}}
 
   {{if .EnableAssetCache}}
   # Asset Caching
-  include /dpanel/nginx/include/assets.conf;
+  include /etc/nginx/conf.d/include/assets.conf;
   {{end}}
   {{if .EnableBlockCommonExploits}}
   # Block Exploits
-  include /dpanel/nginx/include/block-exploits.conf;
+  include /etc/nginx/conf.d/include/block-exploits.conf;
   {{end}}
 
   {{if .EnableWs}}
