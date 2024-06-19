@@ -132,12 +132,12 @@ func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error 
 	}
 	defer vhostFile.Close()
 
-	if setting.SslCrt != "" && setting.SslKey != "" {
-		err = os.WriteFile(self.GetNginxCertPath()+fmt.Sprintf(CertFileName, setting.ServerName), []byte(setting.SslCrt), 0666)
+	if setting.SslResource.Certificate != nil && setting.SslResource.PrivateKey != nil {
+		err = os.WriteFile(self.GetNginxCertPath()+fmt.Sprintf(CertFileName, setting.ServerName), setting.SslResource.Certificate, 0666)
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(self.GetNginxCertPath()+fmt.Sprintf(KeyFileName, setting.ServerName), []byte(setting.SslKey), 0666)
+		err = os.WriteFile(self.GetNginxCertPath()+fmt.Sprintf(KeyFileName, setting.ServerName), []byte(setting.SslResource.PrivateKey), 0666)
 		if err != nil {
 			return err
 		}

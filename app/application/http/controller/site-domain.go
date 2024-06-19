@@ -94,8 +94,10 @@ func (self SiteDomain) Create(http *gin.Context) {
 		ExtraNginx:                template.HTML(params.ExtraNginx),
 		EnableSSL:                 params.Schema == "https",
 		TargetName:                function.GetMd5(params.ServerName),
-		SslCrt:                    params.SslCrt,
-		SslKey:                    params.SslKey,
+		SslResource: &certificate.Resource{
+			Certificate: []byte(params.SslCrt),
+			PrivateKey:  []byte(params.SslKey),
+		},
 	}
 
 	err = logic.Site{}.MakeNginxConf(domainSetting)
@@ -264,5 +266,35 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fmt.Printf("%v \n", string(certificates.Certificate))
+
+	domainSetting := &accessor.SiteDomainSettingOption{
+		ServerName:                domain.ServerName,
+		Port:                      domain.Setting.Port,
+		ServerAddress:             domain.Setting.ServerAddress,
+		EnableBlockCommonExploits: domain.Setting.EnableBlockCommonExploits,
+		EnableWs:                  domain.Setting.EnableWs,
+		EnableAssetCache:          domain.Setting.EnableAssetCache,
+		ExtraNginx:                domain.Setting.ExtraNginx,
+		EnableSSL:                 true,
+		TargetName:                function.GetMd5(domain.Setting.ServerName),
+		SslResource:               certificates,
+	}
+
+	err = logic.Site{}.MakeNginxConf(domainSetting)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	_, err = dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(params.Id)).Updates(&entity.SiteDomain{
+		Setting: domainSetting,
+	})
+
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	self.JsonSuccessResponse(http)
+	return
 }

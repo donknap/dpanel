@@ -6,9 +6,6 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types"
@@ -18,10 +15,9 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/pkg/archive"
+	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/acme"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/go-acme/lego/v4/registration"
 	"io"
@@ -342,35 +338,20 @@ func (u *MyUser) GetPrivateKey() crypto.PrivateKey {
 }
 
 func TestExportContainer(t *testing.T) {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	acmeUser, err := logic.NewAcmeUser("914417117@qq.com")
 	if err != nil {
 		fmt.Printf("%v \n", err)
 		return
 	}
-	myUser := MyUser{
-		Email: "914417117@qq.com",
-		key:   privateKey,
-	}
-	config := lego.NewConfig(&myUser)
-	client, err := lego.NewClient(config)
-
-	err = client.Challenge.SetHTTP01Provider(acme.NewNginxProvider())
+	client, err := lego.NewClient(lego.NewConfig(acmeUser))
 	if err != nil {
 		fmt.Printf("%v \n", err)
+		return
 	}
-
-	reg, err := client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
+	r, err := client.Certificate.Get("https://acme-v02.api.letsencrypt.org/acme/cert/035525ef5da3d3c896a76555c2873c40021d", false)
 	if err != nil {
 		fmt.Printf("%v \n", err)
+		return
 	}
-	myUser.Registration = reg
-	request := certificate.ObtainRequest{
-		Domains: []string{"test.sdxtlaw.com"},
-		Bundle:  true,
-	}
-	certificates, err := client.Certificate.Obtain(request)
-	if err != nil {
-		fmt.Printf("%v \n", err)
-	}
-	fmt.Printf("%#v\n", certificates)
+	fmt.Printf("%v \n", r)
 }
