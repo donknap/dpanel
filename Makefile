@@ -7,7 +7,8 @@ TARGET_DIR=/Users/renchao/Workspace/docker/dpanel/src
 JS_DIR=/Users/renchao/Workspace/js/d-panel
 
 build: clean
-	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ go build -o ${GO_BIN}/${PROJECT_NAME} ${SOURCE_FILES}
+	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ go build -ldflags '-s -w' -gcflags="all=-trimpath=${PWD}" -asmflags="all=-trimpath=${PWD}" -o ${GO_BIN}/${PROJECT_NAME} ${SOURCE_FILES}
+
 	cp ${GO_BASE}/database/db.sql ${TARGET_DIR}/server
 	cp ${GO_BIN}/${PROJECT_NAME} ${TARGET_DIR}/server
 	cp ${GO_BASE}/config.yaml ${TARGET_DIR}/server

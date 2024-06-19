@@ -2,7 +2,7 @@ package logic
 
 import (
 	"fmt"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/events"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -14,7 +14,7 @@ type EventLogic struct {
 }
 
 func (self EventLogic) MonitorLoop() {
-	messageChan, errorChan := docker.Sdk.Client.Events(docker.Sdk.Ctx, types.EventsOptions{})
+	messageChan, errorChan := docker.Sdk.Client.Events(docker.Sdk.Ctx, events.ListOptions{})
 	for {
 		select {
 		case message := <-messageChan:

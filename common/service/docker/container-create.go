@@ -3,7 +3,6 @@ package docker
 import (
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -116,7 +115,7 @@ func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
 	// 利用Network关联容器
 	options := make(map[string]string)
 	options["name"] = self.containerName
-	myNetwork, _ := Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, types.NetworkCreate{
+	myNetwork, _ := Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, network.CreateOptions{
 		Driver:  "bridge",
 		Options: options,
 	})

@@ -30,8 +30,7 @@ func newSiteDomain(db *gorm.DB, opts ...gen.DOOption) siteDomain {
 	_siteDomain.ID = field.NewInt32(tableName, "id")
 	_siteDomain.ContainerID = field.NewString(tableName, "container_id")
 	_siteDomain.ServerName = field.NewString(tableName, "server_name")
-	_siteDomain.Port = field.NewInt32(tableName, "port")
-	_siteDomain.Schema = field.NewString(tableName, "schema")
+	_siteDomain.Setting = field.NewField(tableName, "setting")
 	_siteDomain.CreatedAt = field.NewTime(tableName, "created_at")
 
 	_siteDomain.fillFieldMap()
@@ -46,8 +45,7 @@ type siteDomain struct {
 	ID          field.Int32
 	ContainerID field.String
 	ServerName  field.String
-	Port        field.Int32
-	Schema      field.String
+	Setting     field.Field
 	CreatedAt   field.Time
 
 	fieldMap map[string]field.Expr
@@ -68,8 +66,7 @@ func (s *siteDomain) updateTableName(table string) *siteDomain {
 	s.ID = field.NewInt32(table, "id")
 	s.ContainerID = field.NewString(table, "container_id")
 	s.ServerName = field.NewString(table, "server_name")
-	s.Port = field.NewInt32(table, "port")
-	s.Schema = field.NewString(table, "schema")
+	s.Setting = field.NewField(table, "setting")
 	s.CreatedAt = field.NewTime(table, "created_at")
 
 	s.fillFieldMap()
@@ -87,12 +84,11 @@ func (s *siteDomain) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *siteDomain) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 6)
+	s.fieldMap = make(map[string]field.Expr, 5)
 	s.fieldMap["id"] = s.ID
 	s.fieldMap["container_id"] = s.ContainerID
 	s.fieldMap["server_name"] = s.ServerName
-	s.fieldMap["port"] = s.Port
-	s.fieldMap["schema"] = s.Schema
+	s.fieldMap["setting"] = s.Setting
 	s.fieldMap["created_at"] = s.CreatedAt
 }
 

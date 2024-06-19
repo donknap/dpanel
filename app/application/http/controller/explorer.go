@@ -5,7 +5,6 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -102,7 +101,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		params.Md5,
 		params.DestPath,
 		tarReader,
-		types.CopyToContainerOptions{},
+		container.CopyToContainerOptions{},
 	)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -158,7 +157,7 @@ func (self Explorer) Import(http *gin.Context) {
 		params.Md5,
 		params.DestPath,
 		tarReader,
-		types.CopyToContainerOptions{},
+		container.CopyToContainerOptions{},
 	)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

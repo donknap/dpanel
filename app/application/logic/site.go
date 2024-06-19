@@ -1,9 +1,15 @@
 package logic
 
 import (
+	"embed"
+	"errors"
+	"fmt"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
+	"html/template"
+	"os"
 	"strings"
 )
 
@@ -14,6 +20,12 @@ const (
 	LangGolang = "golang"
 	LangHtml   = "html"
 	LangOther  = "other"
+)
+
+var (
+	CertFileName  = "%s.crt"
+	KeyFileName   = "%s.key"
+	VhostFileName = "%s.conf"
 )
 
 type Site struct {
@@ -106,4 +118,43 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	envOption.Entrypoint = strings.Join(info.Config.Entrypoint, " ")
 
 	return envOption, nil
+}
+
+func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error {
+	var asset embed.FS
+	err := facade.GetContainer().NamedResolve(&asset, "asset")
+	if err != nil {
+		return err
+	}
+	vhostFile, err := os.OpenFile(self.GetNginxSettingPath()+fmt.Sprintf(VhostFileName, setting.ServerName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+	if err != nil {
+		return errors.New("nginx 配置目录不存在")
+	}
+	defer vhostFile.Close()
+
+	if setting.SslCrt != "" && setting.SslKey != "" {
+		err = os.WriteFile(self.GetNginxCertPath()+fmt.Sprintf(CertFileName, setting.ServerName), []byte(setting.SslCrt), 0666)
+		if err != nil {
+			return err
+		}
+		err = os.WriteFile(self.GetNginxCertPath()+fmt.Sprintf(KeyFileName, setting.ServerName), []byte(setting.SslKey), 0666)
+		if err != nil {
+			return err
+		}
+	}
+
+	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
+	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", setting)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self Site) GetNginxSettingPath() string {
+	return fmt.Sprintf("%s/nginx/proxy_host/", facade.GetConfig().Get("storage.local.path"))
+}
+
+func (self Site) GetNginxCertPath() string {
+	return fmt.Sprintf("%s/nginx/cert/", facade.GetConfig().Get("storage.local.path"))
 }

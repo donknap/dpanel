@@ -1,7 +1,7 @@
 package plugin
 
 import (
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/service/docker"
 )
 
@@ -10,7 +10,7 @@ type Command struct {
 
 // Result 执行一条命令返回结果，适用于查询查，防止两个command结果重复
 func (self Command) Result(name string, cmd string) (out []byte, err error) {
-	execConfig := types.ExecConfig{
+	execConfig := container.ExecOptions{
 		Privileged:   true,
 		Tty:          false,
 		AttachStdin:  false,
@@ -29,7 +29,7 @@ func (self Command) Result(name string, cmd string) (out []byte, err error) {
 	o := &Hijacked{
 		Id: exec.ID,
 	}
-	o.conn, err = docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, types.ExecStartCheck{
+	o.conn, err = docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, container.ExecStartOptions{
 		Tty: false,
 	})
 	defer o.Close()

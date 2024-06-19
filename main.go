@@ -51,42 +51,45 @@ func main() {
 	}
 	dao.SetDefault(db)
 
-	// 同步数据库
-	db.Migrator().AutoMigrate(
-		&entity.Event{},
-		&entity.Image{},
-		&entity.Notice{},
-		&entity.Registry{},
-		&entity.Setting{},
-		&entity.Site{},
-		&entity.SiteDomain{},
-		&entity.Compose{},
-	)
-	// 如果没有管理配置新建一条
-	founderSetting, _ := dao.Setting.
-		Where(dao.Setting.GroupName.Eq(logic.SettingUser)).
-		Where(dao.Setting.Name.Eq(logic.SettingUserFounder)).First()
-	if founderSetting == nil {
-		dao.Setting.Create(&entity.Setting{
-			GroupName: logic.SettingUser,
-			Name:      logic.SettingUserFounder,
-			Value: &accessor.SettingValueOption{
-				"password": "f6fdffe48c908deb0f4c3bd36c032e72",
-				"username": "admin",
-			},
-		})
-	}
-	// 初始化挂载目录
-	for _, path := range []string{
-		"nginx/default_host",
-		"nginx/proxy_host",
-		"nginx/redirection_host",
-		"nginx/dead_host",
-		"nginx/temp",
-		"nginx/cert",
-		"storage",
-	} {
-		os.MkdirAll(facade.GetConfig().GetString("storage.local.path")+"/"+path, os.ModePerm)
+	if facade.GetConfig().GetString("app.env") == "production" {
+		// 同步数据库
+		db.Migrator().AutoMigrate(
+			&entity.Event{},
+			&entity.Image{},
+			&entity.Notice{},
+			&entity.Registry{},
+			&entity.Setting{},
+			&entity.Site{},
+			&entity.SiteDomain{},
+			&entity.Compose{},
+		)
+		// 如果没有管理配置新建一条
+		founderSetting, _ := dao.Setting.
+			Where(dao.Setting.GroupName.Eq(logic.SettingUser)).
+			Where(dao.Setting.Name.Eq(logic.SettingUserFounder)).First()
+		if founderSetting == nil {
+			dao.Setting.Create(&entity.Setting{
+				GroupName: logic.SettingUser,
+				Name:      logic.SettingUserFounder,
+				Value: &accessor.SettingValueOption{
+					"password": "f6fdffe48c908deb0f4c3bd36c032e72",
+					"username": "admin",
+				},
+			})
+		}
+		// 初始化挂载目录
+		for _, path := range []string{
+			"nginx/default_host",
+			"nginx/proxy_host",
+			"nginx/redirection_host",
+			"nginx/dead_host",
+			"nginx/temp",
+			"nginx/cert",
+			"storage",
+			"challenge",
+		} {
+			os.MkdirAll(facade.GetConfig().GetString("storage.local.path")+"/"+path, os.ModePerm)
+		}
 	}
 
 	// 注册资源

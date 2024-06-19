@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
@@ -22,7 +21,7 @@ func (self Network) GetDetail(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	networkInfo, _, err := docker.Sdk.Client.NetworkInspectWithRaw(docker.Sdk.Ctx, params.Name, types.NetworkInspectOptions{})
+	networkInfo, _, err := docker.Sdk.Client.NetworkInspectWithRaw(docker.Sdk.Ctx, params.Name, network.InspectOptions{})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -46,7 +45,7 @@ func (self Network) GetList(http *gin.Context) {
 		filter.Add("name", params.Name)
 	}
 
-	networkList, err := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, types.NetworkListOptions{
+	networkList, err := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, network.ListOptions{
 		Filters: filter,
 	})
 	if err != nil {
@@ -219,19 +218,19 @@ func (self Network) GetContainerList(http *gin.Context) {
 		return
 	}
 	type containerListResult struct {
-		Key           string                 `json:"key"`
-		Id            string                 `json:"id"`
-		NetworkName   string                 `json:"networkName"`
-		ContainerName string                 `json:"containerName"`
-		NetworkInfo   types.EndpointResource `json:"networkInfo"`
-		HostName      []string               `json:"hostName"`
-		Children      []containerListResult  `json:"children"`
+		Key           string                   `json:"key"`
+		Id            string                   `json:"id"`
+		NetworkName   string                   `json:"networkName"`
+		ContainerName string                   `json:"containerName"`
+		NetworkInfo   network.EndpointResource `json:"networkInfo"`
+		HostName      []string                 `json:"hostName"`
+		Children      []containerListResult    `json:"children"`
 	}
 
 	var result []containerListResult
 	i := 0
 	for _, name := range params.Name {
-		networkInfo, _ := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, name, types.NetworkInspectOptions{})
+		networkInfo, _ := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, name, network.InspectOptions{})
 		item := containerListResult{
 			NetworkName: name,
 			Key:         name,

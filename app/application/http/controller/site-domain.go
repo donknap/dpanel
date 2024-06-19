@@ -1,18 +1,16 @@
 package controller
 
 import (
-	"embed"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/network"
+	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"html/template"
 	"os"
@@ -21,9 +19,6 @@ import (
 
 var (
 	defaultNetworkName = "dpanel-local"
-	certFileName       = "%s.pem"
-	keyFileName        = "%s-key.pem"
-	vhostFileName      = "%s.conf"
 )
 
 type SiteDomain struct {
@@ -43,6 +38,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		SslCrt                    string `json:"sslCrt"`
 		SslKey                    string `json:"sslKey"`
 	}
+
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
@@ -59,74 +55,47 @@ func (self SiteDomain) Create(http *gin.Context) {
 	}
 
 	// 将当前容器加入到默认 dpanel-local 网络中，并指定 Hostname 用于 Nginx 反向代理
-	_, err = docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, defaultNetworkName, types.NetworkInspectOptions{})
+	_, err = docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, defaultNetworkName, network.InspectOptions{})
 	if err != nil {
 		self.JsonResponseWithError(http, errors.New("DPanel 默认网络不存在，请重新安装或是新建&加入 "+defaultNetworkName+" 网络"), 500)
 		return
 	}
-	hostname := fmt.Sprintf(docker.HostnameTemplate, strings.Trim(containerRow.Name, "/"))
 
+	hostname := fmt.Sprintf(docker.HostnameTemplate, strings.Trim(containerRow.Name, "/"))
 	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
 		ID: params.ContainerId,
 	})).First()
-
 	if siteRow != nil {
 		hostname = fmt.Sprintf(docker.HostnameTemplate, siteRow.SiteName)
 	}
 
-	docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, params.ContainerId, &network.EndpointSettings{
-		Aliases: []string{
-			hostname,
-		},
-	})
-
-	var asset embed.FS
-	err = facade.GetContainer().NamedResolve(&asset, "asset")
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	vhostFile, err := os.OpenFile(self.getNginxSettingPath()+fmt.Sprintf(vhostFileName, params.ServerName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
-	if err != nil {
-		self.JsonResponseWithError(http, errors.New("nginx 配置目录不存在aqk"), 500)
-		return
+	if _, ok := containerRow.NetworkSettings.Networks[defaultNetworkName]; !ok {
+		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, params.ContainerId, &network.EndpointSettings{
+			Aliases: []string{
+				hostname,
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 
-	err = os.WriteFile(self.getNginxCertPath()+fmt.Sprintf(certFileName, params.ServerName), []byte(params.SslCrt), 0666)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	err = os.WriteFile(self.getNginxCertPath()+fmt.Sprintf(keyFileName, params.ServerName), []byte(params.SslKey), 0666)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer vhostFile.Close()
-
-	type tplParams struct {
-		ServerAddress             string
-		Port                      int32
-		ServerName                string
-		EnableBlockCommonExploits bool
-		EnableAssetCache          bool
-		EnableWs                  bool
-		ExtraNginx                template.HTML
-		EnableSSL                 bool
-		TargetName                string
-	}
-	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
-	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", tplParams{
-		ServerAddress:             hostname,
-		Port:                      params.Port,
+	domainSetting := &accessor.SiteDomainSettingOption{
 		ServerName:                params.ServerName,
+		Port:                      params.Port,
+		ServerAddress:             hostname,
 		EnableBlockCommonExploits: params.EnableBlockCommonExploits,
 		EnableWs:                  params.EnableWs,
 		EnableAssetCache:          params.EnableAssetCache,
 		ExtraNginx:                template.HTML(params.ExtraNginx),
 		EnableSSL:                 params.Schema == "https",
 		TargetName:                function.GetMd5(params.ServerName),
-	})
+		SslCrt:                    params.SslCrt,
+		SslKey:                    params.SslKey,
+	}
+
+	err = logic.Site{}.MakeNginxConf(domainSetting)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -134,10 +103,10 @@ func (self SiteDomain) Create(http *gin.Context) {
 
 	err = dao.SiteDomain.Create(&entity.SiteDomain{
 		ServerName:  params.ServerName,
-		Port:        params.Port,
 		ContainerID: strings.Trim(containerRow.Name, "/"),
-		Schema:      params.Schema,
+		Setting:     domainSetting,
 	})
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -174,9 +143,6 @@ func (self SiteDomain) GetList(http *gin.Context) {
 	if params.ServerName != "" {
 		query = query.Where(dao.SiteDomain.ServerName.Like("%" + params.ServerName + "%"))
 	}
-	if params.Port > 0 {
-		query = query.Where(dao.SiteDomain.Port.Eq(params.Port))
-	}
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
 
 	self.JsonResponseWithoutError(http, gin.H{
@@ -202,33 +168,15 @@ func (self SiteDomain) GetDetail(http *gin.Context) {
 		return
 	}
 
-	vhost, err := os.ReadFile(self.getNginxSettingPath() + fmt.Sprintf(vhostFileName, domainRow.ServerName))
+	vhost, err := os.ReadFile(logic.Site{}.GetNginxSettingPath() + fmt.Sprintf(logic.VhostFileName, domainRow.ServerName))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
-	var sslCert []byte
-	var sslKey []byte
-
-	if domainRow.Schema == "https" {
-		sslCert, err = os.ReadFile(self.getNginxCertPath() + fmt.Sprintf(certFileName, domainRow.ServerName))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		sslKey, err = os.ReadFile(self.getNginxCertPath() + fmt.Sprintf(keyFileName, domainRow.ServerName))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-
 	self.JsonResponseWithoutError(http, gin.H{
-		"domain":  domainRow,
-		"vhost":   string(vhost),
-		"sslCert": string(sslCert),
-		"sslKey":  string(sslKey),
+		"domain": domainRow,
+		"vhost":  string(vhost),
 	})
 	return
 }
@@ -243,9 +191,9 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	}
 	list, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
 	for _, item := range list {
-		go os.Remove(self.getNginxSettingPath() + fmt.Sprintf(vhostFileName, item.ServerName))
-		go os.Remove(self.getNginxCertPath() + fmt.Sprintf(certFileName, item.ServerName))
-		go os.Remove(self.getNginxCertPath() + fmt.Sprintf(keyFileName, item.ServerName))
+		go os.Remove(logic.Site{}.GetNginxSettingPath() + fmt.Sprintf(logic.VhostFileName, item.ServerName))
+		go os.Remove(logic.Site{}.GetNginxCertPath() + fmt.Sprintf(logic.CertFileName, item.ServerName))
+		go os.Remove(logic.Site{}.GetNginxCertPath() + fmt.Sprintf(logic.KeyFileName, item.ServerName))
 	}
 	_, err := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Delete()
 	if err != nil {
@@ -267,12 +215,4 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	self.JsonSuccessResponse(http)
 	return
 
-}
-
-func (self SiteDomain) getNginxSettingPath() string {
-	return fmt.Sprintf("%s/nginx/proxy_host/", facade.GetConfig().Get("storage.local.path"))
-}
-
-func (self SiteDomain) getNginxCertPath() string {
-	return fmt.Sprintf("%s/nginx/cert/", facade.GetConfig().Get("storage.local.path"))
 }

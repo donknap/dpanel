@@ -25,8 +25,8 @@ server {
   server_name {{.ServerName}};
 
   {{if .EnableSSL}}
-  ssl_certificate /dpanel/nginx/cert/{{.ServerName}}.pem;
-  ssl_certificate_key /dpanel/nginx/cert/{{.ServerName}}-key.pem;
+  ssl_certificate /dpanel/nginx/cert/{{.ServerName}}.crt;
+  ssl_certificate_key /dpanel/nginx/cert/{{.ServerName}}.key;
   ssl_session_cache shared:SSL:1m;
   ssl_session_timeout 5m;
   ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE:ECDH:AES:HIGH:!NULL:!aNULL:!MD5:!ADH:!RC4;

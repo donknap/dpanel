@@ -5,17 +5,25 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/acme"
 	"github.com/donknap/dpanel/common/service/docker"
-	"html"
+	"github.com/go-acme/lego/v4/certificate"
+	"github.com/go-acme/lego/v4/lego"
+	"github.com/go-acme/lego/v4/registration"
 	"io"
 	"math"
 	"os"
@@ -204,7 +212,7 @@ func TestLoginRegistry(t *testing.T) {
 	fmt.Printf("%v \n", err)
 	fmt.Printf("%v \n", auth)
 
-	messageChan, errorChan := sdk.Client.Events(context.Background(), types.EventsOptions{})
+	messageChan, errorChan := sdk.Client.Events(context.Background(), events.ListOptions{})
 	for {
 		select {
 		case messaage := <-messageChan:
@@ -317,8 +325,52 @@ func TestModifyFile(t *testing.T) {
 	fmt.Printf("%v \n", err)
 }
 
-func TestExportContainer(t *testing.T) {
+type MyUser struct {
+	Email        string
+	Registration *registration.Resource
+	key          crypto.PrivateKey
+}
 
-	//docker.Sdk.Client.ImageImport(docker.Sdk.Ctx, types.ImageImportSource{}, "", image.ImportOptions{})
-	fmt.Printf("%v \n", html.UnescapeString("&#34;&#34;"))
+func (u *MyUser) GetEmail() string {
+	return u.Email
+}
+func (u MyUser) GetRegistration() *registration.Resource {
+	return u.Registration
+}
+func (u *MyUser) GetPrivateKey() crypto.PrivateKey {
+	return u.key
+}
+
+func TestExportContainer(t *testing.T) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		fmt.Printf("%v \n", err)
+		return
+	}
+	myUser := MyUser{
+		Email: "914417117@qq.com",
+		key:   privateKey,
+	}
+	config := lego.NewConfig(&myUser)
+	client, err := lego.NewClient(config)
+
+	err = client.Challenge.SetHTTP01Provider(acme.NewNginxProvider())
+	if err != nil {
+		fmt.Printf("%v \n", err)
+	}
+
+	reg, err := client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
+	if err != nil {
+		fmt.Printf("%v \n", err)
+	}
+	myUser.Registration = reg
+	request := certificate.ObtainRequest{
+		Domains: []string{"test.sdxtlaw.com"},
+		Bundle:  true,
+	}
+	certificates, err := client.Certificate.Obtain(request)
+	if err != nil {
+		fmt.Printf("%v \n", err)
+	}
+	fmt.Printf("%#v\n", certificates)
 }
