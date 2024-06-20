@@ -20,9 +20,9 @@ type RunCommandOption struct {
 }
 
 func (self Command) RunInTerminal(option *RunCommandOption) {
+	slog.Debug("run command", option.CmdName, option.CmdArgs)
 	myWrite := &write{}
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
-
 	var out *os.File
 	var err error
 	if option.WindowSize != nil {
@@ -37,6 +37,8 @@ func (self Command) RunInTerminal(option *RunCommandOption) {
 }
 
 func (self Command) Run(option *RunCommandOption) {
+	slog.Debug("run command", option.CmdName, option.CmdArgs)
+
 	myWrite := &write{}
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
 	cmd.Stdout = myWrite
@@ -48,6 +50,7 @@ func (self Command) Run(option *RunCommandOption) {
 }
 
 func (self Command) RunWithOut(option *RunCommandOption) string {
+	slog.Debug("run command", option.CmdName, option.CmdArgs)
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

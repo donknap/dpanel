@@ -221,6 +221,7 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		CertServer  string `json:"certServer" binding:"required" oneof:"zerossl letsencrypt"`
 		AuthUpgrade bool   `json:"authUpgrade"`
 		Renew       bool   `json:"renew"`
+		Debug       bool   `json:"debug"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -238,6 +239,7 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		CertServer:  params.CertServer,
 		AutoUpgrade: params.AuthUpgrade,
 		Renew:       params.Renew,
+		Debug:       params.Debug,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -272,6 +274,7 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		SslKey:                    string(keyContent),
 		SslCrtCreaeTime:           certInfo.CreateTimeStr,
 		SslCrtRenewTime:           certInfo.RenewTimeStr,
+		AutoSsl:                   true,
 	}
 
 	err = logic.Site{}.MakeNginxConf(domainSetting)

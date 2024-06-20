@@ -19,4 +19,5 @@ type SiteDomainSettingOption struct {
 	SslKey                    string        `json:"sslKey"`
 	SslCrtRenewTime           string        `json:"sslCrtRenewTime"`
 	SslCrtCreaeTime           string        `json:"sslCrtCreaeTime"`
+	AutoSsl                   bool          `json:"autoSsl"`
 }

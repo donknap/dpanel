@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"html/template"
 	"os"
@@ -151,6 +152,18 @@ func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error 
 	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", setting)
 	if err != nil {
 		return err
+	}
+	// 如果有证书就重启Nginx，否则重载
+	if setting.SslCrt != "" && setting.SslKey != "" {
+		exec.Command{}.RunWithOut(&exec.RunCommandOption{
+			CmdName: "nginx",
+			CmdArgs: []string{
+				"-s", "stop",
+			},
+		})
+		exec.Command{}.RunWithOut(&exec.RunCommandOption{
+			CmdName: "nginx",
+		})
 	}
 	return nil
 }

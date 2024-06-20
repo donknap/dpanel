@@ -10,7 +10,7 @@ type Acme struct {
 }
 
 const (
-	commandName = "/Users/renchao/.acme.sh/acme.sh"
+	commandName = "/root/.acme.sh/acme.sh"
 )
 
 type AcmeIssueOption struct {
@@ -20,6 +20,7 @@ type AcmeIssueOption struct {
 	AutoUpgrade bool
 	Force       bool
 	Renew       bool
+	Debug       bool
 }
 
 type acmeInfoResult struct {
@@ -37,8 +38,8 @@ func (self AcmeIssueOption) to() ([]string, error) {
 
 		settingPath := Site{}.GetSiteNginxSetting(self.ServerName)
 		command = append(command, "--nginx", settingPath.ConfPath)
-		command = append(command, "--key-file", settingPath.CertPath)
-		command = append(command, "--fullchain-file", settingPath.KeyPath)
+		command = append(command, "--key-file", settingPath.KeyPath)
+		command = append(command, "--fullchain-file", settingPath.CertPath)
 	}
 	if self.CertServer != "" {
 		command = append(command, "--server", self.CertServer)
@@ -51,6 +52,9 @@ func (self AcmeIssueOption) to() ([]string, error) {
 	}
 	if self.Force {
 		command = append(command, "--force")
+	}
+	if self.Debug {
+		command = append(command, "--debug")
 	}
 
 	return command, nil
