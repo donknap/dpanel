@@ -30,7 +30,7 @@ func (self Image) TagRemote(http *gin.Context) {
 		}
 	}
 
-	if authString == "" && registry != nil {
+	if authString == "" && registry != nil && len(registry) > 0 {
 		authString = logic.Image{}.GetRegistryAuthString(registry[0].ServerAddress, registry[0].Username, registry[0].Password)
 	}
 
