@@ -10,11 +10,13 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"html/template"
 	"os"
 	"strings"
+	"time"
 )
 
 var (
@@ -295,7 +297,35 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	defer func() {
+		go func() {
+			time.Sleep(3 * time.Second)
+			exec.Command{}.RunWithOut(&exec.RunCommandOption{
+				CmdName: "nginx",
+				CmdArgs: []string{
+					"-s", "stop",
+				},
+			})
+			exec.Command{}.RunWithOut(&exec.RunCommandOption{
+				CmdName: "nginx",
+			})
+		}()
+	}()
 
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self SiteDomain) RestartNginx(http *gin.Context) {
+	exec.Command{}.RunWithOut(&exec.RunCommandOption{
+		CmdName: "nginx",
+		CmdArgs: []string{
+			"-s", "stop",
+		},
+	})
+	exec.Command{}.RunWithOut(&exec.RunCommandOption{
+		CmdName: "nginx",
+	})
 	self.JsonSuccessResponse(http)
 	return
 }

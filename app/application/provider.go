@@ -26,6 +26,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/site/delete-domain", controller.SiteDomain{}.Delete)
 			cors.POST("/app/site/get-domain-detail", controller.SiteDomain{}.GetDetail)
 			cors.POST("/app/site/apply-domain-cert", controller.SiteDomain{}.ApplyDomainCert)
+			cors.POST("/app/site/restart-nginx", controller.SiteDomain{}.RestartNginx)
 
 			// 容器相关
 			cors.POST("/app/container/status", controller.Container{}.Status)

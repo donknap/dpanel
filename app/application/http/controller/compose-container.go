@@ -65,7 +65,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 func (self Compose) ContainerCtrl(http *gin.Context) {
 	type ParamsValidate struct {
 		Id int32  `json:"id" binding:"required"`
-		Op string `json:"op" binding:"required",oneof:"start restart stop pause unpause ls"`
+		Op string `json:"op" binding:"required" oneof:"start restart stop pause unpause ls"`
 	}
 
 	params := ParamsValidate{}
