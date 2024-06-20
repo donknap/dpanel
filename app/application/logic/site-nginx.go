@@ -42,5 +42,5 @@ func (self Site) getNginxSettingPath() string {
 }
 
 func (self Site) getNginxCertPath() string {
-	return fmt.Sprintf("%s/nginx/cert/", facade.GetConfig().Get("storage.local.path"))
+	return fmt.Sprintf("%s/cert/", facade.GetConfig().Get("storage.local.path"))
 }

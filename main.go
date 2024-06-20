@@ -84,9 +84,8 @@ func main() {
 			"nginx/redirection_host",
 			"nginx/dead_host",
 			"nginx/temp",
-			"nginx/cert",
+			"cert",
 			"storage",
-			"challenge/.well-known/acme-challenge",
 		} {
 			os.MkdirAll(facade.GetConfig().GetString("storage.local.path")+"/"+path, os.ModePerm)
 		}

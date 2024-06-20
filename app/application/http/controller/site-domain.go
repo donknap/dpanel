@@ -259,6 +259,10 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 	}
 
 	certInfo := logic.Acme{}.Info(domain.ServerName)
+	if certInfo.CreateTimeStr == "" || certInfo.RenewTimeStr == "" {
+		self.JsonResponseWithError(http, errors.New("证书申请失败，请查看控制台日志"), 500)
+		return
+	}
 
 	domainSetting := &accessor.SiteDomainSettingOption{
 		ServerName:                domain.ServerName,
