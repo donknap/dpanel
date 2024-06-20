@@ -32,8 +32,6 @@ server {
   ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE:ECDH:AES:HIGH:!NULL:!aNULL:!MD5:!ADH:!RC4;
   ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
   ssl_prefer_server_ciphers on;
-  {{else}}
-  include /etc/nginx/conf.d/include/challenge.conf;
   {{end}}
 
   {{if .EnableAssetCache}}

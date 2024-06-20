@@ -3,7 +3,6 @@ package logic
 import (
 	"embed"
 	"errors"
-	"fmt"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -126,18 +125,20 @@ func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error 
 	if err != nil {
 		return err
 	}
-	vhostFile, err := os.OpenFile(self.GetNginxSettingPath()+fmt.Sprintf(VhostFileName, setting.ServerName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+	siteSettingPath := Site{}.GetSiteNginxSetting(setting.ServerName)
+
+	vhostFile, err := os.OpenFile(siteSettingPath.ConfPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
 		return errors.New("nginx 配置目录不存在")
 	}
 	defer vhostFile.Close()
 
-	if setting.SslResource.Certificate != nil && setting.SslResource.PrivateKey != nil {
-		err = os.WriteFile(self.GetNginxCertPath()+fmt.Sprintf(CertFileName, setting.ServerName), setting.SslResource.Certificate, 0666)
+	if setting.SslCrt != "" && setting.SslKey != "" {
+		err = os.WriteFile(siteSettingPath.CertPath, []byte(setting.SslCrt), 0666)
 		if err != nil {
 			return err
 		}
-		err = os.WriteFile(self.GetNginxCertPath()+fmt.Sprintf(KeyFileName, setting.ServerName), []byte(setting.SslResource.PrivateKey), 0666)
+		err = os.WriteFile(siteSettingPath.KeyPath, []byte(setting.SslKey), 0666)
 		if err != nil {
 			return err
 		}
@@ -152,12 +153,4 @@ func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error 
 		return err
 	}
 	return nil
-}
-
-func (self Site) GetNginxSettingPath() string {
-	return fmt.Sprintf("%s/nginx/proxy_host/", facade.GetConfig().Get("storage.local.path"))
-}
-
-func (self Site) GetNginxCertPath() string {
-	return fmt.Sprintf("%s/nginx/cert/", facade.GetConfig().Get("storage.local.path"))
 }

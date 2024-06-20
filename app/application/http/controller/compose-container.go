@@ -21,7 +21,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
-	err := logic.Compose{}.Deploy(&logic.ComposeTask{
+	err := logic.Compose{}.Deploy(&logic.ComposeTaskOption{
 		SiteName: composeRow.Name,
 		Yaml:     composeRow.Yaml,
 	})
@@ -49,7 +49,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		return
 	}
 
-	err := logic.Compose{}.Destroy(&logic.ComposeTask{
+	err := logic.Compose{}.Destroy(&logic.ComposeTaskOption{
 		SiteName:    composeRow.Name,
 		Yaml:        composeRow.Yaml,
 		DeleteImage: params.DeleteImage,
@@ -78,7 +78,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		return
 	}
 
-	err := logic.Compose{}.Ctrl(&logic.ComposeTask{
+	err := logic.Compose{}.Ctrl(&logic.ComposeTaskOption{
 		SiteName: composeRow.Name,
 		Yaml:     composeRow.Yaml,
 	}, params.Op)

@@ -1,66 +1,97 @@
 package logic
 
 import (
-	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"fmt"
-	"github.com/go-acme/lego/v4/registration"
-	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
-	"os"
+	"errors"
+	"github.com/donknap/dpanel/common/service/exec"
+	"strings"
 )
 
-type acmeUser struct {
-	Email        string
-	Registration *registration.Resource
-	key          crypto.PrivateKey
+type Acme struct {
 }
 
-func NewAcmeUser(email string) (*acmeUser, error) {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, err
+const (
+	commandName = "/Users/renchao/.acme.sh/acme.sh"
+)
+
+type AcmeIssueOption struct {
+	ServerName  string
+	CertServer  string
+	Email       string
+	AutoUpgrade bool
+	Force       bool
+	Renew       bool
+}
+
+type acmeInfoResult struct {
+	CreateTimeStr string
+	RenewTimeStr  string
+}
+
+func (self AcmeIssueOption) to() ([]string, error) {
+	var command []string
+	if self.ServerName == "" || self.Email == "" {
+		return nil, errors.New("缺少生成参数")
 	}
-	return &acmeUser{
-		Email: email,
-		key:   privateKey,
-	}, nil
+	if self.ServerName != "" {
+		command = append(command, "--domain", self.ServerName)
+
+		settingPath := Site{}.GetSiteNginxSetting(self.ServerName)
+		command = append(command, "--nginx", settingPath.ConfPath)
+		command = append(command, "--key-file", settingPath.CertPath)
+		command = append(command, "--fullchain-file", settingPath.KeyPath)
+	}
+	if self.CertServer != "" {
+		command = append(command, "--server", self.CertServer)
+	}
+	if self.Email != "" {
+		command = append(command, "--email", self.Email)
+	}
+	if self.AutoUpgrade {
+		command = append(command, "--auto-upgrade", "1")
+	}
+	if self.Force {
+		command = append(command, "--force")
+	}
+
+	return command, nil
 }
 
-func (u *acmeUser) GetEmail() string {
-	return u.Email
-}
-func (u acmeUser) GetRegistration() *registration.Resource {
-	return u.Registration
-}
-func (u *acmeUser) GetPrivateKey() crypto.PrivateKey {
-	return u.key
-}
-
-type acmeNginxProvider struct {
-}
-
-func NewAcmeNginxProvider() *acmeNginxProvider {
-	return &acmeNginxProvider{}
-}
-
-func (self acmeNginxProvider) Present(domain, token, keyAuth string) error {
-	err := os.WriteFile(self.getChallengeFilePath(token), []byte(keyAuth), 0666)
+func (self Acme) Issue(option *AcmeIssueOption) error {
+	command, err := option.to()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%v \n", domain)
-	fmt.Printf("%v \n", token)
-	fmt.Printf("%v \n", keyAuth)
+	if option.Renew {
+		command = append(command, "--renew", "--force")
+	} else {
+		command = append(command, "--issue")
+	}
+
+	exec.Command{}.Run(&exec.RunCommandOption{
+		CmdName: commandName,
+		CmdArgs: command,
+	})
 	return nil
 }
 
-func (self acmeNginxProvider) CleanUp(domain, token, keyAuth string) error {
-	_ = os.Remove(self.getChallengeFilePath(token))
-	return nil
-}
-
-func (self acmeNginxProvider) getChallengeFilePath(token string) string {
-	return fmt.Sprintf("%s/challenge/.well-known/acme-challenge/%s", facade.GetConfig().GetString("storage.local.path"), token)
+func (self Acme) Info(serverName string) *acmeInfoResult {
+	out := exec.Command{}.RunWithOut(&exec.RunCommandOption{
+		CmdName: commandName,
+		CmdArgs: []string{
+			"--info",
+			"--domain", serverName,
+		},
+	})
+	result := &acmeInfoResult{}
+	for _, row := range strings.Split(out, "\n") {
+		if strings.HasPrefix(row, "Le_CertCreateTimeStr=") {
+			value, _ := strings.CutPrefix(row, "Le_CertCreateTimeStr=")
+			result.CreateTimeStr = value
+		}
+		if strings.HasPrefix(row, "Le_NextRenewTimeStr=") {
+			value, _ := strings.CutPrefix(row, "Le_NextRenewTimeStr=")
+			result.RenewTimeStr = value
+		}
+	}
+	return result
 }

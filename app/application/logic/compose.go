@@ -1,16 +1,10 @@
 package logic
 
 import (
-	"github.com/creack/pty"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec"
 	"gopkg.in/yaml.v3"
-	"io"
-	"log/slog"
 	"os"
-	"os/exec"
 )
-
-var cmd *exec.Cmd
 
 type dockerComposeYamlV2 struct {
 	Service map[string]struct {
@@ -19,18 +13,10 @@ type dockerComposeYamlV2 struct {
 	} `yaml:"service"`
 }
 
-type ComposeTask struct {
+type ComposeTaskOption struct {
 	SiteName    string
 	Yaml        string
 	DeleteImage bool
-}
-
-type writer struct {
-}
-
-func (self *writer) Write(p []byte) (n int, err error) {
-	docker.QueueDockerComposeMessage <- string(p)
-	return len(p), nil
 }
 
 type Compose struct {
@@ -45,7 +31,7 @@ func (self Compose) GetYaml(yamlStr string) (*dockerComposeYamlV2, error) {
 	return yamlObj, nil
 }
 
-func (self Compose) Deploy(task *ComposeTask) error {
+func (self Compose) Deploy(task *ComposeTaskOption) error {
 	yamlFile, _ := os.CreateTemp("", "dpanel-compose")
 	err := os.WriteFile(yamlFile.Name(), []byte(task.Yaml), 0666)
 	if err != nil {
@@ -65,7 +51,7 @@ func (self Compose) Deploy(task *ComposeTask) error {
 	return nil
 }
 
-func (self Compose) Destroy(task *ComposeTask) error {
+func (self Compose) Destroy(task *ComposeTaskOption) error {
 	yamlFile, err := self.getYamlFile(task.Yaml)
 	if err != nil {
 		return err
@@ -87,7 +73,7 @@ func (self Compose) Destroy(task *ComposeTask) error {
 	return nil
 }
 
-func (self Compose) Ctrl(task *ComposeTask, op string) error {
+func (self Compose) Ctrl(task *ComposeTaskOption, op string) error {
 	yamlFile, err := self.getYamlFile(task.Yaml)
 	if err != nil {
 		return err
@@ -117,20 +103,14 @@ func (self Compose) Ls(projectName string) error {
 }
 
 func (self Compose) Kill() error {
-	if cmd != nil {
-		return cmd.Process.Kill()
-	}
-	return nil
+	return exec.Command{}.Kill()
 }
 
 func (self Compose) runCommand(command []string) {
-	myWrite := &writer{}
-	cmd = exec.Command("docker-compose", command...)
-	out, err := pty.Start(cmd)
-	if err != nil {
-		slog.Debug("docker-compose up", err.Error())
-	}
-	io.Copy(myWrite, out)
+	exec.Command{}.RunInTerminal(&exec.RunCommandOption{
+		CmdName: "docker-compose",
+		CmdArgs: command,
+	})
 }
 
 func (self Compose) getYamlFile(yamlContent string) (*os.File, error) {

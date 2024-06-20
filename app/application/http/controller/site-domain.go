@@ -11,9 +11,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
-	"github.com/go-acme/lego/v4/certificate"
-	"github.com/go-acme/lego/v4/lego"
-	"github.com/go-acme/lego/v4/registration"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"html/template"
 	"os"
@@ -94,10 +91,8 @@ func (self SiteDomain) Create(http *gin.Context) {
 		ExtraNginx:                template.HTML(params.ExtraNginx),
 		EnableSSL:                 params.Schema == "https",
 		TargetName:                function.GetMd5(params.ServerName),
-		SslResource: &certificate.Resource{
-			Certificate: []byte(params.SslCrt),
-			PrivateKey:  []byte(params.SslKey),
-		},
+		SslCrt:                    params.SslCrt,
+		SslKey:                    params.SslKey,
 	}
 
 	err = logic.Site{}.MakeNginxConf(domainSetting)
@@ -172,8 +167,7 @@ func (self SiteDomain) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("域名不存在"), 500)
 		return
 	}
-
-	vhost, err := os.ReadFile(logic.Site{}.GetNginxSettingPath() + fmt.Sprintf(logic.VhostFileName, domainRow.ServerName))
+	vhost, err := logic.Site{}.GetSiteNginxSetting(domainRow.ServerName).GetConfContent()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -196,9 +190,7 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	}
 	list, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
 	for _, item := range list {
-		go os.Remove(logic.Site{}.GetNginxSettingPath() + fmt.Sprintf(logic.VhostFileName, item.ServerName))
-		go os.Remove(logic.Site{}.GetNginxCertPath() + fmt.Sprintf(logic.CertFileName, item.ServerName))
-		go os.Remove(logic.Site{}.GetNginxCertPath() + fmt.Sprintf(logic.KeyFileName, item.ServerName))
+		go logic.Site{}.GetSiteNginxSetting(item.ServerName).RemoveAll()
 	}
 	_, err := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Delete()
 	if err != nil {
@@ -224,8 +216,11 @@ func (self SiteDomain) Delete(http *gin.Context) {
 
 func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 	type ParamsValidate struct {
-		Id    int32  `json:"id" binding:"required"`
-		Email string `json:"email" binding:"required"`
+		Id          int32  `json:"id" binding:"required"`
+		Email       string `json:"email" binding:"required"`
+		CertServer  string `json:"certServer" binding:"required" oneof:"zerossl letsencrypt"`
+		AuthUpgrade bool   `json:"authUpgrade"`
+		Renew       bool   `json:"renew"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -236,36 +231,32 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("域名不存在"), 500)
 		return
 	}
-	acmeUser, err := logic.NewAcmeUser(params.Email)
+
+	err := logic.Acme{}.Issue(&logic.AcmeIssueOption{
+		ServerName:  domain.ServerName,
+		Email:       params.Email,
+		CertServer:  params.CertServer,
+		AutoUpgrade: params.AuthUpgrade,
+		Renew:       params.Renew,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	client, err := lego.NewClient(lego.NewConfig(acmeUser))
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+
+	siteNginxSetting := logic.Site{}.GetSiteNginxSetting(domain.ServerName)
+	certContent, err := siteNginxSetting.GetCertContent()
+	if os.IsNotExist(err) {
+		self.JsonResponseWithError(http, errors.New("证书申请失败，请查看控制台日志"), 500)
 		return
 	}
-	err = client.Challenge.SetHTTP01Provider(logic.NewAcmeNginxProvider())
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	keyContent, err := siteNginxSetting.GetKeyContent()
+	if os.IsNotExist(err) {
+		self.JsonResponseWithError(http, errors.New("证书申请失败，请查看控制台日志"), 500)
 		return
 	}
-	reg, err := client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	acmeUser.Registration = reg
-	request := certificate.ObtainRequest{
-		Domains: []string{domain.ServerName},
-		Bundle:  true,
-	}
-	certificates, err := client.Certificate.Obtain(request)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+
+	certInfo := logic.Acme{}.Info(domain.ServerName)
 
 	domainSetting := &accessor.SiteDomainSettingOption{
 		ServerName:                domain.ServerName,
@@ -277,7 +268,10 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		ExtraNginx:                domain.Setting.ExtraNginx,
 		EnableSSL:                 true,
 		TargetName:                function.GetMd5(domain.Setting.ServerName),
-		SslResource:               certificates,
+		SslCrt:                    string(certContent),
+		SslKey:                    string(keyContent),
+		SslCrtCreaeTime:           certInfo.CreateTimeStr,
+		SslCrtRenewTime:           certInfo.RenewTimeStr,
 	}
 
 	err = logic.Site{}.MakeNginxConf(domainSetting)
