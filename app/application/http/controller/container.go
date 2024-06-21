@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/volume"
+	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
@@ -232,6 +233,14 @@ func (self Container) Delete(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	// 删除域名、配置、证书
+	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.Name)).Find()
+	for _, domain := range domainList {
+		logic.Site{}.GetSiteNginxSetting(domain.ServerName).RemoveAll()
+	}
+	dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.ID)).Delete()
+
 	if !function.IsEmptyArray(containerInfo.HostConfig.Links) {
 		params.DeleteLink = true
 	} else {
