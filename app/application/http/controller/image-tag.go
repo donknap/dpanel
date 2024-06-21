@@ -125,44 +125,51 @@ func (self Image) TagAdd(http *gin.Context) {
 func (self Image) TagSync(http *gin.Context) {
 	type ParamsValidate struct {
 		Tag        []string `json:"tag" binding:"required"`
-		RegistryId int32    `form:"registryId" binding:"required"`
+		RegistryId []int32  `json:"registryId" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	registry, _ := dao.Registry.Where(dao.Registry.ID.Eq(params.RegistryId)).First()
-	if registry == nil {
-		self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
+	if function.IsEmptyArray(params.Tag) {
+		self.JsonResponseWithError(http, errors.New("请选择要推送的镜像"), 500)
 		return
 	}
-	authString := logic.Image{}.GetRegistryAuthString(registry.ServerAddress, registry.Username, registry.Password)
-	for _, tag := range params.Tag {
-		imageDetail, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, tag)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
+	for _, id := range params.RegistryId {
+		registry, _ := dao.Registry.Where(dao.Registry.ID.Eq(id)).First()
+		if registry == nil {
+			self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
 			return
 		}
-		imageName := logic.Image{}.GetImageTagDetail(imageDetail.RepoTags[0])
-		newImageName := logic.Image{}.GetImageName(&logic.ImageNameOption{
-			Registry: registry.ServerAddress,
-			Name:     imageName.ImageName,
-		})
-		err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, imageName.ImageName, newImageName)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
-			Auth: authString,
-			Type: "push",
-			Tag:  newImageName,
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
+		authString := logic.Image{}.GetRegistryAuthString(registry.ServerAddress, registry.Username, registry.Password)
+		for _, tag := range params.Tag {
+			imageDetail, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, tag)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			imageName := logic.Image{}.GetImageTagDetail(imageDetail.RepoTags[0])
+			newImageName := logic.Image{}.GetImageName(&logic.ImageNameOption{
+				Registry: registry.ServerAddress,
+				Name:     imageName.ImageName,
+			})
+			err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, imageName.ImageName, newImageName)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
+				Auth: authString,
+				Type: "push",
+				Tag:  newImageName,
+			})
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 	}
+
 	self.JsonSuccessResponse(http)
 	return
 }
