@@ -118,6 +118,7 @@ func (self Home) WsConsole(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
+	dpanelContainerInfo, _ := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
 	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -143,9 +144,10 @@ func (self Home) Info(http *gin.Context) {
 			"containerTask": int(containerTask),
 			"imageTask":     int(imageTask),
 		},
-		"dpanel": map[string]string{
-			"version": facade.GetConfig().GetString("app.version"),
-			"release": "",
+		"dpanel": map[string]interface{}{
+			"version":       facade.GetConfig().GetString("app.version"),
+			"release":       "",
+			"containerInfo": dpanelContainerInfo,
 		},
 	})
 	return

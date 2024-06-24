@@ -6,6 +6,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/app/application/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
@@ -143,15 +144,17 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 
 func (self Image) CreateByDockerfile(http *gin.Context) {
 	type ParamsValidate struct {
-		Id              int32  `form:"id"`
-		Registry        string `form:"registry"`
-		Tag             string `form:"tag" binding:"required"`
+		Id              int32  `json:"id"`
+		Registry        string `json:"registry"`
+		Tag             string `json:"tag" binding:"required"`
 		Title           string `json:"title"`
-		BuildType       string `form:"buildType" binding:"required"`
-		BuildDockerfile string `form:"buildDockerfile" binding:"omitempty"`
-		BuildGit        string `form:"buildGit" binding:"omitempty"`
-		BuildZip        string `form:"buildZip" binding:"omitempty"`
-		BuildRoot       string `form:"buildRoot" binding:"omitempty"`
+		BuildType       string `json:"buildType" binding:"required"`
+		BuildDockerfile string `json:"buildDockerfile" binding:"omitempty"`
+		BuildGit        string `json:"buildGit" binding:"omitempty"`
+		BuildZip        string `json:"buildZip" binding:"omitempty"`
+		BuildRoot       string `json:"buildRoot" binding:"omitempty"`
+		Platform        string `json:"platform"`
+		PlatformArch    string `json:"platformArch"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -210,15 +213,18 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		buildImageTask.GitUrl = params.BuildGit
 	}
 	imageNew := &entity.Image{
-		Registry:        params.Registry,
-		Tag:             imageName,
-		Title:           params.Title,
-		BuildGit:        params.BuildGit,
-		BuildDockerfile: params.BuildDockerfile,
-		BuildRoot:       params.BuildRoot,
-		BuildType:       params.BuildType,
-		Status:          logic.StatusStop,
-		Message:         "",
+		Tag:   imageName,
+		Title: params.Title,
+		Setting: &accessor.ImageSettingOption{
+			Registry:        params.Registry,
+			BuildGit:        params.BuildGit,
+			BuildDockerfile: params.BuildDockerfile,
+			BuildRoot:       params.BuildRoot,
+			Platform:        params.Platform,
+		},
+		BuildType: params.BuildType,
+		Status:    logic.StatusStop,
+		Message:   "",
 	}
 	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
 	if imageRow == nil {
@@ -231,16 +237,18 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 			_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, imageName, imageName+"-deprecated-"+function.GetRandomString(6))
 		}
 		dao.Image.Select(
-			dao.Image.BuildDockerfile,
-			dao.Image.BuildRoot,
-			dao.Image.BuildGit,
 			dao.Image.Status,
 			dao.Image.Message,
-			dao.Image.Registry,
 			dao.Image.Tag,
+			dao.Image.Setting,
 		).Where(dao.Image.ID.Eq(imageRow.ID)).Updates(imageNew)
 	}
 	buildImageTask.ImageId = imageRow.ID
+
+	buildImageTask.Platform = &logic.Platform{
+		Type: params.Platform,
+		Arch: params.PlatformArch,
+	}
 
 	err := logic.DockerTask{}.ImageBuild(buildImageTask)
 	if err != nil {

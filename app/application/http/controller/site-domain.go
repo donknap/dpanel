@@ -31,14 +31,11 @@ func (self SiteDomain) Create(http *gin.Context) {
 	type ParamsValidate struct {
 		ContainerId               string `json:"containerId" binding:"required"`
 		ServerName                string `json:"serverName" binding:"required"`
-		Schema                    string `json:"schema" binding:"omitempty,oneof=http https"`
 		Port                      int32  `json:"port" binding:"required"`
 		EnableBlockCommonExploits bool   `json:"enableBlockCommonExploits"`
 		EnableAssetCache          bool   `json:"enableAssetCache"`
 		EnableWs                  bool   `json:"enableWs"`
 		ExtraNginx                string `json:"extraNginx"`
-		SslCrt                    string `json:"sslCrt"`
-		SslKey                    string `json:"sslKey"`
 	}
 
 	params := ParamsValidate{}
@@ -50,12 +47,15 @@ func (self SiteDomain) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	siteDomainRow, _ := dao.SiteDomain.Where(dao.SiteDomain.ServerName.Eq(params.ServerName)).First()
+
+	var siteDomainRow *entity.SiteDomain
+	var domainSetting *accessor.SiteDomainSettingOption
+
+	siteDomainRow, _ = dao.SiteDomain.Where(dao.SiteDomain.ServerName.Eq(params.ServerName)).First()
 	if siteDomainRow != nil {
 		self.JsonResponseWithError(http, errors.New("域名已经存在"), 500)
 		return
 	}
-
 	// 将当前容器加入到默认 dpanel-local 网络中，并指定 Hostname 用于 Nginx 反向代理
 	_, err = docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, defaultNetworkName, network.InspectOptions{})
 	if err != nil {
@@ -67,6 +67,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
 		ID: params.ContainerId,
 	})).First()
+
 	if siteRow != nil {
 		hostname = fmt.Sprintf(docker.HostnameTemplate, siteRow.SiteName)
 	}
@@ -83,18 +84,16 @@ func (self SiteDomain) Create(http *gin.Context) {
 		}
 	}
 
-	domainSetting := &accessor.SiteDomainSettingOption{
+	domainSetting = &accessor.SiteDomainSettingOption{
 		ServerName:                params.ServerName,
-		Port:                      params.Port,
 		ServerAddress:             hostname,
+		Port:                      params.Port,
 		EnableBlockCommonExploits: params.EnableBlockCommonExploits,
 		EnableWs:                  params.EnableWs,
 		EnableAssetCache:          params.EnableAssetCache,
+		EnableSSL:                 false,
 		ExtraNginx:                template.HTML(params.ExtraNginx),
-		EnableSSL:                 params.Schema == "https",
 		TargetName:                function.GetMd5(params.ServerName),
-		SslCrt:                    params.SslCrt,
-		SslKey:                    params.SslKey,
 	}
 
 	err = logic.Site{}.MakeNginxConf(domainSetting)
@@ -203,10 +202,14 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	if list != nil && len(list) > 0 {
 		count, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(list[0].ContainerID)).Count()
 		if count == 0 {
-			err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, defaultNetworkName, list[0].ContainerID, false)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
+			// 如果只有dpanel-local一个网络则保留
+			containerInfo, err := docker.Sdk.ContainerInfo(list[0].ContainerID)
+			if err == nil && len(containerInfo.NetworkSettings.Networks) > 1 {
+				err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, defaultNetworkName, list[0].ContainerID, false)
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
 			}
 		}
 	}
@@ -312,6 +315,64 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		}()
 	}()
 
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self SiteDomain) UpdateDomain(http *gin.Context) {
+	type ParamsValidate struct {
+		Id                        int32  `json:"id" binding:"required"`
+		SslCrt                    string `json:"sslCrt"`
+		SslKey                    string `json:"sslKey"`
+		SslCrtRenewTime           string `json:"sslCrtRenewTime"`
+		Port                      int32  `json:"port"`
+		EnableBlockCommonExploits bool   `json:"enableBlockCommonExploits"`
+		EnableAssetCache          bool   `json:"enableAssetCache"`
+		EnableWs                  bool   `json:"enableWs"`
+		ExtraNginx                string `json:"extraNginx"`
+	}
+
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	siteDomainRow, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(params.Id)).First()
+	if siteDomainRow == nil {
+		self.JsonResponseWithError(http, errors.New("域名不存在，请先添加域名"), 500)
+		return
+	}
+	// 站点基本信息
+	if params.Port != 0 {
+		siteDomainRow.Setting.Port = params.Port
+	}
+
+	siteDomainRow.Setting.EnableBlockCommonExploits = params.EnableBlockCommonExploits
+	siteDomainRow.Setting.EnableAssetCache = params.EnableAssetCache
+	siteDomainRow.Setting.EnableWs = params.EnableWs
+
+	if params.ExtraNginx != "" {
+		siteDomainRow.Setting.ExtraNginx = template.HTML(params.ExtraNginx)
+	}
+	// 手动导入证书
+	if params.SslCrt != "" && params.SslKey != "" {
+		siteDomainRow.Setting.SslCrt = params.SslCrt
+		siteDomainRow.Setting.SslKey = params.SslKey
+		siteDomainRow.Setting.AutoSsl = false
+		siteDomainRow.Setting.SslCrtRenewTime = params.SslCrtRenewTime
+		siteDomainRow.Setting.EnableSSL = true
+	}
+	err := logic.Site{}.MakeNginxConf(siteDomainRow.Setting)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	_, err = dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(params.Id)).Updates(&entity.SiteDomain{
+		Setting: siteDomainRow.Setting,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	self.JsonSuccessResponse(http)
 	return
 }

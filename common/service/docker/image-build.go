@@ -3,9 +3,9 @@ package docker
 import (
 	"archive/tar"
 	"archive/zip"
-	"context"
 	"errors"
 	"github.com/docker/docker/api/types"
+	"github.com/donknap/dpanel/common/function"
 	"io"
 	"log/slog"
 	"os"
@@ -33,6 +33,11 @@ func (self *imageBuildBuilder) WithDockerFilePath(path string) {
 
 func (self *imageBuildBuilder) WithTag(name string) {
 	self.imageBuildOption.Tags = append(self.imageBuildOption.Tags, name)
+}
+
+func (self *imageBuildBuilder) WithPlatform(name string, arch string) {
+	self.imageBuildOption.Platform = name
+	self.imageBuildOption.BuildArgs["TARGETARCH"] = function.PtrString(arch)
 }
 
 // fileInfo, _ := file.Stat()
@@ -85,12 +90,8 @@ func (self *imageBuildBuilder) Execute() (response types.ImageBuildResponse, err
 	if err != nil {
 		return response, err
 	}
-	if self.imageBuildOption.RemoteContext != "" {
-		response, err = Sdk.Client.ImageBuild(context.Background(), tarArchive, self.imageBuildOption)
-		if err != nil {
-			return response, err
-		}
-	} else {
+
+	if self.imageBuildOption.RemoteContext == "" {
 		tarWriter := tar.NewWriter(tarArchive)
 		defer tarWriter.Close()
 		defer os.Remove(tarArchive.Name())
@@ -101,6 +102,7 @@ func (self *imageBuildBuilder) Execute() (response types.ImageBuildResponse, err
 				return response, err
 			}
 		}
+
 		if self.dockerFileContent != nil {
 			file, _ := os.CreateTemp("", "dpanel")
 			defer file.Close()
@@ -124,10 +126,10 @@ func (self *imageBuildBuilder) Execute() (response types.ImageBuildResponse, err
 			}
 		}
 		tarArchive.Seek(0, io.SeekStart)
-		response, err = Sdk.Client.ImageBuild(context.Background(), tarArchive, self.imageBuildOption)
-		if err != nil {
-			return response, err
-		}
+	}
+	response, err = Sdk.Client.ImageBuild(Sdk.Ctx, tarArchive, self.imageBuildOption)
+	if err != nil {
+		return response, err
 	}
 	return response, nil
 }

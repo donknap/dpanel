@@ -88,6 +88,7 @@ func (self Builder) GetImageBuildBuilder() *imageBuildBuilder {
 				"BuildWebSite": BuildWebSite,
 				"buildVersion": BuildVersion,
 			},
+			BuildArgs: map[string]*string{},
 		},
 	}
 	return builder

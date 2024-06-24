@@ -27,6 +27,9 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
 	if buildImageTask.GitUrl != "" {
 		builder.WithGitUrl(buildImageTask.GitUrl)
 	}
+	if buildImageTask.Platform != nil {
+		builder.WithPlatform(buildImageTask.Platform.Type, buildImageTask.Platform.Arch)
+	}
 	builder.WithTag(buildImageTask.Tag)
 	response, err := builder.Execute()
 	if err != nil {

@@ -12,6 +12,9 @@ relation:
     column:
       image_info:
         type: ImageInfoOption
+      setting:
+        type: ImageSettingOption
+        serializer: json
   - table: ims_setting
     column:
       value:

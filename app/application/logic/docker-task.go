@@ -19,6 +19,12 @@ type BuildImageMessage struct {
 	Tag               string // 镜像Tag
 	ImageId           int32
 	Context           string // Dockerfile 所在的目录
+	Platform          *Platform
+}
+
+type Platform struct {
+	Type string
+	Arch string
 }
 
 type ImageRemoteMessage struct {
