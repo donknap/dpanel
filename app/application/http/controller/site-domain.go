@@ -16,7 +16,6 @@ import (
 	"html/template"
 	"os"
 	"strings"
-	"time"
 )
 
 var (
@@ -36,6 +35,9 @@ func (self SiteDomain) Create(http *gin.Context) {
 		EnableAssetCache          bool   `json:"enableAssetCache"`
 		EnableWs                  bool   `json:"enableWs"`
 		ExtraNginx                string `json:"extraNginx"`
+		SslCrt                    string `json:"sslCrt"`
+		SslKey                    string `json:"sslKey"`
+		SslCrtRenewTime           string `json:"sslCrtRenewTime"`
 	}
 
 	params := ParamsValidate{}
@@ -94,6 +96,12 @@ func (self SiteDomain) Create(http *gin.Context) {
 		EnableSSL:                 false,
 		ExtraNginx:                template.HTML(params.ExtraNginx),
 		TargetName:                function.GetMd5(params.ServerName),
+	}
+	if params.SslKey != "" && params.SslCrt != "" && params.SslCrtRenewTime != "" {
+		domainSetting.SslKey = params.SslKey
+		domainSetting.SslCrt = params.SslCrt
+		domainSetting.SslCrtRenewTime = params.SslCrtRenewTime
+		domainSetting.EnableSSL = true
 	}
 
 	err = logic.Site{}.MakeNginxConf(domainSetting)
@@ -221,37 +229,44 @@ func (self SiteDomain) Delete(http *gin.Context) {
 
 func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 	type ParamsValidate struct {
-		Id          int32  `json:"id" binding:"required"`
-		Email       string `json:"email" binding:"required"`
-		CertServer  string `json:"certServer" binding:"required" oneof:"zerossl letsencrypt"`
-		AuthUpgrade bool   `json:"authUpgrade"`
-		Renew       bool   `json:"renew"`
-		Debug       bool   `json:"debug"`
+		Id          []int32 `json:"id" binding:"required"`
+		Email       string  `json:"email" binding:"required"`
+		CertServer  string  `json:"certServer" binding:"required" oneof:"zerossl letsencrypt"`
+		AuthUpgrade bool    `json:"authUpgrade"`
+		Renew       bool    `json:"renew"`
+		Debug       bool    `json:"debug"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	domain, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(params.Id)).First()
-	if domain == nil {
+	var serverNameList []string
+
+	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
+	if function.IsEmptyArray(domainList) || len(domainList) != len(params.Id) {
 		self.JsonResponseWithError(http, errors.New("域名不存在"), 500)
 		return
 	}
 
+	for _, domain := range domainList {
+		serverNameList = append(serverNameList, domain.ServerName)
+	}
+
 	err := logic.Acme{}.Issue(&logic.AcmeIssueOption{
-		ServerName:  domain.ServerName,
+		ServerName:  serverNameList,
 		Email:       params.Email,
 		CertServer:  params.CertServer,
 		AutoUpgrade: params.AuthUpgrade,
 		Renew:       params.Renew,
 		Debug:       params.Debug,
 	})
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
-	siteNginxSetting := logic.Site{}.GetSiteNginxSetting(domain.ServerName)
+	siteNginxSetting := logic.Site{}.GetSiteNginxSetting(serverNameList[0])
 	certContent, err := siteNginxSetting.GetCertContent()
 	if os.IsNotExist(err) {
 		self.JsonResponseWithError(http, errors.New("证书申请失败，请查看控制台日志"), 500)
@@ -263,58 +278,44 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		return
 	}
 
-	certInfo := logic.Acme{}.Info(domain.ServerName)
+	certInfo := logic.Acme{}.Info(serverNameList[0])
 	if certInfo.CreateTimeStr == "" || certInfo.RenewTimeStr == "" {
 		self.JsonResponseWithError(http, errors.New("证书申请失败，请查看控制台日志"), 500)
 		return
 	}
 
-	domainSetting := &accessor.SiteDomainSettingOption{
-		ServerName:                domain.ServerName,
-		Port:                      domain.Setting.Port,
-		ServerAddress:             domain.Setting.ServerAddress,
-		EnableBlockCommonExploits: domain.Setting.EnableBlockCommonExploits,
-		EnableWs:                  domain.Setting.EnableWs,
-		EnableAssetCache:          domain.Setting.EnableAssetCache,
-		ExtraNginx:                domain.Setting.ExtraNginx,
-		EnableSSL:                 true,
-		TargetName:                function.GetMd5(domain.Setting.ServerName),
-		SslCrt:                    string(certContent),
-		SslKey:                    string(keyContent),
-		SslCrtCreaeTime:           certInfo.CreateTimeStr,
-		SslCrtRenewTime:           certInfo.RenewTimeStr,
-		AutoSsl:                   true,
+	for _, domain := range domainList {
+		domainSetting := &accessor.SiteDomainSettingOption{
+			ServerName:                domain.ServerName,
+			Port:                      domain.Setting.Port,
+			ServerAddress:             domain.Setting.ServerAddress,
+			EnableBlockCommonExploits: domain.Setting.EnableBlockCommonExploits,
+			EnableWs:                  domain.Setting.EnableWs,
+			EnableAssetCache:          domain.Setting.EnableAssetCache,
+			ExtraNginx:                domain.Setting.ExtraNginx,
+			EnableSSL:                 true,
+			TargetName:                function.GetMd5(domain.Setting.ServerName),
+			SslCrt:                    string(certContent),
+			SslKey:                    string(keyContent),
+			SslCrtCreaeTime:           certInfo.CreateTimeStr,
+			SslCrtRenewTime:           certInfo.RenewTimeStr,
+			AutoSsl:                   true,
+		}
+		err = logic.Site{}.MakeNginxConf(domainSetting)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
+		_, err = dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(domain.ID)).Updates(&entity.SiteDomain{
+			Setting: domainSetting,
+		})
+
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
-
-	err = logic.Site{}.MakeNginxConf(domainSetting)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	_, err = dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(params.Id)).Updates(&entity.SiteDomain{
-		Setting: domainSetting,
-	})
-
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		go func() {
-			time.Sleep(3 * time.Second)
-			exec.Command{}.RunWithOut(&exec.RunCommandOption{
-				CmdName: "nginx",
-				CmdArgs: []string{
-					"-s", "stop",
-				},
-			})
-			exec.Command{}.RunWithOut(&exec.RunCommandOption{
-				CmdName: "nginx",
-			})
-		}()
-	}()
-
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -354,7 +355,7 @@ func (self SiteDomain) UpdateDomain(http *gin.Context) {
 		siteDomainRow.Setting.ExtraNginx = template.HTML(params.ExtraNginx)
 	}
 	// 手动导入证书
-	if params.SslCrt != "" && params.SslKey != "" {
+	if params.SslCrt != "" && params.SslKey != "" && siteDomainRow.Setting.AutoSsl == false {
 		siteDomainRow.Setting.SslCrt = params.SslCrt
 		siteDomainRow.Setting.SslKey = params.SslKey
 		siteDomainRow.Setting.AutoSsl = false

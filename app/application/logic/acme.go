@@ -2,6 +2,7 @@ package logic
 
 import (
 	"errors"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
 	"strings"
 )
@@ -14,13 +15,14 @@ const (
 )
 
 type AcmeIssueOption struct {
-	ServerName  string
+	ServerName  []string
 	CertServer  string
 	Email       string
 	AutoUpgrade bool
 	Force       bool
 	Renew       bool
 	Debug       bool
+	FileName    string
 }
 
 type acmeInfoResult struct {
@@ -30,14 +32,16 @@ type acmeInfoResult struct {
 
 func (self AcmeIssueOption) to() ([]string, error) {
 	var command []string
-	if self.ServerName == "" || self.Email == "" {
+	if function.IsEmptyArray(self.ServerName) || self.Email == "" {
 		return nil, errors.New("缺少生成参数")
 	}
-	if self.ServerName != "" {
-		command = append(command, "--domain", self.ServerName)
+	if !function.IsEmptyArray(self.ServerName) {
+		for _, serverName := range self.ServerName {
+			command = append(command, "--domain", serverName)
+		}
+		settingPath := Site{}.GetSiteNginxSetting(self.ServerName[0])
 
-		settingPath := Site{}.GetSiteNginxSetting(self.ServerName)
-		command = append(command, "--nginx", settingPath.ConfPath)
+		command = append(command, "--nginx")
 		command = append(command, "--key-file", settingPath.KeyPath)
 		command = append(command, "--fullchain-file", settingPath.CertPath)
 	}

@@ -10,7 +10,10 @@ upstream {{.TargetName}} {
 server {
     listen 80;
     server_name {{.ServerName}};
-    rewrite ^(.*) https://$server_name$1 permanent;
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
 }
 {{end}}
 
