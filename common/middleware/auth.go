@@ -18,6 +18,7 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 	if function.InArray([]string{
 		"/common/user/login",
 		"/api/common/user/login",
+		"/common/home/info",
 	}, http.Request.URL.Path) {
 		http.Next()
 		return
