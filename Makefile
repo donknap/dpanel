@@ -10,14 +10,12 @@ build: clean
 	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ \
 	go build -ldflags '-s -w' -gcflags="all=-trimpath=${PWD}" -asmflags="all=-trimpath=${PWD}" -o ${GO_BIN}/${PROJECT_NAME} ${SOURCE_FILES}
 
-	cp ${GO_BIN}/${PROJECT_NAME} ${TARGET_DIR}/server
 	cp ${GO_BIN}/${PROJECT_NAME} ${TARGET_DIR}/server/${PROJECT_NAME}-amd64
-
 	cp ${GO_BASE}/config.yaml ${TARGET_DIR}/server
 
 	cd ${JS_DIR} && npm run build && cp -r $(JS_DIR)/dist/* ${TARGET_DIR}/html
-#	cd ${TARGET_DIR} && git add . && git commit -a -m "update"
-#	cd ${TARGET_DIR} && git push
+	cd ${TARGET_DIR} && git add . && git commit -a -m "update"
+	cd ${TARGET_DIR} && git push
 build-windows: clean
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o ${GO_BIN}/${PROJECT_NAME}.exe ${SOURCE_FILES}
 	cp ${GO_BIN}/${PROJECT_NAME}.exe ${TARGET_DIR}/server
