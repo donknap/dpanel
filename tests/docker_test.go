@@ -15,10 +15,8 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/pkg/archive"
-	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/go-acme/lego/v4/lego"
 	"github.com/go-acme/lego/v4/registration"
 	"io"
 	"math"
@@ -338,20 +336,5 @@ func (u *MyUser) GetPrivateKey() crypto.PrivateKey {
 }
 
 func TestExportContainer(t *testing.T) {
-	acmeUser, err := logic.NewAcmeUser("914417117@qq.com")
-	if err != nil {
-		fmt.Printf("%v \n", err)
-		return
-	}
-	client, err := lego.NewClient(lego.NewConfig(acmeUser))
-	if err != nil {
-		fmt.Printf("%v \n", err)
-		return
-	}
-	r, err := client.Certificate.Get("https://acme-v02.api.letsencrypt.org/acme/cert/035525ef5da3d3c896a76555c2873c40021d", false)
-	if err != nil {
-		fmt.Printf("%v \n", err)
-		return
-	}
-	fmt.Printf("%v \n", r)
+
 }

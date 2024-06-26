@@ -10,33 +10,35 @@ type Image struct {
 }
 
 type ImageNameOption struct {
-	Registry string
-	Name     string
-	Version  string
+	Registry  string
+	Name      string
+	Version   string
+	Namespace string
 }
 
 func (self Image) GetImageName(option *ImageNameOption) (imageName string) {
-	imageName = option.Name
 	if option.Name == "" {
-		return imageName
+		return ""
 	}
-	if strings.Contains(imageName, ":") {
-		s := strings.Split(imageName, ":")
-		if option.Version == "" {
-			option.Version = s[1]
+	temp := self.GetImageTagDetail(option.Name)
+	imageName = temp.ImageName
+
+	if option.Version != "" {
+		imageName = strings.Replace(imageName, temp.Version, option.Version, 1)
+	}
+
+	if option.Namespace != "" {
+		if strings.Contains(imageName, "/") {
+			imageName = strings.Replace(imageName, temp.Namespace, option.Namespace, 1)
+		} else {
+			imageName = option.Namespace + "/" + imageName
 		}
-		option.Name = s[0]
-		imageName = s[0]
 	}
 
 	if option.Registry != "" {
-		imageName = option.Registry + "/" + option.Name
+		imageName = option.Registry + "/" + imageName
 	}
-	if option.Version == "" {
-		imageName += ":latest"
-	} else {
-		imageName += ":" + option.Version
-	}
+
 	return imageName
 }
 
@@ -44,10 +46,14 @@ type imageTagDetail struct {
 	Registry  string
 	Namespace string
 	ImageName string
+	Version   string
 }
 
 func (self Image) GetImageTagDetail(tag string) *imageTagDetail {
 	result := &imageTagDetail{}
+	if !strings.Contains(tag, ":") {
+		tag += ":latest"
+	}
 
 	// 如果没有指定仓库地址，则默认为 docker.io
 	temp := strings.Split(tag, "/")
@@ -62,9 +68,13 @@ func (self Image) GetImageTagDetail(tag string) *imageTagDetail {
 	if len(temp) <= 2 {
 		temp = strings.Split(result.ImageName, ":")
 		result.Namespace = temp[0]
+		result.Version = temp[1]
 	} else {
 		result.Namespace = temp[1]
+		temp = strings.Split(result.ImageName, ":")
+		result.Version = temp[1]
 	}
+
 	return result
 }
 
