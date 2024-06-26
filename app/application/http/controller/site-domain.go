@@ -112,7 +112,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 
 	err = dao.SiteDomain.Create(&entity.SiteDomain{
 		ServerName:  params.ServerName,
-		ContainerID: strings.Trim(containerRow.Name, "/"),
+		ContainerID: containerRow.Name,
 		Setting:     domainSetting,
 	})
 
@@ -148,7 +148,7 @@ func (self SiteDomain) GetList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	query := dao.SiteDomain.Order(dao.SiteDomain.ID.Desc()).Where(dao.SiteDomain.ContainerID.Eq(strings.Trim(containerRow.Name, "/")))
+	query := dao.SiteDomain.Order(dao.SiteDomain.ID.Desc()).Where(dao.SiteDomain.ContainerID.Eq(containerRow.Name))
 	if params.ServerName != "" {
 		query = query.Where(dao.SiteDomain.ServerName.Like("%" + params.ServerName + "%"))
 	}

@@ -244,3 +244,33 @@ func (self Site) Delete(http *gin.Context) {
 	self.JsonSuccessResponse(http)
 	return
 }
+
+func (self Site) UpdateTitle(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5   string `json:"md5" binding:"required"`
+		Title string `json:"title" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
+		ID: params.Md5,
+	})).First()
+	if siteRow != nil {
+		dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
+			ID: params.Md5,
+		})).Updates(&entity.Site{
+			SiteTitle: params.Title,
+		})
+	} else {
+		dao.Site.Create(&entity.Site{
+			SiteTitle: params.Title,
+			ContainerInfo: &accessor.SiteContainerInfoOption{
+				ID: params.Md5,
+			},
+		})
+	}
+	self.JsonSuccessResponse(http)
+	return
+}

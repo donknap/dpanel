@@ -91,65 +91,34 @@ func (self Container) GetList(http *gin.Context) {
 	}
 
 	if function.IsEmptyArray(list) {
-		list = make([]types.Container, 0)
 		self.JsonResponseWithoutError(http, gin.H{
-			"list": list,
+			"list": make([]types.Container, 0),
 		})
-	} else {
-		var md5List []driver.Valuer
-		for _, item := range list {
-			md5List = append(md5List, &accessor.SiteContainerInfoOption{
-				ID: item.ID,
-			})
-		}
-		siteList, _ := dao.Site.Select(
-			dao.Site.SiteTitle,
-			dao.Site.SiteName,
-			dao.Site.ID,
-		).Where(dao.Site.ContainerInfo.In(md5List...)).Find()
-
-		for i, item := range list {
-			tagName := item.Names[0]
-			for _, name := range item.Names {
-				if strings.Count(name, "/") == 1 {
-					tagName = name
-					break
-				}
-			}
-			has := false
-			for _, site := range siteList {
-				if function.InArray(item.Names, "/"+site.SiteName) {
-					list[i].Names = []string{
-						tagName,
-						site.SiteTitle,
-					}
-					has = true
-					break
-				}
-			}
-			if !has {
-				list[i].Names = []string{
-					tagName,
-				}
-			}
-		}
-
-		if params.SiteTitle != "" {
-			temp := make([]types.Container, 0)
-			for _, item := range list {
-				if len(item.Names) > 1 && strings.Contains(item.Names[1], params.SiteTitle) {
-					temp = append(temp, item)
-				}
-			}
-			self.JsonResponseWithoutError(http, gin.H{
-				"list": temp,
-			})
-		} else {
-			self.JsonResponseWithoutError(http, gin.H{
-				"list": list,
-			})
-		}
+		return
 	}
+
+	var md5List []driver.Valuer
+	var nameList []string
+	for _, item := range list {
+		md5List = append(md5List, &accessor.SiteContainerInfoOption{
+			ID: item.ID,
+		})
+		nameList = append(nameList, item.Names...)
+	}
+
+	query := dao.Site.Where(dao.Site.ContainerInfo.In(md5List...))
+
+	if params.SiteTitle != "" {
+		query = query.Where(dao.Site.SiteTitle.Like("%" + params.SiteTitle + "%"))
+	}
+	siteList, _ := query.Find()
+
+	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(nameList...)).Find()
+	self.JsonResponseWithoutError(http, gin.H{
+		"list":       list,
+		"siteList":   siteList,
+		"domainList": domainList,
+	})
 	return
 }
 
