@@ -22,7 +22,7 @@ func (self Registry) Create(http *gin.Context) {
 		Title         string `form:"title" binding:"required"`
 		Username      string `form:"username"`
 		Password      string `form:"password"`
-		ServerAddress string `form:"serverAddress" binding:"required"`
+		ServerAddress string `form:"serverAddress"`
 		Email         string `form:"email" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
