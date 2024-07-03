@@ -28,9 +28,10 @@ type Platform struct {
 }
 
 type ImageRemoteMessage struct {
-	Auth string
-	Type string
-	Tag  string
+	Auth     string
+	Type     string
+	Tag      string
+	Platform string
 }
 
 type NoticeMessage struct {
