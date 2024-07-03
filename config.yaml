@@ -1,6 +1,6 @@
 app:
   name: ${APP_NAME-dpanel}
-  version: 1.0.1-20240625
+  version: 1.0.2-20240703
   env: ${APP_ENV-debug}
   server: http
   cors:
