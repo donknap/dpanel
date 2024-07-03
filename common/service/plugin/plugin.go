@@ -3,10 +3,13 @@ package plugin
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"io"
+	"os"
+	"strings"
 )
 
 func NewPlugin(name string) (*plugin, error) {
@@ -34,25 +37,43 @@ type plugin struct {
 }
 
 func (self plugin) Create() (string, error) {
-	if self.setting.Image != "" {
-		err := self.importImage()
-		if err != nil {
-			return "", err
+	dockerVersion, _ := docker.Sdk.Client.ServerVersion(docker.Sdk.Ctx)
+	if image, ok := self.setting.Image[dockerVersion.Arch]; ok {
+		if image != "" {
+			if strings.HasPrefix(image, "asset/plugin") {
+				err := self.importImage(image)
+				if err != nil {
+					return "", err
+				}
+			} else {
+				self.setting.ImageName = image
+			}
+			err := self.runContainer()
+			if err != nil {
+				return "", err
+			}
 		}
-		err = self.runContainer()
-		if err != nil {
-			return "", err
+		if self.setting.Container.Init != "" {
+			_, err := Command{}.Result(self.setting.Name, self.setting.Container.Init)
+			if err != nil {
+				return "", err
+			}
 		}
+		return self.setting.Name, nil
+	} else {
+		return "", errors.New("插件暂不支持该平台，请提交 issues ")
 	}
-	return self.setting.Name, nil
 }
 
-func (self plugin) importImage() error {
+func (self plugin) importImage(imagePath string) error {
 	_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, self.setting.ImageName)
 	if err == nil {
 		return nil
 	}
-	imageFile, _ := self.asset.Open(self.setting.Image)
+	imageFile, err := self.asset.Open(imagePath)
+	if os.IsNotExist(err) {
+		return errors.New("插件暂不支持该平台，请提交 issues ")
+	}
 	reader, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageFile, false)
 	if err != nil {
 		return err
@@ -73,7 +94,7 @@ func (self plugin) runContainer() error {
 	if self.setting.Env.Privileged {
 		builder.WithPrivileged()
 	}
-	builder.WithImage(self.setting.ImageName, false)
+	builder.WithImage(self.setting.ImageName, true)
 	builder.WithAutoRemove()
 	builder.WithContainerName(self.setting.Name)
 	if self.setting.Env.PidHost {
