@@ -16,6 +16,7 @@ func (self Image) TagRemote(http *gin.Context) {
 		Tag      string `json:"tag" binding:"required"`
 		Type     string `json:"type" binding:"required,oneof=pull push"`
 		AsLatest bool   `json:"asLatest"`
+		Platform string `json:"platform"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -23,6 +24,8 @@ func (self Image) TagRemote(http *gin.Context) {
 	}
 	var authString string
 	tagDetail := logic.Image{}.GetImageTagDetail(params.Tag)
+
+	// 从官方仓库拉取镜像不用权限
 	registry, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(tagDetail.Registry)).Find()
 	for _, registryRow := range registry {
 		if registryRow.Username == tagDetail.Namespace {
@@ -52,11 +55,11 @@ func (self Image) TagRemote(http *gin.Context) {
 			return
 		}
 	} else {
-		// 从官方仓库拉取镜像不用权限
 		err := logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
-			Auth: authString,
-			Type: params.Type,
-			Tag:  params.Tag,
+			Auth:     authString,
+			Type:     params.Type,
+			Tag:      params.Tag,
+			Platform: params.Platform,
 		})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
