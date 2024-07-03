@@ -336,5 +336,6 @@ func (u *MyUser) GetPrivateKey() crypto.PrivateKey {
 }
 
 func TestExportContainer(t *testing.T) {
-
+	info, _ := docker.Sdk.Client.ServerVersion(docker.Sdk.Ctx)
+	fmt.Printf("%v \n", info)
 }

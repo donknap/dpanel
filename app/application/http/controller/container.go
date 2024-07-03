@@ -249,7 +249,9 @@ func (self Container) Delete(http *gin.Context) {
 			for _, volueItem := range volumeList.Volumes {
 				if strings.HasPrefix(volueItem.Name, siteRow.SiteName) {
 					err = docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, volueItem.Name, false)
-					slog.Debug("remove container volume", err.Error())
+					if err != nil {
+						slog.Debug("remove container volume", err.Error())
+					}
 				}
 			}
 		}
