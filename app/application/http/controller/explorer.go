@@ -290,12 +290,25 @@ func (self Explorer) GetContent(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Md5, params.File)
+	if pathStat.Size >= 1024*1024 {
+		self.JsonResponseWithError(http, errors.New("超过1M的文件请通过导入&导出修改文件"), 500)
+		return
+	}
+	out, _, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Md5, params.File)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer out.Close()
+	tarReader := tar.NewReader(out)
+
 	explorer, err := logic.NewExplorer(params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	content, err := explorer.GetContent(params.File)
+	content, err := explorer.GetContentByTar(tarReader)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

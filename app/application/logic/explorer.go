@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"archive/tar"
 	"bytes"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
+	"github.com/h2non/filetype"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -127,21 +129,44 @@ func (self explorer) DeleteFileList(fileList []string) error {
 	return nil
 }
 
+// Deprecated: 获取文件不采用 shell 命令，不稳定且需要借助 file 命令才能判断文件类型
+// file 在 busybox 和 alpine 并未支持
+// 获取主谁的内容先把文件下载本地生成临时文件，再通过文件的导入提交修改
 func (self explorer) GetContent(file string) (string, error) {
 	if !strings.HasPrefix(file, "/") {
 		return "", errors.New("please use absolute address")
 	}
 	file = fmt.Sprintf("%s%s", self.rootPath, file)
-	cmd := fmt.Sprintf(`file --mime-type -b %s | grep -q -e "text" -e "empty" -e "javascript" -e "json" && cat %s \n`, file, file)
+	cmd := fmt.Sprintf(`cat %s \n`, file)
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return "", err
 	}
-	slog.Debug("explorer", "out", string(out))
 	if len(out) <= 8 {
 		return "", nil
 	}
 	return string(out[8:]), nil
+}
+
+func (self explorer) GetContentByTar(reader *tar.Reader) (string, error) {
+	file, err := reader.Next()
+	if err != nil {
+		return "", nil
+	}
+	if file.Typeflag != tar.TypeReg {
+		return "", errors.New("不支持编辑的文件类型")
+	}
+	if file.Size >= 1024*1024 {
+		return "", errors.New("超过1M的文件请通过导入&导出修改文件")
+	}
+	content := make([]byte, file.Size)
+	reader.Read(content)
+
+	fileType, _ := filetype.Match(content)
+	if fileType == filetype.Unknown {
+		return string(content), nil
+	}
+	return "", nil
 }
 
 func (self explorer) getSafePath(path string) (string, error) {

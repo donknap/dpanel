@@ -6,13 +6,14 @@ toolchain go1.22.3
 
 require (
 	github.com/creack/pty v1.1.21
-	github.com/docker/docker v27.0.1+incompatible
+	github.com/docker/docker v27.0.3+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-acme/lego/v4 v4.17.4
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gookit/color v1.5.4
 	github.com/gorilla/websocket v1.5.3
+	github.com/h2non/filetype v1.1.3
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
@@ -34,7 +35,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
-	github.com/containerd/containerd v1.7.18 // indirect
+	github.com/containerd/containerd v1.7.19 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/creasty/defaults v1.7.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -73,7 +74,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
-	github.com/miekg/dns v1.1.59 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
@@ -104,12 +104,12 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/we7coreteam/gorm-gen-yaml v1.0.8 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.52.0 // indirect
-	go.opentelemetry.io/otel v1.27.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
+	go.opentelemetry.io/otel v1.28.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.27.0 // indirect
-	go.opentelemetry.io/otel/metric v1.27.0 // indirect
+	go.opentelemetry.io/otel/metric v1.28.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.27.0 // indirect
-	go.opentelemetry.io/otel/trace v1.27.0 // indirect
+	go.opentelemetry.io/otel/trace v1.28.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go.uber.org/zap/exp v0.2.0 // indirect
