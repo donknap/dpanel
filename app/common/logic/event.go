@@ -6,7 +6,6 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
-	"log/slog"
 	"time"
 )
 
@@ -44,7 +43,6 @@ func (self EventLogic) MonitorLoop() {
 				eventRow.Message += fmt.Sprintf("%s %s", message.Actor.Attributes["name"],
 					message.Actor.Attributes["type"])
 			}
-			slog.Debug("event", message.Actor.Attributes)
 			dao.Event.Create(eventRow)
 			time.Sleep(time.Second * 1)
 		case err := <-errorChan:

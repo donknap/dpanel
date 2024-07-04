@@ -19,8 +19,8 @@ var (
 	QueueDockerImageDownloadMessage = make(chan map[string]*ProgressDownloadImage, 999)
 	QueueDockerComposeMessage       = make(chan string, 999)
 	BuilderAuthor                   = "DPanel"
-	BuildDesc                       = "DPanel is an open source docker web management panel that provides image building and deployment"
-	BuildWebSite                    = "https://github.com/donknap/dpanel, https://phpey.net"
+	BuildDesc                       = "DPanel is a docker web management panel"
+	BuildWebSite                    = "https://github.com/donknap/dpanel"
 	BuildVersion                    = "1.0.0"
 	HostnameTemplate                = "%s.pod.dpanel.local"
 )
