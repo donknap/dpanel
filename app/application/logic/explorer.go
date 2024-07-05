@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"archive/tar"
 	"bytes"
 	"errors"
 	"fmt"
@@ -9,7 +8,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
-	"github.com/h2non/filetype"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -146,27 +144,6 @@ func (self explorer) GetContent(file string) (string, error) {
 		return "", nil
 	}
 	return string(out[8:]), nil
-}
-
-func (self explorer) GetContentByTar(reader *tar.Reader) (string, error) {
-	file, err := reader.Next()
-	if err != nil {
-		return "", nil
-	}
-	if file.Typeflag != tar.TypeReg {
-		return "", errors.New("不支持编辑的文件类型")
-	}
-	if file.Size >= 1024*1024 {
-		return "", errors.New("超过1M的文件请通过导入&导出修改文件")
-	}
-	content := make([]byte, file.Size)
-	reader.Read(content)
-
-	fileType, _ := filetype.Match(content)
-	if fileType == filetype.Unknown {
-		return string(content), nil
-	}
-	return "", nil
 }
 
 func (self explorer) getSafePath(path string) (string, error) {

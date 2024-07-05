@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 )
@@ -37,6 +39,17 @@ type plugin struct {
 }
 
 func (self plugin) Create() (string, error) {
+	explorereContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, self.setting.Name)
+	if err == nil {
+		slog.Debug("plugin", "create-explorer", explorereContainerInfo.ID)
+		if !explorereContainerInfo.State.Running {
+			err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, explorereContainerInfo.ID, container.StartOptions{})
+			if err != nil {
+				return "", err
+			}
+		}
+		return self.setting.Name, nil
+	}
 	dockerVersion, _ := docker.Sdk.Client.ServerVersion(docker.Sdk.Ctx)
 	if image, ok := self.setting.Image[dockerVersion.Arch]; ok {
 		if image != "" {
@@ -68,7 +81,14 @@ func (self plugin) Create() (string, error) {
 func (self plugin) importImage(imagePath string) error {
 	_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, self.setting.ImageName)
 	if err == nil {
-		return nil
+		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, self.setting.ImageName, image.RemoveOptions{
+			Force:         true,
+			PruneChildren: true,
+		})
+		slog.Debug("plugin", "create-explorer", "delete old image dpanel/explorer")
+		if err != nil {
+			return err
+		}
 	}
 	imageFile, err := self.asset.Open(imagePath)
 	if os.IsNotExist(err) {
@@ -94,8 +114,13 @@ func (self plugin) runContainer() error {
 	if self.setting.Env.Privileged {
 		builder.WithPrivileged()
 	}
-	builder.WithImage(self.setting.ImageName, true)
-	builder.WithAutoRemove()
+	builder.WithImage(self.setting.ImageName, false)
+	if self.setting.Env.AutoRemove {
+		builder.WithAutoRemove()
+	}
+	if self.setting.Env.Restart != "" {
+		builder.WithRestart(self.setting.Env.Restart)
+	}
 	builder.WithContainerName(self.setting.Name)
 	if self.setting.Env.PidHost {
 		builder.WithPid("host")

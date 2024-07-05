@@ -12,6 +12,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/h2non/filetype"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"io"
 	"os"
@@ -300,23 +301,37 @@ func (self Explorer) GetContent(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer out.Close()
+	var content []byte
 	tarReader := tar.NewReader(out)
-
-	explorer, err := logic.NewExplorer(params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	for {
+		file, err := tarReader.Next()
+		if err != nil {
+			break
+		}
+		if file.Typeflag != tar.TypeReg {
+			continue
+		}
+		if file.Name != filepath.Base(params.File) {
+			continue
+		}
+		content = make([]byte, file.Size)
+		tarReader.Read(content)
+	}
+	out.Close()
+	if content == nil {
+		self.JsonResponseWithError(http, errors.New("获取文件失败"), 500)
 		return
 	}
-	content, err := explorer.GetContentByTar(tarReader)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	fileType, _ := filetype.Match(content)
+	if fileType == filetype.Unknown {
+		self.JsonResponseWithoutError(http, gin.H{
+			"content": string(content),
+		})
+		return
+	} else {
+		self.JsonResponseWithError(http, errors.New("文件类型不支持在线编辑"), 500)
 		return
 	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"content": content,
-	})
-	return
 }
 
 func (self Explorer) Chmod(http *gin.Context) {

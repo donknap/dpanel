@@ -2,13 +2,13 @@
   "name": "dpanel-plugin-explorer",
   "imageName": "dpanel/explorer",
   "image": {
-    "amd64": "ccr.ccs.tencentyun.com/library/alpine:latest",
-    "arm64": "ccr.ccs.tencentyun.com/library/alpine:latest"
+    "amd64": "asset/plugin/explorer/image-amd64.tar",
+    "arm64": "asset/plugin/explorer/image-arm64.tar"
   },
   "env": {
     "pidHost": true,
     "privileged": true,
     "restart": "always",
-    "autoRemove": true
+    "autoRemove": false
   }
 }
