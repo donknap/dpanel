@@ -51,15 +51,15 @@ func (self plugin) Create() (string, error) {
 		return self.setting.Name, nil
 	}
 	dockerVersion, _ := docker.Sdk.Client.ServerVersion(docker.Sdk.Ctx)
-	if image, ok := self.setting.Image[dockerVersion.Arch]; ok {
-		if image != "" {
-			if strings.HasPrefix(image, "asset/plugin") {
-				err := self.importImage(image)
+	if imageUrl, ok := self.setting.Image[dockerVersion.Arch]; ok {
+		if imageUrl != "" {
+			if strings.HasPrefix(imageUrl, "asset/plugin") {
+				err := self.importImage(imageUrl)
 				if err != nil {
 					return "", err
 				}
 			} else {
-				self.setting.ImageName = image
+				self.setting.ImageName = imageUrl
 			}
 			err := self.runContainer()
 			if err != nil {
