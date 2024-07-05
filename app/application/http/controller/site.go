@@ -36,14 +36,22 @@ func (self Site) CreateByImage(http *gin.Context) {
 	// 重新部署，先删掉之前的容器
 	if params.Id != 0 || params.Md5 != "" {
 		notice.Message{}.Info("containerCreate", "正在停止旧容器")
-		docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, params.SiteName, container.StopOptions{})
-		err := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, params.SiteName, container.RemoveOptions{})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			slog.Debug("remove container", "name", params.SiteName, "error", err.Error())
-			return
+		_, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName)
+		if err == nil {
+			err := docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, params.SiteName, container.StopOptions{})
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, params.SiteName, container.RemoveOptions{})
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				slog.Debug("remove container", "name", params.SiteName, "error", err.Error())
+				return
+			}
 		}
 	}
+
 	if params.Ports != nil {
 		var checkPorts []string
 		for _, port := range params.Ports {
@@ -69,6 +77,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	runParams := accessor.SiteEnvOption{
 		Environment:    params.Environment,
 		Links:          params.Links,

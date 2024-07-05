@@ -25,6 +25,9 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 
 	if task.RunParams.Environment != nil {
 		for _, value := range task.RunParams.Environment {
+			if value.Name == "" {
+				continue
+			}
 			builder.WithEnv(value.Name, value.Value)
 		}
 	}
@@ -43,6 +46,9 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 
 	if !function.IsEmptyArray(task.RunParams.VolumesDefault) {
 		for _, item := range task.RunParams.VolumesDefault {
+			if item.Dest == "" {
+				continue
+			}
 			builder.WithDefaultVolume(item.Dest)
 		}
 	}

@@ -85,6 +85,11 @@ func (self *ContainerCreateBuilder) WithContainerVolume(fromContainerMd5 string)
 
 func (self *ContainerCreateBuilder) WithDefaultVolume(container string) {
 	volumePath := fmt.Sprintf("%s.%s", self.containerName, strings.Join(strings.Split(container, "/"), "-"))
+	// 为了兼容之前生成的没有前缀的存储
+	_, err := Sdk.Client.VolumeInspect(Sdk.Ctx, volumePath)
+	if err != nil {
+		volumePath = "dpanel." + volumePath
+	}
 	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s:rw", volumePath, container))
 }
 
