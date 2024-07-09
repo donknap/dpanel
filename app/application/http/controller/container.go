@@ -6,6 +6,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -202,6 +203,30 @@ func (self Container) Delete(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
+		ID: params.Md5,
+	})).First()
+
+	if siteRow != nil && siteRow.SiteName != "" {
+		// 删除网络
+		// 获取该容器的网络，退出里面的容器
+		networkInfo, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, siteRow.SiteName, network.InspectOptions{})
+		if err == nil {
+			for md5, _ := range networkInfo.Containers {
+				err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, siteRow.SiteName, md5, true)
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+
+			}
+		}
+		docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, siteRow.SiteName)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
 
 	// 删除域名、配置、证书
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.Name)).Find()
@@ -236,14 +261,8 @@ func (self Container) Delete(http *gin.Context) {
 		})
 	}
 
-	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-		ID: params.Md5,
-	})).First()
-
 	if siteRow != nil {
-		docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, siteRow.SiteName)
 		dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
-
 		if params.DeleteVolume {
 			volumeList, _ := docker.Sdk.Client.VolumeList(docker.Sdk.Ctx, volume.ListOptions{})
 			for _, volueItem := range volumeList.Volumes {
