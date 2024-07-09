@@ -47,7 +47,7 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItem, err error
 		return fileList, err
 	}
 	cmd := fmt.Sprintf("ls -AlhX --full-time %s%s \n", self.rootPath, path)
-	slog.Debug("explorer", "cmd", cmd)
+	slog.Debug("explorer", "get-list", cmd)
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return fileList, err
@@ -118,12 +118,12 @@ func (self explorer) DeleteFileList(fileList []string) error {
 		}
 		deleteFileList = append(deleteFileList, self.rootPath+path)
 	}
-	cmd := fmt.Sprintf("cd %s && rm -rf %s \n", self.rootPath, strings.Join(deleteFileList, " "))
+	cmd := fmt.Sprintf("cd %s && rm -rf \"%s\" \n", self.rootPath, strings.Join(deleteFileList, " "))
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return err
 	}
-	slog.Debug("explorer", "out", string(out))
+	slog.Debug("explorer", "delete", string(out))
 	return nil
 }
 
@@ -176,7 +176,7 @@ func (self explorer) Create(path string, isDir bool) error {
 	if err != nil {
 		return err
 	}
-	slog.Debug("explorer", "out", string(out))
+	slog.Debug("explorer", "create", string(out))
 	return nil
 }
 
@@ -197,7 +197,7 @@ func (self explorer) Chmod(fileList []string, mod int, hasChildren bool) error {
 	if err != nil {
 		return err
 	}
-	slog.Debug("explorer", "out", string(out))
+	slog.Debug("explorer", "chmod", string(out))
 	return nil
 }
 
@@ -218,7 +218,7 @@ func (self explorer) Chown(fileList []string, owner string, hasChildren bool) er
 	if err != nil {
 		return err
 	}
-	slog.Debug("explorer", "out", string(out))
+	slog.Debug("explorer", "chown", string(out))
 	return nil
 }
 
@@ -234,6 +234,6 @@ func (self explorer) Rename(file string, newFileName string) error {
 	if err != nil {
 		return err
 	}
-	slog.Debug("explorer", "out", string(out))
+	slog.Debug("explorer", "rename", string(out))
 	return nil
 }
