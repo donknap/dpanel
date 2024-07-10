@@ -5,6 +5,7 @@ import (
 	"github.com/docker/docker/api/types/events"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"time"
 )
@@ -49,7 +50,7 @@ func (self EventLogic) MonitorLoop() {
 			dao.Event.Create(&entity.Event{
 				Type:      "error",
 				Message:   err.Error(),
-				CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
+				CreatedAt: time.Now().Format(function.ShowYmdHis),
 			})
 			time.Sleep(time.Second)
 		}

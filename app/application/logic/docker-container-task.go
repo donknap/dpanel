@@ -92,11 +92,11 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	}
 
 	if task.RunParams.Command != "" {
-		builder.WithCommand(task.RunParams.Command)
+		builder.WithCommandStr(task.RunParams.Command)
 	}
 
 	if task.RunParams.Entrypoint != "" {
-		builder.WithEntrypoint(task.RunParams.Entrypoint)
+		builder.WithEntrypointStr(task.RunParams.Entrypoint)
 	}
 
 	response, err := builder.Execute()
