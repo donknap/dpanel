@@ -44,10 +44,10 @@ func (self EventLogic) MonitorLoop() {
 				eventRow.Message += fmt.Sprintf("%s %s", message.Actor.Attributes["name"],
 					message.Actor.Attributes["type"])
 			}
-			dao.Event.Create(eventRow)
+			_ = dao.Event.Create(eventRow)
 			time.Sleep(time.Second * 1)
 		case err := <-errorChan:
-			dao.Event.Create(&entity.Event{
+			_ = dao.Event.Create(&entity.Event{
 				Type:      "error",
 				Message:   err.Error(),
 				CreatedAt: time.Now().Format(function.ShowYmdHis),

@@ -220,7 +220,7 @@ func (self Container) Delete(http *gin.Context) {
 				}
 
 			}
-			docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, siteRow.SiteName)
+			err = docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, siteRow.SiteName)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return

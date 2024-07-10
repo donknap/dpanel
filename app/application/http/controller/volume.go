@@ -142,7 +142,7 @@ func (self Volume) Create(http *gin.Context) {
 			options[item[0]] = item[1]
 		}
 	}
-	volume, err := docker.Sdk.Client.VolumeCreate(docker.Sdk.Ctx, volume.CreateOptions{
+	volumeInfo, err := docker.Sdk.Client.VolumeCreate(docker.Sdk.Ctx, volume.CreateOptions{
 		Driver:     params.Driver,
 		Name:       params.Name,
 		DriverOpts: options,
@@ -152,7 +152,7 @@ func (self Volume) Create(http *gin.Context) {
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"info": volume,
+		"info": volumeInfo,
 	})
 	return
 
