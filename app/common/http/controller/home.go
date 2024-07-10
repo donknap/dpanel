@@ -46,8 +46,9 @@ func (self Home) WsConsole(http *gin.Context) {
 		return
 	}
 	type ParamsValidate struct {
-		Id  string `uri:"id" binding:"required"`
-		Cmd string `form:"cmd,default=/bin/sh"`
+		Id      string `uri:"id" binding:"required"`
+		Cmd     string `form:"cmd,default=/bin/sh111"`
+		WorkDir string `form:"workDir"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -58,7 +59,9 @@ func (self Home) WsConsole(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("请指定容器Id"), 500)
 		return
 	}
-
+	if params.WorkDir == "" {
+		params.WorkDir = "/"
+	}
 	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, params.Id, container.ExecOptions{
 		Privileged:   true,
 		Tty:          true,
@@ -68,6 +71,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		Cmd: []string{
 			params.Cmd,
 		},
+		WorkingDir: params.WorkDir,
 	})
 	if err != nil {
 		notice.Message{}.Error("console", err.Error())
