@@ -1,0 +1,22 @@
+services:
+  backup:
+    image: dpanel/explorer
+    container_name: dpanel-plugin-backup
+    restart: no
+    command:
+#{{- range $key, $val := .backup.Command }}
+      - {{ $val | unescaped }}
+#{{- end}}
+    volumes_from:
+#{{- range $key, $val := .backup.VolumesFrom }}
+      - {{ $val }}
+#{{- end}}
+    volumes:
+#{{- range $key, $val := .backup.Volumes }}
+      - {{ $val }}
+#{{- end}}
+    extend:
+      image_local_tar:
+        amd64: asset/plugin/explorer/image-amd64.tar
+        arm64: asset/plugin/explorer/image-arm64.tar
+      auto_remove: true

@@ -1,0 +1,11 @@
+services:
+  explorer:
+    image: dpanel/explorer
+    container_name: dpanel-plugin-explorer
+    restart: always
+    privileged: true
+    pid: host
+    extend:
+      image_local_tar:
+        amd64: asset/plugin/explorer/image-amd64.tar
+        arm64: asset/plugin/explorer/image-arm64.tar

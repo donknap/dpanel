@@ -2,90 +2,154 @@ package plugin
 
 import (
 	"embed"
-	"encoding/json"
 	"errors"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
+	"html/template"
 	"io"
 	"log/slog"
 	"os"
 	"strings"
 )
 
-func NewPlugin(name string) (*plugin, error) {
+func NewPlugin(name string, composeData map[string]docker.ComposeService) (*plugin, error) {
 	var asset embed.FS
 	err := facade.GetContainer().NamedResolve(&asset, "asset")
 	if err != nil {
 		return nil, err
 	}
-	pluginSettingStr, err := asset.ReadFile("asset/plugin/" + name + "/setting.json")
+	yamlTpl, err := asset.ReadFile("asset/plugin/" + name + "/compose.yaml")
+	tpl := template.New(name)
+	tpl.Funcs(template.FuncMap{
+		"unescaped": func(s string) template.HTML {
+			return template.HTML(s)
+		},
+	})
+	parser, err := tpl.Parse(string(yamlTpl))
 	if err != nil {
 		return nil, err
 	}
-	var ps pluginSetting
-	json.Unmarshal(pluginSettingStr, &ps)
+
+	yamlResult := newResult()
+	err = parser.Execute(yamlResult, composeData)
+	if err != nil {
+		return nil, err
+	}
+	compose, err := docker.NewYaml(string(yamlResult.GetData()))
+	if err != nil {
+		return nil, err
+	}
 	obj := &plugin{
 		asset:   asset,
-		setting: &ps,
+		name:    name,
+		compose: compose,
 	}
 	return obj, nil
 }
 
 type plugin struct {
 	asset   embed.FS
-	setting *pluginSetting
+	name    string
+	compose *docker.DockerComposeYamlV2
+}
+
+type CreateOption struct {
+	VolumesForm string
+	Volumes     []string
+	Cmd         string
 }
 
 func (self plugin) Create() (string, error) {
-	explorereContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, self.setting.Name)
+	service, err := self.compose.GetService(self.name)
+	if err != nil {
+		return "", err
+	}
+	pluginContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, service.ContainerName)
 	if err == nil {
-		slog.Debug("plugin", "create-explorer", explorereContainerInfo.ID)
-		if !explorereContainerInfo.State.Running {
-			err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, explorereContainerInfo.ID, container.StartOptions{})
+		// 如果容器在，并且有 auto-remove 参数，则删除掉
+		if service.Extend.AutoRemove {
+			err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, service.ContainerName, container.StopOptions{})
 			if err != nil {
 				return "", err
 			}
-		}
-		return self.setting.Name, nil
-	}
-	dockerVersion, _ := docker.Sdk.Client.ServerVersion(docker.Sdk.Ctx)
-	if imageUrl, ok := self.setting.Image[dockerVersion.Arch]; ok {
-		if imageUrl != "" {
-			if strings.HasPrefix(imageUrl, "asset/plugin") {
-				err := self.importImage(imageUrl)
+			err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, service.ContainerName, container.RemoveOptions{})
+			if err != nil {
+				return "", err
+			}
+		} else {
+			slog.Debug("plugin", "create-explorer", pluginContainerInfo.ID)
+			if !pluginContainerInfo.State.Running {
+				err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, pluginContainerInfo.ID, container.StartOptions{})
 				if err != nil {
 					return "", err
 				}
-			} else {
-				self.setting.ImageName = imageUrl
 			}
-			err := self.runContainer()
-			if err != nil {
-				return "", err
-			}
+			return service.ContainerName, nil
 		}
-		if self.setting.Container.Init != "" {
-			_, err := Command{}.Result(self.setting.Name, self.setting.Container.Init)
-			if err != nil {
-				return "", err
-			}
-		}
-		return self.setting.Name, nil
-	} else {
-		return "", errors.New("插件暂不支持该平台，请提交 issues ")
 	}
+	dockerVersion, _ := docker.Sdk.Client.ServerVersion(docker.Sdk.Ctx)
+
+	imageUrl := service.Image
+	imageTryPull := true
+
+	if imageTarUrl, ok := service.Extend.ImageLocalTar[dockerVersion.Arch]; ok {
+		if imageTarUrl != "" && strings.HasPrefix(imageTarUrl, "asset/plugin") {
+			imageTryPull = false
+			err = self.importImage(service.Image, imageTarUrl)
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+
+	builder := docker.Sdk.GetContainerCreateBuilder()
+	builder.WithImage(imageUrl, imageTryPull)
+	builder.WithContainerName(service.ContainerName)
+
+	if service.Privileged {
+		builder.WithPrivileged()
+	}
+	if service.Extend.AutoRemove {
+		builder.WithAutoRemove()
+	}
+	if service.Restart != "" {
+		builder.WithRestart(service.Restart)
+	}
+	if service.Pid != "" {
+		builder.WithPid(service.Pid)
+	}
+	for _, item := range service.VolumesFrom {
+		builder.WithContainerVolume(item)
+	}
+	if !function.IsEmptyArray(service.Command) {
+		builder.WithCommand(service.Command)
+	}
+	for _, item := range service.Volumes {
+		path := strings.Split(item, ":")
+		builder.WithVolume(path[0], path[1], path[2])
+	}
+	response, err := builder.Execute()
+	if err != nil {
+		return "", err
+	}
+	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
+	if err != nil {
+		return "", err
+	}
+	return service.ContainerName, nil
 }
 
-func (self plugin) importImage(imagePath string) error {
-	_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, self.setting.ImageName)
+func (self plugin) importImage(imageName string, imagePath string) error {
+	_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
 	if err == nil {
-		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, self.setting.ImageName, image.RemoveOptions{
+		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, imageName, image.RemoveOptions{
 			Force:         true,
 			PruneChildren: true,
 		})
-		slog.Debug("plugin", "create-explorer", "delete old image dpanel/explorer")
+		slog.Debug("plugin", "create-explorer", "delete old image", imageName)
 		if err != nil {
 			return err
 		}
@@ -99,37 +163,6 @@ func (self plugin) importImage(imagePath string) error {
 		return err
 	}
 	_, err = io.Copy(io.Discard, reader.Body)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (self plugin) runContainer() error {
-	_, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, self.setting.Name)
-	if err == nil {
-		return nil
-	}
-	builder := docker.Sdk.GetContainerCreateBuilder()
-	if self.setting.Env.Privileged {
-		builder.WithPrivileged()
-	}
-	builder.WithImage(self.setting.ImageName, false)
-	if self.setting.Env.AutoRemove {
-		builder.WithAutoRemove()
-	}
-	if self.setting.Env.Restart != "" {
-		builder.WithRestart(self.setting.Env.Restart)
-	}
-	builder.WithContainerName(self.setting.Name)
-	if self.setting.Env.PidHost {
-		builder.WithPid("host")
-	}
-	response, err := builder.Execute()
-	if err != nil {
-		return err
-	}
-	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
 	if err != nil {
 		return err
 	}
