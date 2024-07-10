@@ -75,14 +75,14 @@ func (self Compose) Ctrl(task *ComposeTaskOption, op string) error {
 	return nil
 }
 
-func (self Compose) Ls(projectName string) error {
+func (self Compose) Ls(projectName string) {
 	command := []string{
 		"ls",
 		"--filter",
 		"name=" + projectName,
 	}
 	self.runCommand(command)
-	return nil
+	return
 }
 
 func (self Compose) Kill() error {
