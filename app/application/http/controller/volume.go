@@ -1,13 +1,20 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/plugin"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"log/slog"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 type Volume struct {
@@ -178,5 +185,56 @@ func (self Volume) Delete(http *gin.Context) {
 		}
 	}
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Volume) Backup(http *gin.Context) {
+	type ParamsValidate struct {
+		ContainerMd5 string   `json:"containerMd5"`
+		VolumeList   []string `json:"volumeList"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	pluginName := "backup"
+
+	if params.ContainerMd5 != "" {
+		containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerMd5)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		var pathList []string
+		for _, mount := range containerInfo.Mounts {
+			pathList = append(pathList, mount.Destination)
+		}
+		backupTar := fmt.Sprintf("/backup/%s/%s.tar", strings.TrimPrefix(containerInfo.Name, "/"), time.Now().Format(function.YmdHis))
+		cmd := fmt.Sprintf(`mkdir -p %s && tar czvf %s %s`, filepath.Dir(backupTar), backupTar, strings.Join(pathList, " "))
+		slog.Debug("volume", "backup", cmd)
+		backupPlugin, err := plugin.NewPlugin(pluginName, map[string]docker.ComposeService{
+			pluginName: {
+				Command: []string{
+					"/bin/sh", "-c", cmd,
+				},
+				VolumesFrom: []string{
+					containerInfo.ID,
+				},
+				Volumes: []string{
+					storage.Local{}.GetBackupPath("") + ":/backup:rw",
+				},
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		pluginContainerName, err := backupPlugin.Create()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		fmt.Printf("%v \n", pluginContainerName)
+	}
 	return
 }

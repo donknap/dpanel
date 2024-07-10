@@ -86,6 +86,7 @@ func main() {
 			"nginx/temp",
 			"cert",
 			"storage",
+			"backup",
 		} {
 			os.MkdirAll(facade.GetConfig().GetString("storage.local.path")+"/"+path, os.ModePerm)
 		}
