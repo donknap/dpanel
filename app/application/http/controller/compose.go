@@ -5,6 +5,7 @@ import (
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 )
@@ -39,7 +40,7 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
-	_, err := logic.Compose{}.GetYaml(params.Yaml)
+	_, err := docker.NewYaml(params.Yaml)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

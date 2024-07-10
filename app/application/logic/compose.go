@@ -2,16 +2,8 @@ package logic
 
 import (
 	"github.com/donknap/dpanel/common/service/exec"
-	"gopkg.in/yaml.v3"
 	"os"
 )
-
-type dockerComposeYamlV2 struct {
-	Service map[string]struct {
-		Image string `yaml:"image"`
-		Build string `yaml:"build"`
-	} `yaml:"service"`
-}
 
 type ComposeTaskOption struct {
 	SiteName    string
@@ -20,15 +12,6 @@ type ComposeTaskOption struct {
 }
 
 type Compose struct {
-}
-
-func (self Compose) GetYaml(yamlStr string) (*dockerComposeYamlV2, error) {
-	yamlObj := &dockerComposeYamlV2{}
-	err := yaml.Unmarshal([]byte(yamlStr), yamlObj)
-	if err != nil {
-		return nil, err
-	}
-	return yamlObj, nil
 }
 
 func (self Compose) Deploy(task *ComposeTaskOption) error {
