@@ -29,3 +29,8 @@ relation:
         type: SiteDomainSettingOption
         serializer: json
   - table: ims_compose
+  - table: ims_backup
+    column:
+      setting:
+        type: BackupSettingOption
+        serializer: json

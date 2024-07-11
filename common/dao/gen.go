@@ -17,6 +17,7 @@ import (
 
 var (
 	Q          = new(Query)
+	Backup     *backup
 	Compose    *compose
 	Event      *event
 	Image      *image
@@ -29,6 +30,7 @@ var (
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
+	Backup = &Q.Backup
 	Compose = &Q.Compose
 	Event = &Q.Event
 	Image = &Q.Image
@@ -42,6 +44,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
 		db:         db,
+		Backup:     newBackup(db, opts...),
 		Compose:    newCompose(db, opts...),
 		Event:      newEvent(db, opts...),
 		Image:      newImage(db, opts...),
@@ -56,6 +59,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 type Query struct {
 	db *gorm.DB
 
+	Backup     backup
 	Compose    compose
 	Event      event
 	Image      image
@@ -71,6 +75,7 @@ func (q *Query) Available() bool { return q.db != nil }
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
 		db:         db,
+		Backup:     q.Backup.clone(db),
 		Compose:    q.Compose.clone(db),
 		Event:      q.Event.clone(db),
 		Image:      q.Image.clone(db),
@@ -93,6 +98,7 @@ func (q *Query) WriteDB() *Query {
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
 		db:         db,
+		Backup:     q.Backup.replaceDB(db),
 		Compose:    q.Compose.replaceDB(db),
 		Event:      q.Event.replaceDB(db),
 		Image:      q.Image.replaceDB(db),
@@ -105,6 +111,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 }
 
 type queryCtx struct {
+	Backup     IBackupDo
 	Compose    IComposeDo
 	Event      IEventDo
 	Image      IImageDo
@@ -117,6 +124,7 @@ type queryCtx struct {
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
+		Backup:     q.Backup.WithContext(ctx),
 		Compose:    q.Compose.WithContext(ctx),
 		Event:      q.Event.WithContext(ctx),
 		Image:      q.Image.WithContext(ctx),
