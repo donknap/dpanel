@@ -45,8 +45,8 @@ func (self Image) DeleteBuildTask(http *gin.Context) {
 
 func (self Image) GetListBuild(http *gin.Context) {
 	type ParamsValidate struct {
-		Page     int  `form:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize int  `form:"pageSize" binding:"omitempty,gt=1"`
+		Page     int  `json:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize int  `json:"pageSize" binding:"omitempty,gt=1"`
 		All      bool `json:"all"`
 	}
 	params := ParamsValidate{}

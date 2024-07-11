@@ -71,11 +71,7 @@ func (self plugin) Create() (string, error) {
 	if err == nil {
 		// 如果容器在，并且有 auto-remove 参数，则删除掉
 		if service.Extend.AutoRemove {
-			err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, service.ContainerName, container.StopOptions{})
-			if err != nil {
-				return "", err
-			}
-			err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, service.ContainerName, container.RemoveOptions{})
+			err = self.Destroy()
 			if err != nil {
 				return "", err
 			}
@@ -140,6 +136,25 @@ func (self plugin) Create() (string, error) {
 		return "", err
 	}
 	return service.ContainerName, nil
+}
+
+func (self plugin) Destroy() error {
+	service, err := self.compose.GetService(self.name)
+	if err != nil {
+		return err
+	}
+	_, err = docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, service.ContainerName)
+	if err == nil {
+		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, service.ContainerName, container.StopOptions{})
+		if err != nil {
+			return err
+		}
+		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, service.ContainerName, container.RemoveOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (self plugin) importImage(imageName string, imagePath string) error {

@@ -62,6 +62,7 @@ func main() {
 			&entity.Site{},
 			&entity.SiteDomain{},
 			&entity.Compose{},
+			&entity.Backup{},
 		)
 		// 如果没有管理配置新建一条
 		founderSetting, _ := dao.Setting.
