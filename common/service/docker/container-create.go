@@ -55,7 +55,12 @@ func (self *ContainerCreateBuilder) WithImage(imageName string, tryPullImage boo
 			self.err = err
 			return
 		}
-		io.Copy(os.Stdout, reader)
+		_, err = io.Copy(os.Stdout, reader)
+		if err != nil {
+			self.err = err
+			return
+		}
+
 	}
 	self.containerConfig.Image = imageName
 	return

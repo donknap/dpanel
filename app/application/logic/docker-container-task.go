@@ -12,7 +12,7 @@ import (
 )
 
 func (self DockerTask) ContainerCreate(task *CreateMessage) error {
-	notice.Message{}.Info("containerCreate", "正在部署", task.SiteName)
+	_ = notice.Message{}.Info("containerCreate", "正在部署", task.SiteName)
 	builder := docker.Sdk.GetContainerCreateBuilder()
 	builder.WithImage(task.RunParams.ImageName, false)
 	builder.WithContainerName(task.SiteName)

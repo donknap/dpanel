@@ -5,6 +5,8 @@
 package entity
 
 import (
+	"time"
+
 	"github.com/donknap/dpanel/common/accessor"
 )
 
@@ -15,6 +17,7 @@ type Backup struct {
 	ID          int32                         `gorm:"column:id;type:INTEGER" json:"id"`
 	ContainerID string                        `gorm:"column:container_id" json:"containerId"`
 	Setting     *accessor.BackupSettingOption `gorm:"column:setting;serializer:json" json:"setting"`
+	CreatedAt   time.Time                     `gorm:"column:created_at" json:"createdAt"`
 }
 
 // TableName Backup's table name

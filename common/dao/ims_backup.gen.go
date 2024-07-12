@@ -30,6 +30,7 @@ func newBackup(db *gorm.DB, opts ...gen.DOOption) backup {
 	_backup.ID = field.NewInt32(tableName, "id")
 	_backup.ContainerID = field.NewString(tableName, "container_id")
 	_backup.Setting = field.NewField(tableName, "setting")
+	_backup.CreatedAt = field.NewTime(tableName, "created_at")
 
 	_backup.fillFieldMap()
 
@@ -43,6 +44,7 @@ type backup struct {
 	ID          field.Int32
 	ContainerID field.String
 	Setting     field.Field
+	CreatedAt   field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -62,6 +64,7 @@ func (b *backup) updateTableName(table string) *backup {
 	b.ID = field.NewInt32(table, "id")
 	b.ContainerID = field.NewString(table, "container_id")
 	b.Setting = field.NewField(table, "setting")
+	b.CreatedAt = field.NewTime(table, "created_at")
 
 	b.fillFieldMap()
 
@@ -78,10 +81,11 @@ func (b *backup) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (b *backup) fillFieldMap() {
-	b.fieldMap = make(map[string]field.Expr, 3)
+	b.fieldMap = make(map[string]field.Expr, 4)
 	b.fieldMap["id"] = b.ID
 	b.fieldMap["container_id"] = b.ContainerID
 	b.fieldMap["setting"] = b.Setting
+	b.fieldMap["created_at"] = b.CreatedAt
 }
 
 func (b backup) clone(db *gorm.DB) backup {

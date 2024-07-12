@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -192,10 +193,9 @@ func (self Volume) Delete(http *gin.Context) {
 
 func (self Volume) Backup(http *gin.Context) {
 	type ParamsValidate struct {
-		ContainerMd5     string   `json:"containerMd5"`
-		VolumeList       []string `json:"volumeList"`
-		BackupTargetType string   `json:"BackupTargetType" binding:"oneof=host dpanel"`
-		BackupPath       string   `json:"BackupPath"`
+		ContainerMd5     string `json:"containerMd5"`
+		BackupTargetType string `json:"BackupTargetType" binding:"oneof=host dpanel"`
+		BackupPath       string `json:"BackupPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -212,6 +212,10 @@ func (self Volume) Backup(http *gin.Context) {
 		var pathList []string
 		for _, mount := range containerInfo.Mounts {
 			pathList = append(pathList, mount.Destination)
+		}
+		if function.IsEmptyArray(pathList) {
+			self.JsonResponseWithError(http, errors.New("该容器没有绑定存储，请直接导出容器"), 500)
+			return
 		}
 		backupTar := fmt.Sprintf("/backup/%s/%s.tar.gz", strings.TrimPrefix(containerInfo.Name, "/"), time.Now().Format(function.YmdHis))
 		if params.BackupTargetType == "dpanel" {
@@ -250,6 +254,7 @@ func (self Volume) Backup(http *gin.Context) {
 				BackupTar:        backupTar,
 				BackupTargetType: params.BackupTargetType,
 				BackupPath:       params.BackupPath,
+				VolumePathList:   pathList,
 			},
 		})
 		if err != nil {
@@ -264,5 +269,55 @@ func (self Volume) Backup(http *gin.Context) {
 		})
 		return
 	}
+	return
+}
+
+func (self Volume) Restore(http *gin.Context) {
+	type ParamsValidate struct {
+		Id           int32  `json:"id" binding:"required"`
+		ContainerMd5 string `json:"containerMd5" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	backupInfo, _ := dao.Backup.Where(dao.Backup.ID.Eq(params.Id)).First()
+	if backupInfo == nil {
+		self.JsonResponseWithError(http, errors.New("备份数据不存在"), 500)
+		return
+	}
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerMd5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	cmd := fmt.Sprintf(`tar xzvf %s`, backupInfo.Setting.BackupTar)
+	slog.Debug("volume", "restore", cmd)
+
+	pluginName := "backup"
+	backupPlugin, err := plugin.NewPlugin(pluginName, map[string]docker.ComposeService{
+		pluginName: {
+			Command: []string{
+				"/bin/sh", "-c", cmd,
+			},
+			VolumesFrom: []string{
+				containerInfo.ID,
+			},
+			Volumes: []string{
+				backupInfo.Setting.BackupPath + ":/backup:rw",
+			},
+		},
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	_, err = backupPlugin.Create()
+	if err != nil {
+		_ = backupPlugin.Destroy()
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
 	return
 }
