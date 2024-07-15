@@ -100,6 +100,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/volume/backup", controller.Volume{}.Backup)
 			cors.POST("/app/volume/restore", controller.Volume{}.Restore)
 			cors.POST("/app/volume/get-backup-list", controller.Volume{}.GetBackupList)
+			cors.POST("/app/volume/delete-backup", controller.Volume{}.DeleteBackup)
 
 			// Compose 相关
 			cors.POST("/app/compose/create", controller.Compose{}.Create)

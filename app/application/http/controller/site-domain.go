@@ -244,7 +244,7 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
 	if function.IsEmptyArray(domainList) || len(domainList) != len(params.Id) {
-		self.JsonResponseWithError(http, errors.New("域名不存在"), 500)
+		self.JsonResponseWithError(http, errors.New("请先在域名列表勾选待申请的域名，多个域名可以共用同一张证书"), 500)
 		return
 	}
 
