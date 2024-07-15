@@ -17,6 +17,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"io"
 	"log/slog"
+	"strconv"
 	"strings"
 )
 
@@ -100,11 +101,31 @@ func (self Container) GetList(http *gin.Context) {
 
 	var md5List []driver.Valuer
 	var nameList []string
-	for _, item := range list {
+	for index, item := range list {
 		md5List = append(md5List, &accessor.SiteContainerInfoOption{
 			ID: item.ID,
 		})
 		nameList = append(nameList, item.Names...)
+		// 如果是直接绑定到宿主机网络，端口号不会显示到容器详情中
+		// 需要通过镜像允许再次获取下
+		if item.HostConfig.NetworkMode == "host" {
+			imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, item.ImageID)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			ports := []types.Port{}
+			for port, _ := range imageInfo.Config.ExposedPorts {
+				portInt, _ := strconv.Atoi(port.Port())
+				ports = append(ports, types.Port{
+					IP:          "0.0.0.0",
+					PublicPort:  uint16(portInt),
+					PrivatePort: uint16(portInt),
+					Type:        port.Proto(),
+				})
+			}
+			list[index].Ports = ports
+		}
 	}
 
 	query := dao.Site.Where(dao.Site.ContainerInfo.In(md5List...))
