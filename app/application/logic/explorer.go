@@ -41,7 +41,7 @@ type explorer struct {
 	rootPath   string
 }
 
-func (self explorer) GetListByPath(path string) (fileList []*fileItem, err error) {
+func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err error) {
 	path, err = self.getSafePath(path)
 	if err != nil {
 		return fileList, err
@@ -67,7 +67,7 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItem, err error
 		case 'd', 'l', '-', 'b':
 			row := strings.Fields(string(line))
 			if !function.IsEmptyArray(row) {
-				item := &fileItem{
+				item := &fileItemResult{
 					ShowName: string(line[strings.LastIndex(string(line), row[8]):]),
 					IsDir:    line[0] == 'd',
 					Size:     row[4],
@@ -201,25 +201,58 @@ func (self explorer) Chmod(fileList []string, mod int, hasChildren bool) error {
 	return nil
 }
 
-func (self explorer) Chown(fileList []string, owner string, hasChildren bool) error {
+// Chown 更改文件所属用户时，由于变更的用户在 explorer 中可能不存在，只能在当前容器中操作
+func (self explorer) Chown(containerName string, fileList []string, owner string, hasChildren bool) error {
 	var changeFileList []string
 	for _, path := range fileList {
 		if !strings.HasPrefix(path, "/") {
 			return errors.New("please use absolute address")
 		}
-		changeFileList = append(changeFileList, self.rootPath+path)
+		changeFileList = append(changeFileList, path)
 	}
 	flag := ""
 	if hasChildren {
 		flag += " -R "
 	}
-	cmd := fmt.Sprintf("cd %s && chown %s %s %s \n", self.rootPath, flag, owner, strings.Join(changeFileList, " "))
-	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+	cmd := fmt.Sprintf("chown %s %s:%s %s \n", flag, owner, owner, strings.Join(changeFileList, " "))
+	out, err := plugin.Command{}.Result(containerName, cmd)
 	if err != nil {
 		return err
 	}
 	slog.Debug("explorer", "chown", string(out))
 	return nil
+}
+
+func (self explorer) GetPasswd() ([]*userItemResult, error) {
+	result := make([]*userItemResult, 0)
+	cmd := fmt.Sprintf("cd %s && cat etc/passwd \n", self.rootPath)
+	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+	if err != nil {
+		return result, err
+	}
+	slog.Debug("explorer", "passwd", string(out))
+
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		if len(line) > 8 {
+			switch stdcopy.StdType(line[0]) {
+			case stdcopy.Stdin, stdcopy.Stdout, stdcopy.Stderr, stdcopy.Systemerr:
+				line = line[8:]
+			}
+		}
+		detail := strings.Split(string(line), ":")
+		if len(line) < 7 {
+			continue
+		}
+		result = append(result, &userItemResult{
+			Username:    detail[0],
+			UID:         detail[2],
+			GID:         detail[3],
+			Description: detail[4],
+			HomePath:    detail[5],
+		})
+	}
+	return result, nil
 }
 
 // Deprecated: 无用

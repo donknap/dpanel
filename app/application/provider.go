@@ -77,6 +77,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			engine.POST("/app/explorer/delete", controller.Explorer{}.Delete)
 			engine.POST("/app/explorer/get-content", controller.Explorer{}.GetContent)
 			engine.POST("/app/explorer/chmod", controller.Explorer{}.Chmod)
+			engine.POST("/app/explorer/get-passwd", controller.Explorer{}.GetPasswd)
 
 			// 日志相关
 			cors.POST("/app/log/run", controller.RunLog{}.Run)

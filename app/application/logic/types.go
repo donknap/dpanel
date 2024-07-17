@@ -16,7 +16,7 @@ const (
 	StepContainerRun        = "containerRun"   // 运行容器
 )
 
-type fileItem struct {
+type fileItemResult struct {
 	ShowName string `json:"showName"`
 	Name     string `json:"name"`
 	LinkName string `json:"linkName"`
@@ -27,4 +27,12 @@ type fileItem struct {
 	Change   int    `json:"change"`
 	Group    string `json:"group"`
 	Owner    string `json:"owner"`
+}
+
+type userItemResult struct {
+	Username    string `json:"username"`
+	UID         string `json:"uid"`
+	GID         string `json:"gid"`
+	Description string `json:"description"`
+	HomePath    string `json:"homePath"`
 }

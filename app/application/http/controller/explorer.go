@@ -261,7 +261,13 @@ func (self Explorer) GetPathList(http *gin.Context) {
 			tempChangeFileList[change.Path] = change
 		}
 	}
-	for _, item := range result {
+	userList, err := explorer.GetPasswd()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	for index, item := range result {
 		if tempChangeFileList != nil {
 			if change, ok := tempChangeFileList[item.Name]; ok {
 				item.Change = int(change.Kind)
@@ -273,6 +279,12 @@ func (self Explorer) GetPathList(http *gin.Context) {
 					item.Change = 100
 					break
 				}
+			}
+		}
+		for _, userItem := range userList {
+			if userItem.UID == item.Owner {
+				result[index].Owner = userItem.Username
+				result[index].Group = userItem.Username
 			}
 		}
 	}
@@ -357,7 +369,7 @@ func (self Explorer) Chmod(http *gin.Context) {
 		return
 	}
 	if params.Owner != "" {
-		err = explorer.Chown(params.FileList, params.Owner, params.HasChildren)
+		err = explorer.Chown(params.Md5, params.FileList, params.Owner, params.HasChildren)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -365,5 +377,29 @@ func (self Explorer) Chmod(http *gin.Context) {
 	}
 
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Explorer) GetPasswd(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5 string `json:"md5" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	explorer, err := logic.NewExplorer(params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	userList, err := explorer.GetPasswd()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": userList,
+	})
 	return
 }
