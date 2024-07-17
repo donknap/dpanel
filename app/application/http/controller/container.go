@@ -256,12 +256,6 @@ func (self Container) Delete(http *gin.Context) {
 	}
 	dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.ID)).Delete()
 
-	if !function.IsEmptyArray(containerInfo.HostConfig.Links) {
-		params.DeleteLink = true
-	} else {
-		params.DeleteLink = false
-	}
-
 	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.ID, container.StopOptions{})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

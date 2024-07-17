@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"strings"
 )
 
 type Network struct {
@@ -198,7 +199,7 @@ func (self Network) Connect(http *gin.Context) {
 
 	err := docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, params.Name, params.ContainerName, &network.EndpointSettings{
 		Aliases: []string{
-			params.ContainerAlise,
+			strings.TrimPrefix(params.ContainerAlise, "/"),
 		},
 	})
 	if err != nil {
