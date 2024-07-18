@@ -99,6 +99,10 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		builder.WithEntrypointStr(task.RunParams.Entrypoint)
 	}
 
+	if task.RunParams.UseHostNetwork {
+		builder.WithNetworkMode(network.NetworkHost)
+	}
+
 	response, err := builder.Execute()
 	if err != nil {
 		dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{

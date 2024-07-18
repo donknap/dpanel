@@ -48,4 +48,5 @@ type SiteEnvOption struct {
 	User           string        `json:"user"`
 	Command        string        `json:"command"`
 	Entrypoint     string        `json:"entrypoint"`
+	UseHostNetwork bool          `json:"useHostNetwork"`
 }

@@ -200,6 +200,10 @@ func (self *ContainerCreateBuilder) WithPid(pid ...string) {
 	self.hostConfig.PidMode = container.PidMode(pidStr)
 }
 
+func (self *ContainerCreateBuilder) WithNetworkMode(mode container.NetworkMode) {
+	self.hostConfig.NetworkMode = mode
+}
+
 func (self *ContainerCreateBuilder) Execute() (response container.CreateResponse, err error) {
 	if self.err != nil {
 		return response, self.err
