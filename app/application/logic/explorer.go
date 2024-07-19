@@ -118,7 +118,7 @@ func (self explorer) DeleteFileList(fileList []string) error {
 		}
 		deleteFileList = append(deleteFileList, self.rootPath+path)
 	}
-	cmd := fmt.Sprintf("cd %s && rm -rf \"%s\" \n", self.rootPath, strings.Join(deleteFileList, " "))
+	cmd := fmt.Sprintf("cd %s && rm -rf \"%s\" \n", self.rootPath, strings.Join(deleteFileList, "\" \""))
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return err
