@@ -47,7 +47,7 @@ func (self Home) WsConsole(http *gin.Context) {
 	}
 	type ParamsValidate struct {
 		Id      string `uri:"id" binding:"required"`
-		Cmd     string `form:"cmd,default=/bin/sh111"`
+		Cmd     string `form:"cmd,default=/bin/sh"`
 		WorkDir string `form:"workDir"`
 	}
 	params := ParamsValidate{}
@@ -139,6 +139,7 @@ func (self Home) Info(http *gin.Context) {
 	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, network.ListOptions{})
 	containerTask, _ := dao.Site.Where(dao.Site.DeletedAt.IsNull()).Count()
 	imageTask, _ := dao.Image.Count()
+	backupData, _ := dao.Backup.Count()
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,
 		"usage":      dataUsage,
@@ -147,6 +148,7 @@ func (self Home) Info(http *gin.Context) {
 			"network":       len(networkRow),
 			"containerTask": int(containerTask),
 			"imageTask":     int(imageTask),
+			"backup":        int(backupData),
 		},
 		"dpanel": map[string]interface{}{
 			"version":       facade.GetConfig().GetString("app.version"),
