@@ -9,7 +9,7 @@
       <env name="STORAGE_LOCAL_PATH" value="/Users/renchao/Workspace/go/dpanel/data" />
       <env name="DOCKER_HOST" value="unix:///Users/renchao/.docker/run/docker.sock" />
       <env name="APP_ENV" value="debug" />
-      <env name="APP_VERSION" value="1.0.2" />
+      <env name="APP_VERSION" value="1.0.3" />
     </envs>
     <EXTENSION ID="net.ashald.envfile">
       <option name="IS_ENABLED" value="false" />

@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/accessor"
@@ -117,7 +118,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	if !function.IsEmptyArray(task.RunParams.Links) {
 		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, &network.EndpointSettings{
 			Aliases: []string{
-				task.SiteName,
+				fmt.Sprintf("%s.pod.dpanel.local", task.SiteName),
 			},
 		})
 	}

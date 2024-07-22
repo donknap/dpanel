@@ -47,11 +47,14 @@ func (self EventLogic) MonitorLoop() {
 			_ = dao.Event.Create(eventRow)
 			time.Sleep(time.Second * 1)
 		case err := <-errorChan:
-			_ = dao.Event.Create(&entity.Event{
-				Type:      "error",
-				Message:   err.Error(),
-				CreatedAt: time.Now().Format(function.ShowYmdHis),
-			})
+			if err != nil {
+				_ = dao.Event.Create(&entity.Event{
+					Type:      "error",
+					Message:   err.Error(),
+					CreatedAt: time.Now().Format(function.ShowYmdHis),
+				})
+			}
+
 			time.Sleep(time.Second)
 		}
 	}
