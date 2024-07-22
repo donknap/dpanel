@@ -30,9 +30,7 @@ func newRegistry(db *gorm.DB, opts ...gen.DOOption) registry {
 	_registry.ID = field.NewInt32(tableName, "id")
 	_registry.Title = field.NewString(tableName, "title")
 	_registry.ServerAddress = field.NewString(tableName, "server_address")
-	_registry.Username = field.NewString(tableName, "username")
-	_registry.Password = field.NewString(tableName, "password")
-	_registry.Email = field.NewString(tableName, "email")
+	_registry.Setting = field.NewField(tableName, "setting")
 
 	_registry.fillFieldMap()
 
@@ -46,9 +44,7 @@ type registry struct {
 	ID            field.Int32
 	Title         field.String
 	ServerAddress field.String
-	Username      field.String
-	Password      field.String
-	Email         field.String
+	Setting       field.Field
 
 	fieldMap map[string]field.Expr
 }
@@ -68,9 +64,7 @@ func (r *registry) updateTableName(table string) *registry {
 	r.ID = field.NewInt32(table, "id")
 	r.Title = field.NewString(table, "title")
 	r.ServerAddress = field.NewString(table, "server_address")
-	r.Username = field.NewString(table, "username")
-	r.Password = field.NewString(table, "password")
-	r.Email = field.NewString(table, "email")
+	r.Setting = field.NewField(table, "setting")
 
 	r.fillFieldMap()
 
@@ -87,13 +81,11 @@ func (r *registry) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (r *registry) fillFieldMap() {
-	r.fieldMap = make(map[string]field.Expr, 6)
+	r.fieldMap = make(map[string]field.Expr, 4)
 	r.fieldMap["id"] = r.ID
 	r.fieldMap["title"] = r.Title
 	r.fieldMap["server_address"] = r.ServerAddress
-	r.fieldMap["username"] = r.Username
-	r.fieldMap["password"] = r.Password
-	r.fieldMap["email"] = r.Email
+	r.fieldMap["setting"] = r.Setting
 }
 
 func (r registry) clone(db *gorm.DB) registry {

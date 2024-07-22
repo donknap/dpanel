@@ -69,7 +69,7 @@ func main() {
 			Where(dao.Setting.GroupName.Eq(logic.SettingUser)).
 			Where(dao.Setting.Name.Eq(logic.SettingUserFounder)).First()
 		if founderSetting == nil {
-			dao.Setting.Create(&entity.Setting{
+			_ = dao.Setting.Create(&entity.Setting{
 				GroupName: logic.SettingUser,
 				Name:      logic.SettingUserFounder,
 				Value: &accessor.SettingValueOption{
@@ -78,6 +78,18 @@ func main() {
 				},
 			})
 		}
+		registryRow, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq("docker.io")).First()
+		if registryRow == nil {
+			_ = dao.Registry.Create(&entity.Registry{
+				Title:         "Docker Hub",
+				ServerAddress: "docker.io",
+				Setting: &accessor.RegistrySettingOption{
+					Username: "anonymous",
+					Proxy:    []string{},
+				},
+			})
+		}
+
 		// 初始化挂载目录
 		for _, path := range []string{
 			"nginx/default_host",

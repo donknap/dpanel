@@ -79,13 +79,13 @@ func (self DockerTask) ImageRemote(task *ImageRemoteMessage) error {
 	var err error
 	var out io.ReadCloser
 	if task.Type == "pull" {
-		if task.Platform == "" {
-			task.Platform = "amd64"
-		}
-		out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, task.Tag, image.PullOptions{
+		pullOption := image.PullOptions{
 			RegistryAuth: task.Auth,
-			Platform:     task.Platform,
-		})
+		}
+		if task.Platform != "" {
+			pullOption.Platform = task.Platform
+		}
+		out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, task.Tag, pullOption)
 	} else {
 		out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, task.Tag, image.PushOptions{
 			RegistryAuth: task.Auth,

@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"github.com/docker/docker/api/types/registry"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
@@ -18,12 +19,13 @@ type Registry struct {
 
 func (self Registry) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id            int32  `json:"id"`
-		Title         string `form:"title" binding:"required"`
-		Username      string `form:"username"`
-		Password      string `form:"password"`
-		ServerAddress string `form:"serverAddress"`
-		Email         string `form:"email" binding:"omitempty"`
+		Id            int32    `json:"id"`
+		Title         string   `json:"title" binding:"required"`
+		Username      string   `json:"username"`
+		Password      string   `json:"password"`
+		ServerAddress string   `json:"serverAddress" binding:"required"`
+		Email         string   `json:"email" binding:"omitempty"`
+		Proxy         []string `json:"proxy"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -43,8 +45,8 @@ func (self Registry) Create(http *gin.Context) {
 			return
 		}
 		// 如果提交上来密码为空，则使用默认密码
-		if params.Password == "" {
-			code, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registryRow.Password)
+		if params.Password == "" && registryRow.Setting.Password != "" {
+			code, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registryRow.Setting.Password)
 			params.Password = code
 		}
 	}
@@ -61,19 +63,27 @@ func (self Registry) Create(http *gin.Context) {
 	}
 	registryNew := &entity.Registry{
 		Title:         params.Title,
-		Username:      params.Username,
 		ServerAddress: params.ServerAddress,
-		Email:         params.Email,
+		Setting: &accessor.RegistrySettingOption{
+			Username: params.Username,
+			Email:    params.Email,
+			Proxy:    params.Proxy,
+		},
 	}
 	key := facade.GetConfig().GetString("app.name")
 	code, _ := function.AseEncode(key, params.Password)
-	registryNew.Password = code
+	registryNew.Setting.Password = code
 
 	if params.Id <= 0 {
-		dao.Registry.Create(registryNew)
+		err = dao.Registry.Create(registryNew)
 	} else {
-		dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).Updates(registryNew)
+		_, err = dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).Updates(registryNew)
 		registryNew.ID = params.Id
+	}
+
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
@@ -93,7 +103,6 @@ func (self Registry) GetList(http *gin.Context) {
 		return
 	}
 
-	hasDockerIo := false
 	var list []*entity.Registry
 
 	query := dao.Registry.Order(dao.Registry.ID.Desc())
@@ -103,26 +112,9 @@ func (self Registry) GetList(http *gin.Context) {
 	if params.ServerAddress != "" {
 		query = query.Where(dao.Registry.ServerAddress.Like("%" + params.ServerAddress + "%"))
 	}
-	list, _ = query.Select(
-		dao.Registry.Title,
-		dao.Registry.ServerAddress,
-		dao.Registry.ID,
-		dao.Registry.Username,
-	).Find()
-	for _, item := range list {
-		if item.ServerAddress == "docker.io" {
-			hasDockerIo = true
-			break
-		}
-	}
-	if !hasDockerIo && params.Title == "" && params.ServerAddress == "" {
-		list = append([]*entity.Registry{
-			{
-				Title:         "Docker Hub",
-				ServerAddress: "docker.io",
-				Username:      "anonymous",
-			},
-		}, list...)
+	list, _ = query.Find()
+	for index, _ := range list {
+		list[index].Setting.Password = "****"
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": list,
@@ -151,11 +143,12 @@ func (self Registry) GetDetail(http *gin.Context) {
 
 func (self Registry) Update(http *gin.Context) {
 	type ParamsValidate struct {
-		Id            int32  `json:"id" binding:"required"`
-		Title         string `json:"title"`
-		ServerAddress string `json:"serverAddress"`
-		Username      string `json:"username"`
-		Password      string `json:"password"`
+		Id            int32    `json:"id" binding:"required"`
+		Title         string   `json:"title"`
+		ServerAddress string   `json:"serverAddress"`
+		Username      string   `json:"username"`
+		Password      string   `json:"password"`
+		Proxy         []string `json:"proxy"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -166,15 +159,17 @@ func (self Registry) Update(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
 		return
 	}
-	password := row.Password
+	password := row.Setting.Password
 	if params.Password != "" {
 		password, _ = function.AseEncode(facade.GetConfig().GetString("app.name"), params.Password)
 	}
 	_, err := dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).Updates(&entity.Registry{
 		Title:         params.Title,
 		ServerAddress: params.ServerAddress,
-		Username:      params.Username,
-		Password:      password,
+		Setting: &accessor.RegistrySettingOption{
+			Username: params.Username,
+			Password: password,
+		},
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

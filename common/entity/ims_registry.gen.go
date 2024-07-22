@@ -4,16 +4,18 @@
 
 package entity
 
+import (
+	"github.com/donknap/dpanel/common/accessor"
+)
+
 const TableNameRegistry = "ims_registry"
 
 // Registry mapped from table <ims_registry>
 type Registry struct {
-	ID            int32  `gorm:"column:id;primaryKey" json:"id"`
-	Title         string `gorm:"column:title" json:"title"`
-	ServerAddress string `gorm:"column:server_address" json:"serverAddress"`
-	Username      string `gorm:"column:username" json:"username"`
-	Password      string `gorm:"column:password" json:"password"`
-	Email         string `gorm:"column:email" json:"email"`
+	ID            int32                           `gorm:"column:id;type:INTEGER" json:"id"`
+	Title         string                          `gorm:"column:title" json:"title"`
+	ServerAddress string                          `gorm:"column:server_address" json:"serverAddress"`
+	Setting       *accessor.RegistrySettingOption `gorm:"column:setting;serializer:json" json:"setting"`
 }
 
 // TableName Registry's table name

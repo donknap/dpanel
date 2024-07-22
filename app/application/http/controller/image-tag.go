@@ -25,16 +25,18 @@ func (self Image) TagRemote(http *gin.Context) {
 	var authString string
 	tagDetail := logic.Image{}.GetImageTagDetail(params.Tag)
 
+	proxyList := make([]string, 0)
 	// 从官方仓库拉取镜像不用权限
 	registry, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(tagDetail.Registry)).Find()
 	for _, registryRow := range registry {
-		if registryRow.Username == tagDetail.Namespace {
-			authString = logic.Image{}.GetRegistryAuthString(registryRow.ServerAddress, registryRow.Username, registryRow.Password)
+		if registryRow.Setting.Username == tagDetail.Namespace {
+			authString = logic.Image{}.GetRegistryAuthString(registryRow.ServerAddress, registryRow.Setting.Username, registryRow.Setting.Password)
 		}
+		proxyList = append(proxyList, registryRow.Setting.Proxy...)
 	}
 
 	if authString == "" && registry != nil && len(registry) > 0 {
-		authString = logic.Image{}.GetRegistryAuthString(registry[0].ServerAddress, registry[0].Username, registry[0].Password)
+		authString = logic.Image{}.GetRegistryAuthString(registry[0].ServerAddress, registry[0].Setting.Username, registry[0].Setting.Password)
 	}
 
 	if params.AsLatest {
@@ -55,15 +57,35 @@ func (self Image) TagRemote(http *gin.Context) {
 			return
 		}
 	} else {
-		err := logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
-			Auth:     authString,
-			Type:     params.Type,
-			Tag:      params.Tag,
-			Platform: params.Platform,
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
+		// 如果仓库采用了代理地址，则优先使用
+		if !function.IsEmptyArray(proxyList) {
+			var err error
+			for _, value := range proxyList {
+				err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
+					Auth:     authString,
+					Type:     params.Type,
+					Tag:      strings.Trim(strings.TrimPrefix(value, "https://"), "/") + "/" + params.Tag,
+					Platform: params.Platform,
+				})
+				if err == nil {
+					break
+				}
+			}
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		} else {
+			err := logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
+				Auth:     authString,
+				Type:     params.Type,
+				Tag:      params.Tag,
+				Platform: params.Platform,
+			})
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 	}
 
@@ -145,7 +167,7 @@ func (self Image) TagSync(http *gin.Context) {
 			self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
 			return
 		}
-		authString := logic.Image{}.GetRegistryAuthString(registry.ServerAddress, registry.Username, registry.Password)
+		authString := logic.Image{}.GetRegistryAuthString(registry.ServerAddress, registry.Setting.Username, registry.Setting.Password)
 		for _, md5 := range params.Md5 {
 			imageDetail, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, md5)
 			if err != nil {

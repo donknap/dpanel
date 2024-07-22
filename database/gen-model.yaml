@@ -21,16 +21,20 @@ relation:
         serializer: json
         type: SettingValueOption
   - table: ims_registry
-  - table: ims_event
-  - table: ims_notice
+    column:
+      setting:
+        serializer: json
+        type: RegistrySettingOption
   - table: ims_site_domain
     column:
       setting:
         type: SiteDomainSettingOption
         serializer: json
-  - table: ims_compose
   - table: ims_backup
     column:
       setting:
         type: BackupSettingOption
         serializer: json
+  - table: ims_event
+  - table: ims_notice
+  - table: ims_compose
