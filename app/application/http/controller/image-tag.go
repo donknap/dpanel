@@ -39,6 +39,8 @@ func (self Image) TagRemote(http *gin.Context) {
 		authString = logic.Image{}.GetRegistryAuthString(registry[0].ServerAddress, registry[0].Setting.Username, registry[0].Setting.Password)
 	}
 
+	var proxyUrl string
+
 	if params.AsLatest {
 		tag := strings.Split(params.Tag, ":")
 		latestTag := tag[0] + ":latest"
@@ -61,13 +63,22 @@ func (self Image) TagRemote(http *gin.Context) {
 		if !function.IsEmptyArray(proxyList) {
 			var err error
 			for _, value := range proxyList {
+				proxyImageTag := strings.Trim(strings.TrimPrefix(value, "https://"), "/")
+				if tagDetail.Registry == "docker.io" && strings.Count(tagDetail.ImageName, "/") == 0 {
+					proxyImageTag += "/library"
+				}
+				proxyImageTag += "/" + tagDetail.ImageName
+
 				err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
 					Auth:     authString,
 					Type:     params.Type,
-					Tag:      strings.Trim(strings.TrimPrefix(value, "https://"), "/") + "/" + params.Tag,
+					Tag:      proxyImageTag,
 					Platform: params.Platform,
 				})
 				if err == nil {
+					proxyUrl = value
+					// 如果使用了加速，需要给镜像 tag 一个原来的名称
+					_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, proxyImageTag, params.Tag)
 					break
 				}
 			}
@@ -88,9 +99,9 @@ func (self Image) TagRemote(http *gin.Context) {
 			}
 		}
 	}
-
 	self.JsonResponseWithoutError(http, gin.H{
-		"tag": params.Tag,
+		"proxyUrl": proxyUrl,
+		"tag":      params.Tag,
 	})
 	return
 }

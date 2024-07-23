@@ -51,16 +51,22 @@ func (self Registry) Create(http *gin.Context) {
 		}
 	}
 
-	response, err := docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, registry.AuthConfig{
-		Username:      params.Username,
-		Password:      params.Password,
-		ServerAddress: params.ServerAddress,
-		Email:         params.Email,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	var response registry.AuthenticateOKBody
+	var err error
+
+	if params.Username != "" && params.Password != "" {
+		response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, registry.AuthConfig{
+			Username:      params.Username,
+			Password:      params.Password,
+			ServerAddress: params.ServerAddress,
+			Email:         params.Email,
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
+
 	registryNew := &entity.Registry{
 		Title:         params.Title,
 		ServerAddress: params.ServerAddress,
