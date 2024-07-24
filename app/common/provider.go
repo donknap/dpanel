@@ -14,7 +14,7 @@ type Provider struct {
 func (provider *Provider) Register(httpServer *http_server.Server) {
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
-		cors := engine.Group("/", common.CorsMiddleware{}.Process)
+		cors := engine.Group("/api", common.CorsMiddleware{}.Process)
 
 		cors.POST("/common/attach/upload", controller.Attach{}.Upload)
 		cors.POST("/common/attach/delete", controller.Attach{}.Delete)
@@ -45,12 +45,13 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
-		engine.GET("/home/index", controller.Home{}.Index)
-		engine.GET("/home/ws/notice", controller.Home{}.WsNotice)
-		engine.GET("/home/ws/console/:id", controller.Home{}.WsConsole)
+		cors := engine.Group("/api/", common.CorsMiddleware{}.Process)
+		cors.POST("/common/home/info", controller.Home{}.Info)
+		cors.POST("/common/home/upgrade-script", controller.Home{}.UpgradeScript)
 
-		engine.POST("/common/home/info", controller.Home{}.Info)
-		engine.POST("/common/home/upgrade-script", controller.Home{}.UpgradeScript)
+		wsCors := engine.Group("/ws/", common.CorsMiddleware{}.Process)
+		wsCors.GET("/common/ws/notice", controller.Home{}.WsNotice)
+		wsCors.GET("/common/ws/console/:id", controller.Home{}.WsConsole)
 	})
 
 	event := logic.EventLogic{}

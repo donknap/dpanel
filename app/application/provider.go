@@ -14,7 +14,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	// 注册一些路由
 	httpServer.RegisterRouters(
 		func(engine *gin.Engine) {
-			cors := engine.Group("/", common.CorsMiddleware{}.Process)
+			cors := engine.Group("/api/", common.CorsMiddleware{}.Process)
 
 			// 站点相关
 			cors.POST("/app/site/create-by-image", controller.Site{}.CreateByImage)
@@ -69,15 +69,15 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/image/update-title", controller.Image{}.UpdateTitle)
 
 			// 文件相关
-			engine.POST("/app/explorer/export", controller.Explorer{}.Export)
-			engine.POST("/app/explorer/import", controller.Explorer{}.Import)
-			engine.POST("/app/explorer/import-file-content", controller.Explorer{}.ImportFileContent)
-			engine.POST("/app/explorer/unzip", controller.Explorer{}.Unzip)
-			engine.POST("/app/explorer/get-path-list", controller.Explorer{}.GetPathList)
-			engine.POST("/app/explorer/delete", controller.Explorer{}.Delete)
-			engine.POST("/app/explorer/get-content", controller.Explorer{}.GetContent)
-			engine.POST("/app/explorer/chmod", controller.Explorer{}.Chmod)
-			engine.POST("/app/explorer/get-passwd", controller.Explorer{}.GetPasswd)
+			cors.POST("/app/explorer/export", controller.Explorer{}.Export)
+			cors.POST("/app/explorer/import", controller.Explorer{}.Import)
+			cors.POST("/app/explorer/import-file-content", controller.Explorer{}.ImportFileContent)
+			cors.POST("/app/explorer/unzip", controller.Explorer{}.Unzip)
+			cors.POST("/app/explorer/get-path-list", controller.Explorer{}.GetPathList)
+			cors.POST("/app/explorer/delete", controller.Explorer{}.Delete)
+			cors.POST("/app/explorer/get-content", controller.Explorer{}.GetContent)
+			cors.POST("/app/explorer/chmod", controller.Explorer{}.Chmod)
+			cors.POST("/app/explorer/get-passwd", controller.Explorer{}.GetPasswd)
 
 			// 日志相关
 			cors.POST("/app/log/run", controller.RunLog{}.Run)
