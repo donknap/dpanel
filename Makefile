@@ -31,7 +31,7 @@ clean:
  	${GO_TARGET_DIR}/${PROJECT_NAME}-osx \
  	${GO_SOURCE_DIR}/asset/static/*.js ${GO_SOURCE_DIR}/asset/static/*.css ${GO_SOURCE_DIR}/asset/static/index.html
 all: js linux arm
-test:
+test: all
 	docker buildx build \
 	-t ccr.ccs.tencentyun.com/dpanel/dpanel:lite-test \
 	-t ccr.ccs.tencentyun.com/dpanel/dpanel:${VERSION}-lite-test \
