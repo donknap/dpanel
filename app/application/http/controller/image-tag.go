@@ -59,8 +59,9 @@ func (self Image) TagRemote(http *gin.Context) {
 			return
 		}
 	} else {
-		// 如果仓库采用了代理地址，则优先使用
+		// 如果仓库采用了代理地址，则优先使用，代理地址无法拉取后，尝试用原始的地址拉取
 		if !function.IsEmptyArray(proxyList) {
+			proxyList = append(proxyList, tagDetail.Registry)
 			var err error
 			for _, value := range proxyList {
 				proxyImageTag := strings.Trim(strings.TrimPrefix(value, "https://"), "/")
