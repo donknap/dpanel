@@ -6,23 +6,28 @@ TRIM_PATH=/Users/renchao
 JS_SOURCE_DIR=$(GO_SOURCE_DIR)/../../js/d-panel
 VERSION=1.0.0
 
-linux: clean
+help:
+	@echo "make build r1 r2 push VERSION="
+	@echo "make test VERSION="
+	@echo "make clean"
+
+linux: clean-source
 	# apk add musl
 	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ \
 	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-amd64 ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
-arm: clean
+arm: clean-source
 	# brew tap messense/macos-cross-toolchains && brew install aarch64-unknown-linux-gnu
 	# apk add libc6-compat
 	CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux CC=aarch64-unknown-linux-gnu-gcc CXX=aarch64-unknown-linux-gnu-g++ \
 	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-arm64 ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
-osx: clean
+osx: clean-source
 	CGO_ENABLED=1 go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-osx ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
-js: clean
+js: clean-source
 	cd ${JS_SOURCE_DIR} && npm run build && cp -r ${JS_SOURCE_DIR}/dist/* ${GO_SOURCE_DIR}/asset/static
-clean:
+clean-source:
 	go clean
 	rm -f \
 	${GO_TARGET_DIR}/config.yaml \
@@ -30,6 +35,9 @@ clean:
  	${GO_TARGET_DIR}/${PROJECT_NAME}-arm64 \
  	${GO_TARGET_DIR}/${PROJECT_NAME}-osx \
  	${GO_SOURCE_DIR}/asset/static/*.js ${GO_SOURCE_DIR}/asset/static/*.css ${GO_SOURCE_DIR}/asset/static/index.html
+clean:
+	docker buildx prune -a -f
+	docker stop buildx_buildkit_dpanel-builder0 && docker rm /buildx_buildkit_dpanel-builder0
 all: js linux arm
 test: all
 	docker buildx build \
@@ -46,6 +54,3 @@ test: all
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile \
 	. --push
-help:
-	@echo "make - 编译 Go 代码, 生成二进制文件"
-	@echo "make dev - 在开发模式下编译 Go 代码"
