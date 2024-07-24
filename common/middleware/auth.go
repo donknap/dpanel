@@ -16,15 +16,15 @@ type AuthMiddleware struct {
 
 func (self AuthMiddleware) Process(http *gin.Context) {
 	if function.InArray([]string{
-		"/common/user/login",
 		"/api/common/user/login",
-		"/common/home/info",
-	}, http.Request.URL.Path) {
+		"/api/common/home/info",
+	}, http.Request.URL.Path) || !strings.HasPrefix(http.Request.URL.Path, "/api") {
 		http.Next()
 		return
 	}
+
 	var authToken = ""
-	if strings.Contains(http.Request.URL.Path, "/home/ws") {
+	if strings.Contains(http.Request.URL.Path, "/common/ws") {
 		authToken = "Bearer " + http.Query("token")
 	} else {
 		authToken = http.GetHeader("Authorization")

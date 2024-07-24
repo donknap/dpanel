@@ -15,6 +15,8 @@ import (
 	app "github.com/we7coreteam/w7-rangine-go/src"
 	"github.com/we7coreteam/w7-rangine-go/src/http"
 	"github.com/we7coreteam/w7-rangine-go/src/http/middleware"
+	"io/fs"
+	http2 "net/http"
 	"os"
 )
 
@@ -35,13 +37,18 @@ func main() {
 	httpServer := new(http.Provider).Register(app.GetConfig(), app.GetConsole(), app.GetServerManager()).Export()
 	// 注册一些全局中间件，路由或是其它一些全局操作
 	httpServer.Use(middleware.GetPanicHandlerMiddleware())
+	// 全局登录判断
+	httpServer.Use(common2.AuthMiddleware{}.Process)
 	httpServer.RegisterRouters(
 		func(engine *gin.Engine) {
-			engine.NoRoute(
-				func(context *gin.Context) {
-					context.String(404, "404 Not Found")
-				},
-			)
+			subFs, _ := fs.Sub(Asset, "asset/static")
+			engine.StaticFS("/static", http2.FS(subFs))
+			engine.StaticFileFS("/favicon.ico", "icon.jpg", http2.FS(subFs))
+			engine.NoRoute(func(http *gin.Context) {
+				indexHtml, _ := Asset.ReadFile("asset/static/index.html")
+				http.Data(http2.StatusOK, "text/html; charset=UTF-8", indexHtml)
+				return
+			})
 		},
 	)
 
@@ -51,7 +58,7 @@ func main() {
 	}
 	dao.SetDefault(db)
 
-	if facade.GetConfig().GetString("app.env") == "production" {
+	if facade.GetConfig().GetString("app.env") != "debug" {
 		// 同步数据库
 		db.Migrator().AutoMigrate(
 			&entity.Event{},
@@ -109,9 +116,6 @@ func main() {
 	facade.GetContainer().NamedSingleton("asset", func() embed.FS {
 		return Asset
 	})
-
-	// 全局登录判断
-	httpServer.Use(common2.AuthMiddleware{}.Process)
 
 	// 注册业务 provider，此模块中需要使用 http server 和 console
 	new(common.Provider).Register(httpServer)

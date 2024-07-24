@@ -173,6 +173,7 @@ func (self Home) Info(http *gin.Context) {
 		},
 		"dpanel": map[string]interface{}{
 			"version":       facade.GetConfig().GetString("app.version"),
+			"family":        facade.GetConfig().GetString("app.env"),
 			"release":       "",
 			"containerInfo": dpanelContainerInfo,
 		},

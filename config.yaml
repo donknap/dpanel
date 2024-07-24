@@ -8,7 +8,7 @@ app:
 server:
   http:
     host: 0.0.0.0
-    port: 8086
+    port: ${APP_SERVER_PORT-8086}
 log:
   default:
     driver: stack
