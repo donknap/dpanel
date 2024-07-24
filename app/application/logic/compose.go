@@ -91,8 +91,10 @@ func (self Compose) Kill() error {
 
 func (self Compose) runCommand(command []string) {
 	exec.Command{}.RunInTerminal(&exec.RunCommandOption{
-		CmdName: "docker-compose",
-		CmdArgs: command,
+		CmdName: "docker",
+		CmdArgs: append([]string{
+			"compose",
+		}, command...),
 	})
 }
 
