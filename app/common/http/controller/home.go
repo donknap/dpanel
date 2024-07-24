@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/docker/docker/api/types"
@@ -14,6 +15,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"log/slog"
+	"time"
 )
 
 type Home struct {
@@ -128,21 +131,39 @@ func (self Home) Info(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	dataUsage, err := docker.Sdk.Client.DiskUsage(docker.Sdk.Ctx, types.DiskUsageOptions{
-		Types: []types.DiskUsageObject{
-			types.ContainerObject,
-			types.ImageObject,
-			types.VolumeObject,
-			types.BuildCacheObject,
-		},
-	})
+
+	// 有些设备的docker获取磁盘占用比较耗时，这里增加一个超时判断
+	var diskUsage types.DiskUsage
+	diskUsageChan := make(chan types.DiskUsage)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*5)
+	go func() {
+		diskUsage, err := docker.Sdk.Client.DiskUsage(docker.Sdk.Ctx, types.DiskUsageOptions{
+			Types: []types.DiskUsageObject{
+				types.ContainerObject,
+				types.ImageObject,
+				types.VolumeObject,
+				types.BuildCacheObject,
+			},
+		})
+		if err == nil {
+			diskUsageChan <- diskUsage
+		}
+	}()
+	select {
+	case diskUsage = <-diskUsageChan:
+		slog.Debug("home", "info", "get disk usage")
+	case <-ctx.Done():
+		slog.Debug("home", "info", "disk usage timeout ")
+		cancelFunc()
+	}
+
 	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, network.ListOptions{})
 	containerTask, _ := dao.Site.Where(dao.Site.DeletedAt.IsNull()).Count()
 	imageTask, _ := dao.Image.Count()
 	backupData, _ := dao.Backup.Count()
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,
-		"usage":      dataUsage,
+		"usage":      diskUsage,
 		"sdkVersion": docker.Sdk.Client.ClientVersion(),
 		"total": map[string]int{
 			"network":       len(networkRow),
@@ -155,6 +176,27 @@ func (self Home) Info(http *gin.Context) {
 			"release":       "",
 			"containerInfo": dpanelContainerInfo,
 		},
+	})
+	return
+}
+
+func (self Home) DiskUsage(http *gin.Context) {
+
+	dataUsage, err := docker.Sdk.Client.DiskUsage(docker.Sdk.Ctx, types.DiskUsageOptions{
+		Types: []types.DiskUsageObject{
+			types.ContainerObject,
+			types.ImageObject,
+			types.VolumeObject,
+			types.BuildCacheObject,
+		},
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"usage": dataUsage,
 	})
 	return
 }
