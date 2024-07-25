@@ -2,7 +2,7 @@ package logic
 
 import (
 	"fmt"
-	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
+	"github.com/donknap/dpanel/common/service/storage"
 	"os"
 )
 
@@ -38,9 +38,9 @@ func (self Site) GetSiteNginxSetting(serverName string) *siteNginxSettingResult 
 }
 
 func (self Site) getNginxSettingPath() string {
-	return fmt.Sprintf("%s/nginx/proxy_host/", facade.GetConfig().Get("storage.local.path"))
+	return fmt.Sprintf("%s/nginx/proxy_host/", storage.Local{}.GetStorageLocalPath())
 }
 
 func (self Site) getNginxCertPath() string {
-	return fmt.Sprintf("%s/cert/", facade.GetConfig().Get("storage.local.path"))
+	return fmt.Sprintf("%s/cert/", storage.Local{}.GetStorageLocalPath())
 }

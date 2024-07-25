@@ -27,9 +27,9 @@ database:
     driver: sqlite
     user_name: ${DB_USERNAME-root}
     password: ${DB_PASSWORD-123456}
-    db_name: ${DB_DATABASE-./dpanel.db}
+    db_name: ${STORAGE_LOCAL_PATH}/dpanel.db
     charset: utf8mb4
     prefix: ims_
 storage:
   local:
-    path: ${STORAGE_LOCAL_PATH-/dpanel}
+    path: ${STORAGE_LOCAL_PATH}

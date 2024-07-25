@@ -10,14 +10,17 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	common2 "github.com/donknap/dpanel/common/middleware"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	app "github.com/we7coreteam/w7-rangine-go/src"
 	"github.com/we7coreteam/w7-rangine-go/src/http"
 	"github.com/we7coreteam/w7-rangine-go/src/http/middleware"
 	"io/fs"
+	"log/slog"
 	http2 "net/http"
 	"os"
+	"path/filepath"
 )
 
 var (
@@ -28,11 +31,21 @@ var (
 )
 
 func main() {
+	// 兼容没有配置存储目录的情况
+	if os.Getenv("STORAGE_LOCAL_PATH") == "" {
+		exePath, _ := os.Executable()
+		os.Setenv("STORAGE_LOCAL_PATH", filepath.Dir(exePath))
+	}
+
 	app := app.NewApp(
 		app.Option{
 			Name: "w7-rangine-go-skeleton",
 		},
 	)
+	slog.Debug("config", "env", facade.GetConfig().GetString("app.env"))
+	slog.Debug("config", "storage", storage.Local{}.GetStorageLocalPath())
+	slog.Debug("config", "db", facade.GetConfig().GetString("database.default.db_name"))
+
 	// 业务中需要使用 http server，这里需要先实例化
 	httpServer := new(http.Provider).Register(app.GetConfig(), app.GetConsole(), app.GetServerManager()).Export()
 	// 注册一些全局中间件，路由或是其它一些全局操作
@@ -108,7 +121,10 @@ func main() {
 			"storage",
 			"backup",
 		} {
-			os.MkdirAll(facade.GetConfig().GetString("storage.local.path")+"/"+path, os.ModePerm)
+			err = os.MkdirAll(storage.Local{}.GetStorageLocalPath()+"/"+path, os.ModePerm)
+			if err != nil {
+				panic(err.Error())
+			}
 		}
 	}
 
