@@ -103,7 +103,7 @@ func (self *ContainerCreateBuilder) WithDefaultVolume(container string) {
 func (self *ContainerCreateBuilder) WithPort(host string, container string) *ContainerCreateBuilder {
 	var port nat.Port
 	var err error
-	hostIp := "0.0.0.0"
+	hostIp := ""
 	if strings.Contains(container, "/") {
 		portArr := strings.Split(container, "/")
 		port, err = nat.NewPort(portArr[1], portArr[0])
