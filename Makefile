@@ -25,7 +25,8 @@ arm: clean-source
 osx: clean-source
 	CGO_ENABLED=1 go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-osx ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
-js: clean-source
+js:
+	rm -f ${GO_SOURCE_DIR}/asset/static/*.js ${GO_SOURCE_DIR}/asset/static/*.css ${GO_SOURCE_DIR}/asset/static/index.html
 	cd ${JS_SOURCE_DIR} && npm run build && cp -r ${JS_SOURCE_DIR}/dist/* ${GO_SOURCE_DIR}/asset/static
 clean-source:
 	go clean
@@ -33,8 +34,7 @@ clean-source:
 	${GO_TARGET_DIR}/config.yaml \
 	${GO_TARGET_DIR}/${PROJECT_NAME}-amd64 \
  	${GO_TARGET_DIR}/${PROJECT_NAME}-arm64 \
- 	${GO_TARGET_DIR}/${PROJECT_NAME}-osx \
- 	${GO_SOURCE_DIR}/asset/static/*.js ${GO_SOURCE_DIR}/asset/static/*.css ${GO_SOURCE_DIR}/asset/static/index.html
+ 	${GO_TARGET_DIR}/${PROJECT_NAME}-osx
 clean:
 	docker buildx prune -a -f
 	docker stop buildx_buildkit_dpanel-builder0 && docker rm /buildx_buildkit_dpanel-builder0
