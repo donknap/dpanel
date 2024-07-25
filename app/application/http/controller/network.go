@@ -105,6 +105,11 @@ func (self Network) Create(http *gin.Context) {
 		IpGateway    string         `json:"ipGateway"`
 		IpRange      string         `json:"ipRange"`
 		IpAux        []ipAux        `json:"ipAux"`
+		EnableIpV6   bool           `json:"enableIpV6"`
+		IpV6Subnet   string         `json:"ipV6Subnet"`
+		IpV6Gateway  string         `json:"ipV6Gateway"`
+		IpV6Range    string         `json:"ipV6Range"`
+		IpV6Aux      []ipAux        `json:"ipV6Aux"`
 		DriverOption []driverOption `json:"driverOption"`
 		Internal     bool           `json:"internal"`
 		Attachable   bool           `json:"attachable"`
@@ -114,15 +119,13 @@ func (self Network) Create(http *gin.Context) {
 		return
 	}
 
-	ipAmConfig := network.IPAMConfig{}
-	if params.IpGateway != "" {
-		ipAmConfig.Gateway = params.IpGateway
+	ipAm := &network.IPAM{
+		Config: []network.IPAMConfig{},
 	}
-	if params.IpSubnet != "" {
-		ipAmConfig.Subnet = params.IpSubnet
-	}
-	if params.IpRange != "" {
-		ipAmConfig.IPRange = params.IpRange
+	ipAmConfig := network.IPAMConfig{
+		Gateway: params.IpGateway,
+		Subnet:  params.IpSubnet,
+		IPRange: params.IpRange,
 	}
 	if !function.IsEmptyArray(params.IpAux) {
 		ipAmConfig.AuxAddress = make(map[string]string)
@@ -130,13 +133,24 @@ func (self Network) Create(http *gin.Context) {
 			ipAmConfig.AuxAddress[item.IpAuxDevice] = item.IpAuxAddress
 		}
 	}
-
-	ipAm := &network.IPAM{
-		Config: []network.IPAMConfig{},
+	if params.IpGateway != "" && params.IpSubnet != "" {
+		ipAm.Config = append(ipAm.Config, ipAmConfig)
 	}
-	if ipAmConfig.Gateway != "" || ipAmConfig.Subnet != "" || ipAmConfig.IPRange != "" || len(ipAmConfig.AuxAddress) > 0 {
-		ipAm.Config = []network.IPAMConfig{
-			ipAmConfig,
+
+	if params.EnableIpV6 {
+		ipV6AmConfig := network.IPAMConfig{
+			Gateway: params.IpV6Gateway,
+			Subnet:  params.IpV6Subnet,
+			IPRange: params.IpV6Range,
+		}
+		if !function.IsEmptyArray(params.IpV6Aux) {
+			ipV6AmConfig.AuxAddress = make(map[string]string)
+			for _, item := range params.IpV6Aux {
+				ipV6AmConfig.AuxAddress[item.IpAuxDevice] = item.IpAuxAddress
+			}
+		}
+		if params.IpV6Gateway != "" && params.IpV6Subnet != "" {
+			ipAm.Config = append(ipAm.Config, ipV6AmConfig)
 		}
 	}
 
@@ -148,7 +162,7 @@ func (self Network) Create(http *gin.Context) {
 	}
 
 	result, err := docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, params.Name, network.CreateOptions{
-		EnableIPv6: function.PtrBool(false),
+		EnableIPv6: function.PtrBool(params.EnableIpV6),
 		Driver:     params.Driver,
 		IPAM:       ipAm,
 		Internal:   params.Internal,
