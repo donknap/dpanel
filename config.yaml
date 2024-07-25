@@ -1,7 +1,7 @@
 app:
   name: ${APP_NAME-dpanel}
   version: ${APP_VERSION}
-  env: ${APP_ENV-debug}
+  env: ${APP_ENV-lite}
   server: http
   cors:
     - http://localhost:8000
