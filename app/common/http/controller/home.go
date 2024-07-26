@@ -158,7 +158,7 @@ func (self Home) Info(http *gin.Context) {
 	}
 
 	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, network.ListOptions{})
-	containerTask, _ := dao.Site.Where(dao.Site.DeletedAt.IsNull()).Count()
+	containerTask, _ := dao.Site.Where(dao.Site.DeletedAt.IsNotNull()).Unscoped().Count()
 	imageTask, _ := dao.Image.Count()
 	backupData, _ := dao.Backup.Count()
 	self.JsonResponseWithoutError(http, gin.H{
@@ -177,27 +177,6 @@ func (self Home) Info(http *gin.Context) {
 			"release":       "",
 			"containerInfo": dpanelContainerInfo,
 		},
-	})
-	return
-}
-
-func (self Home) DiskUsage(http *gin.Context) {
-
-	dataUsage, err := docker.Sdk.Client.DiskUsage(docker.Sdk.Ctx, types.DiskUsageOptions{
-		Types: []types.DiskUsageObject{
-			types.ContainerObject,
-			types.ImageObject,
-			types.VolumeObject,
-			types.BuildCacheObject,
-		},
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	self.JsonResponseWithoutError(http, gin.H{
-		"usage": dataUsage,
 	})
 	return
 }
