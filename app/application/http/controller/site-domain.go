@@ -12,6 +12,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
 	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
 	"html/template"
 	"os"
@@ -59,10 +60,31 @@ func (self SiteDomain) Create(http *gin.Context) {
 		return
 	}
 	// 将当前容器加入到默认 dpanel-local 网络中，并指定 Hostname 用于 Nginx 反向代理
-	_, err = docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, defaultNetworkName, network.InspectOptions{})
+	dpanelContainerInfo, err := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
 	if err != nil {
-		self.JsonResponseWithError(http, errors.New("DPanel 默认网络不存在，请重新安装或是新建&加入 "+defaultNetworkName+" 网络"), 500)
+		self.JsonResponseWithError(http, errors.New("您创建的面板容器名称非默认的 dpanel，请重建并通过环境变量 APP_NAME 指定新的名称。"), 500)
 		return
+	}
+	if _, ok := dpanelContainerInfo.NetworkSettings.Networks[defaultNetworkName]; !ok {
+		_, err = docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, defaultNetworkName, network.InspectOptions{})
+		if err != nil {
+			_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, defaultNetworkName, network.CreateOptions{
+				Driver: "bridge",
+				Options: map[string]string{
+					"name": defaultNetworkName,
+				},
+				EnableIPv6: function.PtrBool(false),
+			})
+			if err != nil {
+				self.JsonResponseWithError(http, errors.New("创建 DPanel 默认网络失败，请重新安装并新建&加入 "+defaultNetworkName+" 网络"), 500)
+				return
+			}
+		}
+		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, dpanelContainerInfo.ID, &network.EndpointSettings{})
+		if err != nil {
+			self.JsonResponseWithError(http, errors.New("创建 DPanel 默认网络失败，请重新安装并新建&加入 "+defaultNetworkName+" 网络"), 500)
+			return
+		}
 	}
 
 	hostname := fmt.Sprintf(docker.HostnameTemplate, strings.Trim(containerRow.Name, "/"))

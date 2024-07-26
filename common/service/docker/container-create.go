@@ -199,12 +199,14 @@ func (self *ContainerCreateBuilder) CreateOwnerNetwork(enableIpV6 bool) {
 	// 利用Network关联容器
 	options := make(map[string]string)
 	options["name"] = self.containerName
-	myNetwork, err := Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, network.CreateOptions{
+	_, err := Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, network.CreateOptions{
 		Driver:     "bridge",
 		Options:    options,
 		EnableIPv6: &enableIpV6,
 	})
-	slog.Debug("create network", "name", myNetwork.ID, err)
+	if err != nil {
+		slog.Debug("create network", "name", self.containerName, err)
+	}
 }
 
 func (self *ContainerCreateBuilder) Execute() (response container.CreateResponse, err error) {

@@ -32,6 +32,14 @@ admin / admin
 
 https://donknap.github.io/dpanel-docs
 
+#### 赞助
+
+DPanel 是一个开源软件。
+
+如果此项目对你所有帮助，并希望我继续下去，请考虑赞助，我为爱发电！感谢所有的爱和支持。
+
+https://afdian.com/a/dpanel
+
 #### 交流群
 
 QQ: 837583876
