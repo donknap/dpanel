@@ -97,6 +97,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Entrypoint:     params.Entrypoint,
 		Network:        params.Network,
 		UseHostNetwork: params.UseHostNetwork,
+		BindIpV6:       params.BindIpV6,
 	}
 	dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
 

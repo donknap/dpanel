@@ -18,6 +18,10 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	builder.WithImage(task.RunParams.ImageName, false)
 	builder.WithContainerName(task.SiteName)
 
+	if task.RunParams.BindIpV6 || !function.IsEmptyArray(task.RunParams.Links) {
+		builder.CreateOwnerNetwork(task.RunParams.BindIpV6)
+	}
+
 	if task.RunParams.Ports != nil {
 		for _, value := range task.RunParams.Ports {
 			builder.WithPort(value.Host, value.Dest)
@@ -115,7 +119,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	}
 
 	// 仅当容器有关联时，才加新建自己的网络
-	if !function.IsEmptyArray(task.RunParams.Links) {
+	if task.RunParams.BindIpV6 || !function.IsEmptyArray(task.RunParams.Links) {
 		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, &network.EndpointSettings{
 			Aliases: []string{
 				fmt.Sprintf("%s.pod.dpanel.local", task.SiteName),

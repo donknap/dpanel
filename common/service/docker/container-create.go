@@ -103,7 +103,6 @@ func (self *ContainerCreateBuilder) WithDefaultVolume(container string) {
 func (self *ContainerCreateBuilder) WithPort(host string, container string) *ContainerCreateBuilder {
 	var port nat.Port
 	var err error
-	hostIp := ""
 	if strings.Contains(container, "/") {
 		portArr := strings.Split(container, "/")
 		port, err = nat.NewPort(portArr[1], portArr[0])
@@ -115,26 +114,18 @@ func (self *ContainerCreateBuilder) WithPort(host string, container string) *Con
 		return nil
 	}
 	self.containerConfig.ExposedPorts[port] = struct{}{}
-	self.hostConfig.PortBindings[port] = make([]nat.PortBinding, 0, 1)
+	self.hostConfig.PortBindings[port] = make([]nat.PortBinding, 0)
 	self.hostConfig.PortBindings[port] = append(
-		self.hostConfig.PortBindings[port], nat.PortBinding{HostIP: hostIp, HostPort: host},
+		self.hostConfig.PortBindings[port], nat.PortBinding{HostIP: "", HostPort: host},
 	)
 	return self
 }
 
 func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
-	// 利用Network关联容器
-	options := make(map[string]string)
-	options["name"] = self.containerName
-	myNetwork, _ := Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, network.CreateOptions{
-		Driver:  "bridge",
-		Options: options,
-	})
-	slog.Debug("create network", "name", myNetwork.ID)
 	// 关联网络时，重新退出加入
 	err := Sdk.Client.NetworkDisconnect(Sdk.Ctx, self.containerName, name, true)
 	if err != nil {
-		slog.Debug("disconnect network", "name", myNetwork.ID, "error", err.Error())
+		slog.Debug("disconnect network", "name", self.containerName, "error", err.Error())
 	}
 	err = Sdk.Client.NetworkConnect(Sdk.Ctx, self.containerName, name, &network.EndpointSettings{
 		Aliases: []string{
@@ -142,7 +133,7 @@ func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
 		},
 	})
 	if err != nil {
-		slog.Debug("join network", "name", myNetwork.ID, "error", err.Error())
+		slog.Debug("join network", "name", self.containerName, "error", err.Error())
 	}
 }
 
@@ -202,6 +193,18 @@ func (self *ContainerCreateBuilder) WithPid(pid ...string) {
 
 func (self *ContainerCreateBuilder) WithNetworkMode(mode container.NetworkMode) {
 	self.hostConfig.NetworkMode = mode
+}
+
+func (self *ContainerCreateBuilder) CreateOwnerNetwork(enableIpV6 bool) {
+	// 利用Network关联容器
+	options := make(map[string]string)
+	options["name"] = self.containerName
+	myNetwork, err := Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, network.CreateOptions{
+		Driver:     "bridge",
+		Options:    options,
+		EnableIPv6: &enableIpV6,
+	})
+	slog.Debug("create network", "name", myNetwork.ID, err)
 }
 
 func (self *ContainerCreateBuilder) Execute() (response container.CreateResponse, err error) {

@@ -77,7 +77,6 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 					HostIp: binding.HostIP,
 					Host:   binding.HostPort,
 					Dest:   string(port),
-					Type:   "port",
 				})
 			}
 		}

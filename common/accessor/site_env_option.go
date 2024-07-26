@@ -24,7 +24,6 @@ type EnvItem struct {
 }
 
 type PortItem struct {
-	Type   string `json:"type"`
 	HostIp string `json:"hostIp"`
 	Host   string `json:"host"`
 	Dest   string `json:"dest"`
@@ -49,4 +48,5 @@ type SiteEnvOption struct {
 	Command        string        `json:"command"`
 	Entrypoint     string        `json:"entrypoint"`
 	UseHostNetwork bool          `json:"useHostNetwork"`
+	BindIpV6       bool          `json:"bindIpV6"`
 }
