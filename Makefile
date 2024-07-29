@@ -16,11 +16,15 @@ linux: clean-source
 	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ \
 	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-amd64 ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
-arm: clean-source
+arm64: clean-source
 	# brew tap messense/macos-cross-toolchains && brew install aarch64-unknown-linux-gnu
 	# apk add libc6-compat
 	CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux CC=aarch64-unknown-linux-gnu-gcc CXX=aarch64-unknown-linux-gnu-g++ \
 	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-arm64 ${GO_SOURCE_DIR}/*.go
+	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
+armv7: clean-source
+	CGO_ENABLED=1 GOARM=7 GOARCH=arm GOOS=linux CC=arm-none-eabi-gcc CXX=arm-none-eabi-g++ \
+	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-arm ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 osx: clean-source
 	CGO_ENABLED=1 go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-osx ${GO_SOURCE_DIR}/*.go
@@ -39,18 +43,18 @@ clean:
 	docker buildx prune -a -f
 	docker stop buildx_buildkit_dpanel-builder0 && docker rm /buildx_buildkit_dpanel-builder0
 all: js linux arm
-test: all
+test:
 	docker buildx build \
 	-t ccr.ccs.tencentyun.com/dpanel/dpanel:lite-test \
 	-t ccr.ccs.tencentyun.com/dpanel/dpanel:${VERSION}-lite-test \
-	--platform linux/arm64,linux/amd64 \
+	--platform linux/arm64,linux/amd64,linux/arm/v7 \
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile-lite \
 	. --push
 	docker buildx build \
 	-t ccr.ccs.tencentyun.com/dpanel/dpanel:test \
 	-t ccr.ccs.tencentyun.com/dpanel/dpanel:${VERSION}-test \
-	--platform linux/arm64,linux/amd64 \
+	--platform linux/arm64,linux/amd64,linux/arm/v7 \
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile \
 	. --push
