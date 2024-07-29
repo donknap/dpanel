@@ -16,14 +16,16 @@ linux: clean-source
 	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ \
 	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-amd64 ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
-arm64: clean-source
+armv8: clean-source
 	# brew tap messense/macos-cross-toolchains && brew install aarch64-unknown-linux-gnu
 	# apk add libc6-compat
 	CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux CC=aarch64-unknown-linux-gnu-gcc CXX=aarch64-unknown-linux-gnu-g++ \
 	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-arm64 ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 armv7: clean-source
-	CGO_ENABLED=1 GOARM=7 GOARCH=arm GOOS=linux CC=arm-none-eabi-gcc CXX=arm-none-eabi-g++ \
+	# brew tap messense/macos-cross-toolchains && brew install armv7-unknown-linux-gnueabihf
+	# apk add libc6-compat
+	CGO_ENABLED=1 GOARM=7 GOARCH=arm GOOS=linux CC=armv7-unknown-linux-gnueabihf-gcc CXX=armv7-unknown-linux-gnueabihf-g++ \
 	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-arm ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 osx: clean-source
@@ -42,8 +44,8 @@ clean-source:
 clean:
 	docker buildx prune -a -f
 	docker stop buildx_buildkit_dpanel-builder0 && docker rm /buildx_buildkit_dpanel-builder0
-all: js linux arm
-test:
+all: js linux armv8 armv7
+test: all
 	docker buildx build \
 	-t ccr.ccs.tencentyun.com/dpanel/dpanel:lite-test \
 	-t ccr.ccs.tencentyun.com/dpanel/dpanel:${VERSION}-lite-test \
