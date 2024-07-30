@@ -7,7 +7,7 @@ JS_SOURCE_DIR=$(GO_SOURCE_DIR)/../../js/d-panel
 VERSION=1.0.0
 
 help:
-	@echo "make build r1 r2 push VERSION="
+	@echo "make build"
 	@echo "make test VERSION="
 	@echo "make clean"
 
@@ -28,8 +28,8 @@ armv7: clean-source
 	CGO_ENABLED=1 GOARM=7 GOARCH=arm GOOS=linux CC=armv7-unknown-linux-musleabihf-gcc CXX=armv7-unknown-linux-musleabihf-g++ \
 	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-arm ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
-osx: clean-source
-	CGO_ENABLED=1 go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-osx ${GO_SOURCE_DIR}/*.go
+build: clean-source
+	CGO_ENABLED=1 go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME} ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 js:
 	rm -f ${GO_SOURCE_DIR}/asset/static/*.js ${GO_SOURCE_DIR}/asset/static/*.css ${GO_SOURCE_DIR}/asset/static/index.html
@@ -40,7 +40,8 @@ clean-source:
 	${GO_TARGET_DIR}/config.yaml \
 	${GO_TARGET_DIR}/${PROJECT_NAME}-amd64 \
  	${GO_TARGET_DIR}/${PROJECT_NAME}-arm64 \
- 	${GO_TARGET_DIR}/${PROJECT_NAME}-osx
+ 	${GO_TARGET_DIR}/${PROJECT_NAME}-arm \
+ 	${GO_TARGET_DIR}/${PROJECT_NAME}
 clean:
 	docker buildx prune -a -f
 	docker stop buildx_buildkit_dpanel-builder0 && docker rm /buildx_buildkit_dpanel-builder0
