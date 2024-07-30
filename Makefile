@@ -9,6 +9,7 @@ VERSION=1.0.0
 help:
 	@echo "make build"
 	@echo "make test VERSION="
+	@echo "make all r1 r2 VERSION="
 	@echo "make clean"
 
 amd64: clean-source
@@ -60,4 +61,18 @@ test: all
 	--platform linux/arm64,linux/amd64,linux/arm/v7 \
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile \
+	. --push
+r1:
+	docker buildx build \
+	-t dpanel/dpanel:latest \
+	-t dpanel/dpanel:${VERSION} \
+	--platform linux/arm64,linux/amd64,linux/arm/v7 \
+	--build-arg APP_VERSION=${VERSION} \
+	. --push
+r2:
+	docker buildx build \
+	-t ccr.ccs.tencentyun.com/dpanel/dpanel:latest \
+	-t ccr.ccs.tencentyun.com/dpanel/dpanel:${VERSION} \
+	--platform linux/arm64,linux/amd64,linux/arm/v7 \
+	--build-arg APP_VERSION=${VERSION} \
 	. --push
