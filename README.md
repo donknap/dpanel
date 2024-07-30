@@ -2,13 +2,6 @@
 
 Docker 可视化面板系统，提供完善的 docker 管理功能。
 
-##### 新建 DPanel 默认网络
-
-
-```
-docker network create dpanel-local
-```
-
 ##### 启动容器
 
 > [!IMPORTANT]  
@@ -19,7 +12,7 @@ docker network create dpanel-local
 
 ```
 docker run -it -d --name dpanel --restart=always \
- -p 80:80 -p 443:443 -p 8807:8080 --network dpanel-local \
+ -p 80:80 -p 443:443 -p 8807:8080 \
  -v /var/run/docker.sock:/var/run/docker.sock \
  -e APP_NAME=dpanel dpanel/dpanel:latest 
 ```
@@ -48,7 +41,7 @@ QQ: 837583876
 
 #### 界面预览
 
-![home.png](https://s2.loli.net/2024/05/22/Q14SEiR7z2uOHTX.png)
+![home.png](https://s2.loli.net/2024/07/30/5qkCGuWHZyPxoRT.png)
 ![app-list.png](https://s2.loli.net/2024/05/25/P1RTvFtiwYOB6Hn.png)
 ![compose.png](https://s2.loli.net/2024/06/12/IHTiGBnzr4RMSla.png)
 
