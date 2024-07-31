@@ -1,4 +1,33 @@
 name: release
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+    - 'v*'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Install dependencies
+        run: go get .
+      - name: Build
+        run: make build
+      - name: create release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          body: TODO New Release.
+          prerelease: false
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dpanel_${{ env.SHA }}
+          path: dist
