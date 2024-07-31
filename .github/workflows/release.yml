@@ -29,33 +29,33 @@ jobs:
           make clean-source 
           make build PROJECT_NAME=dpanel-amd64 CGO_ENABLED=1
           
-          # arm64 
-          curl -Lo arm64.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          tar -xf arm64.tar.xz
-          make build PROJECT_NAME=dpanel-arm64 CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux \
-          CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc \
-          CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-g++
-
-          # armv7
-          curl -Lo arm.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-          tar -xf arm.tar.xz
-          make build PROJECT_NAME=dpanel-arm CGO_ENABLED=1 GOARM=7 GOARCH=arm GOOS=linux \
-          CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc \
-          CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-g++
-
-          # 群辉 arm64
-          curl -Lo synology-arm64.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz
-          tar -Jxf synology-arm64.txz
-          make build PROJECT_NAME=dpanel-synology-arm64 CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux \
-          CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc \
-          CXX=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-g++
-
-          # 群辉 amd64
-          curl -Lo synology-amd64.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
-          tar -Jxf synology-amd64.txz
-          make build PROJECT_NAME=dpanel-synologty-amd64 CGO_ENABLED=1 GOARCH=amd64 GOOS=linux \
-          CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc \
-          CXX=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-g++
+#          # arm64
+#          curl -Lo arm64.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
+#          tar -xf arm64.tar.xz
+#          make build PROJECT_NAME=dpanel-arm64 CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux \
+#          CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc \
+#          CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-g++
+#
+#          # armv7
+#          curl -Lo arm.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
+#          tar -xf arm.tar.xz
+#          make build PROJECT_NAME=dpanel-arm CGO_ENABLED=1 GOARM=7 GOARCH=arm GOOS=linux \
+#          CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc \
+#          CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-g++
+#
+#          # 群辉 arm64
+#          curl -Lo synology-arm64.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz
+#          tar -Jxf synology-arm64.txz
+#          make build PROJECT_NAME=dpanel-synology-arm64 CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux \
+#          CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc \
+#          CXX=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-g++
+#
+#          # 群辉 amd64
+#          curl -Lo synology-amd64.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
+#          tar -Jxf synology-amd64.txz
+#          make build PROJECT_NAME=dpanel-synologty-amd64 CGO_ENABLED=1 GOARCH=amd64 GOOS=linux \
+#          CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc \
+#          CXX=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-g++
 
       - name: create release
         uses: actions/create-release@v1
