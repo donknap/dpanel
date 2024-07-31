@@ -58,16 +58,16 @@ jobs:
 #          CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc \
 #          CXX=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-g++
 
-      - name: create release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          body: TODO New Release.
-          prerelease: false
+#      - name: create release
+#        uses: actions/create-release@v1
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        with:
+#          tag_name: ${{ github.ref }}
+#          release_name: Release ${{ github.ref }}
+#          draft: false
+#          body: TODO New Release.
+#          prerelease: false
       - name: upload artifact
         uses: actions/upload-artifact@v4
         with:
