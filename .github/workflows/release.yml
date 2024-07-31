@@ -30,31 +30,35 @@ jobs:
           
           # arm64
           curl -Lo arm64.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          mkdir ./arm64 && tar -xvf arm64.tar.xz --strip-components=1 -C ./arm64
+          tar -xvf arm64.tar.xz
           make build PROJECT_NAME=dpanel-arm64 CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux \
-          CC=${PWD}/arm64/bin/aarch64-unknown-linux-gnu-gcc CXX=${PWD}/arm64/bin/aarch64-unknown-linux-gnu-g++
-          rm -rf arm64.tar.xz arm64
+          CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc \
+          CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-unknown-linux-gnu-g++
+          rm -rf arm64.tar.xz ./arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu
 
           # armv7
           curl -Lo arm.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-          mkdir ./arm && tar -xvf arm.tar.xz --strip-components=1 -C ./arm
+          tar -xvf arm.tar.xz
           make build PROJECT_NAME=dpanel-arm CGO_ENABLED=1 GOARM=7 GOARCH=arm GOOS=linux \
-          CC=${PWD}/arm/bin/arm-none-linux-gnueabihf-gcc CXX=${PWD}/arm/bin/arm-none-linux-gnueabihf-g++
-          rm -rf arm.tar.xz arm
+          CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc \
+          CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-g++
+          rm -rf arm.tar.xz ./arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf
 
           # 群辉 arm64
           curl -Lo synology-arm64.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz
-          mkdir ./synology-arm64 && tar -Jvxf synology-arm64.txz --strip-components=1 -C ./synology-arm64
+          tar -Jvxf synology-arm64.txz
           make build PROJECT_NAME=dpanel-synology-arm64 CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux \
-          CC=${PWD}/synology-arm64/bin/aarch64-unknown-linux-gnu-gcc CXX=${PWD}/synology-arm64/bin/aarch64-unknown-linux-gnu-g++
-          rm -rf synology-arm64.txz synology-arm64
+          CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc \
+          CXX=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-g++
+          rm -rf synology-arm64.txz ./aarch64-unknown-linux-gnu
 
           # 群辉 amd64
           curl -Lo synology-amd64.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
-          mkdir ./synology-amd64 && tar -Jvxf synology-amd64.txz --strip-components=1 -C ./synology-amd64
+          tar -Jvxf synology-amd64.txz
           make build PROJECT_NAME=dpanel-synologty-amd64 CGO_ENABLED=1 GOARCH=amd64 GOOS=linux \
-          CC=${PWD}/synology-amd64/bin/x86_64-pc-linux-gnu-gcc CXX=${PWD}/synology-amd64/bin/x86_64-pc-linux-gnu-g++
-          rm -rf synology-amd64.txz synology-amd64
+          CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc \
+          CXX=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-g++
+          rm -rf synology-amd64.txz ./x86_64-pc-linux-gnu
       - name: create release
         uses: actions/create-release@v1
         env:
