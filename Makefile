@@ -5,6 +5,7 @@ GO_TARGET_DIR=$(GO_SOURCE_DIR)/runtime
 TRIM_PATH=/Users/renchao
 JS_SOURCE_DIR=$(GO_SOURCE_DIR)/../../js/d-panel
 VERSION=1.0.0
+COMMON_PARAMS=-ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}"
 
 help:
 	@echo "make build"
@@ -15,22 +16,22 @@ help:
 amd64: clean-source
 	# apk add musl
 	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ \
-	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-amd64 ${GO_SOURCE_DIR}/*.go
+	go build ${COMMON_PARAMS} -o ${GO_TARGET_DIR}/${PROJECT_NAME}-amd64 ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 arm64: clean-source
 	# brew tap messense/macos-cross-toolchains && brew install aarch64-unknown-linux-gnu
 	# apk add libc6-compat
 	CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux CC=aarch64-unknown-linux-gnu-gcc CXX=aarch64-unknown-linux-gnu-g++ \
-	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-arm64 ${GO_SOURCE_DIR}/*.go
+	go build ${COMMON_PARAMS} -o ${GO_TARGET_DIR}/${PROJECT_NAME}-arm64 ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 armv7: clean-source
 	# brew tap messense/macos-cross-toolchains && brew install armv7-unknown-linux-musleabihf
 	# apk add libc6-compat
 	CGO_ENABLED=1 GOARM=7 GOARCH=arm GOOS=linux CC=armv7-unknown-linux-musleabihf-gcc CXX=armv7-unknown-linux-musleabihf-g++ \
-	go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME}-arm ${GO_SOURCE_DIR}/*.go
+	go build ${COMMON_PARAMS} -o ${GO_TARGET_DIR}/${PROJECT_NAME}-arm ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 build: clean-source
-	CGO_ENABLED=1 go build -ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" -o ${GO_TARGET_DIR}/${PROJECT_NAME} ${GO_SOURCE_DIR}/*.go
+	CGO_ENABLED=1 go build ${COMMON_PARAMS} -o ${GO_TARGET_DIR}/${PROJECT_NAME} ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 js:
 	rm -f ${GO_SOURCE_DIR}/asset/static/*.js ${GO_SOURCE_DIR}/asset/static/*.css ${GO_SOURCE_DIR}/asset/static/index.html
