@@ -92,7 +92,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		ID: params.ContainerId,
 	})).First()
 
-	if siteRow != nil {
+	if siteRow != nil && siteRow.SiteName != "" {
 		hostname = fmt.Sprintf(docker.HostnameTemplate, siteRow.SiteName)
 	}
 
