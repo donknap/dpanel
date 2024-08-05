@@ -60,19 +60,19 @@ jobs:
           CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-g++
 
           docker buildx build \
-          -t dpanel/test:lite \
-          -t dpanel/test:${GITHUB_REF_NAME#v}-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite-test \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${GITHUB_REF_NAME#v}-lite-test \
+          -t dpanel/dpanel:lite \
+          -t dpanel/dpanel:${GITHUB_REF_NAME#v}-lite \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${GITHUB_REF_NAME#v}-lite \
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
           -f Dockerfile-lite \
           . --push
           docker buildx build \
-          -t dpanel/test:latest \
-          -t dpanel/test:${GITHUB_REF_NAME#v} \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest-test \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${GITHUB_REF_NAME#v}-latest-test \
+          -t dpanel/dpanel:latest \
+          -t dpanel/dpanel:${GITHUB_REF_NAME#v} \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${GITHUB_REF_NAME#v}-latest \
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
           . --push
