@@ -22,6 +22,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
+      - name: Install dependencies
+        run: |
+          go get .
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -31,9 +34,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Install dependencies
-        run: |
-          go get .
       - name: Build
         run: |
           make clean-source 
@@ -53,33 +53,19 @@ jobs:
           CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc \
           CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-g++
 
-#          # 群辉 arm64
-#          curl -Lo synology-arm64.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz
-#          tar -Jxf synology-arm64.txz
-#          make build PROJECT_NAME=dpanel-synology-arm64 CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux \
-#          CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc \
-#          CXX=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-g++
-#
-#          # 群辉 amd64
-#          curl -Lo synology-amd64.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
-#          tar -Jxf synology-amd64.txz
-#          make build PROJECT_NAME=dpanel-synologty-amd64 CGO_ENABLED=1 GOARCH=amd64 GOOS=linux \
-#          CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc \
-#          CXX=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-g++
-
-           docker buildx build \
-           -t dpanel/test:lite \
-           -t dpanel/test:${GITHUB_REF_NAME#v}-lite \
-           --platform linux/arm64,linux/amd64,linux/arm/v7 \
-           --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
-           -f Dockerfile-lite \
-           . --push
-           docker buildx build \
-           -t dpanel/test:latest \
-           -t dpanel/test:${GITHUB_REF_NAME#v} \
-           --platform linux/arm64,linux/amd64,linux/arm/v7 \
-           --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
-           . --push
+          docker buildx build \
+          -t dpanel/test:lite \
+          -t dpanel/test:${GITHUB_REF_NAME#v}-lite \
+          --platform linux/arm64,linux/amd64,linux/arm/v7 \
+          --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
+          -f Dockerfile-lite \
+          . --push
+          docker buildx build \
+          -t dpanel/test:latest \
+          -t dpanel/test:${GITHUB_REF_NAME#v} \
+          --platform linux/arm64,linux/amd64,linux/arm/v7 \
+          --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
+          . --push
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
