@@ -79,6 +79,9 @@ func (self Image) GetImageTagDetail(tag string) *imageTagDetail {
 }
 
 func (self Image) GetRegistryAuthString(serverAddress string, username string, password string) string {
+	if password == "" || username == "" {
+		return ""
+	}
 	password, _ = function.AseDecode(facade.GetConfig().GetString("app.name"), password)
 	authString := function.Base64Encode(struct {
 		Username      string `json:"username"`

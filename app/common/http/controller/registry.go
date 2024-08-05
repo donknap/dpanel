@@ -74,11 +74,14 @@ func (self Registry) Create(http *gin.Context) {
 			Username: params.Username,
 			Email:    params.Email,
 			Proxy:    params.Proxy,
+			Password: "",
 		},
 	}
-	key := facade.GetConfig().GetString("app.name")
-	code, _ := function.AseEncode(key, params.Password)
-	registryNew.Setting.Password = code
+	if params.Password != "" {
+		key := facade.GetConfig().GetString("app.name")
+		code, _ := function.AseEncode(key, params.Password)
+		registryNew.Setting.Password = code
+	}
 
 	if params.Id <= 0 {
 		err = dao.Registry.Create(registryNew)
