@@ -17,6 +17,17 @@ docker run -it -d --name dpanel --restart=always \
  -e APP_NAME=dpanel dpanel/dpanel:latest 
 ```
 
+##### lite 版
+
+lite 版去掉了域名转发相关，需要自行转发域名绑定容器，不需要绑定 80 及 443 端口
+
+```
+docker run -it -d --name dpanel --restart=always \
+ -p 8807:8080 -e APP_NAME=dpanel \
+ -v /var/run/docker.sock:/var/run/docker.sock \
+ -v dpanel:/dpanel dpanel/dpanel:lite
+```
+
 ### 默认帐号
 
 admin / admin
@@ -47,8 +58,7 @@ QQ: 837583876
 
 #### 相关仓库
 
-- 镜像构建基础模板 https://github.com/donknap/dpanel-base-image 
-- DPanel镜像 https://github.com/donknap/dpanel-image
+- 镜像构建基础模板 https://github.com/donknap/dpanel-base-image
 - 文档 https://github.com/donknap/dpanel-docs
 
 #### 相关组件
