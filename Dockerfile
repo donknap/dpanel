@@ -18,7 +18,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/re
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/nginx/include /etc/nginx/conf.d/include
 
-COPY ./runtime/dpanel-${TARGETARCH} /app/server/dpanel
+COPY ./runtime/dpanel-${TARGETARCH}-musl /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml
 
 COPY ./docker/entrypoint.sh /docker/entrypoint.sh

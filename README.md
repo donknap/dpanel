@@ -8,7 +8,7 @@ Docker 可视化面板系统，提供完善的 docker 管理功能。
 > macos 下需要先将 docker.sock 文件 link 到 /var/run/docker.sock 目录中 \
 > ln -s -f /Users/用户/.docker/run/docker.sock  /var/run/docker.sock
 
-> 国内镜像 ccr.ccs.tencentyun.com/dpanel/dpanel:latest
+> 国内镜像 registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest
 
 ```
 docker run -it -d --name dpanel --restart=always \
