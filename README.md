@@ -12,9 +12,9 @@ Docker 可视化面板系统，提供完善的 docker 管理功能。
 
 ```
 docker run -it -d --name dpanel --restart=always \
- -p 80:80 -p 443:443 -p 8807:8080 \
- -v /var/run/docker.sock:/var/run/docker.sock \
- -e APP_NAME=dpanel dpanel/dpanel:latest 
+ -p 80:80 -p 443:443 -p 8807:8080 -e APP_NAME=dpanel \
+ -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
+ dpanel/dpanel:latest 
 ```
 
 ##### lite 版
@@ -24,8 +24,8 @@ lite 版去掉了域名转发相关，需要自行转发域名绑定容器，不
 ```
 docker run -it -d --name dpanel --restart=always \
  -p 8807:8080 -e APP_NAME=dpanel \
- -v /var/run/docker.sock:/var/run/docker.sock \
- -v dpanel:/dpanel dpanel/dpanel:lite
+ -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
+ dpanel/dpanel:lite
 ```
 
 ### 默认帐号
