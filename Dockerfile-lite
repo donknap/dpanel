@@ -11,9 +11,9 @@ ENV STORAGE_LOCAL_PATH=/dpanel
 ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-  apk add --no-cache --update musl libc6-compat docker-compose
+  apk add --no-cache --update musl docker-compose
 
-COPY ./runtime/dpanel-${TARGETARCH}-musl /app/server/dpanel
+COPY ./runtime/dpanel-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml
 
 WORKDIR /app

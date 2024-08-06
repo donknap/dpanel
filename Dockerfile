@@ -11,14 +11,14 @@ ENV STORAGE_LOCAL_PATH=/dpanel
 ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-  apk add --no-cache --update nginx musl libc6-compat inotify-tools docker-compose curl openssl && \
+  apk add --no-cache --update nginx musl inotify-tools docker-compose curl openssl && \
   mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
   curl https://get.acme.sh | sh
 
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/nginx/include /etc/nginx/conf.d/include
 
-COPY ./runtime/dpanel-${TARGETARCH}-musl /app/server/dpanel
+COPY ./runtime/dpanel-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml
 
 COPY ./docker/entrypoint.sh /docker/entrypoint.sh
