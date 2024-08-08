@@ -8,7 +8,7 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [ ubuntu-18.04 ]
+        platform: [ ubuntu-20.04 ]
         go-version: [ '1.22' ]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -18,6 +18,7 @@ jobs:
           echo "Tag name from github.ref_name: ${{  github.ref_name }}"
           echo "Tag name from github.ref: ${{  github.ref }}"
           echo "Runs name: ${{runner.os}}"
+          gcc --version
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -25,6 +26,8 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Install dependencies
         run: |
+          sudo apt update
+          sudo apt -y install gcc-8 g++-8
           go get .
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -44,7 +47,9 @@ jobs:
       - name: Build
         run: |
           make clean-source 
-          make build PROJECT_NAME=dpanel-amd64 CGO_ENABLED=1
+          make build PROJECT_NAME=dpanel-amd64 CGO_ENABLED=1 \
+          CC=gcc-8 \
+          CXX=g++-8
           
           # arm64
           curl -Lo arm64.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
