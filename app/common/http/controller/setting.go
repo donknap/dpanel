@@ -32,19 +32,19 @@ func (self Setting) Founder(http *gin.Context) {
 
 	// 修改密码
 	if params.Password != "" && params.NewPassword != "" {
-		if (*oldUser.Value)["password"] != function.GetMd5(params.Password+(*oldUser.Value)["username"]) {
+		if oldUser.Value.Password != function.GetMd5(params.Password+oldUser.Value.Username) {
 			self.JsonResponseWithError(http, errors.New("旧密码不正确"), 500)
 			return
 		}
-		(*oldUser.Value)["password"] = function.GetMd5(params.NewPassword + (*oldUser.Value)["username"])
+		oldUser.Value.Password = function.GetMd5(params.NewPassword + oldUser.Value.Username)
 	}
 
 	if params.Username != "" {
-		(*oldUser.Value)["username"] = params.Username
+		oldUser.Value.Username = params.Username
 		if params.NewPassword == "" {
-			(*oldUser.Value)["password"] = function.GetMd5(params.Password + (*oldUser.Value)["username"])
+			oldUser.Value.Password = function.GetMd5(params.Password + oldUser.Value.Username)
 		} else {
-			(*oldUser.Value)["password"] = function.GetMd5(params.NewPassword + (*oldUser.Value)["username"])
+			oldUser.Value.Password = function.GetMd5(params.NewPassword + oldUser.Value.Username)
 		}
 	}
 

@@ -93,8 +93,8 @@ func main() {
 				GroupName: logic.SettingUser,
 				Name:      logic.SettingUserFounder,
 				Value: &accessor.SettingValueOption{
-					"password": "f6fdffe48c908deb0f4c3bd36c032e72",
-					"username": "admin",
+					Password: "f6fdffe48c908deb0f4c3bd36c032e72",
+					Username: "admin",
 				},
 			})
 		}

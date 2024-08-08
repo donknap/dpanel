@@ -36,11 +36,11 @@ func (self User) Login(http *gin.Context) {
 		return
 	}
 	password := logic.User{}.GetMd5Password(params.Password, params.Username)
-	if params.Username == (*currentUser.Value)["username"] && (*currentUser.Value)["password"] == password {
+	if params.Username == currentUser.Value.Username && currentUser.Value.Password == password {
 		jwtSecret := logic.User{}.GetJwtSecret()
 		jwt := jwt.NewWithClaims(jwt.SigningMethodHS256, logic.UserInfo{
 			UserId:       currentUser.ID,
-			Username:     (*currentUser.Value)["username"],
+			Username:     currentUser.Value.Username,
 			RoleIdentity: currentUser.Name,
 			RegisteredClaims: jwt.RegisteredClaims{
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(expireAddTime)),

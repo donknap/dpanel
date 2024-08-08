@@ -131,11 +131,16 @@ func (self Home) Info(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	timeout := time.Second * 5
+	setting, _ := logic.Setting{}.GetValue("setting", "server")
+	if setting != nil && setting.Value.RequestTimeout > 0 {
+		timeout = time.Duration(setting.Value.RequestTimeout) * time.Second
+	}
 
 	// 有些设备的docker获取磁盘占用比较耗时，这里增加一个超时判断
 	var diskUsage types.DiskUsage
 	diskUsageChan := make(chan types.DiskUsage)
-	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
 	go func() {
 		diskUsage, err := docker.Sdk.Client.DiskUsage(docker.Sdk.Ctx, types.DiskUsageOptions{
 			Types: []types.DiskUsageObject{
