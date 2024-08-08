@@ -5,37 +5,6 @@ on:
     tags:
     - 'v*'
 jobs:
-  macos-build:
-    strategy:
-      matrix:
-        platform: [ 'macos-12', 'macos-latest' ]
-        go-version: [ '1.22' ]
-    runs-on: ${{ matrix.platform }}
-    steps:
-      - name: Test Env
-        run: |
-          echo "Tag name from GITHUB_REF_NAME: $GITHUB_REF_NAME"
-          echo "Tag name from github.ref_name: ${{  github.ref_name }}"
-          echo "Tag name from github.ref: ${{  github.ref }}"
-          echo "Runs name: ${{runner.os}}"
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-      - name: Install dependencies
-        run: |
-          go get .
-      - name: Build
-        run: |
-          make clean-source 
-          make build PROJECT_NAME=dpanel-darwin-${{runner.arch}} CGO_ENABLED=1
-      - name: upload artifact
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: runtime/*
-          prerelease: false
   windows-build:
     strategy:
       matrix:
@@ -60,7 +29,7 @@ jobs:
       - name: Build
         run: |
           make clean-source 
-          make build PROJECT_NAME=dpanel-windows-${{runner.arch}} CGO_ENABLED=1
+          CGO_ENABLED=1 go build -o ./runtime/dpanel-windows ./*.go
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
