@@ -64,18 +64,6 @@ func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {
 	return builder
 }
 
-func (self Builder) GetContainerLogBuilder() *containerLogBuilder {
-	builder := &containerLogBuilder{
-		option: container.LogsOptions{
-			Timestamps: false,
-			ShowStderr: true,
-			ShowStdout: true,
-		},
-	}
-	builder.withSdk(self.Client)
-	return builder
-}
-
 func (self Builder) GetImageBuildBuilder() *imageBuildBuilder {
 	builder := &imageBuildBuilder{
 		imageBuildOption: types.ImageBuildOptions{
