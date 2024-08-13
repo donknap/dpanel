@@ -6,8 +6,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/go-connections/nat"
+	"github.com/donknap/dpanel/common/function"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"io"
 	"log/slog"
@@ -171,9 +171,8 @@ func (self *ContainerCreateBuilder) WithUser(user string) {
 }
 
 func (self *ContainerCreateBuilder) WithCommandStr(cmd string) {
-	self.containerConfig.Cmd = strslice.StrSlice{
-		"sh", "-c", cmd,
-	}
+	cmdArr := function.CommandSplit(cmd)
+	self.containerConfig.Cmd = cmdArr
 }
 
 func (self *ContainerCreateBuilder) WithCommand(cmd []string) {
@@ -181,9 +180,12 @@ func (self *ContainerCreateBuilder) WithCommand(cmd []string) {
 }
 
 func (self *ContainerCreateBuilder) WithEntrypointStr(cmd string) {
-	self.containerConfig.Entrypoint = strslice.StrSlice{
-		"sh", "-c", cmd,
-	}
+	cmdArr := function.CommandSplit(cmd)
+	self.containerConfig.Entrypoint = cmdArr
+}
+
+func (self *ContainerCreateBuilder) WithEntrypoint(cmd []string) {
+	self.containerConfig.Entrypoint = cmd
 }
 
 func (self *ContainerCreateBuilder) WithPid(pid ...string) {

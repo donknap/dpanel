@@ -3,7 +3,9 @@ package tests
 import (
 	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/stretchr/testify/assert"
+	"path/filepath"
 	"testing"
 )
 
@@ -91,4 +93,23 @@ func TestGetImageName(t *testing.T) {
 		Namespace: "dpanel",
 	})
 	asserter.Equal(newImageName, "ccr.ccs.tencentyun.com/dpanel/mysql:1.0.0")
+}
+
+func TestSplitCommand(t *testing.T) {
+
+	fmt.Printf("%v \n", filepath.FromSlash("/home/abc/def"))
+
+	asserter := assert.New(t)
+
+	cmd := "./dpanel server:start -f config.yaml"
+	cmdArr := function.CommandSplit(cmd)
+	asserter.Equal(cmdArr[3], "config.yaml")
+
+	cmd = "sh -c \"./dpanel server:start -f config.yaml\""
+	cmdArr = function.CommandSplit(cmd)
+	asserter.Equal(cmdArr[2], "./dpanel server:start -f config.yaml")
+
+	cmd = "/bin/sh -c ./dpanel server:start -f config.yaml"
+	cmdArr = function.CommandSplit(cmd)
+	asserter.Equal(cmdArr[5], "config.yaml")
 }
