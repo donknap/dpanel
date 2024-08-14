@@ -14,7 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	"log/slog"
 	"strconv"

@@ -1,9 +1,8 @@
 package controller
 
 import (
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
 type RunLog struct {
@@ -21,16 +20,5 @@ func (self RunLog) Run(http *gin.Context) {
 		return
 	}
 
-	builder := docker.Sdk.GetContainerLogBuilder()
-	builder.WithContainerId(params.Md5)
-	builder.WithTail(params.LineTotal)
-	content, err := builder.Execute()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"log": content,
-	})
 	return
 }

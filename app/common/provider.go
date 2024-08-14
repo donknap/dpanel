@@ -5,7 +5,7 @@ import (
 	"github.com/donknap/dpanel/app/common/logic"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
-	http_server "github.com/we7coreteam/w7-rangine-go/src/http/server"
+	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
 
 type Provider struct {
