@@ -148,12 +148,6 @@ func TestGetContainerLog(t *testing.T) {
 	})
 	fmt.Printf("%v \n", task)
 	return
-	builder := sdk.GetContainerLogBuilder()
-	builder.WithContainerId("0bf3c0b9f3d6")
-	builder.WithTail(0)
-	content, err := builder.Execute()
-	fmt.Printf("%v \n", err)
-	fmt.Printf("%v \n", content)
 }
 
 type progressStream struct {
@@ -336,6 +330,10 @@ func (u *MyUser) GetPrivateKey() crypto.PrivateKey {
 }
 
 func TestExportContainer(t *testing.T) {
-	info, _ := docker.Sdk.Client.ServerVersion(docker.Sdk.Ctx)
-	fmt.Printf("%v \n", info)
+	out, _ := docker.Sdk.Client.ContainerLogs(context.Background(), "minio", container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+	})
+	io.Copy(os.Stdout, out)
 }
