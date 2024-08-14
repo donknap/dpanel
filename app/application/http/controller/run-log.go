@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
@@ -16,8 +15,9 @@ type RunLog struct {
 
 func (self RunLog) Run(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5       string `form:"md5" binding:"required"`
-		LineTotal int    `form:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000"`
+		Md5       string `json:"md5" binding:"required"`
+		LineTotal int    `json:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000"`
+		Download  bool   `json:"download"`
 	}
 
 	params := ParamsValidate{}
@@ -28,17 +28,22 @@ func (self RunLog) Run(http *gin.Context) {
 		ShowStderr: true,
 		ShowStdout: true,
 		Tail:       strconv.Itoa(params.LineTotal),
-		Follow:     true,
+		Follow:     false,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	myWrite := &write{http: http}
-	//self.JsonResponseWithoutError(http, gin.H{
-	//	"log": string(output),
-	//})
-	http.Header("Content-Type", "text/event-stream")
-	http.SSEvent("data", "dafa")
-	io.Copy(myWrite, out)
+	output, _ := io.ReadAll(out)
+	if params.Download {
+		http.Header("Content-Type", "text/plain")
+		http.Header("Content-Disposition", "attachment; filename="+params.Md5+".log")
+		http.Data(200, "text/plain", output)
+		return
+	} else {
+		self.JsonResponseWithoutError(http, gin.H{
+			"log": string(output),
+		})
+	}
+	return
 }

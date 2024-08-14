@@ -15,7 +15,7 @@ type CorsMiddleware struct {
 func (self CorsMiddleware) Process(ctx *gin.Context) {
 	if host, ok := self.isAllow(ctx); ok {
 		ctx.Header("Access-Control-Allow-Origin", host)
-		ctx.Header("Access-Control-Allow-Headers", "Content-Type,AccessToken,X-CSRF-Token, Authorization")
+		ctx.Header("Access-Control-Allow-Headers", "Content-Type, AccessToken, X-CSRF-Token, Authorization, ")
 		ctx.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 		ctx.Header("Access-Control-Expose-Headers", self.getAllowHeader())
 		ctx.Header("Access-Control-Allow-Credentials", "true")
