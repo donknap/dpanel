@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"log/slog"
 	"os"
 	"path/filepath"

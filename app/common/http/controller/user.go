@@ -5,7 +5,7 @@ import (
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/we7coreteam/w7-rangine-go/src/http/controller"
+	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"time"
 )
 

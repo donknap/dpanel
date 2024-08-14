@@ -2,7 +2,7 @@ package logic
 
 import (
 	"github.com/donknap/dpanel/common/function"
-	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"strings"
 )
 

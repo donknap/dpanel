@@ -2,7 +2,7 @@ package storage
 
 import (
 	"fmt"
-	"github.com/we7coreteam/w7-rangine-go-support/src/facade"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"os"
 )
 
