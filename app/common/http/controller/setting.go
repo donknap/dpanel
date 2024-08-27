@@ -29,23 +29,21 @@ func (self Setting) Founder(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("创始人配置不存在，请重新安装"), 500)
 		return
 	}
-
-	// 修改密码
-	if params.Password != "" && params.NewPassword != "" {
-		if oldUser.Value.Password != function.GetMd5(params.Password+oldUser.Value.Username) {
-			self.JsonResponseWithError(http, errors.New("旧密码不正确"), 500)
-			return
-		}
-		oldUser.Value.Password = function.GetMd5(params.NewPassword + oldUser.Value.Username)
+	if oldUser.Value.Password != function.GetMd5(params.Password+oldUser.Value.Username) {
+		self.JsonResponseWithError(http, errors.New("旧密码不正确"), 500)
+		return
 	}
 
+	// 修改密码
+	if params.NewPassword != "" {
+		oldUser.Value.Password = function.GetMd5(params.NewPassword + oldUser.Value.Username)
+		params.Password = params.NewPassword
+	}
+
+	// 修改用户名
 	if params.Username != "" {
 		oldUser.Value.Username = params.Username
-		if params.NewPassword == "" {
-			oldUser.Value.Password = function.GetMd5(params.Password + oldUser.Value.Username)
-		} else {
-			oldUser.Value.Password = function.GetMd5(params.NewPassword + oldUser.Value.Username)
-		}
+		oldUser.Value.Password = function.GetMd5(params.Password + params.Username)
 	}
 
 	err = logic.Setting{}.Save(oldUser)
