@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -51,8 +50,13 @@ func (self Compose) Create(http *gin.Context) {
 	}
 	yamlRow := &entity.Compose{
 		Title: params.Title,
-		Yaml:  params.Yaml,
 		Name:  params.Name,
+		Yaml:  params.Yaml,
+		Setting: &accessor.ComposeSettingOption{
+			RawYaml:     params.RawYaml,
+			Environment: params.Environment,
+			Status:      "waiting",
+		},
 	}
 	if params.Id > 0 {
 		_, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).Updates(yamlRow)
@@ -67,41 +71,46 @@ func (self Compose) Create(http *gin.Context) {
 
 func (self Compose) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Name string `json:"name"`
+		Name  string `json:"name"`
+		Title string `json:"title"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+	composeRunList := logic.Compose{}.Ls(params.Name)
+	composeList := make([]*entity.Compose, 0)
+	query := dao.Compose.Order(dao.Compose.ID.Desc())
+	if params.Name != "" {
+		query = query.Where(dao.Compose.Name.Like("%" + params.Name + "%"))
+	}
+	if params.Title != "" {
+		query = query.Where(dao.Compose.Title.Like("%" + params.Title + "%"))
+	}
+	composeList, _ = query.Find()
 
-	type item struct {
-		ID          int32  `json:"id"`
-		Name        string `json:"name"`
-		Title       string `json:"title"`
-		Status      string `json:"status"`
-		ConfigFiles string `json:"configFiles"`
-		Yaml        string `json:"yaml"`
-	}
-	result := make([]*item, 0)
-	out := logic.Compose{}.Ls(params.Name)
-	err := json.Unmarshal([]byte(out), &result)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	composeList, _ := dao.Compose.Find()
-	for _, compose := range composeList {
-		for i, row := range result {
-			if row.Name == compose.Name {
-				result[i].ID = compose.ID
-				result[i].Title = compose.Title
-				result[i].Yaml = compose.Yaml
-				break
+	for _, runItem := range composeRunList {
+		has := false
+
+		for i, item := range composeList {
+			if runItem.Name == item.Name {
+				has = true
+				composeList[i].Setting.Status = runItem.Status
 			}
+		}
+
+		if params.Title == "" && !has {
+			composeList = append(composeList, &entity.Compose{
+				Title: "",
+				Name:  runItem.Name,
+				Setting: &accessor.ComposeSettingOption{
+					Status: runItem.Status,
+				},
+			})
 		}
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": result,
+		"list": composeList,
 	})
 	return
 }
@@ -116,13 +125,27 @@ func (self Compose) GetDetail(http *gin.Context) {
 		return
 	}
 	var yamlRow *entity.Compose
-
 	if params.Id > 0 {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
-	}
-	if params.Name != "" {
+		params.Name = yamlRow.Name
+	} else if params.Name != "" {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
 	}
+	if yamlRow == nil {
+		yamlRow = &entity.Compose{
+			Name:    "",
+			Title:   "",
+			Setting: &accessor.ComposeSettingOption{},
+		}
+	}
+	composeRunList := logic.Compose{}.Ls(params.Name)
+	for _, item := range composeRunList {
+		if item.Name == yamlRow.Name {
+			yamlRow.Setting.Status = item.Status
+			break
+		}
+	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"detail": yamlRow,
 	})

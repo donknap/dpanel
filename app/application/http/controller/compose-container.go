@@ -22,9 +22,11 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 
 	err := logic.Compose{}.Deploy(&logic.ComposeTaskOption{
-		SiteName: composeRow.Name,
-		Yaml:     composeRow.Yaml,
+		Name:        composeRow.Name,
+		Yaml:        composeRow.Yaml,
+		Environment: composeRow.Setting.Environment,
 	})
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -37,6 +39,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	type ParamsValidate struct {
 		Id          int32 `json:"id" binding:"required"`
 		DeleteImage bool  `json:"deleteImage"`
+		DeleteData  bool  `json:"deleteData"`
 	}
 
 	params := ParamsValidate{}
@@ -50,13 +53,21 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	}
 
 	err := logic.Compose{}.Destroy(&logic.ComposeTaskOption{
-		SiteName:    composeRow.Name,
+		Name:        composeRow.Name,
 		Yaml:        composeRow.Yaml,
 		DeleteImage: params.DeleteImage,
+		Environment: composeRow.Setting.Environment,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+	if params.DeleteData {
+		_, err := dao.Compose.Where(dao.Compose.ID.In(params.Id)).Delete()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 	self.JsonSuccessResponse(http)
 	return
@@ -79,8 +90,9 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 	}
 
 	err := logic.Compose{}.Ctrl(&logic.ComposeTaskOption{
-		SiteName: composeRow.Name,
-		Yaml:     composeRow.Yaml,
+		Name:        composeRow.Name,
+		Yaml:        composeRow.Yaml,
+		Environment: composeRow.Setting.Environment,
 	}, params.Op)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
