@@ -12,7 +12,7 @@ const TableNameRegistry = "ims_registry"
 
 // Registry mapped from table <ims_registry>
 type Registry struct {
-	ID            int32                           `gorm:"column:id;type:INTEGER" json:"id"`
+	ID            int32                           `gorm:"column:id;primaryKey" json:"id"`
 	Title         string                          `gorm:"column:title" json:"title"`
 	ServerAddress string                          `gorm:"column:server_address" json:"serverAddress"`
 	Setting       *accessor.RegistrySettingOption `gorm:"column:setting;serializer:json" json:"setting"`

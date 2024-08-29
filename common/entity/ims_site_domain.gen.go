@@ -14,7 +14,7 @@ const TableNameSiteDomain = "ims_site_domain"
 
 // SiteDomain mapped from table <ims_site_domain>
 type SiteDomain struct {
-	ID          int32                             `gorm:"column:id;type:INTEGER" json:"id"`
+	ID          int32                             `gorm:"column:id;primaryKey" json:"id"`
 	ContainerID string                            `gorm:"column:container_id" json:"containerId"`
 	ServerName  string                            `gorm:"column:server_name" json:"serverName"`
 	Setting     *accessor.SiteDomainSettingOption `gorm:"column:setting;serializer:json" json:"setting"`
