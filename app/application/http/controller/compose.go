@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/donknap/dpanel/app/application/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -16,10 +18,12 @@ type Compose struct {
 
 func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Title string `json:"title" binding:"required"`
-		Name  string `json:"name" binding:"required"`
-		Yaml  string `json:"yaml" binding:"required"`
-		Id    int32  `json:"id"`
+		Title       string `json:"title" binding:"required"`
+		Name        string `json:"name" binding:"required"`
+		Yaml        string `json:"yaml" binding:"required"`
+		RawYaml     string `json:"rawYaml"`
+		Environment []accessor.EnvItem
+		Id          int32 `json:"id"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -63,56 +67,65 @@ func (self Compose) Create(http *gin.Context) {
 
 func (self Compose) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Page     int    `json:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize int    `json:"pageSize" binding:"omitempty"`
-		Title    string `json:"title"`
-		Name     string `json:"name"`
+		Name string `json:"name"`
 	}
-
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
-	if params.Page < 1 {
-		params.Page = 1
+	type item struct {
+		ID          int32  `json:"id"`
+		Name        string `json:"name"`
+		Title       string `json:"title"`
+		Status      string `json:"status"`
+		ConfigFiles string `json:"configFiles"`
+		Yaml        string `json:"yaml"`
 	}
-	if params.PageSize < 1 {
-		params.PageSize = 10
+	result := make([]*item, 0)
+	out := logic.Compose{}.Ls(params.Name)
+	err := json.Unmarshal([]byte(out), &result)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
-
-	query := dao.Compose.Order(dao.Compose.ID.Desc())
-	if params.Title != "" {
-		query = query.Where(dao.Compose.Title.Like("%" + params.Title + "%"))
+	composeList, _ := dao.Compose.Find()
+	for _, compose := range composeList {
+		for i, row := range result {
+			if row.Name == compose.Name {
+				result[i].ID = compose.ID
+				result[i].Title = compose.Title
+				result[i].Yaml = compose.Yaml
+				break
+			}
+		}
 	}
-	if params.Name != "" {
-		query = query.Where(dao.Compose.Name.Like("%" + params.Name + "%"))
-	}
-	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
-
 	self.JsonResponseWithoutError(http, gin.H{
-		"total": total,
-		"page":  params.Page,
-		"list":  list,
+		"list": result,
 	})
 	return
 }
 
 func (self Compose) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Id int32 `json:"id" binding:"required"`
+		Id   int32  `json:"id"`
+		Name string `json:"name"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	yamlRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
-	if yamlRow == nil {
-		self.JsonResponseWithError(http, errors.New("站点标识已经存在，请更换"), 500)
-		return
+	var yamlRow *entity.Compose
+
+	if params.Id > 0 {
+		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
 	}
-	logic.Compose{}.Ls(yamlRow.Name)
-	self.JsonResponseWithoutError(http, yamlRow)
+	if params.Name != "" {
+		yamlRow, _ = dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"detail": yamlRow,
+	})
 	return
 }
 

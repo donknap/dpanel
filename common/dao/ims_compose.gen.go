@@ -28,9 +28,9 @@ func newCompose(db *gorm.DB, opts ...gen.DOOption) compose {
 	tableName := _compose.composeDo.TableName()
 	_compose.ALL = field.NewAsterisk(tableName)
 	_compose.ID = field.NewInt32(tableName, "id")
-	_compose.Title = field.NewString(tableName, "title")
-	_compose.Yaml = field.NewString(tableName, "yaml")
 	_compose.Name = field.NewString(tableName, "name")
+	_compose.Title = field.NewString(tableName, "title")
+	_compose.Setting = field.NewField(tableName, "setting")
 
 	_compose.fillFieldMap()
 
@@ -40,11 +40,11 @@ func newCompose(db *gorm.DB, opts ...gen.DOOption) compose {
 type compose struct {
 	composeDo
 
-	ALL   field.Asterisk
-	ID    field.Int32
-	Title field.String
-	Yaml  field.String
-	Name  field.String
+	ALL     field.Asterisk
+	ID      field.Int32
+	Name    field.String
+	Title   field.String
+	Setting field.Field
 
 	fieldMap map[string]field.Expr
 }
@@ -62,9 +62,9 @@ func (c compose) As(alias string) *compose {
 func (c *compose) updateTableName(table string) *compose {
 	c.ALL = field.NewAsterisk(table)
 	c.ID = field.NewInt32(table, "id")
-	c.Title = field.NewString(table, "title")
-	c.Yaml = field.NewString(table, "yaml")
 	c.Name = field.NewString(table, "name")
+	c.Title = field.NewString(table, "title")
+	c.Setting = field.NewField(table, "setting")
 
 	c.fillFieldMap()
 
@@ -83,9 +83,9 @@ func (c *compose) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 func (c *compose) fillFieldMap() {
 	c.fieldMap = make(map[string]field.Expr, 4)
 	c.fieldMap["id"] = c.ID
-	c.fieldMap["title"] = c.Title
-	c.fieldMap["yaml"] = c.Yaml
 	c.fieldMap["name"] = c.Name
+	c.fieldMap["title"] = c.Title
+	c.fieldMap["setting"] = c.Setting
 }
 
 func (c compose) clone(db *gorm.DB) compose {

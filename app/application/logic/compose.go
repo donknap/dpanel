@@ -75,14 +75,21 @@ func (self Compose) Ctrl(task *ComposeTaskOption, op string) error {
 	return nil
 }
 
-func (self Compose) Ls(projectName string) {
+func (self Compose) Ls(projectName string) string {
 	command := []string{
 		"ls",
-		"--filter",
-		"name=" + projectName,
+		"--format", "json",
+		"--all",
 	}
-	self.runCommand(command)
-	return
+	if projectName != "" {
+		command = append(command, "--filter", "name="+projectName)
+	}
+	return exec.Command{}.RunWithOut(&exec.RunCommandOption{
+		CmdName: "docker",
+		CmdArgs: append([]string{
+			"compose",
+		}, command...),
+	})
 }
 
 func (self Compose) Kill() error {

@@ -38,3 +38,7 @@ relation:
   - table: ims_event
   - table: ims_notice
   - table: ims_compose
+    column:
+      setting:
+        type: ComposeSettingOption
+        serializer: json
