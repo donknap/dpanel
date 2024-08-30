@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	Sdk, _                          = NewDockerClient()
+	Sdk, _                          = NewDockerClient("")
 	QueueDockerProgressMessage      = make(chan *Progress, 999)
 	QueueDockerImageDownloadMessage = make(chan map[string]*ProgressDownloadImage, 999)
 	QueueDockerComposeMessage       = make(chan string, 999)
@@ -30,12 +30,15 @@ type Builder struct {
 	Ctx    context.Context
 }
 
-func NewDockerClient() (*Builder, error) {
-	obj, err := client.NewClientWithOpts(
+func NewDockerClient(host string) (*Builder, error) {
+	options := []client.Opt{
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
-		//client.WithHost("unix:///var/run/docker.sock"),
-	)
+	}
+	if host != "" {
+		options = append(options, client.WithHost(host))
+	}
+	obj, err := client.NewClientWithOpts(options...)
 	if err != nil {
 		return nil, err
 	}

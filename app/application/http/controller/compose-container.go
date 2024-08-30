@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,6 +28,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		Environment: composeRow.Setting.Environment,
 	})
 
+	notice.Message{}.Success("composeDeploy", composeRow.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -69,6 +71,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			return
 		}
 	}
+	notice.Message{}.Success("composeDestroy", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
 }

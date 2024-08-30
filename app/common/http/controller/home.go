@@ -125,6 +125,8 @@ func (self Home) WsConsole(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
+	docker.Sdk, _ = docker.NewDockerClient("tcp://172.16.1.13:2375")
+
 	dpanelContainerInfo, _ := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
 	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err != nil {
