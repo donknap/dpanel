@@ -160,10 +160,24 @@ func (self Compose) Delete(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	_, err := dao.Compose.Where(dao.Compose.ID.In(params.Id...)).Delete()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	composeRunList := logic.Compose{}.Ls("")
+	for _, id := range params.Id {
+		row, err := dao.Compose.Where(dao.Compose.ID.Eq(id)).First()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		for _, runItem := range composeRunList {
+			if row.Name == runItem.Name {
+				self.JsonResponseWithError(http, errors.New("请先销毁容器"), 500)
+				return
+			}
+		}
+		_, err = dao.Compose.Where(dao.Compose.ID.Eq(id)).Delete()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 	self.JsonSuccessResponse(http)
 	return

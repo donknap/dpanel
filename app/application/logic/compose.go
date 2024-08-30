@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/accessor"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"os"
@@ -41,6 +40,9 @@ func (self Compose) Deploy(task *ComposeTaskOption) error {
 	defer os.Remove(yamlFile.Name())
 
 	dockerYaml, err := docker.NewYaml(task.Yaml)
+	if err != nil {
+		return err
+	}
 	self.runCommand(append([]string{
 		"-f", yamlFile.Name(),
 		"-p", task.Name,
@@ -52,14 +54,8 @@ func (self Compose) Deploy(task *ComposeTaskOption) error {
 
 	// 部署完成后还需要把外部容器加入到对应的网络中
 	// 如果 compose 中未指定网络，则默认的名称为 项目名_default
-	networkList := function.GetMapKeys(dockerYaml.Networks)
-	if function.IsEmptyArray(networkList) {
-		networkList = []string{
-			"default",
-		}
-	}
 	for _, item := range dockerYaml.GetExternalLinks() {
-		for _, name := range networkList {
+		for _, name := range dockerYaml.GetNetworkList() {
 			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.Name+"_"+name, item.ContainerName, &network.EndpointSettings{})
 			if err != nil {
 				return err
@@ -70,6 +66,20 @@ func (self Compose) Deploy(task *ComposeTaskOption) error {
 }
 
 func (self Compose) Destroy(task *ComposeTaskOption) error {
+	dockerYaml, err := docker.NewYaml(task.Yaml)
+	if err != nil {
+		return err
+	}
+	// 删除compose 前需要先把关联的已有容器网络退出
+	for _, item := range dockerYaml.GetExternalLinks() {
+		for _, name := range dockerYaml.GetNetworkList() {
+			err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, task.Name+"_"+name, item.ContainerName, true)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	envFile, err := self.getEnvFile(task.Environment)
 	if err != nil {
 		return err
