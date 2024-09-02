@@ -86,12 +86,12 @@ func main() {
 		)
 		// 如果没有管理配置新建一条
 		founderSetting, _ := dao.Setting.
-			Where(dao.Setting.GroupName.Eq(logic.SettingUser)).
-			Where(dao.Setting.Name.Eq(logic.SettingUserFounder)).First()
+			Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
+			Where(dao.Setting.Name.Eq(logic.SettingGroupUserFounder)).First()
 		if founderSetting == nil {
 			_ = dao.Setting.Create(&entity.Setting{
-				GroupName: logic.SettingUser,
-				Name:      logic.SettingUserFounder,
+				GroupName: logic.SettingGroupUser,
+				Name:      logic.SettingGroupUserFounder,
 				Value: &accessor.SettingValueOption{
 					Password: "f6fdffe48c908deb0f4c3bd36c032e72",
 					Username: "admin",

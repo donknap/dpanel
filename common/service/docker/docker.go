@@ -26,8 +26,10 @@ var (
 )
 
 type Builder struct {
-	Client *client.Client
-	Ctx    context.Context
+	Client        *client.Client
+	Ctx           context.Context
+	CtxCancelFunc context.CancelFunc
+	Host          string
 }
 
 func NewDockerClient(host string) (*Builder, error) {
@@ -43,9 +45,13 @@ func NewDockerClient(host string) (*Builder, error) {
 		return nil, err
 	}
 
+	ctx, cancelFunc := context.WithCancel(context.Background())
+
 	return &Builder{
-		Client: obj,
-		Ctx:    context.Background(),
+		Client:        obj,
+		Ctx:           ctx,
+		CtxCancelFunc: cancelFunc,
+		Host:          host,
 	}, nil
 }
 
@@ -62,7 +68,7 @@ func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {
 		networkingConfig: &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{},
 		},
-		ctx: context.Background(),
+		ctx: self.Ctx,
 	}
 	return builder
 }

@@ -42,18 +42,22 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/setting/save", controller.Setting{}.Save)
 		cors.POST("/common/setting/founder", controller.Setting{}.Founder)
 		cors.POST("/common/setting/get-setting", controller.Setting{}.GetSetting)
-	})
 
-	httpServer.RegisterRouters(func(engine *gin.Engine) {
-		cors := engine.Group("/api/", common.CorsMiddleware{}.Process)
 		cors.POST("/common/home/info", controller.Home{}.Info)
 		cors.POST("/common/home/upgrade-script", controller.Home{}.UpgradeScript)
 
+		// 环境管理
+		cors.POST("/common/env/get-list", controller.Env{}.GetList)
+		cors.POST("/common/env/create", controller.Env{}.Create)
+		cors.POST("/common/env/switch", controller.Env{}.Switch)
+	})
+
+	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		wsCors := engine.Group("/ws/", common.CorsMiddleware{}.Process)
+
 		wsCors.GET("/common/ws/notice", controller.Home{}.WsNotice)
 		wsCors.GET("/common/ws/console/:id", controller.Home{}.WsConsole)
 	})
 
-	event := logic.EventLogic{}
-	go event.MonitorLoop()
+	go logic.EventLogic{}.MonitorLoop()
 }

@@ -30,7 +30,7 @@ func (self User) Login(http *gin.Context) {
 		expireAddTime = time.Hour * 24
 	}
 
-	currentUser, err := logic.Setting{}.GetValue(logic.SettingUser, logic.SettingUserFounder)
+	currentUser, err := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
 	if err != nil {
 		self.JsonResponseWithError(http, errors.New("创始人配置不存在，请重新安装"+err.Error()), 500)
 		return

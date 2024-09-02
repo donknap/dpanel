@@ -6,9 +6,17 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 )
 
+// 全局配置
 var (
-	SettingUser        = "user"
-	SettingUserFounder = "founder"
+	SettingGroupSetting       = "setting"
+	SettingGroupSettingServer = "server" // 服务器
+	SettingGroupSettingDocker = "docker" // docker env
+)
+
+// 用户相关数据
+var (
+	SettingGroupUser        = "user"
+	SettingGroupUserFounder = "founder"
 )
 
 type Setting struct {

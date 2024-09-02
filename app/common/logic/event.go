@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"log/slog"
 	"time"
 )
 
@@ -17,6 +18,9 @@ func (self EventLogic) MonitorLoop() {
 	messageChan, errorChan := docker.Sdk.Client.Events(docker.Sdk.Ctx, events.ListOptions{})
 	for {
 		select {
+		case <-docker.Sdk.Ctx.Done():
+			slog.Debug("event", "loop", "exit event loop")
+			return
 		case message := <-messageChan:
 			eventRow := &entity.Event{
 				Type:      string(message.Type),

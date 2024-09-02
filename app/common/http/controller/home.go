@@ -125,8 +125,6 @@ func (self Home) WsConsole(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
-	docker.Sdk, _ = docker.NewDockerClient("tcp://172.16.1.13:2375")
-
 	dpanelContainerInfo, _ := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
 	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err != nil {
@@ -134,7 +132,7 @@ func (self Home) Info(http *gin.Context) {
 		return
 	}
 	timeout := time.Second * 5
-	setting, _ := logic.Setting{}.GetValue("setting", "server")
+	setting, _ := logic.Setting{}.GetValue(logic.SettingGroupSetting, "server")
 	if setting != nil && setting.Value.RequestTimeout > 0 {
 		timeout = time.Duration(setting.Value.RequestTimeout) * time.Second
 	}

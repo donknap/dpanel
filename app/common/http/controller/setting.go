@@ -24,7 +24,7 @@ func (self Setting) Founder(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	oldUser, err := logic.Setting{}.GetValue(logic.SettingUser, logic.SettingUserFounder)
+	oldUser, err := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
 	if err != nil {
 		self.JsonResponseWithError(http, errors.New("创始人配置不存在，请重新安装"), 500)
 		return
