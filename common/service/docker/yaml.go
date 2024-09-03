@@ -22,16 +22,16 @@ func NewYaml(yamlStr string) (*DockerComposeYamlV2, error) {
 }
 
 type ComposeService struct {
-	Image         string   `yaml:"image"`
-	Build         string   `yaml:"build"`
-	ContainerName string   `yaml:"container_name"`
-	Restart       string   `yaml:"restart"`
-	Privileged    bool     `yaml:"privileged"`
-	Pid           string   `yaml:"pid"`
-	VolumesFrom   []string `yaml:"volumes_from"`
-	Volumes       []string `yaml:"volumes"`
-	Command       []string `yaml:"command"`
-	ExternalLinks []string `yaml:"external_links"`
+	Image         string      `yaml:"image"`
+	Build         string      `yaml:"build"`
+	ContainerName string      `yaml:"container_name"`
+	Restart       string      `yaml:"restart"`
+	Privileged    bool        `yaml:"privileged"`
+	Pid           string      `yaml:"pid"`
+	VolumesFrom   []string    `yaml:"volumes_from"`
+	Volumes       []string    `yaml:"volumes"`
+	Command       interface{} `yaml:"command"` // 可以为数组也可以为字符串
+	ExternalLinks []string    `yaml:"external_links"`
 	Extend        struct {
 		ImageLocalTar map[string]string `yaml:"image_local_tar"`
 		AutoRemove    bool              `yaml:"auto_remove"`
@@ -81,7 +81,7 @@ func (self DockerComposeYamlV2) GetExternalLinks() []linksItem {
 }
 
 func (self DockerComposeYamlV2) GetNetworkList() []string {
-	networkList := function.GetMapKeys(self.Networks)
+	networkList := function.GetArrayFromMapKeys(self.Networks)
 	if function.IsEmptyArray(networkList) {
 		networkList = []string{
 			"default",

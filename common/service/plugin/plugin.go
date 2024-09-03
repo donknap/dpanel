@@ -120,9 +120,17 @@ func (self plugin) Create() (string, error) {
 	for _, item := range service.VolumesFrom {
 		builder.WithContainerVolume(item)
 	}
-	if !function.IsEmptyArray(service.Command) {
-		builder.WithCommand(service.Command)
+	switch cmd := service.Command.(type) {
+	case []string:
+		if !function.IsEmptyArray(cmd) {
+			builder.WithCommand(cmd)
+		}
+	case []interface{}:
+		builder.WithCommand(function.ConvertArray[string](cmd))
+	case string:
+		builder.WithCommandStr(cmd)
 	}
+
 	for _, item := range service.Volumes {
 		path := strings.Split(item, ":")
 		builder.WithVolume(path[0], path[1], path[2])
