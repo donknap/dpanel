@@ -29,8 +29,9 @@ func (self Compose) Create(http *gin.Context) {
 		return
 	}
 
+	var yamlRow *entity.Compose
 	if params.Id > 0 {
-		yamlRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
 		if yamlRow == nil {
 			self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 			return
@@ -48,21 +49,25 @@ func (self Compose) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	yamlRow := &entity.Compose{
-		Title: params.Title,
-		Name:  params.Name,
-		Yaml:  params.Yaml,
-		Setting: &accessor.ComposeSettingOption{
-			RawYaml:     params.RawYaml,
-			Environment: params.Environment,
-			Status:      "waiting",
-		},
-	}
 	if params.Id > 0 {
-		_, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).Updates(yamlRow)
+		yamlRow.Yaml = params.Yaml
+		yamlRow.Title = params.Title
+		yamlRow.Setting.Environment = params.Environment
+		_, _ = dao.Compose.Updates(yamlRow)
 	} else {
+		yamlRow = &entity.Compose{
+			Title: params.Title,
+			Name:  params.Name,
+			Yaml:  params.Yaml,
+			Setting: &accessor.ComposeSettingOption{
+				RawYaml:     params.RawYaml,
+				Environment: params.Environment,
+				Status:      "waiting",
+			},
+		}
 		_ = dao.Compose.Create(yamlRow)
 	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"id": yamlRow.ID,
 	})

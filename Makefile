@@ -51,44 +51,14 @@ clean:
 all: clean-source js amd64 arm64 armv7
 test: all
 	docker buildx build \
-	-t ccr.ccs.tencentyun.com/dpanel/dpanel:lite-test \
-	-t ccr.ccs.tencentyun.com/dpanel/dpanel:${VERSION}-lite-test \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite-beta \
 	--platform linux/arm64,linux/amd64,linux/arm/v7 \
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile-lite \
 	. --push
 	docker buildx build \
-	-t ccr.ccs.tencentyun.com/dpanel/dpanel:test \
-	-t ccr.ccs.tencentyun.com/dpanel/dpanel:${VERSION}-test \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta \
 	--platform linux/arm64,linux/amd64,linux/arm/v7 \
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile \
-	. --push
-r1:
-	docker buildx build \
-	-t dpanel/dpanel:lite \
-	-t dpanel/dpanel:${VERSION}-lite \
-	--platform linux/arm64,linux/amd64,linux/arm/v7 \
-	--build-arg APP_VERSION=${VERSION} \
-	-f Dockerfile-lite \
-	. --push
-	docker buildx build \
-	-t dpanel/dpanel:latest \
-	-t dpanel/dpanel:${VERSION} \
-	--platform linux/arm64,linux/amd64,linux/arm/v7 \
-	--build-arg APP_VERSION=${VERSION} \
-	. --push
-r2:
-	docker buildx build \
-	-t ccr.ccs.tencentyun.com/dpanel/dpanel:lite \
-	-t ccr.ccs.tencentyun.com/dpanel/dpanel:${VERSION}-lite \
-	--platform linux/arm64,linux/amd64,linux/arm/v7 \
-	--build-arg APP_VERSION=${VERSION} \
-	-f Dockerfile-lite \
-	. --push
-	docker buildx build \
-	-t ccr.ccs.tencentyun.com/dpanel/dpanel:latest \
-	-t ccr.ccs.tencentyun.com/dpanel/dpanel:${VERSION} \
-	--platform linux/arm64,linux/amd64,linux/arm/v7 \
-	--build-arg APP_VERSION=${VERSION} \
 	. --push

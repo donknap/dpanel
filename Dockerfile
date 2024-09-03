@@ -4,11 +4,15 @@ ARG APP_VERSION
 ARG TARGETARCH
 
 ENV APP_ENV=production
+ENV APP_NAME=dpanel
 ENV APP_VERSION=$APP_VERSION
 ENV APP_SERVER_PORT=8080
 ENV DOCKER_HOST=unix:///var/run/docker.sock
 ENV STORAGE_LOCAL_PATH=/dpanel
 ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
+
+ENV INSTALL_USERNAME=""
+ENV INSTALL_PASSWORD=""
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update nginx musl inotify-tools docker-compose curl openssl && \

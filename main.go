@@ -89,12 +89,23 @@ func main() {
 			Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
 			Where(dao.Setting.Name.Eq(logic.SettingGroupUserFounder)).First()
 		if founderSetting == nil {
+			var (
+				username = "admin"
+				password = "admin"
+			)
+			if os.Getenv("INSTALL_USERNAME") != "" {
+				username = os.Getenv("INSTALL_USERNAME")
+			}
+			if os.Getenv("INSTALL_PASSWORD") != "" {
+				password = os.Getenv("INSTALL_PASSWORD")
+			}
+
 			_ = dao.Setting.Create(&entity.Setting{
 				GroupName: logic.SettingGroupUser,
 				Name:      logic.SettingGroupUserFounder,
 				Value: &accessor.SettingValueOption{
-					Password: "f6fdffe48c908deb0f4c3bd36c032e72",
-					Username: "admin",
+					Password: logic.User{}.GetMd5Password(password, username),
+					Username: username,
 				},
 			})
 		}
