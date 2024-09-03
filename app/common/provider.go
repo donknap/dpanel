@@ -1,9 +1,12 @@
 package common
 
 import (
+	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	common "github.com/donknap/dpanel/common/middleware"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
@@ -50,6 +53,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/env/get-list", controller.Env{}.GetList)
 		cors.POST("/common/env/create", controller.Env{}.Create)
 		cors.POST("/common/env/switch", controller.Env{}.Switch)
+		cors.POST("/common/env/delete", controller.Env{}.Delete)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
@@ -59,5 +63,15 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		wsCors.GET("/common/ws/console/:id", controller.Home{}.WsConsole)
 	})
 
-	go logic.EventLogic{}.MonitorLoop()
+	// 当前如果有连接，则添加一条docker环境数据
+	_, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
+	if err == nil {
+		logic.DockerEnv{}.UpdateEnv(&accessor.DockerClientResult{
+			Name:    "local",
+			Title:   "本机",
+			Address: client.DefaultDockerHost,
+			Default: true,
+		})
+		go logic.EventLogic{}.MonitorLoop()
+	}
 }

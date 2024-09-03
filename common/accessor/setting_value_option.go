@@ -12,4 +12,5 @@ type DockerClientResult struct {
 	Name    string `json:"name"`
 	Title   string `json:"title"`
 	Address string `json:"address"`
+	Default bool   `json:"default"`
 }
