@@ -11,9 +11,6 @@ ENV DOCKER_HOST=unix:///var/run/docker.sock
 ENV STORAGE_LOCAL_PATH=/dpanel
 ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
 
-ENV INSTALL_USERNAME=""
-ENV INSTALL_PASSWORD=""
-
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update musl docker-compose
 

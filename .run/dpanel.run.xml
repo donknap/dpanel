@@ -9,6 +9,8 @@
       <env name="DOCKER_HOST" value="unix:///Users/renchao/.docker/run/docker.sock" />
       <env name="APP_ENV" value="debug" />
       <env name="APP_VERSION" value="1.0.4" />
+      <env name="INSTALL_USERNAME" value="root" />
+      <env name="INSTALL_PASSWORD" value="123456" />
     </envs>
     <EXTENSION ID="net.ashald.envfile">
       <option name="IS_ENABLED" value="false" />

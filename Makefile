@@ -56,9 +56,3 @@ test: all
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile-lite \
 	. --push
-	docker buildx build \
-	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta \
-	--platform linux/arm64,linux/amd64,linux/arm/v7 \
-	--build-arg APP_VERSION=${VERSION} \
-	-f Dockerfile \
-	. --push
