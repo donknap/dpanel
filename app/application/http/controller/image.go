@@ -305,11 +305,16 @@ func (self Image) GetList(http *gin.Context) {
 	if !function.IsEmptyArray(filterTagList) {
 		for _, summary := range imageList {
 			for _, tag := range summary.RepoTags {
+				has := false
 				for _, s := range filterTagList {
 					if strings.Contains(tag, s) {
+						has = true
 						result = append(result, summary)
 						break
 					}
+				}
+				if has {
+					break
 				}
 			}
 		}
