@@ -29,7 +29,6 @@ type Builder struct {
 	Client        *client.Client
 	Ctx           context.Context
 	CtxCancelFunc context.CancelFunc
-	Address       string
 }
 
 func NewDockerClient(host string) (*Builder, error) {
@@ -51,7 +50,6 @@ func NewDockerClient(host string) (*Builder, error) {
 		Client:        obj,
 		Ctx:           ctx,
 		CtxCancelFunc: cancelFunc,
-		Address:       host,
 	}, nil
 }
 

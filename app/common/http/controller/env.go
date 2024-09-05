@@ -27,7 +27,7 @@ func (self Env) GetList(http *gin.Context) {
 
 	currentName := "local"
 	for _, item := range result {
-		if item.Address == docker.Sdk.Address {
+		if item.Address == docker.Sdk.Client.DaemonHost() {
 			currentName = item.Name
 			break
 		}
@@ -98,7 +98,7 @@ func (self Env) Switch(http *gin.Context) {
 	fmt.Printf("%v \n", address)
 	fmt.Printf("%v \n", runtime.NumGoroutine())
 
-	if docker.Sdk.Address == address {
+	if docker.Sdk.Client.DaemonHost() == address {
 		self.JsonSuccessResponse(http)
 		return
 	}
@@ -142,7 +142,7 @@ func (self Env) Delete(http *gin.Context) {
 			self.JsonResponseWithError(http, errors.New("Docker 客户端不存在，请先添加"), 500)
 			return
 		} else {
-			if docker.Sdk.Address == row.Address {
+			if docker.Sdk.Client.DaemonHost() == row.Address {
 				docker.Sdk.CtxCancelFunc()
 				_ = docker.Sdk.Client.Close()
 			}

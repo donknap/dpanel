@@ -139,9 +139,12 @@ func (self Compose) Ls(projectName string) []*composeItem {
 	if projectName != "" {
 		command = append(command, "--filter", "name="+projectName)
 	}
+
+	host := docker.Sdk.Client.DaemonHost()
 	out := exec.Command{}.RunWithOut(&exec.RunCommandOption{
 		CmdName: "docker",
 		CmdArgs: append([]string{
+			"-H", host,
 			"compose",
 		}, command...),
 	})
@@ -158,9 +161,11 @@ func (self Compose) Kill() error {
 }
 
 func (self Compose) runCommand(command []string) {
+	host := docker.Sdk.Client.DaemonHost()
 	exec.Command{}.RunInTerminal(&exec.RunCommandOption{
 		CmdName: "docker",
 		CmdArgs: append([]string{
+			"-H", host,
 			"compose",
 		}, command...),
 	})
