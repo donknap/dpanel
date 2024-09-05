@@ -14,6 +14,7 @@ Docker 可视化面板系统，提供完善的 docker 管理功能。
 docker run -it -d --name dpanel --restart=always \
  -p 80:80 -p 443:443 -p 8807:8080 -e APP_NAME=dpanel \
  -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
+ -e INSTALL_USERNAME=admin -e INSTALL_PASSWORD=admin \
  dpanel/dpanel:latest 
 ```
 
@@ -25,6 +26,7 @@ lite 版去掉了域名转发相关，需要自行转发域名绑定容器，不
 docker run -it -d --name dpanel --restart=always \
  -p 8807:8080 -e APP_NAME=dpanel \
  -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
+ -e INSTALL_USERNAME=admin -e INSTALL_PASSWORD=admin \
  dpanel/dpanel:lite
 ```
 
@@ -52,9 +54,22 @@ QQ: 837583876
 
 #### 界面预览
 
-![home.png](https://s2.loli.net/2024/07/30/5qkCGuWHZyPxoRT.png)
-![app-list.png](https://s2.loli.net/2024/05/25/P1RTvFtiwYOB6Hn.png)
-![compose.png](https://s2.loli.net/2024/06/12/IHTiGBnzr4RMSla.png)
+###### 概览
+![home.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/home.png)
+###### 容器管理
+![app-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/app-list.png)
+###### 文件管理
+![app-file.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/app-file.png)
+###### 镜像管理
+![image-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/image-list.png)
+###### 创建镜像
+![image-create.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/image-create.png)
+###### 创建Compose
+![compose-create.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/compose-create.png)
+###### 部署Compose
+![compose-deploy.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/compose-deploy.png)
+###### 系统管理
+![system-basic.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/system-basic.png)
 
 #### 相关仓库
 
