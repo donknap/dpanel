@@ -6,8 +6,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -18,7 +18,6 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
-	"strings"
 )
 
 type Container struct {
@@ -276,20 +275,19 @@ func (self Container) Delete(http *gin.Context) {
 		})
 	}
 
-	if siteRow != nil {
-		dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
-		if params.DeleteVolume {
-			volumeList, _ := docker.Sdk.Client.VolumeList(docker.Sdk.Ctx, volume.ListOptions{})
-			for _, volueItem := range volumeList.Volumes {
-				if strings.HasPrefix(volueItem.Name, siteRow.SiteName) {
-					err = docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, volueItem.Name, false)
-					if err != nil {
-						slog.Debug("remove container volume", err.Error())
-					}
+	if params.DeleteVolume {
+		for _, item := range containerInfo.Mounts {
+			if item.Type == mount.TypeVolume {
+				err = docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, item.Name, false)
+				if err != nil {
+					slog.Debug("remove container volume", err.Error())
 				}
 			}
 		}
+	}
 
+	if siteRow != nil {
+		dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
 		self.JsonResponseWithoutError(http, gin.H{
 			"siteId": siteRow.ID,
 			"md5":    params.Md5,
