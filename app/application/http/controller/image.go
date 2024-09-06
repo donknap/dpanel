@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -291,7 +292,20 @@ func (self Image) GetList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	containerList, _ := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+		All: true,
+	})
+
 	for key, summary := range imageList {
+		if imageList[key].Containers == -1 {
+			imageList[key].Containers = 0
+			for _, cItem := range containerList {
+				if cItem.ImageID == summary.ID {
+					imageList[key].Containers += 1
+				}
+			}
+		}
+
 		if len(summary.RepoTags) == 0 {
 			if len(summary.RepoDigests) != 0 {
 				noneTag := strings.Split(summary.RepoDigests[0], "@")
