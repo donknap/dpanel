@@ -3,6 +3,7 @@ package logic
 import (
 	"encoding/json"
 	"github.com/docker/go-units"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"strconv"
 	"strings"
@@ -26,10 +27,11 @@ type ioItemResult struct {
 
 func (self Stat) GetStat() ([]*statItemResult, error) {
 	result := make([]*statItemResult, 0)
-
+	host := docker.Sdk.Client.DaemonHost()
 	response := exec.Command{}.RunWithOut(&exec.RunCommandOption{
 		CmdName: "docker",
 		CmdArgs: []string{
+			"-H", host,
 			"stats", "-a",
 			"--format", "json",
 			"--no-stream",
