@@ -131,6 +131,8 @@ func (self Home) Info(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	info.Name = docker.Sdk.Client.DaemonHost()
+
 	timeout := time.Second * 5
 	setting, _ := logic.Setting{}.GetValue(logic.SettingGroupSetting, "server")
 	if setting != nil && setting.Value.RequestTimeout > 0 {
@@ -182,6 +184,18 @@ func (self Home) Info(http *gin.Context) {
 			"release":       "",
 			"containerInfo": dpanelContainerInfo,
 		},
+	})
+	return
+}
+
+func (self Home) GetStatList(http *gin.Context) {
+	statList, err := logic.Stat{}.GetStat()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": statList,
 	})
 	return
 }

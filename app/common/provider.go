@@ -48,6 +48,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 		cors.POST("/common/home/info", controller.Home{}.Info)
 		cors.POST("/common/home/upgrade-script", controller.Home{}.UpgradeScript)
+		cors.POST("/common/home/get-stat-list", controller.Home{}.GetStatList)
 
 		// 环境管理
 		cors.POST("/common/env/get-list", controller.Env{}.GetList)
