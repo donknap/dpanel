@@ -60,5 +60,6 @@ test: all
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION} \
 	--platform linux/arm64,linux/amd64,linux/arm/v7 \
 	--build-arg APP_VERSION=${VERSION} \
+	--build-arg PROXY="https_proxy=http://172.16.1.198:7890 http_proxy=http://172.16.1.198:7890" \
 	-f Dockerfile \
 	. --push

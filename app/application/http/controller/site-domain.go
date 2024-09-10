@@ -176,6 +176,13 @@ func (self SiteDomain) GetList(http *gin.Context) {
 	}
 	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
 
+	for key, domain := range list {
+		if domain.Setting != nil && domain.Setting.EnableSSL && domain.Setting.SslCrtKey != "" {
+			certInfo := logic.Acme{}.Info(domain.Setting.SslCrtKey)
+			list[key].Setting.SslCrtRenewTime = certInfo.RenewTimeStr
+		}
+	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"total": total,
 		"page":  params.Page,
@@ -319,6 +326,7 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 			TargetName:                function.GetMd5(domain.Setting.ServerName),
 			SslCrt:                    string(certContent),
 			SslKey:                    string(keyContent),
+			SslCrtKey:                 serverNameList[0],
 			SslCrtCreaeTime:           certInfo.CreateTimeStr,
 			SslCrtRenewTime:           certInfo.RenewTimeStr,
 			AutoSsl:                   true,

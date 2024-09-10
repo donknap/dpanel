@@ -19,5 +19,6 @@ type SiteDomainSettingOption struct {
 	SslKey                    string        `json:"sslKey"`
 	SslCrtRenewTime           string        `json:"sslCrtRenewTime"`
 	SslCrtCreaeTime           string        `json:"sslCrtCreaeTime"`
+	SslCrtKey                 string        `json:"sslCrtKey"` // 标记当前域名获取证书信息的名称 acme.sh --info -d SslCrtKey
 	AutoSsl                   bool          `json:"autoSsl"`
 }

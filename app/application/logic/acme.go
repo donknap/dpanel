@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/donknap/dpanel/common/service/storage"
 	"strings"
 )
 
@@ -60,7 +61,7 @@ func (self AcmeIssueOption) to() ([]string, error) {
 	if self.Debug {
 		command = append(command, "--debug")
 	}
-
+	command = append(command, "--config-home", storage.Local{}.GetStorageLocalPath()+"/acme")
 	return command, nil
 }
 
@@ -86,6 +87,7 @@ func (self Acme) Info(serverName string) *acmeInfoResult {
 	out := exec.Command{}.RunWithOut(&exec.RunCommandOption{
 		CmdName: commandName,
 		CmdArgs: []string{
+			"--config-home", storage.Local{}.GetStorageLocalPath() + "/acme",
 			"--info",
 			"--domain", serverName,
 		},

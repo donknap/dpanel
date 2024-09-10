@@ -2,6 +2,7 @@ FROM alpine
 
 ARG APP_VERSION
 ARG TARGETARCH
+ARG PROXY="proxy=0"
 
 ENV APP_ENV=production
 ENV APP_NAME=dpanel
@@ -14,7 +15,7 @@ ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update nginx musl inotify-tools docker-compose curl openssl && \
   mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
-  curl https://get.acme.sh | sh
+  export ${PROXY} && curl https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh | sh -s -- --install-online --config-home /dpanel/acme
 
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/nginx/include /etc/nginx/conf.d/include
