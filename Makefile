@@ -51,8 +51,14 @@ clean:
 all: clean-source js amd64 arm64 armv7
 test: all
 	docker buildx build \
-	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite-beta \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION}-lite \
 	--platform linux/arm64,linux/amd64,linux/arm/v7 \
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile-lite \
+	. --push
+	docker buildx build \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION} \
+	--platform linux/arm64,linux/amd64,linux/arm/v7 \
+	--build-arg APP_VERSION=${VERSION} \
+	-f Dockerfile \
 	. --push
