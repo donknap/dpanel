@@ -114,6 +114,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	envOption.User = info.Config.User
 	envOption.Command = strings.Join(info.Config.Cmd, " ")
 	envOption.Entrypoint = strings.Join(info.Config.Entrypoint, " ")
+	envOption.UseHostNetwork = info.HostConfig.NetworkMode.IsHost()
 
 	return envOption, nil
 }
