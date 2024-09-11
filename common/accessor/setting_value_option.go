@@ -9,8 +9,12 @@ type SettingValueOption struct {
 }
 
 type DockerClientResult struct {
-	Name    string `json:"name"`
-	Title   string `json:"title"`
-	Address string `json:"address"`
-	Default bool   `json:"default"`
+	Name      string `json:"name,omitempty"`
+	Title     string `json:"title,omitempty"`
+	Address   string `json:"address,omitempty"`
+	Default   bool   `json:"default,omitempty"`
+	TlsCa     string `json:"tlsCa,omitempty"`
+	TlsCert   string `json:"tlsCert,omitempty"`
+	TlsKey    string `json:"tlsKey,omitempty"`
+	EnableTLS bool   `json:"enableTLS,omitempty"`
 }

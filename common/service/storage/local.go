@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"os"
+	"path/filepath"
 )
 
 type Local struct {
@@ -28,4 +29,8 @@ func (self Local) GetRealPath(name string) string {
 
 func (self Local) GetStorageLocalPath() string {
 	return facade.GetConfig().GetString("storage.local.path")
+}
+
+func (self Local) GetStorageCertPath() string {
+	return filepath.Join(self.GetStorageLocalPath(), "cert")
 }

@@ -9,12 +9,14 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"github.com/donknap/dpanel/common/service/storage"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"path/filepath"
 	"strings"
 )
 
 var (
-	Sdk, _                          = NewDockerClient("")
+	Sdk, _                          = NewDockerClient(NewDockerClientOption{})
 	QueueDockerProgressMessage      = make(chan *Progress, 999)
 	QueueDockerImageDownloadMessage = make(chan map[string]*ProgressDownloadImage, 999)
 	QueueDockerComposeMessage       = make(chan string, 999)
@@ -31,15 +33,29 @@ type Builder struct {
 	CtxCancelFunc context.CancelFunc
 }
 
-func NewDockerClient(host string) (*Builder, error) {
-	options := []client.Opt{
+type NewDockerClientOption struct {
+	Host    string
+	TlsCa   string
+	TlsCert string
+	TlsKey  string
+}
+
+func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
+	dockerOption := []client.Opt{
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
 	}
-	if host != "" {
-		options = append(options, client.WithHost(host))
+	if option.Host != "" {
+		dockerOption = append(dockerOption, client.WithHost(option.Host))
 	}
-	obj, err := client.NewClientWithOpts(options...)
+	if option.TlsCa != "" && option.TlsCert != "" && option.TlsKey != "" {
+		dockerOption = append(dockerOption, client.WithTLSClientConfig(
+			filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCa),
+			filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCert),
+			filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsKey),
+		))
+	}
+	obj, err := client.NewClientWithOpts(dockerOption...)
 	if err != nil {
 		return nil, err
 	}
