@@ -31,6 +31,7 @@ type Builder struct {
 	Client        *client.Client
 	Ctx           context.Context
 	CtxCancelFunc context.CancelFunc
+	ExtraParams   []string
 }
 
 type NewDockerClientOption struct {
@@ -41,11 +42,16 @@ type NewDockerClientOption struct {
 }
 
 func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
+	builder := &Builder{
+		ExtraParams: make([]string, 0),
+	}
+
 	dockerOption := []client.Opt{
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
 	}
 	if option.Host != "" {
+		builder.ExtraParams = append(builder.ExtraParams, "-H", option.Host)
 		dockerOption = append(dockerOption, client.WithHost(option.Host))
 	}
 	if option.TlsCa != "" && option.TlsCert != "" && option.TlsKey != "" {
@@ -54,19 +60,20 @@ func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
 			filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCert),
 			filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsKey),
 		))
+		builder.ExtraParams = append(builder.ExtraParams, "--tlsverify",
+			"--tlscacert", filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCa),
+			"--tlscert", filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCert),
+			"--tlskey", filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsKey))
 	}
 	obj, err := client.NewClientWithOpts(dockerOption...)
 	if err != nil {
 		return nil, err
 	}
-
 	ctx, cancelFunc := context.WithCancel(context.Background())
-
-	return &Builder{
-		Client:        obj,
-		Ctx:           ctx,
-		CtxCancelFunc: cancelFunc,
-	}, nil
+	builder.Client = obj
+	builder.Ctx = ctx
+	builder.CtxCancelFunc = cancelFunc
+	return builder, nil
 }
 
 func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {

@@ -27,15 +27,14 @@ type ioItemResult struct {
 
 func (self Stat) GetStat() ([]*statItemResult, error) {
 	result := make([]*statItemResult, 0)
-	host := docker.Sdk.Client.DaemonHost()
 	response := exec.Command{}.RunWithOut(&exec.RunCommandOption{
 		CmdName: "docker",
-		CmdArgs: []string{
-			"-H", host,
+		CmdArgs: append(
+			docker.Sdk.ExtraParams,
 			"stats", "-a",
 			"--format", "json",
 			"--no-stream",
-		},
+		),
 	})
 
 	statJsonItem := struct {
