@@ -27,7 +27,7 @@ import (
 )
 
 func TestContainerRemove(t *testing.T) {
-	sdk, _ := docker.NewDockerClient("")
+	sdk, _ := docker.NewDockerClient(docker.NewDockerClientOption{})
 	err := sdk.Client.ContainerStop(context.Background(), "phpmyadmin", container.StopOptions{})
 	err = sdk.Client.ContainerRemove(context.Background(), "phpmyadmin", container.RemoveOptions{})
 	fmt.Printf("%v \n", err)
@@ -49,7 +49,7 @@ type pullImageProgress struct {
 }
 
 func TestPullImage(t *testing.T) {
-	sdk, _ := docker.NewDockerClient("")
+	sdk, _ := docker.NewDockerClient(docker.NewDockerClientOption{})
 	//尝试拉取镜像
 	reader, err := sdk.Client.ImagePull(context.Background(), "phpmyadmin", image.PullOptions{})
 	if err != nil {
@@ -92,7 +92,7 @@ func TestPullImage(t *testing.T) {
 }
 
 func TestCreateContainer(t *testing.T) {
-	sdk, err := docker.NewDockerClient("")
+	sdk, err := docker.NewDockerClient(docker.NewDockerClientOption{})
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}
@@ -119,7 +119,7 @@ func TestCreateContainer(t *testing.T) {
 }
 
 func TestGetContainer(t *testing.T) {
-	sdk, err := docker.NewDockerClient("")
+	sdk, err := docker.NewDockerClient(docker.NewDockerClientOption{})
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}
@@ -135,7 +135,7 @@ func TestGetContainer(t *testing.T) {
 }
 
 func TestGetContainerLog(t *testing.T) {
-	sdk, err := docker.NewDockerClient("")
+	sdk, err := docker.NewDockerClient(docker.NewDockerClientOption{})
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}
@@ -161,7 +161,7 @@ type progressImageBuild struct {
 }
 
 func TestImageBuild(t *testing.T) {
-	sdk, err := docker.NewDockerClient("")
+	sdk, err := docker.NewDockerClient(docker.NewDockerClientOption{})
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}
@@ -188,7 +188,7 @@ func TestImageBuild(t *testing.T) {
 }
 
 func TestLoginRegistry(t *testing.T) {
-	sdk, err := docker.NewDockerClient("")
+	sdk, err := docker.NewDockerClient(docker.NewDockerClientOption{})
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}
@@ -214,7 +214,7 @@ func TestLoginRegistry(t *testing.T) {
 }
 
 func TestImage(t *testing.T) {
-	sdk, err := docker.NewDockerClient("")
+	sdk, err := docker.NewDockerClient(docker.NewDockerClientOption{})
 	if err != nil {
 		fmt.Printf("%v \n", err)
 	}

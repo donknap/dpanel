@@ -14,7 +14,7 @@ type Stat struct {
 
 type statItemResult struct {
 	Cpu       float64      `json:"cpu"`
-	Memory    float64      `json:"memory"`
+	Memory    ioItemResult `json:"memory"`
 	BlockIO   ioItemResult `json:"blockIO"`
 	NetworkIO ioItemResult `json:"networkIO"`
 	Name      string       `json:"name"`
@@ -36,7 +36,6 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 			"--no-stream",
 		),
 	})
-
 	statJsonItem := struct {
 		BlockIO  string
 		CPUPerc  string
@@ -59,22 +58,26 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 		cpu, _ := strconv.ParseFloat(strings.TrimSuffix(statJsonItem.CPUPerc, "%"), 64)
 		r.Cpu += cpu
 
-		memory, _ := strconv.ParseFloat(strings.TrimSuffix(statJsonItem.MemPerc, "%"), 64)
-		r.Memory += memory
+		memory := strings.Split(statJsonItem.MemUsage, "/")
+		use, _ := units.RAMInBytes(strings.TrimSpace(memory[0]))
+		limit, _ := units.RAMInBytes(strings.TrimSpace(memory[1]))
+
+		r.Memory.In = use
+		r.Memory.Out = limit
 
 		networkIo := strings.Split(statJsonItem.NetIO, "/")
 		in, _ := units.RAMInBytes(strings.TrimSpace(networkIo[0]))
 		out, _ := units.RAMInBytes(strings.TrimSpace(networkIo[1]))
 
-		r.NetworkIO.In += in
-		r.NetworkIO.Out += out
+		r.NetworkIO.In = in
+		r.NetworkIO.Out = out
 
 		blockIo := strings.Split(statJsonItem.BlockIO, "/")
 		in, _ = units.RAMInBytes(strings.TrimSpace(blockIo[0]))
 		out, _ = units.RAMInBytes(strings.TrimSpace(blockIo[1]))
 
-		r.BlockIO.In += in
-		r.BlockIO.Out += out
+		r.BlockIO.In = in
+		r.BlockIO.Out = out
 
 		result = append(result, r)
 	}
