@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 type Env struct {
@@ -65,40 +66,47 @@ func (self Env) Create(http *gin.Context) {
 		Host: params.Address,
 	}
 	if params.EnableTLS {
-		certList := []struct {
-			name    string
-			content string
-		}{
-			{
-				name:    "ca.pem",
-				content: params.TlsCa,
-			},
-			{
-				name:    "cert.pem",
-				content: params.TlsCert,
-			},
-			{
-				name:    "key.pem",
-				content: params.TlsKey,
-			},
-		}
-		certRootPath := filepath.Join("docker", params.Name)
-		for _, s := range certList {
-			path := filepath.Join(storage.Local{}.GetStorageCertPath(), certRootPath, s.name)
-			err := os.MkdirAll(filepath.Dir(path), os.ModePerm)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
+		if strings.HasSuffix(params.TlsCa, ".pem") {
+			options.TlsCa = params.TlsCa
+			options.TlsCert = params.TlsCert
+			options.TlsKey = params.TlsKey
+		} else {
+			certList := []struct {
+				name    string
+				content string
+			}{
+				{
+					name:    "ca.pem",
+					content: params.TlsCa,
+				},
+				{
+					name:    "cert.pem",
+					content: params.TlsCert,
+				},
+				{
+					name:    "key.pem",
+					content: params.TlsKey,
+				},
 			}
-			err = os.WriteFile(path, []byte(s.content), 0o600)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
+			certRootPath := filepath.Join("docker", params.Name)
+			for _, s := range certList {
+				path := filepath.Join(storage.Local{}.GetStorageCertPath(), certRootPath, s.name)
+				err := os.MkdirAll(filepath.Dir(path), os.ModePerm)
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+				err = os.WriteFile(path, []byte(s.content), 0o600)
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
 			}
+			options.TlsCa = filepath.Join(certRootPath, "ca.pem")
+			options.TlsCert = filepath.Join(certRootPath, "cert.pem")
+			options.TlsKey = filepath.Join(certRootPath, "key.pem")
 		}
-		options.TlsCa = filepath.Join(certRootPath, "ca.pem")
-		options.TlsCert = filepath.Join(certRootPath, "cert.pem")
-		options.TlsKey = filepath.Join(certRootPath, "key.pem")
+
 	}
 	dockerClient, err := docker.NewDockerClient(options)
 	if err != nil {
