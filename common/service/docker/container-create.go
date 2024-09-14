@@ -121,6 +121,10 @@ func (self *ContainerCreateBuilder) WithPort(host string, container string) *Con
 	return self
 }
 
+func (self *ContainerCreateBuilder) PublishAllPorts() {
+	self.hostConfig.PublishAllPorts = true
+}
+
 func (self *ContainerCreateBuilder) WithLink(name string, alise string) {
 	// 关联网络时，重新退出加入
 	err := Sdk.Client.NetworkDisconnect(Sdk.Ctx, self.containerName, name, true)
@@ -150,16 +154,16 @@ func (self *ContainerCreateBuilder) WithAutoRemove() {
 	self.hostConfig.AutoRemove = true
 }
 
-func (self *ContainerCreateBuilder) WithCpus(count int) {
-	self.hostConfig.NanoCPUs = int64(count) * 1000000000
+func (self *ContainerCreateBuilder) WithCpus(count float32) {
+	self.hostConfig.NanoCPUs = int64(count * 1000000000)
 }
 
 func (self *ContainerCreateBuilder) WithMemory(count int) {
 	self.hostConfig.Memory = int64(count) * 1024 * 1024
 }
 
-func (self *ContainerCreateBuilder) WithShmSize(size int) {
-	self.hostConfig.ShmSize = int64(size)
+func (self *ContainerCreateBuilder) WithShmSize(size int64) {
+	self.hostConfig.ShmSize = size
 }
 
 func (self *ContainerCreateBuilder) WithWorkDir(path string) {
@@ -195,6 +199,36 @@ func (self *ContainerCreateBuilder) WithPid(pid ...string) {
 
 func (self *ContainerCreateBuilder) WithNetworkMode(mode container.NetworkMode) {
 	self.hostConfig.NetworkMode = mode
+}
+
+func (self *ContainerCreateBuilder) WithLog(driver string, maxSize string, maxFile string) {
+	self.hostConfig.LogConfig = container.LogConfig{
+		Type: driver,
+		Config: map[string]string{
+			"max-size": maxSize,
+			"max-file": maxFile,
+		},
+	}
+}
+
+func (self *ContainerCreateBuilder) WithDns(ip []string) {
+	if len(ip) > 0 {
+		self.hostConfig.DNS = ip
+	}
+}
+
+func (self *ContainerCreateBuilder) WithLabel(name, value string) {
+	if self.containerConfig.Labels == nil {
+		self.containerConfig.Labels = make(map[string]string)
+	}
+	self.containerConfig.Labels[name] = value
+}
+
+func (self *ContainerCreateBuilder) WithExtraHosts(name, value string) {
+	if self.hostConfig.ExtraHosts == nil {
+		self.hostConfig.ExtraHosts = make([]string, 0)
+	}
+	self.hostConfig.ExtraHosts = append(self.hostConfig.ExtraHosts, fmt.Sprintf("%s:%s", name, value))
 }
 
 func (self *ContainerCreateBuilder) CreateOwnerNetwork(enableIpV6 bool) {

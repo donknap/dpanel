@@ -15,6 +15,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/go-acme/lego/v4/registration"
@@ -330,10 +331,5 @@ func (u *MyUser) GetPrivateKey() crypto.PrivateKey {
 }
 
 func TestExportContainer(t *testing.T) {
-	out, _ := docker.Sdk.Client.ContainerLogs(context.Background(), "minio", container.LogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-		Follow:     true,
-	})
-	io.Copy(os.Stdout, out)
+	fmt.Printf("%v \n", units.BytesSize(float64(67108864)))
 }

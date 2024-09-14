@@ -103,19 +103,34 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 		}
 	}
 
-	envOption.Restart = string(info.HostConfig.RestartPolicy.Name)
 	envOption.ImageName = info.Config.Image
 	envOption.ImageId = info.Image
 	envOption.Privileged = info.HostConfig.Privileged
-	envOption.Cpus = int(info.HostConfig.NanoCPUs / 1000000000)
+	envOption.AutoRemove = info.HostConfig.AutoRemove
+	envOption.Restart = string(info.HostConfig.RestartPolicy.Name)
+	envOption.Cpus = float32(info.HostConfig.NanoCPUs / 1000000000)
 	envOption.Memory = int(info.HostConfig.Memory / 1024 / 1024)
-	envOption.ShmSize = int(info.HostConfig.ShmSize)
+	//envOption.ShmSize = units.BytesSize(float64(info.HostConfig.ShmSize))
 	envOption.WorkDir = info.Config.WorkingDir
 	envOption.User = info.Config.User
 	envOption.Command = strings.Join(info.Config.Cmd, " ")
 	envOption.Entrypoint = strings.Join(info.Config.Entrypoint, " ")
 	envOption.UseHostNetwork = info.HostConfig.NetworkMode.IsHost()
-
+	envOption.LogDriver = accessor.LogDriverItem{
+		Driver:  info.HostConfig.LogConfig.Type,
+		MaxFile: info.HostConfig.LogConfig.Config["max-file"],
+		MaxSize: info.HostConfig.LogConfig.Config["max-size"],
+	}
+	envOption.Dns = info.HostConfig.DNS
+	envOption.PublishAllPorts = info.HostConfig.PublishAllPorts
+	envOption.ExtraHosts = make([]accessor.EnvItem, 0)
+	for _, host := range info.HostConfig.ExtraHosts {
+		value := strings.Split(host, ":")
+		envOption.ExtraHosts = append(envOption.ExtraHosts, accessor.EnvItem{
+			Name:  value[0],
+			Value: value[1],
+		})
+	}
 	return envOption, nil
 }
 

@@ -109,21 +109,19 @@ func (self Container) GetList(http *gin.Context) {
 		// 需要通过镜像允许再次获取下
 		if item.HostConfig.NetworkMode == "host" {
 			imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, item.ImageID)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
+			if err == nil {
+				ports := []types.Port{}
+				for port, _ := range imageInfo.Config.ExposedPorts {
+					portInt, _ := strconv.Atoi(port.Port())
+					ports = append(ports, types.Port{
+						IP:          "0.0.0.0",
+						PublicPort:  uint16(portInt),
+						PrivatePort: uint16(portInt),
+						Type:        port.Proto(),
+					})
+				}
+				list[index].Ports = ports
 			}
-			ports := []types.Port{}
-			for port, _ := range imageInfo.Config.ExposedPorts {
-				portInt, _ := strconv.Atoi(port.Port())
-				ports = append(ports, types.Port{
-					IP:          "0.0.0.0",
-					PublicPort:  uint16(portInt),
-					PrivatePort: uint16(portInt),
-					Type:        port.Proto(),
-				})
-			}
-			list[index].Ports = ports
 		}
 	}
 

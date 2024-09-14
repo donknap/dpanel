@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -18,16 +19,12 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	builder.WithImage(task.RunParams.ImageName, false)
 	builder.WithContainerName(task.SiteName)
 
+	// 如果绑定了ipv6 需要先创建一个ipv6的自身网络
 	if task.RunParams.BindIpV6 || !function.IsEmptyArray(task.RunParams.Links) {
 		builder.CreateOwnerNetwork(task.RunParams.BindIpV6)
 	}
 
-	if task.RunParams.Ports != nil {
-		for _, value := range task.RunParams.Ports {
-			builder.WithPort(value.Host, value.Dest)
-		}
-	}
-
+	// Environment
 	if task.RunParams.Environment != nil {
 		for _, value := range task.RunParams.Environment {
 			if value.Name == "" {
@@ -37,6 +34,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		}
 	}
 
+	// Links
 	if !function.IsEmptyArray(task.RunParams.Links) {
 		for _, value := range task.RunParams.Links {
 			if value.Alise == "" {
@@ -49,6 +47,17 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		}
 	}
 
+	// Ports PublishAllPorts
+	if task.RunParams.Ports != nil {
+		for _, value := range task.RunParams.Ports {
+			builder.WithPort(value.Host, value.Dest)
+		}
+	}
+	if task.RunParams.PublishAllPorts {
+		builder.PublishAllPorts()
+	}
+
+	// VolumesDefault  Volumes
 	if !function.IsEmptyArray(task.RunParams.VolumesDefault) {
 		for _, item := range task.RunParams.VolumesDefault {
 			if item.Dest == "" {
@@ -70,24 +79,37 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 			builder.WithVolume(value.Host, value.Dest, permission)
 		}
 	}
-	builder.WithRestart(task.RunParams.Restart)
 
+	// Privileged
 	if task.RunParams.Privileged {
 		builder.WithPrivileged()
 	}
 
+	// AutoRemove
+	if task.RunParams.AutoRemove {
+		builder.WithAutoRemove()
+	}
+
+	// Restart
+	builder.WithRestart(task.RunParams.Restart)
+
+	// cpus
 	if task.RunParams.Cpus != 0 {
 		builder.WithCpus(task.RunParams.Cpus)
 	}
 
+	// memory
 	if task.RunParams.Memory != 0 {
 		builder.WithMemory(task.RunParams.Memory)
 	}
 
-	if task.RunParams.ShmSize != 0 {
-		builder.WithShmSize(task.RunParams.ShmSize)
+	// shmsize
+	if task.RunParams.ShmSize != "" {
+		size, _ := units.RAMInBytes(task.RunParams.ShmSize)
+		builder.WithShmSize(size)
 	}
 
+	// workDir
 	if task.RunParams.WorkDir != "" {
 		builder.WithWorkDir(task.RunParams.WorkDir)
 	}
@@ -108,6 +130,24 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		builder.WithNetworkMode(network.NetworkHost)
 	}
 
+	if task.RunParams.LogDriver.Driver != "" {
+		builder.WithLog(
+			task.RunParams.LogDriver.Driver,
+			task.RunParams.LogDriver.MaxSize,
+			task.RunParams.LogDriver.MaxFile,
+		)
+	}
+
+	builder.WithDns(task.RunParams.Dns)
+
+	for _, item := range task.RunParams.Label {
+		builder.WithLabel(item.Name, item.Value)
+	}
+
+	for _, item := range task.RunParams.ExtraHosts {
+		builder.WithExtraHosts(item.Name, item.Value)
+	}
+
 	response, err := builder.Execute()
 	if err != nil {
 		dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{
@@ -118,7 +158,7 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		return err
 	}
 
-	// 仅当容器有关联时，才加新建自己的网络
+	// 仅当容器有关联时，才加新建自己的网络。对于ipv6支持，必须加入一个ipv6的网络
 	if task.RunParams.BindIpV6 || !function.IsEmptyArray(task.RunParams.Links) {
 		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, &network.EndpointSettings{
 			Aliases: []string{

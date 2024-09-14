@@ -72,6 +72,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			}
 		}
 	}
+
 	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.ImageName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -79,25 +80,31 @@ func (self Site) CreateByImage(http *gin.Context) {
 	}
 
 	runParams := accessor.SiteEnvOption{
-		Environment:    params.Environment,
-		Links:          params.Links,
-		Ports:          params.Ports,
-		Volumes:        params.Volumes,
-		VolumesDefault: params.VolumesDefault,
-		ImageName:      params.ImageName,
-		ImageId:        imageInfo.ID,
-		Privileged:     params.Privileged,
-		Restart:        params.Restart,
-		Cpus:           params.Cpus,
-		Memory:         params.Memory,
-		ShmSize:        params.ShmSize,
-		WorkDir:        params.WorkDir,
-		User:           params.User,
-		Command:        params.Command,
-		Entrypoint:     params.Entrypoint,
-		Network:        params.Network,
-		UseHostNetwork: params.UseHostNetwork,
-		BindIpV6:       params.BindIpV6,
+		Environment:     params.Environment,
+		Links:           params.Links,
+		Ports:           params.Ports,
+		Volumes:         params.Volumes,
+		VolumesDefault:  params.VolumesDefault,
+		Network:         params.Network,
+		ImageName:       params.ImageName,
+		ImageId:         imageInfo.ID,
+		Privileged:      params.Privileged,
+		AutoRemove:      params.AutoRemove,
+		Restart:         params.Restart,
+		Cpus:            params.Cpus,
+		Memory:          params.Memory,
+		ShmSize:         params.ShmSize,
+		WorkDir:         params.WorkDir,
+		User:            params.User,
+		Command:         params.Command,
+		Entrypoint:      params.Entrypoint,
+		UseHostNetwork:  params.UseHostNetwork,
+		BindIpV6:        params.BindIpV6,
+		LogDriver:       params.LogDriver,
+		Dns:             params.Dns,
+		Label:           params.Label,
+		PublishAllPorts: params.PublishAllPorts,
+		ExtraHosts:      params.ExtraHosts,
 	}
 	dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
 
