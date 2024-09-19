@@ -18,6 +18,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"strings"
 )
 
 type Container struct {
@@ -73,11 +74,7 @@ func (self Container) GetList(http *gin.Context) {
 		return
 	}
 
-	var list []types.Container
 	filter := filters.NewArgs()
-	if params.Tag != "" {
-		filter.Add("name", params.Tag)
-	}
 	if params.Md5 != "" {
 		filter.Add("id", params.Md5)
 	}
@@ -98,9 +95,34 @@ func (self Container) GetList(http *gin.Context) {
 		return
 	}
 
+	searchContainerIds := make([]string, 0)
+	searchSiteList, _ := dao.Site.Where(dao.Site.SiteTitle.Like("%" + params.SiteTitle + "%")).Find()
+	for _, item := range searchSiteList {
+		searchContainerIds = append(searchContainerIds, item.ContainerInfo.ID)
+	}
+	var result []types.Container
+
+	if params.Tag != "" || params.SiteTitle != "" {
+		result = make([]types.Container, 0)
+		for _, item := range list {
+			if function.InArray(searchContainerIds, item.ID) {
+				result = append(result, item)
+				break
+			}
+			for _, name := range item.Names {
+				if strings.Contains(name, params.Tag) {
+					result = append(result, item)
+					break
+				}
+			}
+		}
+	} else {
+		result = list
+	}
+
 	var md5List []driver.Valuer
 	var nameList []string
-	for index, item := range list {
+	for index, item := range result {
 		md5List = append(md5List, &accessor.SiteContainerInfoOption{
 			ID: item.ID,
 		})
@@ -120,21 +142,17 @@ func (self Container) GetList(http *gin.Context) {
 						Type:        port.Proto(),
 					})
 				}
-				list[index].Ports = ports
+				result[index].Ports = ports
 			}
 		}
 	}
 
 	query := dao.Site.Where(dao.Site.ContainerInfo.In(md5List...))
-
-	if params.SiteTitle != "" {
-		query = query.Where(dao.Site.SiteTitle.Like("%" + params.SiteTitle + "%"))
-	}
 	siteList, _ := query.Find()
 
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(nameList...)).Find()
 	self.JsonResponseWithoutError(http, gin.H{
-		"list":       list,
+		"list":       result,
 		"siteList":   siteList,
 		"domainList": domainList,
 	})

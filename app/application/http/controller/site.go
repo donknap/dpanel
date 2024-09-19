@@ -70,7 +70,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 				self.JsonResponseWithError(http, errors.New(port.Host+"绑定的外部端口已经被其它容器占用，请更换。"), 500)
 				return
 			}
-			listener.Close()
+			_ = listener.Close()
 			checkPorts = append(checkPorts, port.Host)
 		}
 		// 没有绑定宿主机的端口，有可能被未启动的容器绑定，这里再次检查一下
