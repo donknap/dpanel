@@ -148,6 +148,13 @@ func (self Site) CreateByImage(http *gin.Context) {
 	}
 	containerId, err := logic.DockerTask{}.ContainerCreate(runTaskRow)
 	if err != nil {
+		if containerId != "" {
+			// 如果容器在启动时发生错误，需要先删除掉
+			_, err1 := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerId)
+			if err1 == nil {
+				_ = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerId, container.RemoveOptions{})
+			}
+		}
 		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(entity.Site{
 			Status:  accessor.StatusError,
 			Message: err.Error(),

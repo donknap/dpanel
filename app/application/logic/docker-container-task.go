@@ -181,14 +181,14 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 
 	if err != nil {
 		//notice.Message{}.Error("containerCreate", err.Error())
-		return "", err
+		return response.ID, err
 	}
 
 	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
 	if err != nil {
 		//notice.Message{}.Error("containerCreate", err.Error())
-		return "", err
+		return response.ID, err
 	}
-	notice.Message{}.Success("containerCreate", task.SiteName)
+	_ = notice.Message{}.Success("containerCreate", task.SiteName)
 	return response.ID, err
 }
