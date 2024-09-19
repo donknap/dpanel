@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
@@ -14,6 +15,7 @@ import (
 	"gorm.io/gorm"
 	"log/slog"
 	"net"
+	"strings"
 )
 
 type Site struct {
@@ -22,22 +24,73 @@ type Site struct {
 
 func (self Site) CreateByImage(http *gin.Context) {
 	type ParamsValidate struct {
-		SiteTitle string `json:"siteTitle" binding:"required"`
-		SiteName  string `json:"siteName" binding:"required"`
-		ImageName string `json:"imageName" binding:"required"`
-		Id        int    `json:"id"`
-		Md5       string `json:"md5"`
-		accessor.SiteEnvOption
+		Id          int32  `json:"id"`
+		SiteTitle   string `json:"siteTitle" binding:"required"`
+		SiteName    string `json:"siteName" binding:"required"`
+		ImageName   string `json:"imageName" binding:"required"`
+		ContainerId string `json:"containerId"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+	buildParams := accessor.SiteEnvOption{}
+	if !self.Validate(http, &buildParams) {
+		return
+	}
+
+	for _, itemDefault := range buildParams.VolumesDefault {
+		for _, item := range buildParams.Volumes {
+			if item.Dest == itemDefault.Dest {
+				self.JsonResponseWithError(http, errors.New("容器内的 "+item.Dest+" 目录重复绑定存储"), 500)
+				return
+			}
+		}
+	}
+
+	oldBindPort := make([]string, 0)
+	oldContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName)
+	if err == nil {
+		for _, item := range oldContainerInfo.HostConfig.PortBindings {
+			for _, value := range item {
+				oldBindPort = append(oldBindPort, value.HostPort)
+			}
+		}
+	}
+
+	if buildParams.Ports != nil {
+		var checkPorts []string
+		for _, port := range buildParams.Ports {
+			// 如果容器绑定过该端口，则不需要再次检测
+			if function.InArray(oldBindPort, port.Host) {
+				continue
+			}
+			listener, err := net.Listen("tcp", "0.0.0.0:"+port.Host)
+			if err != nil {
+				self.JsonResponseWithError(http, errors.New(port.Host+"绑定的外部端口已经被其它容器占用，请更换。"), 500)
+				return
+			}
+			listener.Close()
+			checkPorts = append(checkPorts, port.Host)
+		}
+		// 没有绑定宿主机的端口，有可能被未启动的容器绑定，这里再次检查一下
+		if checkPorts != nil {
+			hasPortContainer, _ := docker.Sdk.ContainerByField("publish", checkPorts...)
+			if len(hasPortContainer) > 0 {
+				names := make([]string, 0)
+				for _, item := range hasPortContainer {
+					names = append(names, item.Names[0])
+				}
+				self.JsonResponseWithError(http, errors.New("绑定的外部端口已经被 "+strings.Join(names, "/")+" 容器占用，请更换其它端口"), 500)
+				return
+			}
+		}
+	}
+
 	// 重新部署，先删掉之前的容器
-	if params.Id != 0 || params.Md5 != "" {
-		notice.Message{}.Info("containerCreate", "正在停止旧容器")
-		_, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName)
-		if err == nil {
+	if params.Id != 0 || params.ContainerId != "" {
+		_ = notice.Message{}.Info("containerCreate", "正在停止旧容器")
+		if oldContainerInfo.ID != "" {
 			err := docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, params.SiteName, container.StopOptions{})
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
@@ -49,27 +102,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 				slog.Debug("remove container", "name", params.SiteName, "error", err.Error())
 				return
 			}
-		}
-	}
-
-	if params.Ports != nil {
-		var checkPorts []string
-		for _, port := range params.Ports {
-			// 检测端口是否可以正常绑定
-			listener, err := net.Listen("tcp", "0.0.0.0:"+port.Host)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			listener.Close()
-			checkPorts = append(checkPorts, port.Host)
-		}
-		if checkPorts != nil {
-			item, _ := docker.Sdk.ContainerByField("publish", checkPorts...)
-			if len(item) > 0 {
-				self.JsonResponseWithError(http, errors.New("绑定的外部端口已经被其它容器占用，请更换其它端口"), 500)
-				return
-			}
+			// 删除容器时，先把记录设置为软删除，部署失败后在回收站中可以查看
+			_, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
 		}
 	}
 
@@ -78,34 +112,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	runParams := accessor.SiteEnvOption{
-		Environment:     params.Environment,
-		Links:           params.Links,
-		Ports:           params.Ports,
-		Volumes:         params.Volumes,
-		VolumesDefault:  params.VolumesDefault,
-		Network:         params.Network,
-		ImageName:       params.ImageName,
-		ImageId:         imageInfo.ID,
-		Privileged:      params.Privileged,
-		AutoRemove:      params.AutoRemove,
-		Restart:         params.Restart,
-		Cpus:            params.Cpus,
-		Memory:          params.Memory,
-		ShmSize:         params.ShmSize,
-		WorkDir:         params.WorkDir,
-		User:            params.User,
-		Command:         params.Command,
-		Entrypoint:      params.Entrypoint,
-		UseHostNetwork:  params.UseHostNetwork,
-		BindIpV6:        params.BindIpV6,
-		LogDriver:       params.LogDriver,
-		Dns:             params.Dns,
-		Label:           params.Label,
-		PublishAllPorts: params.PublishAllPorts,
-		ExtraHosts:      params.ExtraHosts,
-	}
+	buildParams.ImageId = imageInfo.ID
 	dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
 
 	var siteRow *entity.Site
@@ -114,7 +121,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		siteRow = &entity.Site{
 			SiteName:  params.SiteName,
 			SiteTitle: params.SiteTitle,
-			Env:       &runParams,
+			Env:       &buildParams,
 			Status:    logic.StatusStop,
 			ContainerInfo: &accessor.SiteContainerInfoOption{
 				ID: "",
@@ -128,22 +135,36 @@ func (self Site) CreateByImage(http *gin.Context) {
 	} else {
 		dao.Site.Select(dao.Site.ALL).Where(dao.Site.SiteName.Eq(params.SiteName)).Updates(&entity.Site{
 			SiteTitle: params.SiteTitle,
-			Env:       &runParams,
+			Env:       &buildParams,
 			Status:    logic.StatusStop,
 			Message:   "",
 			DeletedAt: gorm.DeletedAt{},
 		})
 	}
-	runTaskRow := &logic.CreateMessage{
-		SiteName:  siteRow.SiteName,
-		SiteId:    siteRow.ID,
-		RunParams: &runParams,
+	runTaskRow := &logic.CreateContainerOption{
+		SiteName:    siteRow.SiteName,
+		SiteId:      siteRow.ID,
+		BuildParams: &buildParams,
 	}
-	err = logic.DockerTask{}.ContainerCreate(runTaskRow)
+	containerId, err := logic.DockerTask{}.ContainerCreate(runTaskRow)
 	if err != nil {
+		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(entity.Site{
+			Status:  accessor.StatusError,
+			Message: err.Error(),
+		})
+		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(&entity.Site{
+		ContainerInfo: &accessor.SiteContainerInfoOption{
+			ID: containerId,
+		},
+		Status:  accessor.StatusSuccess,
+		Message: "",
+	})
+
 	self.JsonResponseWithoutError(http, gin.H{"siteId": siteRow.ID})
 	return
 }
@@ -241,7 +262,6 @@ func (self Site) GetDetail(http *gin.Context) {
 		siteRow.Env = &runOption
 	}
 	siteRow.Env.Network = runOption.Network
-
 	self.JsonResponseWithoutError(http, siteRow)
 	return
 }

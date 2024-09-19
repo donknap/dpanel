@@ -176,7 +176,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	})
 
 	mustHasZipFile := false
-	buildImageTask := &logic.BuildImageMessage{
+	buildImageTask := &logic.BuildImageOption{
 		Tag: imageName,
 	}
 

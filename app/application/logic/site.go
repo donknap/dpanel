@@ -3,6 +3,7 @@ package logic
 import (
 	"embed"
 	"errors"
+	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -110,13 +111,13 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	envOption.Restart = string(info.HostConfig.RestartPolicy.Name)
 	envOption.Cpus = float32(info.HostConfig.NanoCPUs / 1000000000)
 	envOption.Memory = int(info.HostConfig.Memory / 1024 / 1024)
-	//envOption.ShmSize = units.BytesSize(float64(info.HostConfig.ShmSize))
+	envOption.ShmSize = units.BytesSize(float64(info.HostConfig.ShmSize))
 	envOption.WorkDir = info.Config.WorkingDir
 	envOption.User = info.Config.User
 	envOption.Command = strings.Join(info.Config.Cmd, " ")
 	envOption.Entrypoint = strings.Join(info.Config.Entrypoint, " ")
 	envOption.UseHostNetwork = info.HostConfig.NetworkMode.IsHost()
-	envOption.LogDriver = accessor.LogDriverItem{
+	envOption.Log = accessor.LogDriverItem{
 		Driver:  info.HostConfig.LogConfig.Type,
 		MaxFile: info.HostConfig.LogConfig.Config["max-file"],
 		MaxSize: info.HostConfig.LogConfig.Config["max-size"],

@@ -12,7 +12,7 @@ import (
 	"math"
 )
 
-func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
+func (self DockerTask) ImageBuild(buildImageTask *BuildImageOption) error {
 	notice.Message{}.Info("imageBuild", "开始构建镜像", buildImageTask.Tag)
 	builder := docker.Sdk.GetImageBuildBuilder()
 	if buildImageTask.ZipPath != "" {
@@ -75,7 +75,7 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageMessage) error {
 	return nil
 }
 
-func (self DockerTask) ImageRemote(task *ImageRemoteMessage) error {
+func (self DockerTask) ImageRemote(task *ImageRemoteOption) error {
 	var err error
 	var out io.ReadCloser
 	if task.Type == "pull" {

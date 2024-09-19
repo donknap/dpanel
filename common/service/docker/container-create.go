@@ -203,11 +203,14 @@ func (self *ContainerCreateBuilder) WithNetworkMode(mode container.NetworkMode) 
 
 func (self *ContainerCreateBuilder) WithLog(driver string, maxSize string, maxFile string) {
 	self.hostConfig.LogConfig = container.LogConfig{
-		Type: driver,
-		Config: map[string]string{
-			"max-size": maxSize,
-			"max-file": maxFile,
-		},
+		Type:   driver,
+		Config: make(map[string]string),
+	}
+	if maxSize != "" {
+		self.hostConfig.LogConfig.Config["max-size"] = maxSize
+	}
+	if maxFile != "" {
+		self.hostConfig.LogConfig.Config["max-file"] = maxFile
 	}
 }
 

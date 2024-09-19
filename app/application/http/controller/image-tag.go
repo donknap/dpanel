@@ -49,7 +49,7 @@ func (self Image) TagRemote(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
+		err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteOption{
 			Auth: authString,
 			Type: params.Type,
 			Tag:  latestTag,
@@ -70,7 +70,7 @@ func (self Image) TagRemote(http *gin.Context) {
 				}
 				proxyImageTag += "/" + tagDetail.ImageName
 
-				err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
+				err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteOption{
 					Auth:     authString,
 					Type:     params.Type,
 					Tag:      proxyImageTag,
@@ -88,7 +88,7 @@ func (self Image) TagRemote(http *gin.Context) {
 				return
 			}
 		} else {
-			err := logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
+			err := logic.DockerTask{}.ImageRemote(&logic.ImageRemoteOption{
 				Auth:     authString,
 				Type:     params.Type,
 				Tag:      params.Tag,
@@ -102,7 +102,7 @@ func (self Image) TagRemote(http *gin.Context) {
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"proxyUrl": proxyUrl,
-		"tag":      params.Tag,
+		"tag":      tagDetail.ImageName,
 	})
 	return
 }
@@ -200,7 +200,7 @@ func (self Image) TagSync(http *gin.Context) {
 						return
 					}
 				}
-				err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteMessage{
+				err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteOption{
 					Auth: authString,
 					Type: "push",
 					Tag:  newImageName,

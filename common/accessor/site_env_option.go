@@ -48,14 +48,14 @@ type SiteEnvOption struct {
 	Restart         string        `json:"restart"`
 	Cpus            float32       `json:"cpus"`
 	Memory          int           `json:"memory"`
-	ShmSize         string        `json:"shmsize"`
+	ShmSize         string        `json:"shmsize,omitempty"`
 	WorkDir         string        `json:"workDir"`
 	User            string        `json:"user"`
 	Command         string        `json:"command"`
 	Entrypoint      string        `json:"entrypoint"`
 	UseHostNetwork  bool          `json:"useHostNetwork"`
 	BindIpV6        bool          `json:"bindIpV6"`
-	LogDriver       LogDriverItem `json:"logDriver"`
+	Log             LogDriverItem `json:"log"`
 	Dns             []string      `json:"dns"`
 	Label           []EnvItem     `json:"label"`
 	PublishAllPorts bool          `json:"publishAllPorts"`

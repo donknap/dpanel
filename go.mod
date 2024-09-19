@@ -8,16 +8,19 @@ require (
 	github.com/creack/pty v1.1.23
 	github.com/docker/docker v27.1.2+incompatible
 	github.com/docker/go-connections v0.5.0
+	github.com/docker/go-units v0.5.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-acme/lego/v4 v4.17.4
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gookit/color v1.5.4
 	github.com/gorilla/websocket v1.5.3
 	github.com/h2non/filetype v1.1.3
+	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
-	github.com/we7coreteam/w7-rangine-go/v2 v2.0.0
+	github.com/we7coreteam/w7-rangine-go/v2 v2.0.1
+	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/gen v0.3.26
 	gorm.io/gorm v1.25.11
@@ -40,7 +43,6 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.5 // indirect
@@ -73,7 +75,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
-	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
@@ -116,7 +117,6 @@ require (
 	go.uber.org/zap/exp v0.2.0 // indirect
 	golang.org/x/arch v0.9.0 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
-	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa // indirect
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect

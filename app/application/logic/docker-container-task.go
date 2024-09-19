@@ -5,28 +5,25 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-units"
-	"github.com/donknap/dpanel/common/accessor"
-	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 )
 
-func (self DockerTask) ContainerCreate(task *CreateMessage) error {
+func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, error) {
 	_ = notice.Message{}.Info("containerCreate", "正在部署", task.SiteName)
 	builder := docker.Sdk.GetContainerCreateBuilder()
-	builder.WithImage(task.RunParams.ImageName, false)
+	builder.WithImage(task.BuildParams.ImageName, false)
 	builder.WithContainerName(task.SiteName)
 
 	// 如果绑定了ipv6 需要先创建一个ipv6的自身网络
-	if task.RunParams.BindIpV6 || !function.IsEmptyArray(task.RunParams.Links) {
-		builder.CreateOwnerNetwork(task.RunParams.BindIpV6)
+	if task.BuildParams.BindIpV6 || !function.IsEmptyArray(task.BuildParams.Links) {
+		builder.CreateOwnerNetwork(task.BuildParams.BindIpV6)
 	}
 
 	// Environment
-	if task.RunParams.Environment != nil {
-		for _, value := range task.RunParams.Environment {
+	if task.BuildParams.Environment != nil {
+		for _, value := range task.BuildParams.Environment {
 			if value.Name == "" {
 				continue
 			}
@@ -35,8 +32,8 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	}
 
 	// Links
-	if !function.IsEmptyArray(task.RunParams.Links) {
-		for _, value := range task.RunParams.Links {
+	if !function.IsEmptyArray(task.BuildParams.Links) {
+		for _, value := range task.BuildParams.Links {
 			if value.Alise == "" {
 				value.Alise = value.Name
 			}
@@ -48,18 +45,18 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	}
 
 	// Ports PublishAllPorts
-	if task.RunParams.Ports != nil {
-		for _, value := range task.RunParams.Ports {
+	if task.BuildParams.Ports != nil {
+		for _, value := range task.BuildParams.Ports {
 			builder.WithPort(value.Host, value.Dest)
 		}
 	}
-	if task.RunParams.PublishAllPorts {
+	if task.BuildParams.PublishAllPorts {
 		builder.PublishAllPorts()
 	}
 
 	// VolumesDefault  Volumes
-	if !function.IsEmptyArray(task.RunParams.VolumesDefault) {
-		for _, item := range task.RunParams.VolumesDefault {
+	if !function.IsEmptyArray(task.BuildParams.VolumesDefault) {
+		for _, item := range task.BuildParams.VolumesDefault {
 			if item.Dest == "" {
 				continue
 			}
@@ -67,8 +64,8 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 		}
 	}
 
-	if task.RunParams.Volumes != nil {
-		for _, value := range task.RunParams.Volumes {
+	if task.BuildParams.Volumes != nil {
+		for _, value := range task.BuildParams.Volumes {
 			if value.Host == "" || value.Dest == "" {
 				continue
 			}
@@ -81,85 +78,80 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	}
 
 	// Privileged
-	if task.RunParams.Privileged {
+	if task.BuildParams.Privileged {
 		builder.WithPrivileged()
 	}
 
 	// AutoRemove
-	if task.RunParams.AutoRemove {
+	if task.BuildParams.AutoRemove {
 		builder.WithAutoRemove()
 	}
 
 	// Restart
-	builder.WithRestart(task.RunParams.Restart)
+	builder.WithRestart(task.BuildParams.Restart)
 
 	// cpus
-	if task.RunParams.Cpus != 0 {
-		builder.WithCpus(task.RunParams.Cpus)
+	if task.BuildParams.Cpus != 0 {
+		builder.WithCpus(task.BuildParams.Cpus)
 	}
 
 	// memory
-	if task.RunParams.Memory != 0 {
-		builder.WithMemory(task.RunParams.Memory)
+	if task.BuildParams.Memory != 0 {
+		builder.WithMemory(task.BuildParams.Memory)
 	}
 
 	// shmsize
-	if task.RunParams.ShmSize != "" {
-		size, _ := units.RAMInBytes(task.RunParams.ShmSize)
+	if task.BuildParams.ShmSize != "" {
+		size, _ := units.RAMInBytes(task.BuildParams.ShmSize)
 		builder.WithShmSize(size)
 	}
 
 	// workDir
-	if task.RunParams.WorkDir != "" {
-		builder.WithWorkDir(task.RunParams.WorkDir)
+	if task.BuildParams.WorkDir != "" {
+		builder.WithWorkDir(task.BuildParams.WorkDir)
 	}
 
-	if task.RunParams.User != "" {
-		builder.WithWorkDir(task.RunParams.WorkDir)
+	if task.BuildParams.User != "" {
+		builder.WithWorkDir(task.BuildParams.WorkDir)
 	}
 
-	if task.RunParams.Command != "" {
-		builder.WithCommandStr(task.RunParams.Command)
+	if task.BuildParams.Command != "" {
+		builder.WithCommandStr(task.BuildParams.Command)
 	}
 
-	if task.RunParams.Entrypoint != "" {
-		builder.WithEntrypointStr(task.RunParams.Entrypoint)
+	if task.BuildParams.Entrypoint != "" {
+		builder.WithEntrypointStr(task.BuildParams.Entrypoint)
 	}
 
-	if task.RunParams.UseHostNetwork {
+	if task.BuildParams.UseHostNetwork {
 		builder.WithNetworkMode(network.NetworkHost)
 	}
 
-	if task.RunParams.LogDriver.Driver != "" {
+	if task.BuildParams.Log.Driver != "" {
 		builder.WithLog(
-			task.RunParams.LogDriver.Driver,
-			task.RunParams.LogDriver.MaxSize,
-			task.RunParams.LogDriver.MaxFile,
+			task.BuildParams.Log.Driver,
+			task.BuildParams.Log.MaxSize,
+			task.BuildParams.Log.MaxFile,
 		)
 	}
 
-	builder.WithDns(task.RunParams.Dns)
+	builder.WithDns(task.BuildParams.Dns)
 
-	for _, item := range task.RunParams.Label {
+	for _, item := range task.BuildParams.Label {
 		builder.WithLabel(item.Name, item.Value)
 	}
 
-	for _, item := range task.RunParams.ExtraHosts {
+	for _, item := range task.BuildParams.ExtraHosts {
 		builder.WithExtraHosts(item.Name, item.Value)
 	}
 
 	response, err := builder.Execute()
 	if err != nil {
-		dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{
-			Status:  StatusError,
-			Message: err.Error(),
-		})
-		//notice.Message{}.Error("containerCreate", err.Error())
-		return err
+		return "", err
 	}
 
 	// 仅当容器有关联时，才加新建自己的网络。对于ipv6支持，必须加入一个ipv6的网络
-	if task.RunParams.BindIpV6 || !function.IsEmptyArray(task.RunParams.Links) {
+	if task.BuildParams.BindIpV6 || !function.IsEmptyArray(task.BuildParams.Links) {
 		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, &network.EndpointSettings{
 			Aliases: []string{
 				fmt.Sprintf("%s.pod.dpanel.local", task.SiteName),
@@ -169,9 +161,12 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 
 	// 网络需要在创建好容器后统一 connect 否则 bridge 网络会消失。当网络变更后了，可能绑定的端口无法使用。
 	// 如果同时绑定多个网络，会以自定义的网络优先，默认的 bridge 网络将不会绑定
-	if !function.IsEmptyArray(task.RunParams.Network) {
-		for _, value := range task.RunParams.Network {
+	if !function.IsEmptyArray(task.BuildParams.Network) {
+		for _, value := range task.BuildParams.Network {
 			if value.Name == task.SiteName {
+				continue
+			}
+			if value.Name == "host" {
 				continue
 			}
 			for _, aliseName := range value.Alise {
@@ -185,32 +180,15 @@ func (self DockerTask) ContainerCreate(task *CreateMessage) error {
 	}
 
 	if err != nil {
-		dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{
-			Status:  StatusError,
-			Message: err.Error(),
-		})
 		//notice.Message{}.Error("containerCreate", err.Error())
-		return err
+		return "", err
 	}
 
 	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
 	if err != nil {
-		dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(entity.Site{
-			Status:  StatusError,
-			Message: err.Error(),
-		})
 		//notice.Message{}.Error("containerCreate", err.Error())
-		return err
+		return "", err
 	}
-
-	dao.Site.Where(dao.Site.ID.Eq(task.SiteId)).Updates(&entity.Site{
-		ContainerInfo: &accessor.SiteContainerInfoOption{
-			ID: response.ID,
-		},
-		Status:  StatusSuccess,
-		Message: "",
-	})
-
 	notice.Message{}.Success("containerCreate", task.SiteName)
-	return nil
+	return response.ID, err
 }
