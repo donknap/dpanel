@@ -11,6 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"net/url"
+	"strings"
 )
 
 type Registry struct {
@@ -31,7 +33,14 @@ func (self Registry) Create(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-
+	var err error
+	params.ServerAddress = strings.TrimPrefix(strings.TrimPrefix(params.ServerAddress, "https://"), "http://")
+	urls, err := url.Parse("http://" + params.ServerAddress)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	params.ServerAddress = urls.Host
 	if params.Id <= 0 {
 		registryRow, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(params.ServerAddress)).First()
 		if registryRow != nil {
@@ -52,7 +61,6 @@ func (self Registry) Create(http *gin.Context) {
 	}
 
 	var response registry.AuthenticateOKBody
-	var err error
 
 	if params.Username != "" && params.Password != "" {
 		response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, registry.AuthConfig{
