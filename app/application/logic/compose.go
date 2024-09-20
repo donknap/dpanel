@@ -23,6 +23,10 @@ type composeItem struct {
 	ConfigFiles string `json:"configFiles"`
 }
 
+type composeContainerItem struct {
+	Name string `json:"name"`
+}
+
 type Compose struct {
 }
 
@@ -147,6 +151,45 @@ func (self Compose) Ls(projectName string) []*composeItem {
 	err := json.Unmarshal([]byte(out), &result)
 	if err != nil {
 		return result
+	}
+	return result
+}
+
+func (self Compose) Ps(task *ComposeTaskOption) []*composeContainerItem {
+	result := make([]*composeContainerItem, 0)
+	if task.Name == "" || task.Yaml == "" {
+		return result
+	}
+
+	yamlFile, err := self.getYamlFile(task.Yaml)
+	if err != nil {
+		return result
+	}
+	defer os.Remove(yamlFile.Name())
+
+	command := []string{
+		"-f", yamlFile.Name(),
+		"-p", task.Name,
+		"ps",
+		"--format", "json",
+		"--all",
+	}
+	out := exec.Command{}.RunWithOut(&exec.RunCommandOption{
+		CmdName: "docker",
+		CmdArgs: append(append(docker.Sdk.ExtraParams, "compose"), command...),
+	})
+
+	if out == "" {
+		return result
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "{") {
+			temp := composeContainerItem{}
+			err = json.Unmarshal([]byte(line), &temp)
+			if err == nil {
+				result = append(result, &temp)
+			}
+		}
 	}
 	return result
 }

@@ -151,8 +151,14 @@ func (self Compose) GetDetail(http *gin.Context) {
 		}
 	}
 
+	containerList := logic.Compose{}.Ps(&logic.ComposeTaskOption{
+		Name: yamlRow.Name,
+		Yaml: yamlRow.Yaml,
+	})
+
 	self.JsonResponseWithoutError(http, gin.H{
-		"detail": yamlRow,
+		"detail":        yamlRow,
+		"containerList": containerList,
 	})
 	return
 }
