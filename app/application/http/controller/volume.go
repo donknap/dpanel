@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"sort"
 	"strings"
 )
 
@@ -49,6 +50,9 @@ func (self Volume) GetList(http *gin.Context) {
 			}
 		}
 	}
+	sort.Slice(volumeList.Volumes, func(i, j int) bool {
+		return volumeList.Volumes[i].CreatedAt > volumeList.Volumes[j].CreatedAt
+	})
 	self.JsonResponseWithoutError(http, gin.H{
 		"list":    volumeList.Volumes,
 		"warning": volumeList.Warnings,

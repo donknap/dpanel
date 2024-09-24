@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"sort"
 	"strings"
 )
 
@@ -53,6 +54,9 @@ func (self Network) GetList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	sort.Slice(networkList, func(i, j int) bool {
+		return networkList[i].Created.After(networkList[j].Created)
+	})
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": networkList,
 	})
@@ -91,12 +95,12 @@ func (self Network) Delete(http *gin.Context) {
 
 func (self Network) Create(http *gin.Context) {
 	type ipAux struct {
-		IpAuxDevice  string `json:"ipAuxDevice"`
-		IpAuxAddress string `json:"ipAuxAddress"`
+		Device  string `json:"device"`
+		Address string `json:"address"`
 	}
 	type driverOption struct {
-		DriverOptionName  string `json:"driverOptionName"`
-		DriverOptionValue string `json:"driverOptionValue"`
+		Name  string `json:"name"`
+		Value string `json:"value"`
 	}
 	type ParamsValidate struct {
 		Name         string         `json:"name" binding:"required"`
@@ -120,22 +124,27 @@ func (self Network) Create(http *gin.Context) {
 	}
 
 	ipAm := &network.IPAM{
-		Config: []network.IPAMConfig{},
+		Config:  []network.IPAMConfig{},
+		Options: map[string]string{},
+		Driver:  "default",
 	}
-	ipAmConfig := network.IPAMConfig{
-		Gateway: params.IpGateway,
-		Subnet:  params.IpSubnet,
-		IPRange: params.IpRange,
+	ipAmConfig := network.IPAMConfig{}
+	if params.IpGateway != "" {
+		ipAmConfig.Gateway = params.IpGateway
+	}
+	if params.IpSubnet != "" {
+		ipAmConfig.Subnet = params.IpSubnet
+	}
+	if params.IpRange != "" {
+		ipAmConfig.IPRange = params.IpRange
 	}
 	if !function.IsEmptyArray(params.IpAux) {
 		ipAmConfig.AuxAddress = make(map[string]string)
 		for _, item := range params.IpAux {
-			ipAmConfig.AuxAddress[item.IpAuxDevice] = item.IpAuxAddress
+			ipAmConfig.AuxAddress[item.Device] = item.Address
 		}
 	}
-	if params.IpGateway != "" && params.IpSubnet != "" {
-		ipAm.Config = append(ipAm.Config, ipAmConfig)
-	}
+	ipAm.Config = append(ipAm.Config, ipAmConfig)
 
 	if params.EnableIpV6 {
 		ipV6AmConfig := network.IPAMConfig{
@@ -146,7 +155,7 @@ func (self Network) Create(http *gin.Context) {
 		if !function.IsEmptyArray(params.IpV6Aux) {
 			ipV6AmConfig.AuxAddress = make(map[string]string)
 			for _, item := range params.IpV6Aux {
-				ipV6AmConfig.AuxAddress[item.IpAuxDevice] = item.IpAuxAddress
+				ipV6AmConfig.AuxAddress[item.Device] = item.Address
 			}
 		}
 		if params.IpV6Gateway != "" && params.IpV6Subnet != "" {
@@ -157,7 +166,7 @@ func (self Network) Create(http *gin.Context) {
 	option := make(map[string]string)
 	if !function.IsEmptyArray(params.DriverOption) {
 		for _, item := range params.DriverOption {
-			option[item.DriverOptionName] = item.DriverOptionValue
+			option[item.Name] = item.Value
 		}
 	}
 
