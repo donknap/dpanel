@@ -16,6 +16,8 @@ type LinkItem struct {
 type NetworkItem struct {
 	Name  string   `json:"name"`
 	Alise []string `json:"alise"`
+	IpV4  string   `json:"ipV4"`
+	IpV6  string   `json:"ipV6"`
 }
 
 type EnvItem struct {

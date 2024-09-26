@@ -67,6 +67,8 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 			envOption.Network = append(envOption.Network, accessor.NetworkItem{
 				Name:  name,
 				Alise: item.Aliases,
+				IpV4:  item.IPAMConfig.IPv4Address,
+				IpV6:  item.IPAMConfig.IPv6Address,
 			})
 		}
 	}

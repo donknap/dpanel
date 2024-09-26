@@ -169,13 +169,13 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 			if value.Name == "host" {
 				continue
 			}
-			for _, aliseName := range value.Alise {
-				err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, value.Name, response.ID, &network.EndpointSettings{
-					Aliases: []string{
-						aliseName,
-					},
-				})
-			}
+			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, value.Name, response.ID, &network.EndpointSettings{
+				Aliases: value.Alise,
+				IPAMConfig: &network.EndpointIPAMConfig{
+					IPv4Address: value.IpV4,
+					IPv6Address: value.IpV6,
+				},
+			})
 		}
 	}
 

@@ -211,18 +211,24 @@ func (self Network) Disconnect(http *gin.Context) {
 
 func (self Network) Connect(http *gin.Context) {
 	type ParamsValidate struct {
-		Name           string `json:"name" binding:"required"`
-		ContainerName  string `json:"containerName" binding:"required"`
-		ContainerAlise string `json:"containerAlise"`
+		Name           string   `json:"name" binding:"required"`
+		ContainerName  string   `json:"containerName" binding:"required"`
+		ContainerAlise []string `json:"containerAlise"`
+		IpV4           string   `json:"ipV4"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
+	alise := make([]string, 0)
+	for _, item := range params.ContainerAlise {
+		alise = append(alise, strings.TrimPrefix(item, "/"))
+	}
 	err := docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, params.Name, params.ContainerName, &network.EndpointSettings{
-		Aliases: []string{
-			strings.TrimPrefix(params.ContainerAlise, "/"),
+		Aliases: alise,
+		IPAMConfig: &network.EndpointIPAMConfig{
+			IPv4Address: params.IpV4,
 		},
 	})
 	if err != nil {
