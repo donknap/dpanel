@@ -47,6 +47,7 @@ type imageTagDetail struct {
 	Namespace string
 	ImageName string
 	Version   string
+	Tag       string
 }
 
 func (self Image) GetImageTagDetail(tag string) *imageTagDetail {
@@ -54,7 +55,7 @@ func (self Image) GetImageTagDetail(tag string) *imageTagDetail {
 	if !strings.Contains(tag, ":") {
 		tag += ":latest"
 	}
-
+	result.Tag = tag
 	// 如果没有指定仓库地址，则默认为 docker.io
 	temp := strings.Split(tag, "/")
 	if !strings.Contains(temp[0], ".") || len(temp) == 1 {
@@ -74,7 +75,6 @@ func (self Image) GetImageTagDetail(tag string) *imageTagDetail {
 		temp = strings.Split(result.ImageName, ":")
 		result.Version = temp[1]
 	}
-
 	return result
 }
 

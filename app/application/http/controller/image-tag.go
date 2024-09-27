@@ -102,7 +102,7 @@ func (self Image) TagRemote(http *gin.Context) {
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"proxyUrl": proxyUrl,
-		"tag":      tagDetail.ImageName,
+		"tag":      tagDetail.Tag,
 	})
 	return
 }
