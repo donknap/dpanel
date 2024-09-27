@@ -57,9 +57,10 @@ func main() {
 	httpServer.RegisterRouters(
 		func(engine *gin.Engine) {
 			subFs, _ := fs.Sub(Asset, "asset/static")
-			engine.StaticFS("/static", http2.FS(subFs))
+			engine.StaticFS("/dpanel/static", http2.FS(subFs))
 			engine.StaticFileFS("/favicon.ico", "icon.jpg", http2.FS(subFs))
 			engine.NoRoute(func(http *gin.Context) {
+
 				indexHtml, _ := Asset.ReadFile("asset/static/index.html")
 				http.Data(http2.StatusOK, "text/html; charset=UTF-8", indexHtml)
 				return
@@ -73,9 +74,10 @@ func main() {
 	}
 	dao.SetDefault(db)
 
-	if facade.GetConfig().GetString("app.env") != "debug" {
+	runEnvType := facade.GetConfig().GetString("app.env")
+	if runEnvType != "debug" {
 		// 同步数据库
-		db.Migrator().AutoMigrate(
+		err := db.Migrator().AutoMigrate(
 			&entity.Event{},
 			&entity.Image{},
 			&entity.Notice{},
@@ -86,6 +88,9 @@ func main() {
 			&entity.Compose{},
 			&entity.Backup{},
 		)
+		if err != nil {
+			panic(err)
+		}
 		migrateTableData := []migrate.Updater{
 			&migrate.Upgrade20240909{},
 		}
@@ -138,16 +143,23 @@ func main() {
 		}
 
 		// 初始化挂载目录
-		for _, path := range []string{
-			"nginx/default_host",
-			"nginx/proxy_host",
-			"nginx/redirection_host",
-			"nginx/dead_host",
-			"nginx/temp",
-			"cert",
+		initPath := []string{
 			"storage",
 			"backup",
-		} {
+			"compose",
+		}
+		if runEnvType == "production" {
+			initPath = append(initPath,
+				"nginx/default_host",
+				"nginx/proxy_host",
+				"nginx/redirection_host",
+				"nginx/dead_host",
+				"nginx/temp",
+				"acme",
+				"cert",
+			)
+		}
+		for _, path := range initPath {
 			err = os.MkdirAll(storage.Local{}.GetStorageLocalPath()+"/"+path, os.ModePerm)
 			if err != nil {
 				panic(err.Error())
@@ -156,7 +168,7 @@ func main() {
 	}
 
 	// 注册资源
-	facade.GetContainer().NamedSingleton("asset", func() embed.FS {
+	_ = facade.GetContainer().NamedSingleton("asset", func() embed.FS {
 		return Asset
 	})
 

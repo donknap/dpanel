@@ -60,8 +60,8 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		wsCors := engine.Group("/ws/", common.CorsMiddleware{}.Process)
 
-		wsCors.GET("/common/ws/notice", controller.Home{}.WsNotice)
-		wsCors.GET("/common/ws/console/:id", controller.Home{}.WsConsole)
+		wsCors.GET("/common/notice", controller.Home{}.WsNotice)
+		wsCors.GET("/common/console/:id", controller.Home{}.WsConsole)
 	})
 
 	// 当前如果有连接，则添加一条docker环境数据

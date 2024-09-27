@@ -3,7 +3,6 @@ package common
 import (
 	"errors"
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
@@ -15,10 +14,9 @@ type AuthMiddleware struct {
 }
 
 func (self AuthMiddleware) Process(http *gin.Context) {
-	if function.InArray([]string{
-		"/api/common/user/login",
-		"/api/common/home/info",
-	}, http.Request.URL.Path) || !strings.HasPrefix(http.Request.URL.Path, "/api") {
+	if strings.Contains(http.Request.URL.Path, "/api/common/user/login") ||
+		strings.Contains(http.Request.URL.Path, "/api/common/home/info") ||
+		!strings.Contains(http.Request.URL.Path, "/api") {
 		http.Next()
 		return
 	}
