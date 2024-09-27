@@ -100,7 +100,7 @@ func (self *ContainerCreateBuilder) WithDefaultVolume(container string) {
 }
 
 // WithPort 绑定端口
-func (self *ContainerCreateBuilder) WithPort(host string, container string) *ContainerCreateBuilder {
+func (self *ContainerCreateBuilder) WithPort(hostip, host, container string) *ContainerCreateBuilder {
 	var port nat.Port
 	var err error
 	if strings.Contains(container, "/") {
@@ -116,7 +116,7 @@ func (self *ContainerCreateBuilder) WithPort(host string, container string) *Con
 	self.containerConfig.ExposedPorts[port] = struct{}{}
 	self.hostConfig.PortBindings[port] = make([]nat.PortBinding, 0)
 	self.hostConfig.PortBindings[port] = append(
-		self.hostConfig.PortBindings[port], nat.PortBinding{HostIP: "", HostPort: host},
+		self.hostConfig.PortBindings[port], nat.PortBinding{HostIP: hostip, HostPort: host},
 	)
 	return self
 }

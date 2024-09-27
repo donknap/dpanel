@@ -47,7 +47,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	// Ports PublishAllPorts
 	if task.BuildParams.Ports != nil {
 		for _, value := range task.BuildParams.Ports {
-			builder.WithPort(value.Host, value.Dest)
+			builder.WithPort(value.HostIp, value.Host, value.Dest)
 		}
 	}
 	if task.BuildParams.PublishAllPorts {

@@ -60,7 +60,14 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 	if buildParams.Ports != nil {
 		var checkPorts []string
-		for _, port := range buildParams.Ports {
+		for i, port := range buildParams.Ports {
+			if strings.Contains(port.Host, ":") {
+				temp := strings.Split(port.Host, ":")
+				port.Host = temp[1]
+				port.HostIp = temp[0]
+				buildParams.Ports[i].HostIp = temp[0]
+				buildParams.Ports[i].Host = temp[1]
+			}
 			// 如果容器绑定过该端口，则不需要再次检测
 			if function.InArray(oldBindPort, port.Host) {
 				continue
