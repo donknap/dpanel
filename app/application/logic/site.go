@@ -64,12 +64,15 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 			if name == "bridge" {
 				continue
 			}
-			envOption.Network = append(envOption.Network, accessor.NetworkItem{
+			network := accessor.NetworkItem{
 				Name:  name,
 				Alise: item.Aliases,
-				IpV4:  item.IPAMConfig.IPv4Address,
-				IpV6:  item.IPAMConfig.IPv6Address,
-			})
+			}
+			if item.IPAMConfig != nil {
+				network.IpV4 = item.IPAMConfig.IPv4Address
+				network.IpV6 = item.IPAMConfig.IPv6Address
+			}
+			envOption.Network = append(envOption.Network, network)
 		}
 	}
 
