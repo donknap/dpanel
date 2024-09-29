@@ -39,6 +39,31 @@ func (self Site) CreateByImage(http *gin.Context) {
 		return
 	}
 
+	checkIpInSubnet := [][2]string{
+		{
+			buildParams.IpV4.Address, buildParams.IpV4.Subnet,
+		},
+		{
+			buildParams.IpV4.Gateway, buildParams.IpV4.Subnet,
+		},
+		{
+			buildParams.IpV6.Address, buildParams.IpV6.Subnet,
+		},
+		{
+			buildParams.IpV6.Gateway, buildParams.IpV6.Subnet,
+		},
+	}
+	for _, item := range checkIpInSubnet {
+		if item[0] == "" {
+			continue
+		}
+		_, err := function.IpInSubnet(item[0], item[1])
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
 	for _, itemDefault := range buildParams.VolumesDefault {
 		for _, item := range buildParams.Volumes {
 			if item.Dest == itemDefault.Dest {
@@ -97,7 +122,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 	// 重新部署，先删掉之前的容器
 	if params.Id != 0 || params.ContainerId != "" {
 		_ = notice.Message{}.Info("containerCreate", "正在停止旧容器")
-		if oldContainerInfo.ID != "" {
+		if oldContainerInfo.ContainerJSONBase != nil && oldContainerInfo.ID != "" {
 			err := docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, params.SiteName, container.StopOptions{})
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)

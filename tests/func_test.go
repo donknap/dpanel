@@ -113,3 +113,26 @@ func TestSplitCommand(t *testing.T) {
 	cmdArr = function.CommandSplit(cmd)
 	asserter.Equal(cmdArr[5], "config.yaml")
 }
+
+func TestIpInSubnet(t *testing.T) {
+	asserter := assert.New(t)
+	check, err := function.IpInSubnet("192.168.0.1", "192.168.0.0/24")
+	fmt.Printf("%v \n", err)
+	asserter.True(check)
+
+	check, err = function.IpInSubnet("192.168.0.1", "192.168.1.0/24")
+	fmt.Printf("%v \n", err)
+	asserter.False(check)
+
+	check, err = function.IpInSubnet("2001:db8::2", "2001:db8::/48")
+	fmt.Printf("%v \n", err)
+	asserter.True(check)
+
+	check, err = function.IpInSubnet("", "")
+	fmt.Printf("%v \n", err)
+	asserter.True(check)
+
+	check, err = function.IpInSubnet("192.168.0.1", "192.168.0.1/24")
+	fmt.Printf("%v \n", err)
+	asserter.True(check)
+}

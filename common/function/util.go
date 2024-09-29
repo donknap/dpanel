@@ -2,8 +2,10 @@ package function
 
 import (
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"math/rand"
+	"net"
 	"path/filepath"
 	"strings"
 )
@@ -59,4 +61,23 @@ func CheckFileAllowUpload(filename string) bool {
 func GetRootPath() string {
 	rootPath, _ := filepath.Abs("./")
 	return rootPath
+}
+
+func IpInSubnet(ipAddress, subnetAddress string) (bool, error) {
+	ip := net.ParseIP(ipAddress)
+	if ip == nil {
+		return false, errors.New("错误的 ip 地址: " + ipAddress)
+	}
+	_, subnet, err := net.ParseCIDR(subnetAddress)
+	if err != nil {
+		return false, errors.New("错误的子网 CIDR 地址: " + subnetAddress)
+	}
+
+	if subnetAddress != subnet.String() {
+		return false, errors.New("错误的子网 CIDR 地址, 应为: " + subnet.String())
+	}
+	if !subnet.Contains(ip) {
+		return false, errors.New("ip 地址与子网地址不匹配")
+	}
+	return true, nil
 }

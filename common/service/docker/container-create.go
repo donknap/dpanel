@@ -234,18 +234,34 @@ func (self *ContainerCreateBuilder) WithExtraHosts(name, value string) {
 	self.hostConfig.ExtraHosts = append(self.hostConfig.ExtraHosts, fmt.Sprintf("%s:%s", name, value))
 }
 
-func (self *ContainerCreateBuilder) CreateOwnerNetwork(enableIpV6 bool) {
+func (self *ContainerCreateBuilder) CreateOwnerNetwork(option network.CreateOptions) error {
 	// 利用Network关联容器
+	// 每次创建自身网络时，先删除掉，最后再统一将关联和自身加入进来
+	// 容器关联时必须采用 hostname 以保证容器可以访问
+	selfNetwork, err := Sdk.Client.NetworkInspect(Sdk.Ctx, self.containerName, network.InspectOptions{})
+	if err == nil {
+		for _, item := range selfNetwork.Containers {
+			err = Sdk.Client.NetworkDisconnect(Sdk.Ctx, self.containerName, item.Name, true)
+		}
+		if err != nil {
+			return err
+		}
+		_ = Sdk.Client.NetworkRemove(Sdk.Ctx, self.containerName)
+	}
 	options := make(map[string]string)
 	options["name"] = self.containerName
-	_, err := Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, network.CreateOptions{
+
+	myOption := network.CreateOptions{
 		Driver:     "bridge",
 		Options:    options,
-		EnableIPv6: &enableIpV6,
-	})
+		EnableIPv6: option.EnableIPv6,
+		IPAM:       option.IPAM,
+	}
+	_, err = Sdk.Client.NetworkCreate(Sdk.Ctx, self.containerName, myOption)
 	if err != nil {
 		slog.Debug("create network", "name", self.containerName, err)
 	}
+	return err
 }
 
 func (self *ContainerCreateBuilder) Execute() (response container.CreateResponse, err error) {

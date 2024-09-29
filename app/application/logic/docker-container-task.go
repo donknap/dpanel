@@ -17,8 +17,38 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	builder.WithContainerName(task.SiteName)
 
 	// 如果绑定了ipv6 需要先创建一个ipv6的自身网络
-	if task.BuildParams.BindIpV6 || !function.IsEmptyArray(task.BuildParams.Links) {
-		builder.CreateOwnerNetwork(task.BuildParams.BindIpV6)
+	// 如果容器配置了Ip，需要先创一个自身网络
+	if task.BuildParams.BindIpV6 ||
+		!function.IsEmptyArray(task.BuildParams.Links) ||
+		task.BuildParams.IpV4.Address != "" || task.BuildParams.IpV6.Address != "" {
+
+		option := network.CreateOptions{
+			IPAM: &network.IPAM{
+				Driver:  "default",
+				Options: map[string]string{},
+				Config:  []network.IPAMConfig{},
+			},
+		}
+		if task.BuildParams.BindIpV6 {
+			option.EnableIPv6 = function.PtrBool(true)
+		}
+		if task.BuildParams.IpV4.Address != "" {
+			option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
+				Subnet:  task.BuildParams.IpV4.Subnet,
+				Gateway: task.BuildParams.IpV4.Gateway,
+			})
+		}
+		if task.BuildParams.IpV6.Address != "" {
+			option.EnableIPv6 = function.PtrBool(true)
+			option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
+				Subnet:  task.BuildParams.IpV6.Subnet,
+				Gateway: task.BuildParams.IpV6.Gateway,
+			})
+		}
+		err := builder.CreateOwnerNetwork(option)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	// Environment
@@ -31,13 +61,10 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		}
 	}
 
-	// Links
+	// Links Volume
+	// 避免其它容器先抢占了本身容器配置的ip，需要在容器都完成创建后，统一加入网络
 	if !function.IsEmptyArray(task.BuildParams.Links) {
 		for _, value := range task.BuildParams.Links {
-			if value.Alise == "" {
-				value.Alise = value.Name
-			}
-			builder.WithLink(value.Name, value.Alise)
 			if value.Volume {
 				builder.WithContainerVolume(value.Name)
 			}
@@ -150,13 +177,36 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		return "", err
 	}
 
+	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
+	if err != nil {
+		//notice.Message{}.Error("containerCreate", err.Error())
+		return response.ID, err
+	}
+
 	// 仅当容器有关联时，才加新建自己的网络。对于ipv6支持，必须加入一个ipv6的网络
-	if task.BuildParams.BindIpV6 || !function.IsEmptyArray(task.BuildParams.Links) {
-		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, &network.EndpointSettings{
+	if task.BuildParams.BindIpV6 || !function.IsEmptyArray(task.BuildParams.Links) || task.BuildParams.IpV4.Address != "" || task.BuildParams.IpV6.Address != "" {
+		endpointSetting := &network.EndpointSettings{
 			Aliases: []string{
 				fmt.Sprintf("%s.pod.dpanel.local", task.SiteName),
 			},
-		})
+			IPAMConfig: &network.EndpointIPAMConfig{},
+		}
+		if task.BuildParams.IpV4.Address != "" {
+			endpointSetting.IPAMConfig.IPv4Address = task.BuildParams.IpV4.Address
+		}
+		if task.BuildParams.IpV6.Address != "" {
+			endpointSetting.IPAMConfig.IPv6Address = task.BuildParams.IpV6.Address
+		}
+		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, endpointSetting)
+	}
+
+	if !function.IsEmptyArray(task.BuildParams.Links) {
+		for _, value := range task.BuildParams.Links {
+			if value.Alise == "" {
+				value.Alise = value.Name
+			}
+			builder.WithLink(value.Name, value.Alise)
+		}
 	}
 
 	// 网络需要在创建好容器后统一 connect 否则 bridge 网络会消失。当网络变更后了，可能绑定的端口无法使用。
@@ -184,11 +234,6 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		return response.ID, err
 	}
 
-	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
-	if err != nil {
-		//notice.Message{}.Error("containerCreate", err.Error())
-		return response.ID, err
-	}
 	_ = notice.Message{}.Success("containerCreate", task.SiteName)
 	return response.ID, err
 }

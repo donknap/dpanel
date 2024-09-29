@@ -123,6 +123,22 @@ func (self Network) Create(http *gin.Context) {
 		return
 	}
 
+	checkIpInSubnet := [][2]string{
+		{
+			params.IpGateway, params.IpSubnet,
+		},
+		{
+			params.IpV6Gateway, params.IpV6Subnet,
+		},
+	}
+	for _, item := range checkIpInSubnet {
+		_, err := function.IpInSubnet(item[0], item[1])
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
 	ipAm := &network.IPAM{
 		Config:  []network.IPAMConfig{},
 		Options: map[string]string{},
