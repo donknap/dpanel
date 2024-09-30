@@ -1,6 +1,15 @@
-# DPanel
+<h1 align="center">
+  DPanel
+</h1>
+<h4 align="center"> Docker 可视化面板系统，提供完善的 docker 管理功能。 </h4>
 
-Docker 可视化面板系统，提供完善的 docker 管理功能。
+[![Build Status](https://github.com/donknap/dpanel/actions/workflows/release.yml/badge.svg)](https://github.com/donknap/dpanel/actions)
+
+[**官网**](https://dpanel.cc/) &nbsp; |
+&nbsp; [**文档**](https://dpanel.cc/#/zh-cn/install/docker) &nbsp; |
+&nbsp; [**视频教程**](https://space.bilibili.com/346309066) &nbsp; |
+&nbsp; [**交流群**](https://qm.qq.com/q/2v4x9x8q4k) &nbsp; |
+&nbsp; [**赞助**](https://afdian.com/a/dpanel) &nbsp;
 
 ##### 启动容器
 
