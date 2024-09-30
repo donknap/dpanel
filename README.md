@@ -11,7 +11,7 @@
 &nbsp; [**交流群**](https://qm.qq.com/q/2v4x9x8q4k) &nbsp; |
 &nbsp; [**赞助**](https://afdian.com/a/dpanel) &nbsp;
 
-##### 启动容器
+### 开始使用
 
 > [!IMPORTANT]  
 > macos 下需要先将 docker.sock 文件 link 到 /var/run/docker.sock 目录中 \
@@ -42,10 +42,6 @@ docker run -it -d --name dpanel --restart=always \
 ### 默认帐号
 
 admin / admin
-
-# 使用手册
-
-https://donknap.github.io/dpanel-docs
 
 #### 赞助
 
