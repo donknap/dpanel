@@ -145,8 +145,11 @@ func (self Site) CreateByImage(http *gin.Context) {
 		return
 	}
 	buildParams.ImageId = imageInfo.ID
-	dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
-
+	_, err = dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	var siteRow *entity.Site
 	siteRow, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).First()
 	if siteRow == nil {

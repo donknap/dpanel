@@ -84,6 +84,7 @@ func (self Compose) GetList(http *gin.Context) {
 		return
 	}
 	composeRunList := logic.Compose{}.Ls(params.Name)
+
 	composeList := make([]*entity.Compose, 0)
 	query := dao.Compose.Order(dao.Compose.ID.Desc())
 	if params.Name != "" {
@@ -96,14 +97,12 @@ func (self Compose) GetList(http *gin.Context) {
 
 	for _, runItem := range composeRunList {
 		has := false
-
 		for i, item := range composeList {
 			if runItem.Name == item.Name {
 				has = true
 				composeList[i].Setting.Status = runItem.Status
 			}
 		}
-
 		if params.Title == "" && !has {
 			composeList = append(composeList, &entity.Compose{
 				Title: "",
