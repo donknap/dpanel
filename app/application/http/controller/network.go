@@ -132,6 +132,9 @@ func (self Network) Create(http *gin.Context) {
 		},
 	}
 	for _, item := range checkIpInSubnet {
+		if item[0] == "" {
+			continue
+		}
 		_, err := function.IpInSubnet(item[0], item[1])
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
