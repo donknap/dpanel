@@ -80,10 +80,13 @@ func (self SiteDomain) Create(http *gin.Context) {
 				return
 			}
 		}
-		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, dpanelContainerInfo.ID, &network.EndpointSettings{})
-		if err != nil {
-			self.JsonResponseWithError(http, errors.New("创建 DPanel 默认网络失败，请重新安装并新建&加入 "+defaultNetworkName+" 网络"), 500)
-			return
+		// 假如是自身绑定域名，不加入网络，在下面统一处理
+		if dpanelContainerInfo.ID != containerRow.ID {
+			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, dpanelContainerInfo.ID, &network.EndpointSettings{})
+			if err != nil {
+				self.JsonResponseWithError(http, errors.New("创建 DPanel 默认网络失败，请重新安装并新建&加入 "+defaultNetworkName+" 网络"), 500)
+				return
+			}
 		}
 	}
 
