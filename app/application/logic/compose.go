@@ -4,10 +4,22 @@ import (
 	"encoding/json"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/accessor"
+	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/donknap/dpanel/common/service/storage"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
+)
+
+const (
+	ComposeTypeText        = "text"
+	ComposeTypeRemoteUrl   = "remoteUrl"
+	ComposeTypeServerPath  = "serverPath"
+	ComposeTypeStoragePath = "storagePath"
 )
 
 type ComposeTaskOption struct {
@@ -228,4 +240,48 @@ func (self Compose) getEnvFile(env []accessor.EnvItem) (*os.File, error) {
 		return nil, err
 	}
 	return envFile, nil
+}
+
+func (self Compose) Sync() error {
+	composeList, _ := dao.Compose.Find()
+
+	composeFileName := []string{
+		"docker-compose.yml", "docker-compose.yaml",
+		"compose.yml", "compose.yaml",
+	}
+	rootDir := storage.Local{}.GetComposePath()
+	filepath.Walk(rootDir, func(path string, info fs.FileInfo, err error) error {
+		for _, suffix := range composeFileName {
+			if strings.HasSuffix(path, suffix) {
+				rel, _ := filepath.Rel(rootDir, path)
+				// 只同步二级目录下的 yaml
+				if segments := strings.Split(filepath.Clean(rel), string(filepath.Separator)); len(segments) == 2 {
+					name := filepath.Dir(rel)
+
+					has := false
+					for _, item := range composeList {
+						if item.Name == name {
+							has = true
+							break
+						}
+					}
+
+					if !has {
+						dao.Compose.Create(&entity.Compose{
+							Title: "",
+							Name:  name,
+							Yaml:  rel,
+							Setting: &accessor.ComposeSettingOption{
+								Type:   ComposeTypeStoragePath,
+								Status: "waiting",
+							},
+						})
+					}
+				}
+				break
+			}
+		}
+		return nil
+	})
+	return nil
 }

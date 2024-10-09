@@ -7,8 +7,14 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"io"
+	http2 "net/http"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 type Compose struct {
@@ -17,12 +23,14 @@ type Compose struct {
 
 func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
+		Id          int32  `json:"id"`
 		Title       string `json:"title" binding:"required"`
 		Name        string `json:"name" binding:"required"`
-		Yaml        string `json:"yaml" binding:"required"`
-		RawYaml     string `json:"rawYaml"`
+		Type        string `json:"type" binding:"required"`
+		Yaml        string `json:"yaml"`
+		RemoteUrl   string `json:"remoteUrl"`
+		ServerPath  string `json:"serverPath"`
 		Environment []accessor.EnvItem
-		Id          int32 `json:"id"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -44,15 +52,31 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
-	_, err := docker.NewYaml(params.Yaml)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	uri := ""
+	switch params.Type {
+	case logic.ComposeTypeText:
+		_, err := docker.NewYaml(params.Yaml)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		break
+	case logic.ComposeTypeRemoteUrl:
+		params.Yaml = params.RemoteUrl
+		uri = params.RemoteUrl
+		break
+	case logic.ComposeTypeServerPath:
+		params.Yaml = params.ServerPath
+		uri = params.ServerPath
+		break
 	}
+
 	if params.Id > 0 {
 		yamlRow.Yaml = params.Yaml
 		yamlRow.Title = params.Title
 		yamlRow.Setting.Environment = params.Environment
+		yamlRow.Setting.Type = params.Type
+		yamlRow.Setting.Uri = uri
 		_, _ = dao.Compose.Updates(yamlRow)
 	} else {
 		yamlRow = &entity.Compose{
@@ -60,9 +84,10 @@ func (self Compose) Create(http *gin.Context) {
 			Name:  params.Name,
 			Yaml:  params.Yaml,
 			Setting: &accessor.ComposeSettingOption{
-				RawYaml:     params.RawYaml,
 				Environment: params.Environment,
 				Status:      "waiting",
+				Type:        params.Type,
+				Uri:         uri,
 			},
 		}
 		_ = dao.Compose.Create(yamlRow)
@@ -83,6 +108,9 @@ func (self Compose) GetList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	//同步本地目录任务
+	logic.Compose{}.Sync()
+
 	composeRunList := logic.Compose{}.Ls(params.Name)
 
 	composeList := make([]*entity.Compose, 0)
@@ -142,6 +170,32 @@ func (self Compose) GetDetail(http *gin.Context) {
 			Setting: &accessor.ComposeSettingOption{},
 		}
 	}
+
+	if yamlRow.Setting.Type == logic.ComposeTypeRemoteUrl {
+		response, err := http2.Get(yamlRow.Yaml)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer response.Body.Close()
+		content, err := io.ReadAll(response.Body)
+		yamlRow.Yaml = string(content)
+	} else if yamlRow.Setting.Type == logic.ComposeTypeServerPath {
+		content, err := os.ReadFile(yamlRow.Yaml)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		yamlRow.Yaml = string(content)
+	} else if yamlRow.Setting.Type == logic.ComposeTypeStoragePath {
+		content, err := os.ReadFile(filepath.Join(storage.Local{}.GetComposePath(), yamlRow.Yaml))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		yamlRow.Yaml = string(content)
+	}
+
 	composeRunList := logic.Compose{}.Ls(params.Name)
 	for _, item := range composeRunList {
 		if item.Name == yamlRow.Name {
@@ -190,5 +244,42 @@ func (self Compose) Delete(http *gin.Context) {
 		}
 	}
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Compose) GetFromUri(http *gin.Context) {
+	type ParamsValidate struct {
+		Uri string `json:"uri" binding:"required,uri"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	content := make([]byte, 0)
+	var err error
+
+	if strings.HasPrefix(params.Uri, "http") {
+		response, err := http2.Get(params.Uri)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer response.Body.Close()
+		content, err = io.ReadAll(response.Body)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	} else {
+		content, err = os.ReadFile(params.Uri)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"content": string(content),
+	})
 	return
 }
