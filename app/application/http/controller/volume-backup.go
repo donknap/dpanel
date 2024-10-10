@@ -65,7 +65,7 @@ func (self Volume) DeleteBackup(http *gin.Context) {
 		cmdList = append(cmdList, fmt.Sprintf(`rm -r %s`, strings.Replace(item.Setting.BackupTar, "/backup", renameRootPath, 1)))
 		volumeList = append(volumeList, fmt.Sprintf("%s:%s:rw", item.Setting.BackupPath, renameRootPath))
 	}
-	backupPlugin, err := plugin.NewPlugin(pluginName, map[string]docker.ComposeService{
+	backupPlugin, err := plugin.NewPlugin(pluginName, map[string]*plugin.CreateOption{
 		pluginName: {
 			Command: []string{
 				"/bin/sh", "-c", strings.Join(cmdList, " && "),
@@ -124,12 +124,12 @@ func (self Volume) Backup(http *gin.Context) {
 		cmd := fmt.Sprintf(`mkdir -p %s && tar czvf %s %s`, filepath.Dir(backupTar), backupTar, strings.Join(pathList, " "))
 		slog.Debug("volume", "backup", cmd)
 
-		backupPlugin, err := plugin.NewPlugin(pluginName, map[string]docker.ComposeService{
+		backupPlugin, err := plugin.NewPlugin(pluginName, map[string]*plugin.CreateOption{
 			pluginName: {
 				Command: []string{
 					"/bin/sh", "-c", cmd,
 				},
-				VolumesFrom: []string{
+				ExternalVolumeLinks: []string{
 					containerInfo.ID,
 				},
 				Volumes: []string{
@@ -193,12 +193,12 @@ func (self Volume) Restore(http *gin.Context) {
 	cmd := fmt.Sprintf(`tar xzvf %s`, backupInfo.Setting.BackupTar)
 	slog.Debug("volume", "restore", cmd)
 
-	backupPlugin, err := plugin.NewPlugin(pluginName, map[string]docker.ComposeService{
+	backupPlugin, err := plugin.NewPlugin(pluginName, map[string]*plugin.CreateOption{
 		pluginName: {
 			Command: []string{
 				"/bin/sh", "-c", cmd,
 			},
-			VolumesFrom: []string{
+			ExternalVolumeLinks: []string{
 				containerInfo.ID,
 			},
 			Volumes: []string{

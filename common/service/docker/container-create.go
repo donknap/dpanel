@@ -78,8 +78,11 @@ func (self *ContainerCreateBuilder) WithPrivileged() *ContainerCreateBuilder {
 }
 
 // WithVolume 挂载宿主机目录
-func (self *ContainerCreateBuilder) WithVolume(host string, container string, permission string) *ContainerCreateBuilder {
-	//_, err := os.Stat(host)
+func (self *ContainerCreateBuilder) WithVolume(host string, container string, readOnly bool) *ContainerCreateBuilder {
+	permission := "rw"
+	if readOnly {
+		permission = "ro"
+	}
 	self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s:%s", host, container, permission))
 	return self
 }

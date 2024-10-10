@@ -6,7 +6,6 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
@@ -53,11 +52,11 @@ func (self Compose) Create(http *gin.Context) {
 	uri := ""
 	switch params.Type {
 	case logic.ComposeTypeText:
-		_, err := docker.NewYaml([]byte(params.Yaml))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
+		//_, err := docker.NewYaml([]byte(params.Yaml))
+		//if err != nil {
+		//	self.JsonResponseWithError(http, err, 500)
+		//	return
+		//}
 		break
 	case logic.ComposeTypeRemoteUrl:
 		params.Yaml = params.RemoteUrl
@@ -178,12 +177,17 @@ func (self Compose) GetDetail(http *gin.Context) {
 	}
 	containerList := logic.Compose{}.Ps(task)
 
-	yaml, err := task.GetYaml()
+	composer, err := task.Compose()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	yamlRow.Yaml = yaml
+	yaml, err := composer.Project.MarshalYAML()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	yamlRow.Yaml = string(yaml)
 	composeRunList := logic.Compose{}.Ls(params.Name)
 	for _, item := range composeRunList {
 		if item.Name == yamlRow.Name {

@@ -96,11 +96,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 			if value.Host == "" || value.Dest == "" {
 				continue
 			}
-			permission := "rw"
-			if value.Permission == "readonly" {
-				permission = "ro"
-			}
-			builder.WithVolume(value.Host, value.Dest, permission)
+			builder.WithVolume(value.Host, value.Dest, value.Permission == "readonly")
 		}
 	}
 

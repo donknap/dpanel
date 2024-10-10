@@ -5,17 +5,25 @@ import (
 	"errors"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
-	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"html/template"
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
-func NewPlugin(name string, composeData map[string]docker.ComposeService) (*plugin, error) {
+type CreateOption struct {
+	VolumesForm         string
+	Volumes             []string
+	Command             []string
+	ExternalVolumeLinks []string
+}
+
+func NewPlugin(name string, composeData map[string]*CreateOption) (*plugin, error) {
 	var asset embed.FS
 	err := facade.GetContainer().NamedResolve(&asset, "asset")
 	if err != nil {
@@ -38,14 +46,16 @@ func NewPlugin(name string, composeData map[string]docker.ComposeService) (*plug
 	if err != nil {
 		return nil, err
 	}
-	compose, err := docker.NewYaml(yamlResult.GetData())
+
+	composer, err := compose.NewCompose(compose.WithYamlString(filepath.Join("plugin", "compose-"+name+".yaml"), yamlResult.GetData()))
 	if err != nil {
 		return nil, err
 	}
+
 	obj := &plugin{
 		asset:   asset,
 		name:    name,
-		compose: compose,
+		compose: composer,
 	}
 	return obj, nil
 }
@@ -53,24 +63,18 @@ func NewPlugin(name string, composeData map[string]docker.ComposeService) (*plug
 type plugin struct {
 	asset   embed.FS
 	name    string
-	compose *docker.DockerComposeYamlV2
-}
-
-type CreateOption struct {
-	VolumesForm string
-	Volumes     []string
-	Cmd         string
+	compose *compose.Wrapper
 }
 
 func (self plugin) Create() (string, error) {
-	service, err := self.compose.GetService(self.name)
+	service, serviceExt, err := self.compose.GetService(self.name)
 	if err != nil {
 		return "", err
 	}
 	pluginContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, service.ContainerName)
 	if err == nil {
 		// 如果容器在，并且有 auto-remove 参数，则删除掉
-		if service.Extend.AutoRemove {
+		if serviceExt.AutoRemove {
 			err = self.Destroy()
 			if err != nil {
 				return "", err
@@ -91,7 +95,7 @@ func (self plugin) Create() (string, error) {
 	imageUrl := service.Image
 	imageTryPull := true
 
-	if imageTarUrl, ok := service.Extend.ImageLocalTar[dockerVersion.Arch]; ok {
+	if imageTarUrl, ok := serviceExt.ImageTar[dockerVersion.Arch]; ok {
 		if imageTarUrl != "" && strings.HasPrefix(imageTarUrl, "asset/plugin") {
 			imageTryPull = false
 			err = self.importImage(service.Image, imageTarUrl)
@@ -108,7 +112,7 @@ func (self plugin) Create() (string, error) {
 	if service.Privileged {
 		builder.WithPrivileged()
 	}
-	if service.Extend.AutoRemove {
+	if serviceExt.AutoRemove {
 		builder.WithAutoRemove()
 	}
 	if service.Restart != "" {
@@ -117,23 +121,13 @@ func (self plugin) Create() (string, error) {
 	if service.Pid != "" {
 		builder.WithPid(service.Pid)
 	}
-	for _, item := range service.VolumesFrom {
+	for _, item := range serviceExt.ExternalVolumeLinks {
 		builder.WithContainerVolume(item)
 	}
-	switch cmd := service.Command.(type) {
-	case []string:
-		if !function.IsEmptyArray(cmd) {
-			builder.WithCommand(cmd)
-		}
-	case []interface{}:
-		builder.WithCommand(function.ConvertArray[string](cmd))
-	case string:
-		builder.WithCommandStr(cmd)
-	}
+	builder.WithCommand(service.Command)
 
 	for _, item := range service.Volumes {
-		path := strings.Split(item, ":")
-		builder.WithVolume(path[0], path[1], path[2])
+		builder.WithVolume(item.Source, item.Target, false)
 	}
 	response, err := builder.Execute()
 	if err != nil {
@@ -147,7 +141,7 @@ func (self plugin) Create() (string, error) {
 }
 
 func (self plugin) Destroy() error {
-	service, err := self.compose.GetService(self.name)
+	service, _, err := self.compose.GetService(self.name)
 	if err != nil {
 		return err
 	}
