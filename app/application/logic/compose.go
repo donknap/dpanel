@@ -9,7 +9,9 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/storage"
+	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,10 +25,96 @@ const (
 )
 
 type ComposeTaskOption struct {
-	Name        string
-	Yaml        string
-	Environment []accessor.EnvItem
+	Entity      *entity.Compose
 	DeleteImage bool
+}
+
+func (self ComposeTaskOption) getEnvFile() (string, error) {
+	envFile, _ := os.CreateTemp("", "dpanel-compose-env")
+	defer func() {
+		_ = envFile.Close()
+	}()
+	envContent := make([]string, 0)
+	for _, item := range self.Entity.Setting.Environment {
+		envContent = append(envContent, item.Name+"="+item.Value)
+	}
+	err := os.WriteFile(envFile.Name(), []byte(strings.Join(envContent, "\n")), 0666)
+	if err != nil {
+		return "", err
+	}
+	return envFile.Name(), nil
+}
+
+func (self ComposeTaskOption) getYamlFile() (path string, hasDelete bool, err error) {
+	path = ""
+	hasDelete = false
+	err = nil
+
+	if self.Entity.Setting.Type == ComposeTypeServerPath {
+		path = self.Entity.Yaml
+		hasDelete = false
+		return
+	}
+
+	if self.Entity.Setting.Type == ComposeTypeStoragePath {
+		path = filepath.Join(storage.Local{}.GetComposePath(), self.Entity.Yaml)
+		hasDelete = false
+		return
+	}
+
+	yamlFile, _ := os.CreateTemp("", "dpanel-compose")
+	defer func() {
+		_ = yamlFile.Close()
+	}()
+
+	if self.Entity.Setting.Type == ComposeTypeText || self.Entity.Setting.Type == "" {
+		err = os.WriteFile(yamlFile.Name(), []byte(self.Entity.Yaml), 0666)
+		if err != nil {
+			return "", hasDelete, err
+		}
+	}
+
+	if self.Entity.Setting.Type == ComposeTypeRemoteUrl {
+		var response *http.Response
+		var content []byte
+
+		response, err = http.Get(self.Entity.Yaml)
+		if err != nil {
+			return
+		}
+		defer func() {
+			_ = response.Body.Close()
+		}()
+		content, err = io.ReadAll(response.Body)
+		if err != nil {
+			return
+		}
+		err = os.WriteFile(yamlFile.Name(), []byte(content), 0666)
+		if err != nil {
+			return
+		}
+	}
+	path = yamlFile.Name()
+	hasDelete = true
+	return
+}
+
+func (self ComposeTaskOption) GetYaml() (string, error) {
+	if self.Entity.Setting.Type == ComposeTypeText || self.Entity.Setting.Type == "" {
+		return self.Entity.Yaml, nil
+	}
+	yamlFilePath, hasDelete, err := self.getYamlFile()
+	if err != nil {
+		return "", err
+	}
+	if hasDelete {
+		defer os.Remove(yamlFilePath)
+	}
+	content, err := os.ReadFile(yamlFilePath)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
 }
 
 type composeItem struct {
@@ -43,26 +131,31 @@ type Compose struct {
 }
 
 func (self Compose) Deploy(task *ComposeTaskOption) error {
-	envFile, err := self.getEnvFile(task.Environment)
+	envFile, err := task.getEnvFile()
 	if err != nil {
 		return err
 	}
-	defer os.Remove(envFile.Name())
+	defer os.Remove(envFile)
 
-	yamlFile, err := self.getYamlFile(task.Yaml)
+	yamlFilePath, hasDelete, err := task.getYamlFile()
 	if err != nil {
 		return err
 	}
-	defer os.Remove(yamlFile.Name())
+	if hasDelete {
+		// 只有是系统生成的临时yaml文件才删除
+		defer os.Remove(yamlFilePath)
+	}
 
-	dockerYaml, err := docker.NewYaml(task.Yaml)
+	yamlContent, err := os.ReadFile(yamlFilePath)
+	dockerYaml, err := docker.NewYaml(yamlContent)
 	if err != nil {
 		return err
 	}
+
 	self.runCommand(append([]string{
-		"-f", yamlFile.Name(),
-		"-p", task.Name,
-		"--env-file", envFile.Name(),
+		"-f", yamlFilePath,
+		"-p", task.Entity.Name,
+		"--env-file", envFile,
 		"--progress", "tty",
 		"up",
 		"-d",
@@ -72,7 +165,7 @@ func (self Compose) Deploy(task *ComposeTaskOption) error {
 	// 如果 compose 中未指定网络，则默认的名称为 项目名_default
 	for _, item := range dockerYaml.GetExternalLinks() {
 		for _, name := range dockerYaml.GetNetworkList() {
-			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.Name+"_"+name, item.ContainerName, &network.EndpointSettings{})
+			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.Entity.Name+"_"+name, item.ContainerName, &network.EndpointSettings{})
 			if err != nil {
 				return err
 			}
@@ -82,36 +175,42 @@ func (self Compose) Deploy(task *ComposeTaskOption) error {
 }
 
 func (self Compose) Destroy(task *ComposeTaskOption) error {
-	dockerYaml, err := docker.NewYaml(task.Yaml)
+	yamlFilePath, hasDelete, err := task.getYamlFile()
+	if err != nil {
+		return err
+	}
+	if hasDelete {
+		defer os.Remove(yamlFilePath)
+	}
+
+	yamlContent, err := os.ReadFile(yamlFilePath)
+	if err != nil {
+		return err
+	}
+	dockerYaml, err := docker.NewYaml(yamlContent)
 	if err != nil {
 		return err
 	}
 	// 删除compose 前需要先把关联的已有容器网络退出
 	for _, item := range dockerYaml.GetExternalLinks() {
 		for _, name := range dockerYaml.GetNetworkList() {
-			err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, task.Name+"_"+name, item.ContainerName, true)
+			err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, task.Entity.Name+"_"+name, item.ContainerName, true)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	envFile, err := self.getEnvFile(task.Environment)
+	envFile, err := task.getEnvFile()
 	if err != nil {
 		return err
 	}
-	defer os.Remove(envFile.Name())
-
-	yamlFile, err := self.getYamlFile(task.Yaml)
-	if err != nil {
-		return err
-	}
-	defer os.Remove(yamlFile.Name())
+	defer os.Remove(envFile)
 
 	command := []string{
-		"-f", yamlFile.Name(),
-		"-p", task.Name,
-		"--env-file", envFile.Name(),
+		"-f", yamlFilePath,
+		"-p", task.Entity.Name,
+		"--env-file", envFile,
 		"--progress",
 		"tty",
 		"down",
@@ -124,25 +223,29 @@ func (self Compose) Destroy(task *ComposeTaskOption) error {
 }
 
 func (self Compose) Ctrl(task *ComposeTaskOption, op string) error {
-	envFile, err := self.getEnvFile(task.Environment)
+	envFile, err := task.getEnvFile()
 	if err != nil {
 		return err
 	}
-	defer os.Remove(envFile.Name())
+	defer os.Remove(envFile)
 
-	yamlFile, err := self.getYamlFile(task.Yaml)
+	yamlFilePath, hasDelete, err := task.getYamlFile()
 	if err != nil {
 		return err
 	}
+	if hasDelete {
+		defer os.Remove(yamlFilePath)
+	}
+
 	command := []string{
-		"-f", yamlFile.Name(),
-		"-p", task.Name,
-		"--env-file", envFile.Name(),
+		"-f", yamlFilePath,
+		"-p", task.Entity.Name,
+		"--env-file", envFile,
 		"--progress", "tty",
 		op,
 	}
 	self.runCommand(command)
-	os.Remove(yamlFile.Name())
+
 	return nil
 }
 
@@ -169,19 +272,21 @@ func (self Compose) Ls(projectName string) []*composeItem {
 
 func (self Compose) Ps(task *ComposeTaskOption) []*composeContainerItem {
 	result := make([]*composeContainerItem, 0)
-	if task.Name == "" || task.Yaml == "" {
+	if task.Entity.Name == "" {
 		return result
 	}
 
-	yamlFile, err := self.getYamlFile(task.Yaml)
+	yamlFilePath, hasDelete, err := task.getYamlFile()
 	if err != nil {
 		return result
 	}
-	defer os.Remove(yamlFile.Name())
+	if hasDelete {
+		defer os.Remove(yamlFilePath)
+	}
 
 	command := []string{
-		"-f", yamlFile.Name(),
-		"-p", task.Name,
+		"-f", yamlFilePath,
+		"-p", task.Entity.Name,
 		"ps",
 		"--format", "json",
 		"--all",
@@ -220,28 +325,6 @@ func (self Compose) runCommand(command []string) {
 	})
 }
 
-func (self Compose) getYamlFile(yamlContent string) (*os.File, error) {
-	yamlFile, _ := os.CreateTemp("", "dpanel-compose")
-	err := os.WriteFile(yamlFile.Name(), []byte(yamlContent), 0666)
-	if err != nil {
-		return nil, err
-	}
-	return yamlFile, nil
-}
-
-func (self Compose) getEnvFile(env []accessor.EnvItem) (*os.File, error) {
-	envFile, _ := os.CreateTemp("", "dpanel-compose-env")
-	envContent := make([]string, 0)
-	for _, item := range env {
-		envContent = append(envContent, item.Name+"="+item.Value)
-	}
-	err := os.WriteFile(envFile.Name(), []byte(strings.Join(envContent, "\n")), 0666)
-	if err != nil {
-		return nil, err
-	}
-	return envFile, nil
-}
-
 func (self Compose) Sync() error {
 	composeList, _ := dao.Compose.Find()
 
@@ -250,7 +333,7 @@ func (self Compose) Sync() error {
 		"compose.yml", "compose.yaml",
 	}
 	rootDir := storage.Local{}.GetComposePath()
-	filepath.Walk(rootDir, func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(rootDir, func(path string, info fs.FileInfo, err error) error {
 		for _, suffix := range composeFileName {
 			if strings.HasSuffix(path, suffix) {
 				rel, _ := filepath.Rel(rootDir, path)
@@ -274,6 +357,7 @@ func (self Compose) Sync() error {
 							Setting: &accessor.ComposeSettingOption{
 								Type:   ComposeTypeStoragePath,
 								Status: "waiting",
+								Uri:    rel,
 							},
 						})
 					}
@@ -283,5 +367,8 @@ func (self Compose) Sync() error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 	return nil
 }

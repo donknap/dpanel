@@ -23,9 +23,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 
 	err := logic.Compose{}.Deploy(&logic.ComposeTaskOption{
-		Name:        composeRow.Name,
-		Yaml:        composeRow.Yaml,
-		Environment: composeRow.Setting.Environment,
+		Entity: composeRow,
 	})
 
 	notice.Message{}.Success("composeDeploy", composeRow.Name)
@@ -55,10 +53,8 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	}
 
 	err := logic.Compose{}.Destroy(&logic.ComposeTaskOption{
-		Name:        composeRow.Name,
-		Yaml:        composeRow.Yaml,
 		DeleteImage: params.DeleteImage,
-		Environment: composeRow.Setting.Environment,
+		Entity:      composeRow,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -93,9 +89,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 	}
 
 	err := logic.Compose{}.Ctrl(&logic.ComposeTaskOption{
-		Name:        composeRow.Name,
-		Yaml:        composeRow.Yaml,
-		Environment: composeRow.Setting.Environment,
+		Entity: composeRow,
 	}, params.Op)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

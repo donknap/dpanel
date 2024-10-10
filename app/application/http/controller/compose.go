@@ -7,13 +7,11 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	http2 "net/http"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -55,7 +53,7 @@ func (self Compose) Create(http *gin.Context) {
 	uri := ""
 	switch params.Type {
 	case logic.ComposeTypeText:
-		_, err := docker.NewYaml(params.Yaml)
+		_, err := docker.NewYaml([]byte(params.Yaml))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -72,11 +70,14 @@ func (self Compose) Create(http *gin.Context) {
 	}
 
 	if params.Id > 0 {
-		yamlRow.Yaml = params.Yaml
 		yamlRow.Title = params.Title
 		yamlRow.Setting.Environment = params.Environment
-		yamlRow.Setting.Type = params.Type
-		yamlRow.Setting.Uri = uri
+
+		if params.Type != logic.ComposeTypeStoragePath {
+			yamlRow.Setting.Type = params.Type
+			yamlRow.Setting.Uri = uri
+			yamlRow.Yaml = params.Yaml
+		}
 		_, _ = dao.Compose.Updates(yamlRow)
 	} else {
 		yamlRow = &entity.Compose{
@@ -157,6 +158,7 @@ func (self Compose) GetDetail(http *gin.Context) {
 		return
 	}
 	var yamlRow *entity.Compose
+
 	if params.Id > 0 {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
 		params.Name = yamlRow.Name
@@ -171,31 +173,17 @@ func (self Compose) GetDetail(http *gin.Context) {
 		}
 	}
 
-	if yamlRow.Setting.Type == logic.ComposeTypeRemoteUrl {
-		response, err := http2.Get(yamlRow.Yaml)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer response.Body.Close()
-		content, err := io.ReadAll(response.Body)
-		yamlRow.Yaml = string(content)
-	} else if yamlRow.Setting.Type == logic.ComposeTypeServerPath {
-		content, err := os.ReadFile(yamlRow.Yaml)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		yamlRow.Yaml = string(content)
-	} else if yamlRow.Setting.Type == logic.ComposeTypeStoragePath {
-		content, err := os.ReadFile(filepath.Join(storage.Local{}.GetComposePath(), yamlRow.Yaml))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		yamlRow.Yaml = string(content)
+	task := &logic.ComposeTaskOption{
+		Entity: yamlRow,
 	}
+	containerList := logic.Compose{}.Ps(task)
 
+	yaml, err := task.GetYaml()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	yamlRow.Yaml = yaml
 	composeRunList := logic.Compose{}.Ls(params.Name)
 	for _, item := range composeRunList {
 		if item.Name == yamlRow.Name {
@@ -203,11 +191,6 @@ func (self Compose) GetDetail(http *gin.Context) {
 			break
 		}
 	}
-
-	containerList := logic.Compose{}.Ps(&logic.ComposeTaskOption{
-		Name: yamlRow.Name,
-		Yaml: yamlRow.Yaml,
-	})
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"detail":        yamlRow,

@@ -12,9 +12,9 @@ type DockerComposeYamlV2 struct {
 	Networks map[string]interface{}    `yaml:"networks"`
 }
 
-func NewYaml(yamlStr string) (*DockerComposeYamlV2, error) {
+func NewYaml(yamlStr []byte) (*DockerComposeYamlV2, error) {
 	yamlObj := &DockerComposeYamlV2{}
-	err := yaml.Unmarshal([]byte(yamlStr), yamlObj)
+	err := yaml.Unmarshal(yamlStr, yamlObj)
 	if err != nil {
 		return nil, err
 	}

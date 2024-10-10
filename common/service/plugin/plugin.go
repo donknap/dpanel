@@ -38,7 +38,7 @@ func NewPlugin(name string, composeData map[string]docker.ComposeService) (*plug
 	if err != nil {
 		return nil, err
 	}
-	compose, err := docker.NewYaml(string(yamlResult.GetData()))
+	compose, err := docker.NewYaml(yamlResult.GetData())
 	if err != nil {
 		return nil, err
 	}

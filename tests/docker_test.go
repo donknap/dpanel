@@ -194,8 +194,8 @@ func TestLoginRegistry(t *testing.T) {
 		fmt.Printf("%v \n", err)
 	}
 	auth, err := sdk.Client.RegistryLogin(context.Background(), registry.AuthConfig{
-		Username:      "100009529522",
-		Password:      "chaoren945RC",
+		Username:      "",
+		Password:      "",
 		ServerAddress: "ccr.ccs.tencentyun.com",
 	})
 	fmt.Printf("%v \n", err)
