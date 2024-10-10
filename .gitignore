@@ -14,3 +14,4 @@ runtime/main
 runtime/
 bin/
 data
+tests
