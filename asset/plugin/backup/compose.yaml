@@ -7,9 +7,11 @@ services:
 #{{- range $key, $val := .backup.Command }}
       - {{ $val | unescaped }}
 #{{- end}}
+#{{if .backup.Volumes}}
     volumes:
 #{{- range $key, $val := .backup.Volumes }}
       - {{ $val }}
+#{{- end}}
 #{{- end}}
     x-dpanel-service:
       image_tar:
@@ -17,7 +19,12 @@ services:
         arm64: asset/plugin/explorer/image-arm64.tar
         arm: asset/plugin/explorer/image-arm.tar
       auto_remove: true
-      external_volume_links:
-#{{- range $key, $val := .backup.ExternalVolumeLinks }}
-        - {{ $val }}
+      external:
+        volumes_from:
+#{{- range $key, $val := .backup.External.VolumesFrom}}
+          - {{ $val }}
+#{{- end}}
+        volumes:
+#{{- range $key, $val := .backup.External.Volumes}}
+          - {{ $val }}
 #{{- end}}

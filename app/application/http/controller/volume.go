@@ -50,6 +50,7 @@ func (self Volume) GetList(http *gin.Context) {
 			}
 		}
 	}
+
 	sort.Slice(volumeList.Volumes, func(i, j int) bool {
 		return volumeList.Volumes[i].CreatedAt > volumeList.Volumes[j].CreatedAt
 	})
@@ -156,12 +157,58 @@ func (self Volume) Create(http *gin.Context) {
 }
 
 func (self Volume) Prune(http *gin.Context) {
+	type ParamsValidate struct {
+		DeleteAll bool `json:"deleteAll"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
 	filter := filters.NewArgs()
 	_, err := docker.Sdk.Client.VolumesPrune(docker.Sdk.Ctx, filter)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	// 清理非匿名未使用卷
+	if params.DeleteAll {
+		volumeList, err := docker.Sdk.Client.VolumeList(docker.Sdk.Ctx, volume.ListOptions{})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		var unUseVolume []string
+		containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+			All:    true,
+			Latest: true,
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		for _, item := range volumeList.Volumes {
+			has := false
+			for _, container := range containerList {
+				for _, mount := range container.Mounts {
+					if mount.Name != "" && mount.Name == item.Name {
+						has = true
+					}
+				}
+			}
+			if !has {
+				unUseVolume = append(unUseVolume, item.Name)
+			}
+		}
+		for _, item := range unUseVolume {
+			err = docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, item, false)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
+	}
+
 	self.JsonSuccessResponse(http)
 	return
 }

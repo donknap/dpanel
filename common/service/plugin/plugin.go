@@ -16,14 +16,13 @@ import (
 	"strings"
 )
 
-type CreateOption struct {
-	VolumesForm         string
-	Volumes             []string
-	Command             []string
-	ExternalVolumeLinks []string
+type TemplateParser struct {
+	Volumes []string
+	Command []string
+	compose.ExtService
 }
 
-func NewPlugin(name string, composeData map[string]*CreateOption) (*plugin, error) {
+func NewPlugin(name string, composeData map[string]*TemplateParser) (*plugin, error) {
 	var asset embed.FS
 	err := facade.GetContainer().NamedResolve(&asset, "asset")
 	if err != nil {
@@ -47,7 +46,7 @@ func NewPlugin(name string, composeData map[string]*CreateOption) (*plugin, erro
 		return nil, err
 	}
 
-	composer, err := compose.NewCompose(compose.WithYamlString(filepath.Join("plugin", "compose-"+name+".yaml"), yamlResult.GetData()))
+	composer, err := compose.NewCompose(compose.WithYamlString(filepath.Join("dpanel", "plugin", "compose-"+name+".yaml"), yamlResult.GetData()))
 	if err != nil {
 		return nil, err
 	}
@@ -121,13 +120,17 @@ func (self plugin) Create() (string, error) {
 	if service.Pid != "" {
 		builder.WithPid(service.Pid)
 	}
-	for _, item := range serviceExt.ExternalVolumeLinks {
+	for _, item := range serviceExt.External.VolumesFrom {
 		builder.WithContainerVolume(item)
 	}
 	builder.WithCommand(service.Command)
 
 	for _, item := range service.Volumes {
 		builder.WithVolume(item.Source, item.Target, false)
+	}
+	for _, item := range serviceExt.External.Volumes {
+		path := strings.Split(item, ":")
+		builder.WithVolume(path[0], path[1], false)
 	}
 	response, err := builder.Execute()
 	if err != nil {
