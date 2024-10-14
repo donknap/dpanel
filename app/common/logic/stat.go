@@ -5,6 +5,7 @@ import (
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -26,6 +27,11 @@ type ioItemResult struct {
 }
 
 func (self Stat) GetStat() ([]*statItemResult, error) {
+	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make([]*statItemResult, 0)
 	response := exec.Command{}.RunWithOut(&exec.RunCommandOption{
 		CmdName: "docker",
@@ -56,6 +62,11 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 			Name: statJsonItem.Name,
 		}
 		cpu, _ := strconv.ParseFloat(strings.TrimSuffix(statJsonItem.CPUPerc, "%"), 64)
+
+		// 使用率超过100%时，代表该容器使用超过1核。需要将占用转换成100%之内的占用
+		if cpu > 100 {
+			cpu = math.Round(cpu/float64(info.NCPU)*100) / 100
+		}
 		r.Cpu += cpu
 
 		memory := strings.Split(statJsonItem.MemUsage, "/")
