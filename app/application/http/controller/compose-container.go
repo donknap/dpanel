@@ -22,9 +22,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
-	err := logic.Compose{}.Deploy(&logic.ComposeTaskOption{
-		Entity: composeRow,
-	})
+	err := logic.Compose{}.GetTasker(composeRow).Deploy()
 
 	notice.Message{}.Success("composeDeploy", composeRow.Name)
 	if err != nil {
@@ -52,10 +50,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		return
 	}
 
-	err := logic.Compose{}.Destroy(&logic.ComposeTaskOption{
-		DeleteImage: params.DeleteImage,
-		Entity:      composeRow,
-	})
+	err := logic.Compose{}.GetTasker(composeRow).Destroy(params.DeleteImage)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -87,10 +82,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
 	}
-
-	err := logic.Compose{}.Ctrl(&logic.ComposeTaskOption{
-		Entity: composeRow,
-	}, params.Op)
+	err := logic.Compose{}.GetTasker(composeRow).Ctrl(params.Op)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

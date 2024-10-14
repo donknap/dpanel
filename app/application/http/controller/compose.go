@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
@@ -20,14 +21,15 @@ type Compose struct {
 
 func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id          int32  `json:"id"`
-		Title       string `json:"title" binding:"required"`
-		Name        string `json:"name" binding:"required"`
-		Type        string `json:"type" binding:"required"`
-		Yaml        string `json:"yaml"`
-		RemoteUrl   string `json:"remoteUrl"`
-		ServerPath  string `json:"serverPath"`
-		Environment []accessor.EnvItem
+		Id          int32                    `json:"id"`
+		Title       string                   `json:"title"`
+		Name        string                   `json:"name" binding:"required"`
+		Type        string                   `json:"type" binding:"required"`
+		Yaml        string                   `json:"yaml"`
+		RemoteUrl   string                   `json:"remoteUrl"`
+		ServerPath  string                   `json:"serverPath"`
+		Environment []accessor.EnvItem       `json:"environment"`
+		Override    []accessor.SiteEnvOption `json:"override"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -35,6 +37,7 @@ func (self Compose) Create(http *gin.Context) {
 	}
 
 	var yamlRow *entity.Compose
+
 	if params.Id > 0 {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
 		if yamlRow == nil {
@@ -52,11 +55,6 @@ func (self Compose) Create(http *gin.Context) {
 	uri := ""
 	switch params.Type {
 	case logic.ComposeTypeText:
-		//_, err := docker.NewYaml([]byte(params.Yaml))
-		//if err != nil {
-		//	self.JsonResponseWithError(http, err, 500)
-		//	return
-		//}
 		break
 	case logic.ComposeTypeRemoteUrl:
 		params.Yaml = params.RemoteUrl
@@ -71,7 +69,7 @@ func (self Compose) Create(http *gin.Context) {
 	if params.Id > 0 {
 		yamlRow.Title = params.Title
 		yamlRow.Setting.Environment = params.Environment
-
+		yamlRow.Setting.Override = params.Override
 		if params.Type != logic.ComposeTypeStoragePath {
 			yamlRow.Setting.Type = params.Type
 			yamlRow.Setting.Uri = uri
@@ -88,11 +86,11 @@ func (self Compose) Create(http *gin.Context) {
 				Status:      "waiting",
 				Type:        params.Type,
 				Uri:         uri,
+				Override:    params.Override,
 			},
 		}
 		_ = dao.Compose.Create(yamlRow)
 	}
-
 	self.JsonResponseWithoutError(http, gin.H{
 		"id": yamlRow.ID,
 	})
@@ -160,6 +158,10 @@ func (self Compose) GetDetail(http *gin.Context) {
 
 	if params.Id > 0 {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+		if yamlRow == nil {
+			self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+			return
+		}
 		params.Name = yamlRow.Name
 	} else if params.Name != "" {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
@@ -172,22 +174,13 @@ func (self Compose) GetDetail(http *gin.Context) {
 		}
 	}
 
-	task := &logic.ComposeTaskOption{
-		Entity: yamlRow,
-	}
-	containerList := logic.Compose{}.Ps(task)
-
-	composer, err := task.Compose()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	yaml, err := composer.Project.MarshalYAML()
+	yaml, err := logic.Compose{}.GetTasker(yamlRow).Yaml()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	yamlRow.Yaml = string(yaml)
+
 	composeRunList := logic.Compose{}.Ls(params.Name)
 	for _, item := range composeRunList {
 		if item.Name == yamlRow.Name {
@@ -198,7 +191,7 @@ func (self Compose) GetDetail(http *gin.Context) {
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"detail":        yamlRow,
-		"containerList": containerList,
+		"containerList": logic.Compose{}.GetTasker(yamlRow).Ps(),
 	})
 	return
 }
@@ -267,6 +260,25 @@ func (self Compose) GetFromUri(http *gin.Context) {
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"content": string(content),
+	})
+	return
+}
+
+func (self Compose) Parse(http *gin.Context) {
+	type ParamsValidate struct {
+		Yaml string `json:"yaml" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	composer, err := compose.NewComposeWithYaml([]byte(params.Yaml))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"project": composer.Project,
 	})
 	return
 }

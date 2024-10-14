@@ -109,6 +109,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/compose/get-detail", controller.Compose{}.GetDetail)
 			cors.POST("/app/compose/delete", controller.Compose{}.Delete)
 			cors.POST("/app/compose/get-from-uri", controller.Compose{}.GetFromUri)
+			cors.POST("/app/compose/parse", controller.Compose{}.Parse)
 
 			cors.POST("/app/compose/container-deploy", controller.Compose{}.ContainerDeploy)
 			cors.POST("/app/compose/container-destroy", controller.Compose{}.ContainerDestroy)

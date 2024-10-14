@@ -44,6 +44,7 @@ type ContainerNetworkItem struct {
 }
 
 type SiteEnvOption struct {
+	Name            string               `json:"name"`
 	Environment     []EnvItem            `json:"environment"`
 	Links           []LinkItem           `json:"links"`
 	Ports           []PortItem           `json:"ports"`

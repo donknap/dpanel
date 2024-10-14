@@ -13,7 +13,7 @@ services:
       - {{ $val }}
 #{{- end}}
 #{{- end}}
-    x-dpanel-service:
+    x-dpanel:
       image_tar:
         amd64: asset/plugin/explorer/image-amd64.tar
         arm64: asset/plugin/explorer/image-arm64.tar

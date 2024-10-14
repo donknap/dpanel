@@ -12,7 +12,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -46,7 +45,7 @@ func NewPlugin(name string, composeData map[string]*TemplateParser) (*plugin, er
 		return nil, err
 	}
 
-	composer, err := compose.NewCompose(compose.WithYamlString(filepath.Join("dpanel", "plugin", "compose-"+name+".yaml"), yamlResult.GetData()))
+	composer, err := compose.NewComposeWithYaml(yamlResult.GetData())
 	if err != nil {
 		return nil, err
 	}
