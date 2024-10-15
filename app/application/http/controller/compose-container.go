@@ -22,9 +22,12 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
-	err := logic.Compose{}.GetTasker(composeRow).Deploy()
-
-	notice.Message{}.Success("composeDeploy", composeRow.Name)
+	tasker, err := logic.Compose{}.GetTasker(composeRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = tasker.Deploy()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -49,8 +52,12 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
 	}
-
-	err := logic.Compose{}.GetTasker(composeRow).Destroy(params.DeleteImage)
+	tasker, err := logic.Compose{}.GetTasker(composeRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = tasker.Destroy(params.DeleteImage)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -82,7 +89,12 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
 	}
-	err := logic.Compose{}.GetTasker(composeRow).Ctrl(params.Op)
+	tasker, err := logic.Compose{}.GetTasker(composeRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = tasker.Ctrl(params.Op)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

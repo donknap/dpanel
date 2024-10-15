@@ -54,7 +54,7 @@ func (self Command) RunWithOut(option *RunCommandOption) string {
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		slog.Debug(option.CmdName, err.Error())
+		slog.Debug(option.CmdName, option.CmdArgs, err.Error())
 	}
 	return string(out)
 }

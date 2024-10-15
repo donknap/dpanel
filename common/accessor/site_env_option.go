@@ -43,6 +43,11 @@ type ContainerNetworkItem struct {
 	Gateway string `json:"gateway"`
 }
 
+type ReplaceDependItem struct {
+	DependName  string `json:"dependName"`
+	ReplaceName string `json:"replaceName"`
+}
+
 type SiteEnvOption struct {
 	Name            string               `json:"name"`
 	Environment     []EnvItem            `json:"environment"`
@@ -72,4 +77,5 @@ type SiteEnvOption struct {
 	ExtraHosts      []EnvItem            `json:"extraHosts"`
 	IpV4            ContainerNetworkItem `json:"ipV4"`
 	IpV6            ContainerNetworkItem `json:"ipV6"`
+	ReplaceDepend   []ReplaceDependItem  `json:"replaceDepend"`
 }

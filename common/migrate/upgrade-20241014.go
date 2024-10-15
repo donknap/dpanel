@@ -22,11 +22,15 @@ func (self Upgrade20241014) Upgrade() error {
 	return nil
 }
 
+// todo 完全适配 compose spec 的参数
 func (self Upgrade20241014) Covert(options []accessor.SiteEnvOption) types.Project {
 	project := types.Project{
 		Services: map[string]types.ServiceConfig{},
 		Networks: make(types.Networks),
 		Volumes:  make(types.Volumes),
+	}
+	extProject := compose.Ext{
+		DisabledServices: make([]string, 0),
 	}
 
 	for _, siteOption := range options {
@@ -77,6 +81,16 @@ func (self Upgrade20241014) Covert(options []accessor.SiteEnvOption) types.Proje
 				service.ExternalLinks = append(service.ExternalLinks, fmt.Sprintf("%s:%s", item.Name, item.Alise))
 				if item.Volume {
 					extService.External.VolumesFrom = append(extService.External.VolumesFrom, item.Name)
+				}
+			}
+		}
+
+		if !function.IsEmptyArray(siteOption.ReplaceDepend) {
+			for _, item := range siteOption.ReplaceDepend {
+				// 替换compose中服务时，部署时需要过滤掉
+				if item.DependName != "" && item.ReplaceName != "" {
+					service.ExternalLinks = append(service.ExternalLinks, fmt.Sprintf("%s:%s", item.ReplaceName, item.DependName))
+					extProject.DisabledServices = append(extProject.DisabledServices, item.DependName)
 				}
 			}
 		}
@@ -218,6 +232,9 @@ func (self Upgrade20241014) Covert(options []accessor.SiteEnvOption) types.Proje
 			project.Networks[siteOption.Name] = projectNetworkConfig
 		}
 		project.Services[siteOption.Name] = service
+	}
+	project.Extensions = map[string]any{
+		compose.ExtensionName: extProject,
 	}
 	return project
 }

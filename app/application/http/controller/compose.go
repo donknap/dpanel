@@ -21,15 +21,15 @@ type Compose struct {
 
 func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id          int32                    `json:"id"`
-		Title       string                   `json:"title"`
-		Name        string                   `json:"name" binding:"required"`
-		Type        string                   `json:"type" binding:"required"`
-		Yaml        string                   `json:"yaml"`
-		RemoteUrl   string                   `json:"remoteUrl"`
-		ServerPath  string                   `json:"serverPath"`
-		Environment []accessor.EnvItem       `json:"environment"`
-		Override    []accessor.SiteEnvOption `json:"override"`
+		Id          int32                             `json:"id"`
+		Title       string                            `json:"title"`
+		Name        string                            `json:"name" binding:"required"`
+		Type        string                            `json:"type" binding:"required"`
+		Yaml        string                            `json:"yaml"`
+		RemoteUrl   string                            `json:"remoteUrl"`
+		ServerPath  string                            `json:"serverPath"`
+		Environment []accessor.EnvItem                `json:"environment"`
+		Override    map[string]accessor.SiteEnvOption `json:"override"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -65,11 +65,15 @@ func (self Compose) Create(http *gin.Context) {
 		uri = params.ServerPath
 		break
 	}
+	overrideYaml := make([]accessor.SiteEnvOption, 0)
+	for _, item := range params.Override {
+		overrideYaml = append(overrideYaml, item)
+	}
 
 	if params.Id > 0 {
 		yamlRow.Title = params.Title
 		yamlRow.Setting.Environment = params.Environment
-		yamlRow.Setting.Override = params.Override
+		yamlRow.Setting.Override = overrideYaml
 		if params.Type != logic.ComposeTypeStoragePath {
 			yamlRow.Setting.Type = params.Type
 			yamlRow.Setting.Uri = uri
@@ -83,10 +87,10 @@ func (self Compose) Create(http *gin.Context) {
 			Yaml:  params.Yaml,
 			Setting: &accessor.ComposeSettingOption{
 				Environment: params.Environment,
-				Status:      "waiting",
+				Status:      logic.ComposeStatusWaiting,
 				Type:        params.Type,
 				Uri:         uri,
-				Override:    params.Override,
+				Override:    overrideYaml,
 			},
 		}
 		_ = dao.Compose.Create(yamlRow)
@@ -173,26 +177,36 @@ func (self Compose) GetDetail(http *gin.Context) {
 			Setting: &accessor.ComposeSettingOption{},
 		}
 	}
-
-	yaml, err := logic.Compose{}.GetTasker(yamlRow).Yaml()
+	tasker, err := logic.Compose{}.GetTasker(yamlRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	yaml, err := tasker.Yaml()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	yamlRow.Yaml = string(yaml)
 
+	status := logic.ComposeStatusWaiting
 	composeRunList := logic.Compose{}.Ls(params.Name)
 	for _, item := range composeRunList {
 		if item.Name == yamlRow.Name {
-			yamlRow.Setting.Status = item.Status
+			status = item.Status
 			break
 		}
 	}
+	yamlRow.Setting.Status = status
+	data := gin.H{
+		"detail":  yamlRow,
+		"project": tasker.Project(),
+	}
+	if status != logic.ComposeStatusWaiting {
+		data["containerList"] = tasker.Ps()
+	}
 
-	self.JsonResponseWithoutError(http, gin.H{
-		"detail":        yamlRow,
-		"containerList": logic.Compose{}.GetTasker(yamlRow).Ps(),
-	})
+	self.JsonResponseWithoutError(http, data)
 	return
 }
 

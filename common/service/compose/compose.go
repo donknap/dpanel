@@ -4,8 +4,17 @@ import (
 	"context"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/donknap/dpanel/common/function"
 	"os"
+	"path/filepath"
 )
+
+func WithYamlPath(path string) cli.ProjectOptionsFn {
+	return func(options *cli.ProjectOptions) error {
+		options.ConfigPaths = append(options.ConfigPaths, path)
+		return nil
+	}
+}
 
 func NewCompose(opts ...cli.ProjectOptionsFn) (*Wrapper, error) {
 	// 自定义解析
@@ -27,11 +36,6 @@ func NewCompose(opts ...cli.ProjectOptionsFn) (*Wrapper, error) {
 	}
 	wrapper := &Wrapper{
 		Project: project,
-	}
-	ext := Ext{}
-	exists, err := project.Extensions.Get(ExtensionName, &ext)
-	if err == nil && exists {
-		wrapper.Ext = &ext
 	}
 	return wrapper, nil
 }
@@ -57,7 +61,6 @@ func NewComposeWithYaml(yaml []byte) (*Wrapper, error) {
 
 type Wrapper struct {
 	Project *types.Project
-	Ext     *Ext
 }
 
 // 区别于 Project.GetService 方法，此方法会将扩展信息一起返回
@@ -81,5 +84,41 @@ func (self Wrapper) GetBaseCommand() []string {
 		cmd = append(cmd, "-f", file)
 	}
 	cmd = append(cmd, "-p", self.Project.Name)
+
+	envFilePath := filepath.Join(self.Project.WorkingDir, ".env")
+	_, err := os.Stat(envFilePath)
+	if err == nil {
+		cmd = append(cmd, "--env-file", envFilePath)
+	}
 	return cmd
+}
+
+// 获取compose中的服务名称，并过滤掉不需要部署的
+func (self Wrapper) GetServiceNameList() []string {
+	serviceNames := make([]string, 0)
+
+	list, err := self.Project.GetServices()
+	if err != nil {
+		return serviceNames
+	}
+
+	ext, exists := self.getProjectExt()
+
+	for _, item := range list {
+		if exists && !function.IsEmptyArray(ext.DisabledServices) {
+			if !function.InArray(ext.DisabledServices, item.Name) {
+				serviceNames = append(serviceNames, item.Name)
+			}
+		} else {
+			serviceNames = append(serviceNames, item.Name)
+		}
+	}
+
+	return serviceNames
+}
+
+func (self Wrapper) getProjectExt() (Ext, bool) {
+	ext := Ext{}
+	exists, _ := self.Project.Extensions.Get(ExtensionName, &ext)
+	return ext, exists
 }
