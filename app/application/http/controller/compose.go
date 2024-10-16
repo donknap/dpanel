@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -113,7 +114,7 @@ func (self Compose) GetList(http *gin.Context) {
 	//同步本地目录任务
 	logic.Compose{}.Sync()
 
-	composeRunList := logic.Compose{}.Ls(params.Name)
+	composeRunList := logic.Compose{}.Ls()
 
 	composeList := make([]*entity.Compose, 0)
 	query := dao.Compose.Order(dao.Compose.ID.Desc())
@@ -128,17 +129,18 @@ func (self Compose) GetList(http *gin.Context) {
 	for _, runItem := range composeRunList {
 		has := false
 		for i, item := range composeList {
-			if runItem.Name == item.Name {
+			if runItem.Name == fmt.Sprintf(logic.ComposeProjectName, item.ID) {
 				has = true
 				composeList[i].Setting.Status = runItem.Status
 			}
 		}
-		if params.Title == "" && !has {
+		if params.Title == "" && !has && strings.Contains(runItem.Name, params.Name) && !strings.Contains(runItem.Name, "dpanel-compose") {
 			composeList = append(composeList, &entity.Compose{
 				Title: "",
 				Name:  runItem.Name,
 				Setting: &accessor.ComposeSettingOption{
 					Status: runItem.Status,
+					Type:   logic.ComposeTypeOutPath,
 				},
 			})
 		}
@@ -170,12 +172,36 @@ func (self Compose) GetDetail(http *gin.Context) {
 	} else if params.Name != "" {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
 	}
+	composeRunList := logic.Compose{}.Ls()
+
 	if yamlRow == nil {
 		yamlRow = &entity.Compose{
-			Name:    "",
-			Title:   "",
-			Setting: &accessor.ComposeSettingOption{},
+			Name:  "",
+			Title: "",
+			Setting: &accessor.ComposeSettingOption{
+				Type: logic.ComposeTypeServerPath,
+			},
 		}
+		// 查不到数据表示此compose非面板管理，尝试获取名称和配置文件信息解析
+		for _, item := range composeRunList {
+			if item.Name == params.Name {
+				yamlRow.Yaml = ""
+				yamlRow.Name = item.Name
+				yamlRow.Setting.Uri = item.ConfigFileList[0]
+				yamlRow.Setting.Status = item.Status
+				_, err := os.Stat(yamlRow.Setting.Uri)
+				if err != nil {
+					data := gin.H{
+						"detail":  yamlRow,
+						"project": nil,
+					}
+					self.JsonResponseWithoutError(http, data)
+					return
+				}
+				break
+			}
+		}
+
 	}
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
@@ -190,14 +216,18 @@ func (self Compose) GetDetail(http *gin.Context) {
 	yamlRow.Yaml = string(yaml)
 
 	status := logic.ComposeStatusWaiting
-	composeRunList := logic.Compose{}.Ls(params.Name)
-	for _, item := range composeRunList {
-		if item.Name == yamlRow.Name {
-			status = item.Status
-			break
+	if yamlRow.Setting.Status == logic.ComposeStatusWaiting {
+		for _, item := range composeRunList {
+			if item.Name == tasker.Name {
+				status = item.Status
+				yamlRow.Setting.Status = status
+				break
+			}
 		}
+	} else {
+		status = yamlRow.Setting.Status
 	}
-	yamlRow.Setting.Status = status
+
 	data := gin.H{
 		"detail":  yamlRow,
 		"project": tasker.Project(),
@@ -218,7 +248,7 @@ func (self Compose) Delete(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	composeRunList := logic.Compose{}.Ls("")
+	composeRunList := logic.Compose{}.Ls()
 	for _, id := range params.Id {
 		row, err := dao.Compose.Where(dao.Compose.ID.Eq(id)).First()
 		if err != nil {
@@ -287,12 +317,15 @@ func (self Compose) Parse(http *gin.Context) {
 		return
 	}
 	composer, err := compose.NewComposeWithYaml([]byte(params.Yaml))
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	if err == nil {
+		self.JsonResponseWithoutError(http, gin.H{
+			"project": composer.Project,
+		})
+	} else {
+		self.JsonResponseWithoutError(http, gin.H{
+			"project": nil,
+		})
 	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"project": composer.Project,
-	})
+
 	return
 }

@@ -50,7 +50,17 @@ func (self Task) Destroy(deleteImage bool) error {
 	cmd := []string{
 		"--progress", "tty", "down",
 	}
-	// todo 删除compose 前需要先把关联的已有容器网络退出
+	// 删除compose 前需要先把关联的已有容器网络退出
+	for _, item := range self.composer.Project.Networks {
+		for _, serviceItem := range self.composer.Project.Services {
+			for _, linkItem := range serviceItem.ExternalLinks {
+				links := strings.Split(linkItem, ":")
+				if len(links) == 2 {
+					_ = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, item.Name, links[0], true)
+				}
+			}
+		}
+	}
 
 	if deleteImage {
 		cmd = append(cmd, "--rmi", "all")

@@ -338,18 +338,35 @@ func (self Site) UpdateTitle(http *gin.Context) {
 		ID: params.Md5,
 	})).First()
 	if siteRow != nil {
-		dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
+		_, err := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
 			ID: params.Md5,
 		})).Updates(&entity.Site{
 			SiteTitle: params.Title,
 		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
 	} else {
-		dao.Site.Create(&entity.Site{
+		runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
+		err = dao.Site.Create(&entity.Site{
 			SiteTitle: params.Title,
+			Env:       &runOption,
 			ContainerInfo: &accessor.SiteContainerInfoOption{
 				ID: params.Md5,
 			},
 		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
 	}
 	self.JsonSuccessResponse(http)
 	return

@@ -27,26 +27,26 @@ const (
 	ComposeTypeRemoteUrl   = "remoteUrl"
 	ComposeTypeServerPath  = "serverPath"
 	ComposeTypeStoragePath = "storagePath"
+	ComposeTypeOutPath     = "outPath"
 	ComposeStatusWaiting   = "waiting"
+	ComposeProjectName     = "dpanel-compose-%d"
 )
 
 type Compose struct {
 }
 
 type composeItem struct {
-	Name        string `json:"name"`
-	Status      string `json:"status"`
-	ConfigFiles string `json:"configFiles"`
+	Name           string `json:"name"`
+	Status         string `json:"status"`
+	ConfigFiles    string `json:"configFiles"`
+	ConfigFileList []string
 }
 
-func (self Compose) Ls(projectName string) []*composeItem {
+func (self Compose) Ls() []*composeItem {
 	command := []string{
 		"ls",
 		"--format", "json",
 		"--all",
-	}
-	if projectName != "" {
-		command = append(command, "--filter", "name="+projectName)
 	}
 	out := exec.Command{}.RunWithOut(&exec.RunCommandOption{
 		CmdName: "docker",
@@ -57,6 +57,15 @@ func (self Compose) Ls(projectName string) []*composeItem {
 	if err != nil {
 		return result
 	}
+	for i, item := range result {
+		if strings.Contains(item.ConfigFiles, ",") {
+			result[i].ConfigFileList = strings.Split(item.ConfigFiles, ",")
+		} else {
+			result[i].ConfigFileList = []string{
+				item.ConfigFiles,
+			}
+		}
+	}
 	return result
 }
 
@@ -66,11 +75,19 @@ func (self Compose) Kill() error {
 
 func (self Compose) Sync() error {
 	composeList, _ := dao.Compose.Find()
+	oldComposeName := make([]string, 0)
+	for _, item := range composeList {
+		if item.Setting.Type == ComposeTypeStoragePath {
+			oldComposeName = append(oldComposeName, item.Name)
+		}
+	}
 
 	composeFileName := []string{
 		"docker-compose.yml", "docker-compose.yaml",
 		"compose.yml", "compose.yaml",
 	}
+
+	pathFindComposeName := make([]string, 0)
 	rootDir := storage.Local{}.GetComposePath()
 	err := filepath.Walk(rootDir, func(path string, info fs.FileInfo, err error) error {
 		for _, suffix := range composeFileName {
@@ -79,6 +96,7 @@ func (self Compose) Sync() error {
 				// 只同步二级目录下的 yaml
 				if segments := strings.Split(filepath.Clean(rel), string(filepath.Separator)); len(segments) == 2 {
 					name := filepath.Dir(rel)
+					pathFindComposeName = append(pathFindComposeName, name)
 
 					has := false
 					for _, item := range composeList {
@@ -106,6 +124,16 @@ func (self Compose) Sync() error {
 		}
 		return nil
 	})
+
+	deleteList := make([]string, 0)
+	for _, name := range oldComposeName {
+		if !function.InArray(pathFindComposeName, name) {
+			deleteList = append(deleteList, name)
+		}
+	}
+	if !function.IsEmptyArray(deleteList) {
+		_, _ = dao.Compose.Where(dao.Compose.Name.In(deleteList...)).Delete()
+	}
 	if err != nil {
 		return err
 	}
@@ -113,21 +141,12 @@ func (self Compose) Sync() error {
 }
 
 func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
+	projectName := fmt.Sprintf(ComposeProjectName, entity.ID)
 	options := make([]cli.ProjectOptionsFn, 0)
-	options = append(options, cli.WithName(entity.Name))
 
-	// 生成 .env 文件
-	if !function.IsEmptyArray(entity.Setting.Environment) {
-		envFilePath := filepath.Join(storage.Local{}.GetComposePath(), entity.Name, ".env")
-		envList := make([]string, 0)
-		for _, item := range entity.Setting.Environment {
-			envList = append(envList, fmt.Sprintf("%s=%s", item.Name, item.Value))
-		}
-		err := os.WriteFile(envFilePath, []byte(strings.Join(envList, "\n")), 0666)
-		if err != nil {
-			return nil, err
-		}
-		options = append(options, cli.WithEnv(envList))
+	if entity.ID > 0 {
+		// compose 项止名称不允许有大小写，但是compose的目录名可以包含特殊字符，这里统一用id进行区分
+		options = append(options, cli.WithName(projectName))
 	}
 
 	yamlFilePath := ""
@@ -164,6 +183,20 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	composer, err := compose.NewCompose(options...)
 	if err != nil {
 		return nil, err
+	}
+
+	// 生成 .env 文件
+	if !function.IsEmptyArray(entity.Setting.Environment) {
+		envFilePath := filepath.Join(composer.Project.WorkingDir, ".env")
+		envList := make([]string, 0)
+		for _, item := range entity.Setting.Environment {
+			envList = append(envList, fmt.Sprintf("%s=%s", item.Name, item.Value))
+		}
+		err := os.WriteFile(envFilePath, []byte(strings.Join(envList, "\n")), 0666)
+		if err != nil {
+			return nil, err
+		}
+		options = append(options, cli.WithEnv(envList))
 	}
 
 	// 生成覆盖配置时，需要获取原始yaml的数据，所以这里生构建出原始的compose对象，再进行覆盖。
@@ -210,6 +243,6 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	tasker := compose.NewTasker(entity.Name, composer)
+	tasker := compose.NewTasker(projectName, composer)
 	return tasker, nil
 }
