@@ -147,12 +147,10 @@ func (self Network) Create(http *gin.Context) {
 		Options: map[string]string{},
 		Driver:  "default",
 	}
+
 	ipAmConfig := network.IPAMConfig{}
 	if params.IpGateway != "" {
 		ipAmConfig.Gateway = params.IpGateway
-	}
-	if params.IpSubnet != "" {
-		ipAmConfig.Subnet = params.IpSubnet
 	}
 	if params.IpRange != "" {
 		ipAmConfig.IPRange = params.IpRange
@@ -163,7 +161,12 @@ func (self Network) Create(http *gin.Context) {
 			ipAmConfig.AuxAddress[item.Device] = item.Address
 		}
 	}
-	ipAm.Config = append(ipAm.Config, ipAmConfig)
+	if params.IpSubnet != "" {
+		ipAmConfig.Subnet = params.IpSubnet
+	}
+	if params.IpGateway != "" && params.IpSubnet != "" {
+		ipAm.Config = append(ipAm.Config, ipAmConfig)
+	}
 
 	if params.EnableIpV6 {
 		ipV6AmConfig := network.IPAMConfig{
