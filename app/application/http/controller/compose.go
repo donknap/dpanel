@@ -8,11 +8,13 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/compose"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	http2 "net/http"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -256,12 +258,20 @@ func (self Compose) Delete(http *gin.Context) {
 			return
 		}
 		for _, runItem := range composeRunList {
-			if row.Name == runItem.Name {
+			if fmt.Sprintf(logic.ComposeProjectName, row.ID) == runItem.Name {
 				self.JsonResponseWithError(http, errors.New("请先销毁容器"), 500)
 				return
 			}
 		}
+		if row.Setting.Type != logic.ComposeTypeStoragePath {
+			err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), row.Name))
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
 		_, err = dao.Compose.Where(dao.Compose.ID.Eq(id)).Delete()
+
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
