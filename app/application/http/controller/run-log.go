@@ -2,6 +2,7 @@ package controller
 
 import (
 	"github.com/docker/docker/api/types/container"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -35,14 +36,17 @@ func (self RunLog) Run(http *gin.Context) {
 		return
 	}
 	output, _ := io.ReadAll(out)
+	cleanOut := function.BytesCleanFunc([]rune(string(output)), func(b rune) bool {
+		return b == '\ufffd'
+	})
 	if params.Download {
 		http.Header("Content-Type", "text/plain")
 		http.Header("Content-Disposition", "attachment; filename="+params.Md5+".log")
-		http.Data(200, "text/plain", output)
+		http.Data(200, "text/plain", []byte(string(cleanOut)))
 		return
 	} else {
 		self.JsonResponseWithoutError(http, gin.H{
-			"log": string(output),
+			"log": string(cleanOut),
 		})
 	}
 	return

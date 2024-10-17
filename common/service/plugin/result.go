@@ -1,7 +1,5 @@
 package plugin
 
-import "log/slog"
-
 func newResult() *result {
 	o := &result{
 		data: make([]byte, 0),
@@ -19,6 +17,5 @@ func (self *result) Write(p []byte) (n int, err error) {
 }
 
 func (self *result) GetData() []byte {
-	slog.Debug("explorer", "copy result", string(self.data))
 	return self.data
 }

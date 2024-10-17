@@ -3,6 +3,7 @@ package plugin
 import (
 	"github.com/docker/docker/api/types"
 	"io"
+	"log/slog"
 )
 
 type Hijacked struct {
@@ -24,7 +25,10 @@ func (self Hijacked) Out() []byte {
 	//write := stdcopy.NewStdWriter(&b, stdcopy.Stdout)
 	//stdcopy.StdCopy(write, nil, self.conn.Reader)
 	write := newResult()
-	io.Copy(write, self.conn.Reader)
+	_, err := io.Copy(write, self.conn.Reader)
+	if err != nil {
+		slog.Debug("plugin", "hijacked", err)
+	}
 	return write.GetData()
 }
 

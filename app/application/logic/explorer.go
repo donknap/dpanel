@@ -1,15 +1,14 @@
 package logic
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
-	"log/slog"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -47,35 +46,40 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 		return fileList, err
 	}
 	cmd := fmt.Sprintf("ls -AlhX --full-time %s%s \n", self.rootPath, path)
-	slog.Debug("explorer", "get-list", cmd)
+
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return fileList, err
 	}
-	lines := bytes.Split(out, []byte("\n"))
+	//lines := strings.Split(out, "\t")
+	// 这里不能单纯的用换行进行分隔，正常的数据中会有多余的 \n
+	lines := make([][]byte, 0)
+	reg := regexp.MustCompile(`[dlb-][a-zA-Z-]{3}[a-zA-Z-]{3}[a-zA-Z-]{3} `).FindAllStringIndex(string(out), -1)
+	for i, _ := range reg {
+		line := make([]byte, 0)
+		start, end := reg[i][0], 0
+		if i+1 >= len(reg) {
+			end = len(out)
+		} else {
+			end = reg[i+1][0]
+		}
+		line = append(line, out[start:end]...)
+		lines = append(lines, line)
+	}
 	for _, line := range lines {
-		if function.IsEmptyArray(line) {
-			continue
-		}
-		if len(line) > 8 {
-			switch stdcopy.StdType(line[0]) {
-			case stdcopy.Stdin, stdcopy.Stdout, stdcopy.Stderr, stdcopy.Systemerr:
-				line = line[8:]
-			}
-		}
 		switch line[0] {
 		case 'd', 'l', '-', 'b':
 			row := strings.Fields(string(line))
 			if !function.IsEmptyArray(row) {
 				item := &fileItemResult{
-					ShowName: string(line[strings.LastIndex(string(line), row[8]):]),
+					ShowName: strings.TrimSpace(string(line[strings.LastIndex(string(line), row[8]):])),
 					IsDir:    line[0] == 'd',
-					Size:     row[4],
-					Mode:     row[0],
+					Size:     strings.TrimSpace(row[4]),
+					Mode:     strings.TrimSpace(row[0]),
 					Change:   -1,
-					ModTime:  row[5] + row[6],
-					Owner:    row[2],
-					Group:    row[3],
+					ModTime:  strings.TrimSpace(row[5]) + strings.TrimSpace(row[6]),
+					Owner:    strings.TrimSpace(row[2]),
+					Group:    strings.TrimSpace(row[3]),
 				}
 				if strings.Contains(item.ShowName, "->") {
 					index := strings.Index(item.ShowName, "->")
@@ -119,11 +123,10 @@ func (self explorer) DeleteFileList(fileList []string) error {
 		deleteFileList = append(deleteFileList, self.rootPath+path)
 	}
 	cmd := fmt.Sprintf("cd %s && rm -rf \"%s\" \n", self.rootPath, strings.Join(deleteFileList, "\" \""))
-	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+	_, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return err
 	}
-	slog.Debug("explorer", "delete", string(out))
 	return nil
 }
 
@@ -172,11 +175,10 @@ func (self explorer) Create(path string, isDir bool) error {
 			currentPath,
 			currentPath)
 	}
-	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+	_, err = plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return err
 	}
-	slog.Debug("explorer", "create", string(out))
 	return nil
 }
 
@@ -193,11 +195,10 @@ func (self explorer) Chmod(fileList []string, mod int, hasChildren bool) error {
 		flag += " -R "
 	}
 	cmd := fmt.Sprintf("cd %s && chmod %s %d %s \n", self.rootPath, flag, mod, strings.Join(changeFileList, " "))
-	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+	_, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return err
 	}
-	slog.Debug("explorer", "chmod", string(out))
 	return nil
 }
 
@@ -215,11 +216,10 @@ func (self explorer) Chown(containerName string, fileList []string, owner string
 		flag += " -R "
 	}
 	cmd := fmt.Sprintf("chown %s %s:%s %s \n", flag, owner, owner, strings.Join(changeFileList, " "))
-	out, err := plugin.Command{}.Result(containerName, cmd)
+	_, err := plugin.Command{}.Result(containerName, cmd)
 	if err != nil {
 		return err
 	}
-	slog.Debug("explorer", "chown", string(out))
 	return nil
 }
 
@@ -230,8 +230,6 @@ func (self explorer) GetPasswd() ([]*userItemResult, error) {
 	if err != nil {
 		return result, err
 	}
-	slog.Debug("explorer", "passwd", string(out))
-
 	lines := strings.Split(string(out), "\n")
 	for _, line := range lines {
 		if len(line) > 8 {
@@ -263,10 +261,9 @@ func (self explorer) Rename(file string, newFileName string) error {
 	oldFile := fmt.Sprintf("%s%s", self.rootPath, file)
 	newFile := fmt.Sprintf("%s/%s", filepath.Dir(oldFile), newFileName)
 	cmd := fmt.Sprintf("mv %s %s \n", oldFile, newFile)
-	out, err := plugin.Command{}.Result(self.pluginName, cmd)
+	_, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return err
 	}
-	slog.Debug("explorer", "rename", string(out))
 	return nil
 }
