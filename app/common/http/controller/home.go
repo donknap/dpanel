@@ -1,21 +1,21 @@
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"log/slog"
 	"time"
 )
 
@@ -133,16 +133,7 @@ func (self Home) Info(http *gin.Context) {
 	}
 	info.Name = docker.Sdk.Client.DaemonHost()
 
-	timeout := time.Second * 5
-	setting, _ := logic.Setting{}.GetValue(logic.SettingGroupSetting, "server")
-	if setting != nil && setting.Value.RequestTimeout > 0 {
-		timeout = time.Duration(setting.Value.RequestTimeout) * time.Second
-	}
-
-	// 有些设备的docker获取磁盘占用比较耗时，这里增加一个超时判断
-	var diskUsage types.DiskUsage
-	diskUsageChan := make(chan types.DiskUsage)
-	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
+	// 有些设备的docker获取磁盘占用比较耗时，跑一下后台协程去获取数据
 	go func() {
 		diskUsage, err := docker.Sdk.Client.DiskUsage(docker.Sdk.Ctx, types.DiskUsageOptions{
 			Types: []types.DiskUsageObject{
@@ -153,15 +144,26 @@ func (self Home) Info(http *gin.Context) {
 			},
 		})
 		if err == nil {
-			diskUsageChan <- diskUsage
+			logic.Setting{}.Save(&entity.Setting{
+				GroupName: logic.SettingGroupSetting,
+				Name:      logic.SettingGroupSettingDiskUsage,
+				Value: &accessor.SettingValueOption{
+					DiskUsage: accessor.DiskUsage{
+						Usage:     diskUsage,
+						UpdatedAt: time.Now(),
+					},
+				},
+			})
 		}
+		return
 	}()
-	select {
-	case diskUsage = <-diskUsageChan:
-		slog.Debug("home", "info", "get disk usage")
-	case <-ctx.Done():
-		slog.Debug("home", "info", "disk usage timeout ")
-		cancelFunc()
+
+	diskUsage := accessor.DiskUsage{
+		Usage: types.DiskUsage{},
+	}
+	setting, err := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDiskUsage)
+	if err == nil && setting != nil {
+		diskUsage = setting.Value.DiskUsage
 	}
 
 	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, network.ListOptions{})
@@ -170,7 +172,7 @@ func (self Home) Info(http *gin.Context) {
 	backupData, _ := dao.Backup.Count()
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,
-		"usage":      diskUsage,
+		"diskUsage":  diskUsage,
 		"sdkVersion": docker.Sdk.Client.ClientVersion(),
 		"total": map[string]int{
 			"network":       len(networkRow),

@@ -8,9 +8,10 @@ import (
 
 // 全局配置
 var (
-	SettingGroupSetting       = "setting"
-	SettingGroupSettingServer = "server" // 服务器
-	SettingGroupSettingDocker = "docker" // docker env
+	SettingGroupSetting          = "setting"
+	SettingGroupSettingServer    = "server" // 服务器
+	SettingGroupSettingDocker    = "docker" // docker env
+	SettingGroupSettingDiskUsage = "diskUsage"
 )
 
 // 用户相关数据
