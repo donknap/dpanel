@@ -33,38 +33,46 @@ func (self Explorer) Export(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	out, _, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Md5, "/")
+	var err error
+
+	zipTempFile, _ := os.CreateTemp("", "dpanel")
+	defer func() {
+		_ = os.Remove(zipTempFile.Name())
+	}()
+	zipWriter := zip.NewWriter(zipTempFile)
+
+	// 需要先将每个目录导出，然后再合并起来。直接导出整个容器效率太低
+	for _, path := range params.FileList {
+		out, _, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Md5, path)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		tarReader := tar.NewReader(out)
+		for {
+			file, err := tarReader.Next()
+			if err != nil {
+				break
+			}
+			switch file.Typeflag {
+			case tar.TypeReg, tar.TypeRegA, tar.TypeDir, tar.TypeGNUSparse:
+				zipHeader := &zip.FileHeader{
+					Name:               file.Name,
+					Method:             zip.Deflate,
+					UncompressedSize64: uint64(file.Size),
+					Modified:           file.ModTime,
+				}
+				writer, _ := zipWriter.CreateHeader(zipHeader)
+				_, _ = io.Copy(writer, tarReader)
+			}
+		}
+		_ = out.Close()
+	}
+	err = zipWriter.Close()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer out.Close()
-	zipTempFile, _ := os.CreateTemp("", "dpanel")
-	defer os.Remove(zipTempFile.Name())
-	zipWriter := zip.NewWriter(zipTempFile)
-	tarReader := tar.NewReader(out)
-	for {
-		file, err := tarReader.Next()
-		if err != nil {
-			break
-		}
-		switch file.Typeflag {
-		case tar.TypeReg, tar.TypeRegA, tar.TypeDir, tar.TypeGNUSparse:
-			for _, rootPath := range params.FileList {
-				if strings.HasPrefix(file.Name, rootPath) {
-					zipHeader := &zip.FileHeader{
-						Name:               file.Name,
-						Method:             zip.Deflate,
-						UncompressedSize64: uint64(file.Size),
-						Modified:           file.ModTime,
-					}
-					writer, _ := zipWriter.CreateHeader(zipHeader)
-					io.Copy(writer, tarReader)
-				}
-			}
-		}
-	}
-	zipWriter.Close()
 	http.Header("Content-Type", "application/zip")
 	http.Header("Content-Disposition", "attachment; filename=export.zip")
 	http.File(zipTempFile.Name())
