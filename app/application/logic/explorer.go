@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
+	"log/slog"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -45,8 +46,9 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 	if err != nil {
 		return fileList, err
 	}
-	cmd := fmt.Sprintf("ls -AlhX --full-time %s%s \n", self.rootPath, path)
 
+	cmd := fmt.Sprintf("ls -AlhX --full-time %s%s \n", self.rootPath, path)
+	cmd = fmt.Sprintf("ls -AulH --full-time %s%s | awk 'NR>1 {print \"`\" $1 \"` \" $2 \" \" $3 \" \" $4 \" \" $5 \" \" $6 \" \" $7 \" \" $8 \" \" $9 \" \" $11}' \n", self.rootPath, path)
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return fileList, err
@@ -54,7 +56,7 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 	//lines := strings.Split(out, "\t")
 	// 这里不能单纯的用换行进行分隔，正常的数据中会有多余的 \n
 	lines := make([][]byte, 0)
-	reg := regexp.MustCompile(`[dlb-][a-zA-Z-]{3}[a-zA-Z-]{3}[a-zA-Z-]{3} `).FindAllStringIndex(string(out), -1)
+	reg := regexp.MustCompile("`[dlb-][a-zA-Z-]{3}[a-zA-Z-]{3}[a-zA-Z-]{3}`").FindAllStringIndex(string(out), -1)
 	for i, _ := range reg {
 		line := make([]byte, 0)
 		start, end := reg[i][0], 0
@@ -66,25 +68,28 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 		line = append(line, out[start:end]...)
 		lines = append(lines, line)
 	}
-	for _, line := range lines {
-		switch line[0] {
+	for i, line := range lines {
+		row := strings.Fields(string(line))
+		if len(row) < 8 {
+			slog.Debug("explorer", "get-path-list", i, "line", string(line))
+			return nil, errors.New("目录解析错误, 请反馈: " + string(line))
+		}
+		row[0] = strings.Trim(row[0], "`")
+		switch row[0][0] {
 		case 'd', 'l', '-', 'b':
-			row := strings.Fields(string(line))
 			if !function.IsEmptyArray(row) {
 				item := &fileItemResult{
-					ShowName: strings.TrimSpace(string(line[strings.LastIndex(string(line), row[8]):])),
-					IsDir:    line[0] == 'd',
-					Size:     strings.TrimSpace(row[4]),
-					Mode:     strings.TrimSpace(row[0]),
+					ShowName: row[8],
+					IsDir:    row[0][0] == 'd',
+					Size:     row[4],
+					Mode:     row[0],
 					Change:   -1,
-					ModTime:  strings.TrimSpace(row[5]) + strings.TrimSpace(row[6]),
-					Owner:    strings.TrimSpace(row[2]),
-					Group:    strings.TrimSpace(row[3]),
+					ModTime:  row[5] + row[6],
+					Owner:    row[2],
+					Group:    row[3],
 				}
-				if strings.Contains(item.ShowName, "->") {
-					index := strings.Index(item.ShowName, "->")
-					item.LinkName = item.ShowName[index+2:]
-					item.ShowName = item.ShowName[0:index]
+				if len(row) >= 10 {
+					item.LinkName = row[9]
 				}
 				item.Name = path + item.ShowName
 				fileList = append(fileList, item)

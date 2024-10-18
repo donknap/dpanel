@@ -41,8 +41,9 @@ func (self Command) Result(containerName string, cmd string) (string, error) {
 	})
 	defer o.Close()
 
-	cleanOut := self.Clean(o.Out())
-	slog.Debug("command", "result", cleanOut)
+	out := o.Out()
+	cleanOut := self.Clean(out)
+	slog.Debug("command", "clear result", cleanOut)
 	return cleanOut, nil
 }
 
@@ -51,8 +52,5 @@ func (self Command) Clean(str []byte) string {
 	out := function.BytesCleanFunc(str, func(b byte) bool {
 		return b < 32 && b != '\n' && b != '\r' && b != '\t'
 	})
-	utf8Out := function.BytesCleanFunc([]rune(string(out)), func(b rune) bool {
-		return b == '\ufffd'
-	})
-	return string(utf8Out)
+	return string(out)
 }
