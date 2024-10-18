@@ -65,7 +65,6 @@ func (self Container) Status(http *gin.Context) {
 
 func (self Container) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Tag       string `json:"tag"`
 		Md5       string `json:"md5"`
 		SiteTitle string `json:"siteTitle"`
 	}
@@ -98,19 +97,21 @@ func (self Container) GetList(http *gin.Context) {
 	searchContainerIds := make([]string, 0)
 	searchSiteList, _ := dao.Site.Where(dao.Site.SiteTitle.Like("%" + params.SiteTitle + "%")).Find()
 	for _, item := range searchSiteList {
-		searchContainerIds = append(searchContainerIds, item.ContainerInfo.ID)
+		if item.ContainerInfo.ID != "" {
+			searchContainerIds = append(searchContainerIds, item.ContainerInfo.ID)
+		}
 	}
 	var result []types.Container
 
-	if params.Tag != "" || params.SiteTitle != "" {
+	if params.SiteTitle != "" {
 		result = make([]types.Container, 0)
 		for _, item := range list {
 			if function.InArray(searchContainerIds, item.ID) {
 				result = append(result, item)
-				break
+				continue
 			}
 			for _, name := range item.Names {
-				if strings.Contains(name, params.Tag) {
+				if strings.Contains(name, params.SiteTitle) {
 					result = append(result, item)
 					break
 				}
