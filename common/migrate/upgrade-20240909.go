@@ -21,7 +21,6 @@ func (self Upgrade20240909) Upgrade() error {
 		_, err := dao.Compose.Where(dao.Compose.ID.Eq(compose.ID)).Updates(&entity.Compose{
 			Setting: &accessor.ComposeSettingOption{
 				Status:      "waiting",
-				RawYaml:     "",
 				Environment: make([]accessor.EnvItem, 0),
 			},
 		})

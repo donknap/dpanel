@@ -38,9 +38,7 @@ func (self Compose) Create(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-
 	var yamlRow *entity.Compose
-
 	if params.Id > 0 {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
 		if yamlRow == nil {
@@ -68,15 +66,10 @@ func (self Compose) Create(http *gin.Context) {
 		uri = params.ServerPath
 		break
 	}
-	overrideYaml := make([]accessor.SiteEnvOption, 0)
-	for _, item := range params.Override {
-		overrideYaml = append(overrideYaml, item)
-	}
 
 	if params.Id > 0 {
 		yamlRow.Title = params.Title
-		yamlRow.Setting.Environment = params.Environment
-		yamlRow.Setting.Override = overrideYaml
+		yamlRow.Setting.Override = params.Override
 		if params.Type != logic.ComposeTypeStoragePath {
 			yamlRow.Setting.Type = params.Type
 			yamlRow.Setting.Uri = uri
@@ -89,11 +82,10 @@ func (self Compose) Create(http *gin.Context) {
 			Name:  params.Name,
 			Yaml:  params.Yaml,
 			Setting: &accessor.ComposeSettingOption{
-				Environment: params.Environment,
-				Status:      logic.ComposeStatusWaiting,
-				Type:        params.Type,
-				Uri:         uri,
-				Override:    overrideYaml,
+				Status:   logic.ComposeStatusWaiting,
+				Type:     params.Type,
+				Uri:      uri,
+				Override: params.Override,
 			},
 		}
 		_ = dao.Compose.Create(yamlRow)

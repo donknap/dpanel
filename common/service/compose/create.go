@@ -1,35 +1,64 @@
-package migrate
+package compose
 
 import (
+	"context"
 	"fmt"
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/compose"
 	"strconv"
 	"strings"
 )
 
-type Upgrade20241014 struct{}
-
-func (self Upgrade20241014) Version() string {
-	return "1.2.0"
+func WithYamlPath(path string) cli.ProjectOptionsFn {
+	return func(options *cli.ProjectOptions) error {
+		options.ConfigPaths = append(options.ConfigPaths, path)
+		return nil
+	}
 }
 
-func (self Upgrade20241014) Upgrade() error {
+func NewCompose(opts ...cli.ProjectOptionsFn) (*Wrapper, error) {
+	// 自定义解析
+	opts = append(opts,
+		cli.WithExtension(ExtensionName, Ext{}),
+		cli.WithExtension(ExtensionServiceName, ExtService{}),
+	)
+	options, err := cli.NewProjectOptions(
+		[]string{},
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil
+	project, err := options.LoadProject(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	wrapper := &Wrapper{
+		Project: project,
+	}
+	return wrapper, nil
 }
 
-// todo 完全适配 compose spec 的参数
-func (self Upgrade20241014) Covert(options []accessor.SiteEnvOption) types.Project {
+func NewComposeBySiteEnvMap(options map[string]accessor.SiteEnvOption) (*Wrapper, error) {
+	arr := make([]accessor.SiteEnvOption, 0)
+	for _, option := range options {
+		arr = append(arr, option)
+	}
+	return NewComposeBySiteEnv(arr...)
+}
+
+func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
+	// 完全适配 compose spec 的参数
 	project := types.Project{
 		Services: map[string]types.ServiceConfig{},
 		Networks: make(types.Networks),
 		Volumes:  make(types.Volumes),
 	}
-	extProject := compose.Ext{
+	extProject := Ext{
 		DisabledServices: make([]string, 0),
 	}
 
@@ -55,13 +84,13 @@ func (self Upgrade20241014) Covert(options []accessor.SiteEnvOption) types.Proje
 			Labels:     make(types.Labels),
 			ExtraHosts: make(types.HostsList),
 		}
-		extService := compose.ExtService{
-			External: compose.ExternalItem{
+		extService := ExtService{
+			External: ExternalItem{
 				VolumesFrom: make([]string, 0),
 				Volumes:     make([]string, 0),
 			},
 			AutoRemove: siteOption.AutoRemove,
-			Ports: compose.PortsItem{
+			Ports: PortsItem{
 				BindIPV6:   siteOption.BindIpV6,
 				PublishAll: siteOption.PublishAllPorts,
 			},
@@ -85,12 +114,12 @@ func (self Upgrade20241014) Covert(options []accessor.SiteEnvOption) types.Proje
 			}
 		}
 
-		if !function.IsEmptyArray(siteOption.ReplaceDepend) {
-			for _, item := range siteOption.ReplaceDepend {
+		if !function.IsEmptyArray(siteOption.Replace) {
+			for _, item := range siteOption.Replace {
 				// 替换compose中服务时，部署时需要过滤掉
-				if item.DependName != "" && item.ReplaceName != "" {
-					service.ExternalLinks = append(service.ExternalLinks, fmt.Sprintf("%s:%s", item.ReplaceName, item.DependName))
-					extProject.DisabledServices = append(extProject.DisabledServices, item.DependName)
+				if item.Depend != "" && item.Target != "" {
+					service.ExternalLinks = append(service.ExternalLinks, fmt.Sprintf("%s:%s", item.Target, item.Depend))
+					extProject.DisabledServices = append(extProject.DisabledServices, item.Depend)
 				}
 			}
 		}
@@ -200,7 +229,7 @@ func (self Upgrade20241014) Covert(options []accessor.SiteEnvOption) types.Proje
 		}
 
 		service.Extensions = map[string]any{
-			compose.ExtensionServiceName: extService,
+			ExtensionServiceName: extService,
 		}
 
 		if siteOption.IpV4.Address != "" || siteOption.IpV6.Address != "" {
@@ -234,7 +263,9 @@ func (self Upgrade20241014) Covert(options []accessor.SiteEnvOption) types.Proje
 		project.Services[siteOption.Name] = service
 	}
 	project.Extensions = map[string]any{
-		compose.ExtensionName: extProject,
+		ExtensionName: extProject,
 	}
-	return project
+	return &Wrapper{
+		Project: &project,
+	}, nil
 }

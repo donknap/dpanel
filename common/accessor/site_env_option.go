@@ -1,5 +1,7 @@
 package accessor
 
+import "strings"
+
 type VolumeItem struct {
 	Host       string `json:"host"`
 	Dest       string `json:"dest"`
@@ -26,9 +28,29 @@ type EnvItem struct {
 }
 
 type PortItem struct {
-	HostIp string `json:"hostIp"`
-	Host   string `json:"host"`
-	Dest   string `json:"dest"`
+	HostIp   string `json:"hostIp"`
+	Host     string `json:"host"`
+	Dest     string `json:"dest"`
+	Protocol string `json:"protocol"`
+}
+
+func (self PortItem) Parse() PortItem {
+	newValue := PortItem{
+		HostIp:   self.HostIp,
+		Host:     self.Host,
+		Dest:     self.Dest,
+		Protocol: self.Protocol,
+	}
+
+	if strings.Contains(self.Host, ":") {
+		temp := strings.Split(self.Host, ":")
+		newValue.HostIp = temp[0]
+		newValue.Host = temp[1]
+	}
+	if newValue.Protocol == "" {
+		newValue.Protocol = "tcp"
+	}
+	return newValue
 }
 
 type LogDriverItem struct {
@@ -43,39 +65,39 @@ type ContainerNetworkItem struct {
 	Gateway string `json:"gateway"`
 }
 
-type ReplaceDependItem struct {
-	DependName  string `json:"dependName"`
-	ReplaceName string `json:"replaceName"`
+type ReplaceItem struct {
+	Depend string `json:"depend"`
+	Target string `json:"target"`
 }
 
 type SiteEnvOption struct {
 	Name            string               `json:"name"`
-	Environment     []EnvItem            `json:"environment"`
-	Links           []LinkItem           `json:"links"`
-	Ports           []PortItem           `json:"ports"`
-	Volumes         []VolumeItem         `json:"volumes"`
-	VolumesDefault  []VolumeItem         `json:"volumesDefault"`
-	Network         []NetworkItem        `json:"network"`
+	Environment     []EnvItem            `json:"environment,omitempty"`
+	Links           []LinkItem           `json:"links,omitempty"`
+	Ports           []PortItem           `json:"ports,omitempty"`
+	Volumes         []VolumeItem         `json:"volumes,omitempty"`
+	VolumesDefault  []VolumeItem         `json:"volumesDefault,omitempty"`
+	Network         []NetworkItem        `json:"network,omitempty"`
 	ImageName       string               `json:"imageName"` // 非表单提交
 	ImageId         string               `json:"imageId"`   // 非表单提交
-	Privileged      bool                 `json:"privileged"`
-	AutoRemove      bool                 `json:"autoRemove"`
-	Restart         string               `json:"restart"`
-	Cpus            float32              `json:"cpus"`
-	Memory          int                  `json:"memory"`
+	Privileged      bool                 `json:"privileged,omitempty"`
+	AutoRemove      bool                 `json:"autoRemove,omitempty"`
+	Restart         string               `json:"restart,omitempty"`
+	Cpus            float32              `json:"cpus,omitempty"`
+	Memory          int                  `json:"memory,omitempty"`
 	ShmSize         string               `json:"shmsize,omitempty"`
-	WorkDir         string               `json:"workDir"`
-	User            string               `json:"user"`
-	Command         string               `json:"command"`
-	Entrypoint      string               `json:"entrypoint"`
-	UseHostNetwork  bool                 `json:"useHostNetwork"`
-	BindIpV6        bool                 `json:"bindIpV6"`
-	Log             LogDriverItem        `json:"log"`
-	Dns             []string             `json:"dns"`
-	Label           []EnvItem            `json:"label"`
-	PublishAllPorts bool                 `json:"publishAllPorts"`
-	ExtraHosts      []EnvItem            `json:"extraHosts"`
-	IpV4            ContainerNetworkItem `json:"ipV4"`
-	IpV6            ContainerNetworkItem `json:"ipV6"`
-	ReplaceDepend   []ReplaceDependItem  `json:"replaceDepend"`
+	WorkDir         string               `json:"workDir,omitempty"`
+	User            string               `json:"user,omitempty"`
+	Command         string               `json:"command,omitempty"`
+	Entrypoint      string               `json:"entrypoint,omitempty"`
+	UseHostNetwork  bool                 `json:"useHostNetwork,omitempty"`
+	BindIpV6        bool                 `json:"bindIpV6,omitempty"`
+	Log             LogDriverItem        `json:"log,omitempty"`
+	Dns             []string             `json:"dns,omitempty"`
+	Label           []EnvItem            `json:"label,omitempty"`
+	PublishAllPorts bool                 `json:"publishAllPorts,omitempty"`
+	ExtraHosts      []EnvItem            `json:"extraHosts,omitempty"`
+	IpV4            ContainerNetworkItem `json:"ipV4,omitempty"`
+	IpV6            ContainerNetworkItem `json:"ipV6,omitempty"`
+	Replace         []ReplaceItem        `json:"replace,omitempty"`
 }
