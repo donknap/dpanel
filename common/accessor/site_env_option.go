@@ -1,6 +1,8 @@
 package accessor
 
-import "strings"
+import (
+	"strings"
+)
 
 type VolumeItem struct {
 	Host       string `json:"host"`
@@ -71,33 +73,34 @@ type ReplaceItem struct {
 }
 
 type SiteEnvOption struct {
-	Name            string               `json:"name"`
-	Environment     []EnvItem            `json:"environment,omitempty"`
-	Links           []LinkItem           `json:"links,omitempty"`
-	Ports           []PortItem           `json:"ports,omitempty"`
-	Volumes         []VolumeItem         `json:"volumes,omitempty"`
-	VolumesDefault  []VolumeItem         `json:"volumesDefault,omitempty"`
-	Network         []NetworkItem        `json:"network,omitempty"`
-	ImageName       string               `json:"imageName"` // 非表单提交
-	ImageId         string               `json:"imageId"`   // 非表单提交
-	Privileged      bool                 `json:"privileged,omitempty"`
-	AutoRemove      bool                 `json:"autoRemove,omitempty"`
-	Restart         string               `json:"restart,omitempty"`
-	Cpus            float32              `json:"cpus,omitempty"`
-	Memory          int                  `json:"memory,omitempty"`
-	ShmSize         string               `json:"shmsize,omitempty"`
-	WorkDir         string               `json:"workDir,omitempty"`
-	User            string               `json:"user,omitempty"`
-	Command         string               `json:"command,omitempty"`
-	Entrypoint      string               `json:"entrypoint,omitempty"`
-	UseHostNetwork  bool                 `json:"useHostNetwork,omitempty"`
-	BindIpV6        bool                 `json:"bindIpV6,omitempty"`
-	Log             LogDriverItem        `json:"log,omitempty"`
-	Dns             []string             `json:"dns,omitempty"`
-	Label           []EnvItem            `json:"label,omitempty"`
-	PublishAllPorts bool                 `json:"publishAllPorts,omitempty"`
-	ExtraHosts      []EnvItem            `json:"extraHosts,omitempty"`
-	IpV4            ContainerNetworkItem `json:"ipV4,omitempty"`
-	IpV6            ContainerNetworkItem `json:"ipV6,omitempty"`
-	Replace         []ReplaceItem        `json:"replace,omitempty"`
+	Name            string                `json:"name"`
+	ContainerName   string                `json:"containerName,omitempty"`
+	Environment     []EnvItem             `json:"environment,omitempty"`
+	Links           []LinkItem            `json:"links,omitempty"`
+	Ports           []PortItem            `json:"ports,omitempty"`
+	Volumes         []VolumeItem          `json:"volumes,omitempty"`
+	VolumesDefault  []VolumeItem          `json:"volumesDefault,omitempty"`
+	Network         []NetworkItem         `json:"network,omitempty"`
+	ImageName       string                `json:"imageName,omitempty"` // 非表单提交
+	ImageId         string                `json:"imageId,omitempty"`   // 非表单提交
+	Privileged      bool                  `json:"privileged,omitempty"`
+	AutoRemove      bool                  `json:"autoRemove,omitempty"`
+	Restart         string                `json:"restart,omitempty"`
+	Cpus            float32               `json:"cpus,omitempty"`
+	Memory          int                   `json:"memory,omitempty"`
+	ShmSize         string                `json:"shmsize,omitempty"`
+	WorkDir         string                `json:"workDir,omitempty"`
+	User            string                `json:"user,omitempty"`
+	Command         string                `json:"command,omitempty"`
+	Entrypoint      string                `json:"entrypoint,omitempty"`
+	UseHostNetwork  bool                  `json:"useHostNetwork,omitempty"`
+	BindIpV6        bool                  `json:"bindIpV6,omitempty"`
+	Log             *LogDriverItem        `json:"log,omitempty"`
+	Dns             []string              `json:"dns,omitempty"`
+	Label           []EnvItem             `json:"label,omitempty"`
+	PublishAllPorts bool                  `json:"publishAllPorts,omitempty"`
+	ExtraHosts      []EnvItem             `json:"extraHosts,omitempty"`
+	IpV4            *ContainerNetworkItem `json:"ipV4,omitempty"`
+	IpV6            *ContainerNetworkItem `json:"ipV6,omitempty"`
+	Replace         []ReplaceItem         `json:"replace,omitempty"`
 }

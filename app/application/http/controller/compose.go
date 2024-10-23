@@ -38,6 +38,7 @@ func (self Compose) Create(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+
 	var yamlRow *entity.Compose
 	if params.Id > 0 {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
@@ -46,6 +47,10 @@ func (self Compose) Create(http *gin.Context) {
 			return
 		}
 	} else {
+		if params.Type == logic.ComposeTypeStoragePath {
+			self.JsonResponseWithError(http, errors.New("存储路径类型不能手动添加，请挂载 /dpanel/compose 目录自动发现。"), 500)
+			return
+		}
 		yamlExist, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
 		if yamlExist != nil {
 			self.JsonResponseWithError(http, errors.New("站点标识已经存在，请更换"), 500)
@@ -70,6 +75,7 @@ func (self Compose) Create(http *gin.Context) {
 	if params.Id > 0 {
 		yamlRow.Title = params.Title
 		yamlRow.Setting.Override = params.Override
+		yamlRow.Setting.Environment = params.Environment
 		if params.Type != logic.ComposeTypeStoragePath {
 			yamlRow.Setting.Type = params.Type
 			yamlRow.Setting.Uri = uri
@@ -82,10 +88,11 @@ func (self Compose) Create(http *gin.Context) {
 			Name:  params.Name,
 			Yaml:  params.Yaml,
 			Setting: &accessor.ComposeSettingOption{
-				Status:   logic.ComposeStatusWaiting,
-				Type:     params.Type,
-				Uri:      uri,
-				Override: params.Override,
+				Status:      logic.ComposeStatusWaiting,
+				Type:        params.Type,
+				Uri:         uri,
+				Environment: params.Environment,
+				Override:    params.Override,
 			},
 		}
 		_ = dao.Compose.Create(yamlRow)
@@ -195,7 +202,6 @@ func (self Compose) GetDetail(http *gin.Context) {
 				break
 			}
 		}
-
 	}
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
@@ -223,8 +229,7 @@ func (self Compose) GetDetail(http *gin.Context) {
 	}
 
 	data := gin.H{
-		"detail":  yamlRow,
-		"project": tasker.Project(),
+		"detail": yamlRow,
 	}
 	if status != logic.ComposeStatusWaiting {
 		data["containerList"] = tasker.Ps()

@@ -8,7 +8,7 @@
       <env name="STORAGE_LOCAL_PATH" value="/Users/renchao/Workspace/go/dpanel/data" />
       <env name="DOCKER_HOST" value="unix:///Users/renchao/.docker/run/docker.sock" />
 <!--      <env name="DOCKER_HOST" value="tcp://172.16.1.124:2375" />-->
-      <env name="APP_ENV" value="debug1" />
+      <env name="APP_ENV" value="debug" />
       <env name="APP_VERSION" value="1.1.4" />
       <env name="INSTALL_USERNAME" value="root" />
       <env name="INSTALL_PASSWORD" value="123456" />

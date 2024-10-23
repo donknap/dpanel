@@ -93,7 +93,6 @@ func main() {
 		}
 		migrateTableData := []migrate.Updater{
 			&migrate.Upgrade20240909{},
-			&migrate.Upgrade20241014{},
 		}
 		for _, updater := range migrateTableData {
 			if version.CompareSimple(updater.Version(), app.GetConfig().GetString("app.version")) == -1 {

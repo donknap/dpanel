@@ -32,7 +32,6 @@ func (self Task) Deploy() error {
 	cmd = append(cmd, self.composer.GetServiceNameList()...)
 	self.runCommand(cmd)
 
-	// 如果 compose 中未指定网络，则默认的名称为 项目名_default
 	for _, item := range self.composer.Project.Networks {
 		for _, serviceItem := range self.composer.Project.Services {
 			for _, linkItem := range serviceItem.ExternalLinks {

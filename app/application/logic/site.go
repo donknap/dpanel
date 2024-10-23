@@ -122,7 +122,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	envOption.Command = strings.Join(info.Config.Cmd, " ")
 	envOption.Entrypoint = strings.Join(info.Config.Entrypoint, " ")
 	envOption.UseHostNetwork = info.HostConfig.NetworkMode.IsHost()
-	envOption.Log = accessor.LogDriverItem{
+	envOption.Log = &accessor.LogDriverItem{
 		Driver:  info.HostConfig.LogConfig.Type,
 		MaxFile: info.HostConfig.LogConfig.Config["max-file"],
 		MaxSize: info.HostConfig.LogConfig.Config["max-size"],
