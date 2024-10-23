@@ -84,7 +84,7 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 					Size:     row[4],
 					Mode:     row[0],
 					Change:   -1,
-					ModTime:  row[5] + row[6],
+					ModTime:  row[5] + " " + row[6],
 					Owner:    row[2],
 					Group:    row[3],
 				}

@@ -34,7 +34,11 @@ func (self Volume) GetList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	var inUseVolume []string
+	type useVolumeContainerItem struct {
+		Name string `json:"name"`
+		Md5  string `json:"md5"`
+	}
+	inUseVolume := make(map[string][]useVolumeContainerItem)
 	containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
 		All:    true,
 		Latest: true,
@@ -46,7 +50,13 @@ func (self Volume) GetList(http *gin.Context) {
 	for _, item := range containerList {
 		for _, mount := range item.Mounts {
 			if mount.Name != "" {
-				inUseVolume = append(inUseVolume, mount.Name)
+				if _, ok := inUseVolume[mount.Name]; !ok {
+					inUseVolume[mount.Name] = make([]useVolumeContainerItem, 0)
+				}
+				inUseVolume[mount.Name] = append(inUseVolume[mount.Name], useVolumeContainerItem{
+					Name: item.Names[0],
+					Md5:  item.ID,
+				})
 			}
 		}
 	}
