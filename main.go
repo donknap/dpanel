@@ -23,6 +23,7 @@ import (
 	http2 "net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -57,6 +58,12 @@ func main() {
 	httpServer.RegisterRouters(
 		func(engine *gin.Engine) {
 			subFs, _ := fs.Sub(Asset, "asset/static")
+			engine.Use(func(c *gin.Context) {
+                            if strings.HasPrefix(c.Request.URL.Path, "/dpanel/static") || c.Request.URL.Path == "/favicon.ico" {
+                                c.Header("Cache-Control", "max-age=86400")
+                            }
+                            c.Next()
+                        })
 			engine.StaticFS("/dpanel/static", http2.FS(subFs))
 			engine.StaticFileFS("/favicon.ico", "icon.jpg", http2.FS(subFs))
 			engine.NoRoute(func(http *gin.Context) {
