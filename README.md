@@ -1,5 +1,6 @@
 <h1 align="center">
-  ![logo](https://cdn.w7.cc/dpanel/logo.jpg) DPanel
+  <img src="https://cdn.w7.cc/dpanel/logo.png" >
+  <br> DPanel
 </h1>
 <h4 align="center"> Docker 可视化面板系统，提供完善的 docker 管理功能。 </h4>
 
