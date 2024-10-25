@@ -20,7 +20,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	// 如果容器配置了Ip，需要先创一个自身网络
 	if task.BuildParams.BindIpV6 ||
 		!function.IsEmptyArray(task.BuildParams.Links) ||
-		task.BuildParams.IpV4.Address != "" || task.BuildParams.IpV6.Address != "" {
+		task.BuildParams.IpV4 != nil || task.BuildParams.IpV6 != nil {
 
 		option := network.CreateOptions{
 			IPAM: &network.IPAM{
@@ -32,13 +32,13 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		if task.BuildParams.BindIpV6 {
 			option.EnableIPv6 = function.PtrBool(true)
 		}
-		if task.BuildParams.IpV4.Address != "" {
+		if task.BuildParams.IpV4 != nil {
 			option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
 				Subnet:  task.BuildParams.IpV4.Subnet,
 				Gateway: task.BuildParams.IpV4.Gateway,
 			})
 		}
-		if task.BuildParams.IpV6.Address != "" {
+		if task.BuildParams.IpV6 != nil {
 			option.EnableIPv6 = function.PtrBool(true)
 			option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
 				Subnet:  task.BuildParams.IpV6.Subnet,
@@ -150,7 +150,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		builder.WithNetworkMode(network.NetworkHost)
 	}
 
-	if task.BuildParams.Log.Driver != "" {
+	if task.BuildParams.Log != nil && task.BuildParams.Log.Driver != "" {
 		builder.WithLog(
 			task.BuildParams.Log.Driver,
 			task.BuildParams.Log.MaxSize,
@@ -180,17 +180,17 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	}
 
 	// 仅当容器有关联时，才加新建自己的网络。对于ipv6支持，必须加入一个ipv6的网络
-	if task.BuildParams.BindIpV6 || !function.IsEmptyArray(task.BuildParams.Links) || task.BuildParams.IpV4.Address != "" || task.BuildParams.IpV6.Address != "" {
+	if task.BuildParams.BindIpV6 || !function.IsEmptyArray(task.BuildParams.Links) || task.BuildParams.IpV4 != nil || task.BuildParams.IpV6 != nil {
 		endpointSetting := &network.EndpointSettings{
 			Aliases: []string{
 				fmt.Sprintf("%s.pod.dpanel.local", task.SiteName),
 			},
 			IPAMConfig: &network.EndpointIPAMConfig{},
 		}
-		if task.BuildParams.IpV4.Address != "" {
+		if task.BuildParams.IpV4 != nil {
 			endpointSetting.IPAMConfig.IPv4Address = task.BuildParams.IpV4.Address
 		}
-		if task.BuildParams.IpV6.Address != "" {
+		if task.BuildParams.IpV6 != nil {
 			endpointSetting.IPAMConfig.IPv6Address = task.BuildParams.IpV6.Address
 		}
 		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, endpointSetting)

@@ -39,19 +39,22 @@ func (self Site) CreateByImage(http *gin.Context) {
 		return
 	}
 
-	checkIpInSubnet := [][2]string{
-		{
+	checkIpInSubnet := make([][2]string, 0)
+	if buildParams.IpV4 != nil {
+		checkIpInSubnet = append(checkIpInSubnet, [2]string{
 			buildParams.IpV4.Address, buildParams.IpV4.Subnet,
 		},
-		{
-			buildParams.IpV4.Gateway, buildParams.IpV4.Subnet,
-		},
-		{
+			[2]string{
+				buildParams.IpV4.Gateway, buildParams.IpV4.Subnet,
+			})
+	}
+	if buildParams.IpV6 != nil {
+		checkIpInSubnet = append(checkIpInSubnet, [2]string{
 			buildParams.IpV6.Address, buildParams.IpV6.Subnet,
 		},
-		{
-			buildParams.IpV6.Gateway, buildParams.IpV6.Subnet,
-		},
+			[2]string{
+				buildParams.IpV6.Gateway, buildParams.IpV6.Subnet,
+			})
 	}
 	for _, item := range checkIpInSubnet {
 		if item[0] == "" {
