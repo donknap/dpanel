@@ -2,7 +2,6 @@ package function
 
 import (
 	"cmp"
-	"fmt"
 	"reflect"
 )
 
@@ -50,9 +49,13 @@ func FindArrayValueIndex(items interface{}, value ...interface{}) (exists bool, 
 					pos = append(pos, i)
 				}
 			} else {
-				if some.Index(i).Kind() == reflect.Struct {
+				someStruct := some.Index(i)
+				if someStruct.Kind() == reflect.Ptr {
+					someStruct = someStruct.Elem()
+				}
+				if someStruct.Kind() == reflect.Struct {
 					fieldName, ok := value[0].(string)
-					someValue := some.Index(i).FieldByName(fieldName)
+					someValue := someStruct.FieldByName(fieldName)
 					if ok {
 						if someValue.Kind() == reflect.Slice || someValue.Kind() == reflect.Array {
 							exists1, _ := FindArrayValueIndex(someValue.Interface(), value[1:]...)
@@ -72,14 +75,7 @@ func FindArrayValueIndex(items interface{}, value ...interface{}) (exists bool, 
 						return false, pos
 					}
 				} else {
-					fmt.Printf("%v \n", 1111)
-					fieldName, ok := value[0].(string)
-					if ok {
-						someValue := some.Index(i).FieldByName(fieldName)
-						return FindArrayValueIndex(someValue, value[1:]...)
-					} else {
-						return false, pos
-					}
+					return false, pos
 				}
 			}
 		}
@@ -91,16 +87,4 @@ func FindArrayValueIndex(items interface{}, value ...interface{}) (exists bool, 
 	} else {
 		return false, nil
 	}
-	//for i, item := range items {
-	//	itemValue := reflect.ValueOf(item)
-	//	fieldValue := itemValue.FieldByName(fieldName)
-	//	if !fieldValue.IsValid() {
-	//		fmt.Printf("Unknown field name: %s\n", fieldName)
-	//		return -1
-	//	}
-	//	if reflect.DeepEqual(fieldValue.Interface(), value) {
-	//		return i
-	//	}
-	//}
-	//return -1
 }
