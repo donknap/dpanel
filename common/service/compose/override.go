@@ -30,7 +30,7 @@ func (self Wrapper) GetOverrideYaml(overrideList map[string]accessor.SiteEnvOpti
 			ContainerName: override.ContainerName,
 			DependsOn:     oldService.DependsOn,
 			Ports:         oldService.Ports,
-			ExternalLinks: oldService.ExternalLinks,
+			ExternalLinks: make([]string, 0),
 		}
 
 		for _, item := range override.Replace {

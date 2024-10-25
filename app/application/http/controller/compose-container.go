@@ -32,6 +32,14 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	// 部署完成后也上更新状态
+	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
+	if err != nil {
+		composeRow.Setting.Status = logic.ComposeStatusWaiting
+	} else {
+		composeRow.Setting.Status = composeRun.Status
+	}
+	_, _ = dao.Compose.Updates(composeRow)
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -69,6 +77,13 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			return
 		}
 	}
+	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
+	if err != nil {
+		composeRow.Setting.Status = logic.ComposeStatusWaiting
+	} else {
+		composeRow.Setting.Status = composeRun.Status
+	}
+	_, _ = dao.Compose.Updates(composeRow)
 	notice.Message{}.Success("composeDestroy", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
@@ -99,6 +114,13 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
+	if err != nil {
+		composeRow.Setting.Status = logic.ComposeStatusWaiting
+	} else {
+		composeRow.Setting.Status = composeRun.Status
+	}
+	_, _ = dao.Compose.Updates(composeRow)
 	self.JsonSuccessResponse(http)
 	return
 }

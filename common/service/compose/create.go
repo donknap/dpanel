@@ -197,7 +197,7 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 			service.NetworkMode = "host"
 		}
 
-		if siteOption.Log.Driver != "" {
+		if siteOption.Log != nil && siteOption.Log.Driver != "" {
 			loggingOpts := &types.LoggingConfig{
 				Driver:  siteOption.Log.Driver,
 				Options: make(types.Options),
@@ -232,7 +232,7 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 			ExtensionServiceName: extService,
 		}
 
-		if siteOption.IpV4.Address != "" || siteOption.IpV6.Address != "" {
+		if siteOption.IpV4 != nil || siteOption.IpV6 != nil {
 			projectNetworkConfig := types.NetworkConfig{
 				Name: siteOption.Name,
 				Ipam: types.IPAMConfig{

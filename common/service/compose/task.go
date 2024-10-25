@@ -2,38 +2,30 @@ package compose
 
 import (
 	"encoding/json"
-	"errors"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
-	"os"
 	"strings"
 )
 
 // docker compose 任务执行，包含 部署，销毁，控制
 
-func NewTasker(name string, wrapper *Wrapper) *Task {
-	return &Task{
-		Name:     name,
-		composer: wrapper,
-	}
-}
-
 type Task struct {
 	Name     string
-	composer *Wrapper
+	Composer *Wrapper
+	Original *Wrapper // 原始 compose
 }
 
 func (self Task) Deploy() error {
 	cmd := []string{
 		"--progress", "tty", "up", "-d",
 	}
-	cmd = append(cmd, self.composer.GetServiceNameList()...)
+	cmd = append(cmd, self.Composer.GetServiceNameList()...)
 	self.runCommand(cmd)
 
-	for _, item := range self.composer.Project.Networks {
-		for _, serviceItem := range self.composer.Project.Services {
+	for _, item := range self.Composer.Project.Networks {
+		for _, serviceItem := range self.Composer.Project.Services {
 			for _, linkItem := range serviceItem.ExternalLinks {
 				links := strings.Split(linkItem, ":")
 				if len(links) == 2 {
@@ -50,8 +42,8 @@ func (self Task) Destroy(deleteImage bool) error {
 		"--progress", "tty", "down",
 	}
 	// 删除compose 前需要先把关联的已有容器网络退出
-	for _, item := range self.composer.Project.Networks {
-		for _, serviceItem := range self.composer.Project.Services {
+	for _, item := range self.Composer.Project.Networks {
+		for _, serviceItem := range self.Composer.Project.Services {
 			for _, linkItem := range serviceItem.ExternalLinks {
 				links := strings.Split(linkItem, ":")
 				if len(links) == 2 {
@@ -76,19 +68,12 @@ func (self Task) Ctrl(op string) error {
 	return nil
 }
 
-func (self Task) Yaml() ([]byte, error) {
-	if len(self.composer.Project.ComposeFiles) >= 1 {
-		content, err := os.ReadFile(self.composer.Project.ComposeFiles[0])
-		if err != nil {
-			return nil, err
-		}
-		return content, nil
-	}
-	return nil, errors.New("compose yaml not found")
+func (self Task) OriginalYaml() ([]byte, error) {
+	return self.Original.Project.MarshalYAML()
 }
 
 func (self Task) Project() *types.Project {
-	return self.composer.Project
+	return self.Composer.Project
 }
 
 type composeContainerResult struct {
@@ -101,7 +86,7 @@ func (self Task) Ps() []*composeContainerResult {
 		return result
 	}
 	// self.runCommand 只负责执行，Ps 命令需要返回结果
-	cmd := self.composer.GetBaseCommand()
+	cmd := self.Composer.GetBaseCommand()
 	cmd = append(cmd, "ps", "--format", "json", "--all")
 
 	out := exec.Command{}.RunWithOut(&exec.RunCommandOption{
@@ -124,7 +109,7 @@ func (self Task) Ps() []*composeContainerResult {
 }
 
 func (self Task) runCommand(command []string) {
-	command = append(self.composer.GetBaseCommand(), command...)
+	command = append(self.Composer.GetBaseCommand(), command...)
 	exec.Command{}.RunInTerminal(&exec.RunCommandOption{
 		CmdName: "docker",
 		CmdArgs: append(

@@ -47,7 +47,7 @@ func (self Wrapper) GetService(name string) (types.ServiceConfig, ExtService, er
 
 func (self Wrapper) GetBaseCommand() []string {
 	cmd := make([]string, 0)
-	cmd = append(cmd, "-f", self.Project.ComposeFiles[len(self.Project.ComposeFiles)-1])
+	cmd = append(cmd, "-f", self.Project.ComposeFiles[0])
 	cmd = append(cmd, "-p", self.Project.Name)
 
 	envFilePath := filepath.Join(self.Project.WorkingDir, ".env")
