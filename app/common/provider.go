@@ -65,14 +65,17 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	})
 
 	// 当前如果有连接，则添加一条docker环境数据
-	_, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
-	if err == nil {
+	_, err := logic.DockerEnv{}.GetEnvByName("local")
+	if err != nil {
 		logic.DockerEnv{}.UpdateEnv(&accessor.DockerClientResult{
 			Name:    "local",
 			Title:   "本机",
 			Address: client.DefaultDockerHost,
 			Default: true,
 		})
+	}
+	_, err = docker.Sdk.Client.Info(docker.Sdk.Ctx)
+	if err == nil {
 		go logic.EventLogic{}.MonitorLoop()
 	}
 }

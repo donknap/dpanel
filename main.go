@@ -157,6 +157,7 @@ func main() {
 				"nginx/temp",
 				"acme",
 				"cert",
+				"compose",
 			)
 		}
 		for _, path := range initPath {

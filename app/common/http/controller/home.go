@@ -148,9 +148,9 @@ func (self Home) Info(http *gin.Context) {
 				GroupName: logic.SettingGroupSetting,
 				Name:      logic.SettingGroupSettingDiskUsage,
 				Value: &accessor.SettingValueOption{
-					DiskUsage: accessor.DiskUsage{
-						Usage:     diskUsage,
-						UpdatedAt: time.Now(),
+					DiskUsage: &accessor.DiskUsage{
+						Usage:     &diskUsage,
+						UpdatedAt: time.Now().String(),
 					},
 				},
 			})
@@ -158,8 +158,8 @@ func (self Home) Info(http *gin.Context) {
 		return
 	}()
 
-	diskUsage := accessor.DiskUsage{
-		Usage: types.DiskUsage{},
+	diskUsage := &accessor.DiskUsage{
+		Usage: &types.DiskUsage{},
 	}
 	setting, err := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDiskUsage)
 	if err == nil && setting != nil {

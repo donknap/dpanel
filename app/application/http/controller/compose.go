@@ -81,7 +81,6 @@ func (self Compose) Create(http *gin.Context) {
 	if params.Id > 0 {
 		yamlRow.Title = params.Title
 		yamlRow.Setting.Override = params.Override
-		yamlRow.Setting.Environment = params.Environment
 		if params.Type != logic.ComposeTypeStoragePath {
 			yamlRow.Setting.Type = params.Type
 			yamlRow.Setting.Uri = uri
@@ -94,11 +93,10 @@ func (self Compose) Create(http *gin.Context) {
 			Name:  params.Name,
 			Yaml:  params.Yaml,
 			Setting: &accessor.ComposeSettingOption{
-				Status:      logic.ComposeStatusWaiting,
-				Type:        params.Type,
-				Uri:         uri,
-				Environment: params.Environment,
-				Override:    params.Override,
+				Status:   logic.ComposeStatusWaiting,
+				Type:     params.Type,
+				Uri:      uri,
+				Override: params.Override,
 			},
 		}
 		_ = dao.Compose.Create(yamlRow)
@@ -187,7 +185,8 @@ func (self Compose) GetDetail(http *gin.Context) {
 	yamlRow.Yaml = string(yaml)
 
 	data := gin.H{
-		"detail": yamlRow,
+		"detail":  yamlRow,
+		"project": tasker.Project(),
 	}
 
 	if yamlRow != nil && yamlRow.Setting.Status != logic.ComposeStatusWaiting {
@@ -292,6 +291,5 @@ func (self Compose) Parse(http *gin.Context) {
 			"project": nil,
 		})
 	}
-
 	return
 }

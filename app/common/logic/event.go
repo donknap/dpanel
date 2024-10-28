@@ -15,6 +15,7 @@ type EventLogic struct {
 }
 
 func (self EventLogic) MonitorLoop() {
+	slog.Debug("Event Monitor Loop")
 	messageChan, errorChan := docker.Sdk.Client.Events(docker.Sdk.Ctx, events.ListOptions{})
 	for {
 		select {

@@ -105,6 +105,7 @@ func (self Wrapper) GetOverrideYaml(overrideList map[string]accessor.SiteEnvOpti
 	}
 	// ports 配置要覆盖原始文件
 	overrideYaml = bytes.Replace(overrideYaml, []byte("ports:"), []byte("ports: !override"), -1)
+	overrideYaml = bytes.Replace(overrideYaml, []byte("environment:"), []byte("environment: !override"), -1)
 	overrideYaml = bytes.Replace(overrideYaml, []byte("depends_on:"), []byte("depends_on: !override"), -1)
 	return overrideYaml, nil
 }

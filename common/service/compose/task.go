@@ -37,7 +37,7 @@ func (self Task) Deploy() error {
 	return nil
 }
 
-func (self Task) Destroy(deleteImage bool) error {
+func (self Task) Destroy(deleteImage bool, deleteVolume bool) error {
 	cmd := []string{
 		"--progress", "tty", "down",
 	}
@@ -55,6 +55,10 @@ func (self Task) Destroy(deleteImage bool) error {
 
 	if deleteImage {
 		cmd = append(cmd, "--rmi", "all")
+	}
+
+	if deleteVolume {
+		cmd = append(cmd, "--volumes")
 	}
 	self.runCommand(cmd)
 	return nil

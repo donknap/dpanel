@@ -250,10 +250,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		}
 		yamlFilePath = append(yamlFilePath, tempYamlFilePath)
 	}
-	envWithEquals := entity.Setting.EnvironmentToMappingWithEquals()
-	options := []cli.ProjectOptionsFn{
-		cli.WithEnv(envWithEquals),
-	}
+	options := []cli.ProjectOptionsFn{}
 	for _, path := range yamlFilePath {
 		options = append(options, compose.WithYamlPath(path))
 	}
@@ -290,7 +287,6 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		projectName = entity.Name
 	}
 	options = append(options, cli.WithName(projectName))
-	options = append(options, cli.WithEnv(envWithEquals))
 	options = append(options, compose.WithYamlPath(yamlDeployFileName))
 
 	if workingDir != "" {

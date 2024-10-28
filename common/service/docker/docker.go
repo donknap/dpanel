@@ -22,7 +22,7 @@ var (
 	QueueDockerComposeMessage       = make(chan string, 999)
 	BuilderAuthor                   = "DPanel"
 	BuildDesc                       = "DPanel is a docker web management panel"
-	BuildWebSite                    = "https://github.com/donknap/dpanel"
+	BuildWebSite                    = "https://dpanel.cc"
 	BuildVersion                    = "1.0.0"
 	HostnameTemplate                = "%s.pod.dpanel.local"
 )
@@ -32,6 +32,7 @@ type Builder struct {
 	Ctx           context.Context
 	CtxCancelFunc context.CancelFunc
 	ExtraParams   []string
+	Host          string
 }
 
 type NewDockerClientOption struct {
@@ -53,6 +54,8 @@ func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
 	if option.Host != "" {
 		builder.ExtraParams = append(builder.ExtraParams, "-H", option.Host)
 		dockerOption = append(dockerOption, client.WithHost(option.Host))
+	} else {
+		option.Host = "local"
 	}
 	if option.TlsCa != "" && option.TlsCert != "" && option.TlsKey != "" {
 		dockerOption = append(dockerOption, client.WithTLSClientConfig(
@@ -73,6 +76,7 @@ func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
 	builder.Client = obj
 	builder.Ctx = ctx
 	builder.CtxCancelFunc = cancelFunc
+	builder.Host = option.Host
 	return builder, nil
 }
 
