@@ -162,18 +162,18 @@ func (self Compose) GetDetail(http *gin.Context) {
 	}
 
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
-	// 如果外部任务获取不到 yaml 没有管理权限
-	if yamlRow != nil && yamlRow.Setting.Type == logic.ComposeTypeOutPath {
-		data := gin.H{
-			"detail": yamlRow,
-		}
-		if yamlRow.Setting.Status != logic.ComposeStatusWaiting {
-			data["containerPrefix"] = yamlRow.Name // 尝试用名称去获取所属容器
-		}
-		self.JsonResponseWithoutError(http, data)
-		return
-	}
 	if err != nil {
+		// 如果是外部任务并且获取不到yaml，则直接返回基本状态
+		if yamlRow != nil && yamlRow.Setting.Type == logic.ComposeTypeOutPath {
+			data := gin.H{
+				"detail": yamlRow,
+			}
+			if yamlRow.Setting.Status != logic.ComposeStatusWaiting {
+				data["containerPrefix"] = yamlRow.Name // 尝试用名称去获取所属容器
+			}
+			self.JsonResponseWithoutError(http, data)
+			return
+		}
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
