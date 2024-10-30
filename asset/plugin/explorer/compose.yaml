@@ -5,7 +5,7 @@ services:
     restart: always
     privileged: true
     pid: host
-    x-dpanel:
+    x-dpanel-service:
       image_tar:
         amd64: asset/plugin/explorer/image-amd64.tar
         arm64: asset/plugin/explorer/image-arm64.tar
