@@ -150,7 +150,7 @@ func (self Home) Info(http *gin.Context) {
 				Value: &accessor.SettingValueOption{
 					DiskUsage: &accessor.DiskUsage{
 						Usage:     &diskUsage,
-						UpdatedAt: time.Now().String(),
+						UpdatedAt: time.Now(),
 					},
 				},
 			})

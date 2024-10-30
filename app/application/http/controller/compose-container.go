@@ -6,9 +6,14 @@ import (
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
+	"log/slog"
+	"os"
+	"path/filepath"
 )
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
@@ -70,6 +75,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		composeRow.Setting.Status = composeRun.Status
 	}
 	_, _ = dao.Compose.Updates(composeRow)
+	notice.Message{}.Success("composeDeploy", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -78,8 +84,8 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	type ParamsValidate struct {
 		Id           int32 `json:"id" binding:"required"`
 		DeleteImage  bool  `json:"deleteImage"`
-		DeleteData   bool  `json:"deleteData"`
 		DeleteVolume bool  `json:"deleteVolume"`
+		DeleteData   bool  `json:"deleteData"`
 	}
 
 	params := ParamsValidate{}
@@ -101,13 +107,6 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.DeleteData {
-		_, err := dao.Compose.Where(dao.Compose.ID.In(params.Id)).Delete()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
 	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
 	if err != nil {
 		composeRow.Setting.Status = logic.ComposeStatusWaiting
@@ -115,7 +114,28 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		composeRow.Setting.Status = composeRun.Status
 	}
 	_, _ = dao.Compose.Updates(composeRow)
-	notice.Message{}.Success("composeDestroy", composeRow.Name)
+
+	if function.InArray([]string{
+		logic.ComposeTypeText, logic.ComposeTypeRemoteUrl,
+	}, composeRow.Setting.Type) {
+		err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), composeRow.Name))
+		if err != nil {
+			slog.Debug("compose", "destroy", err)
+		}
+	} else {
+		path := filepath.Join(filepath.Dir(tasker.Composer.Project.ComposeFiles[0]), logic.ComposeProjectDeployFileName)
+		err = os.Remove(path)
+		if err != nil {
+			slog.Debug("compose", "delete deploy file", err, "path", path)
+		}
+	}
+	if params.DeleteData {
+		_, err = dao.Compose.Where(dao.Compose.ID.Eq(composeRow.ID)).Delete()
+		if err != nil {
+			slog.Debug("compose", "destroy", err)
+		}
+	}
+	_ = notice.Message{}.Success("composeDestroy", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
 }

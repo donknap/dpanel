@@ -76,6 +76,10 @@ func (self Task) OriginalYaml() ([]byte, error) {
 	return self.Original.Project.MarshalYAML()
 }
 
+func (self Task) Yaml() ([]byte, error) {
+	return self.Composer.Project.MarshalYAML()
+}
+
 func (self Task) Project() *types.Project {
 	return self.Composer.Project
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
-	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
@@ -28,7 +27,7 @@ func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
 		Id          int32                             `json:"id"`
 		Title       string                            `json:"title"`
-		Name        string                            `json:"name" binding:"required"`
+		Name        string                            `json:"name" binding:"required,lowercase"`
 		Type        string                            `json:"type" binding:"required"`
 		Yaml        string                            `json:"yaml"`
 		RemoteUrl   string                            `json:"remoteUrl"`
@@ -141,30 +140,22 @@ func (self Compose) GetList(http *gin.Context) {
 
 func (self Compose) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Id   int32  `json:"id"`
-		Name string `json:"name"`
+		Id int32 `json:"id" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	var yamlRow *entity.Compose
-
-	if params.Id > 0 {
-		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
-		if yamlRow == nil {
-			self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
-			return
-		}
-		params.Name = yamlRow.Name
-	} else if params.Name != "" {
-		yamlRow, _ = dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
+	yamlRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	if yamlRow == nil {
+		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		return
 	}
 
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
 		// 如果是外部任务并且获取不到yaml，则直接返回基本状态
-		if yamlRow != nil && yamlRow.Setting.Type == logic.ComposeTypeOutPath {
+		if yamlRow.Setting.Type == logic.ComposeTypeOutPath {
 			data := gin.H{
 				"detail": yamlRow,
 			}
@@ -177,7 +168,7 @@ func (self Compose) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	yaml, err := tasker.OriginalYaml()
+	yaml, err := tasker.Yaml()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -189,7 +180,7 @@ func (self Compose) GetDetail(http *gin.Context) {
 		"project": tasker.Project(),
 	}
 
-	if yamlRow != nil && yamlRow.Setting.Status != logic.ComposeStatusWaiting {
+	if yamlRow.Setting.Status != logic.ComposeStatusWaiting {
 		data["containerList"] = tasker.Ps()
 	}
 
@@ -213,20 +204,12 @@ func (self Compose) Delete(http *gin.Context) {
 			return
 		}
 		for _, runItem := range composeRunList {
-			if fmt.Sprintf(logic.ComposeProjectName, row.ID) == runItem.Name {
+			if fmt.Sprintf(logic.ComposeProjectName, row.Name) == runItem.Name {
 				self.JsonResponseWithError(http, errors.New("请先销毁容器"), 500)
 				return
 			}
 		}
-		if row.Setting.Type == logic.ComposeTypeText || row.Setting.Type == logic.ComposeTypeRemoteUrl {
-			err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), row.Name))
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
 		_, err = dao.Compose.Where(dao.Compose.ID.Eq(id)).Delete()
-
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

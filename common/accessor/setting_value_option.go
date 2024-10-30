@@ -2,6 +2,7 @@ package accessor
 
 import (
 	"github.com/docker/docker/api/types"
+	"time"
 )
 
 type SettingValueOption struct {
@@ -27,5 +28,5 @@ type DockerClientResult struct {
 
 type DiskUsage struct {
 	Usage     *types.DiskUsage `json:"usage,omitempty"`
-	UpdatedAt string           `json:"updatedAt,omitempty"`
+	UpdatedAt time.Time        `json:"updatedAt,omitempty"`
 }
