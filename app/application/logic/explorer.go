@@ -48,7 +48,7 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 	}
 
 	cmd := fmt.Sprintf("ls -AlhX --full-time %s%s \n", self.rootPath, path)
-	cmd = fmt.Sprintf("ls -AulH --full-time %s%s | awk 'NR>1 {print \"`\" $1 \"` \" $2 \" \" $3 \" \" $4 \" \" $5 \" \" $6 \" \" $7 \" \" $8 \" \" $9 \" \" $11}' \n", self.rootPath, path)
+	cmd = fmt.Sprintf("ls -AlhX --full-time %s%s | awk 'NR>1 {print \"`\" $1 \"` \" $2 \" \" $3 \" \" $4 \" \" $5 \" \" $6 \" \" $7 \" \" $8 \" \" $9 \" \" $11}' \n", self.rootPath, path)
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return fileList, err
