@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-var pluginName = "backup"
+var pluginName = plugin.PluginBackup
 
 func (self Volume) GetBackupList(http *gin.Context) {
 	type ParamsValidate struct {

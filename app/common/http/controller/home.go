@@ -12,6 +12,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -170,6 +171,7 @@ func (self Home) Info(http *gin.Context) {
 	containerTask, _ := dao.Site.Where(dao.Site.DeletedAt.IsNotNull()).Unscoped().Count()
 	imageTask, _ := dao.Image.Count()
 	backupData, _ := dao.Backup.Count()
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,
 		"diskUsage":  diskUsage,
@@ -186,6 +188,7 @@ func (self Home) Info(http *gin.Context) {
 			"release":       "",
 			"containerInfo": dpanelContainerInfo,
 		},
+		"plugin": plugin.Wrapper{}.GetPluginList(),
 	})
 	return
 }

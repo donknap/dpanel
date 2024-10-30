@@ -15,6 +15,9 @@ import (
 	"strings"
 )
 
+const PluginExplorer = "explorer"
+const PluginBackup = "backup"
+
 type TemplateParser struct {
 	Volumes []string
 	Command []string

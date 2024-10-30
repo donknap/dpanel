@@ -21,7 +21,7 @@ func NewExplorer(md5 string) (*explorer, error) {
 	if containerInfo.State.Pid == 0 {
 		return nil, errors.New("please start the container" + md5)
 	}
-	explorerPlugin, err := plugin.NewPlugin("explorer", nil)
+	explorerPlugin, err := plugin.NewPlugin(plugin.PluginExplorer, nil)
 	if err != nil {
 		return nil, err
 	}
