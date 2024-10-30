@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
@@ -213,6 +214,14 @@ func (self Compose) Delete(http *gin.Context) {
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
+		}
+		if function.InArray([]string{
+			logic.ComposeTypeText, logic.ComposeTypeRemoteUrl,
+		}, row.Setting.Type) {
+			err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), row.Name))
+			if err != nil {
+				slog.Error("compose", "delete", err.Error())
+			}
 		}
 	}
 	self.JsonSuccessResponse(http)
