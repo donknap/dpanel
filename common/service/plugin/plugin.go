@@ -107,6 +107,11 @@ func (self plugin) Create() (string, error) {
 	builder.WithImage(imageUrl, imageTryPull)
 	builder.WithContainerName(service.ContainerName)
 
+	if service.Labels != nil {
+		for name, value := range service.Labels {
+			builder.WithLabel(name, value)
+		}
+	}
 	if service.Privileged {
 		builder.WithPrivileged()
 	}
