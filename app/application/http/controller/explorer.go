@@ -15,6 +15,7 @@ import (
 	"github.com/h2non/filetype"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,10 +97,11 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 	}
 	tempFileDir, _ := os.MkdirTemp("", "dpanel-explorer")
 	tempFilePath := fmt.Sprintf("%s%s", strings.TrimSuffix(tempFileDir, "/"), params.File)
-	os.MkdirAll(filepath.Dir(tempFilePath), os.ModePerm)
-	fmt.Printf("%v \n", tempFilePath)
-
-	err := os.WriteFile(tempFilePath, []byte(params.Content), 0o666)
+	err := os.MkdirAll(filepath.Dir(tempFilePath), os.ModePerm)
+	if err != nil {
+		slog.Error("explorer", "import file content", err.Error())
+	}
+	err = os.WriteFile(tempFilePath, []byte(params.Content), 0o666)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -137,7 +139,7 @@ func (self Explorer) Import(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	uploadTempDir, _ := os.MkdirTemp("", "dpanel")
+	uploadTempDir, _ := os.MkdirTemp("", "dpanel-explorer")
 	defer os.RemoveAll(uploadTempDir)
 	for _, item := range params.FileList {
 		sourceFile, err := os.Open(storage.Local{}.GetRealPath(item.Path))
@@ -321,7 +323,12 @@ func (self Explorer) GetContent(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	var content []byte
+	tempFile, err := os.CreateTemp("", "dpanel-explorer")
+	if err != nil {
+		slog.Error("explorer", "get content", err)
+	}
+	defer os.Remove(tempFile.Name())
+
 	tarReader := tar.NewReader(out)
 	for {
 		file, err := tarReader.Next()
@@ -334,11 +341,14 @@ func (self Explorer) GetContent(http *gin.Context) {
 		if file.Name != filepath.Base(params.File) {
 			continue
 		}
-		content = make([]byte, file.Size)
-		tarReader.Read(content)
+		_, err = io.Copy(tempFile, tarReader)
+		if err != nil {
+			slog.Error("explorer", "get content", err)
+		}
 	}
-	out.Close()
-	if content == nil {
+	_ = out.Close()
+	content, err := os.ReadFile(tempFile.Name())
+	if err != nil {
 		self.JsonResponseWithError(http, errors.New("获取文件失败"), 500)
 		return
 	}

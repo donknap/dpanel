@@ -88,7 +88,7 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 					Owner:    row[2],
 					Group:    row[3],
 				}
-				if len(row) >= 10 {
+				if len(row) >= 10 && row[0][0] == 'l' {
 					item.LinkName = row[9]
 				}
 				item.Name = path + item.ShowName
