@@ -3,6 +3,8 @@ services:
     image: dpanel/explorer
     container_name: dpanel-plugin-backup
     restart: no
+    labels:
+      - "com.dpanel.container.title=dpanel 备份助手"
     command:
 #{{- range $key, $val := .backup.Command }}
       - {{ $val | unescaped }}

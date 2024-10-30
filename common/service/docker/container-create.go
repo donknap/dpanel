@@ -28,12 +28,6 @@ type ContainerCreateBuilder struct {
 func (self *ContainerCreateBuilder) WithContainerName(name string) *ContainerCreateBuilder {
 	self.containerConfig.Hostname = fmt.Sprintf("%s.pod.dpanel.local", name)
 	self.containerName = name
-	self.containerConfig.Labels = map[string]string{
-		"BuildAuthor":  BuilderAuthor,
-		"BuildDesc":    BuildDesc,
-		"BuildWebSite": BuildWebSite,
-		"buildVersion": BuildVersion,
-	}
 	//  防止退出
 	self.containerConfig.AttachStdin = true
 	self.containerConfig.AttachStdout = true
@@ -224,9 +218,6 @@ func (self *ContainerCreateBuilder) WithDns(ip []string) {
 }
 
 func (self *ContainerCreateBuilder) WithLabel(name, value string) {
-	if self.containerConfig.Labels == nil {
-		self.containerConfig.Labels = make(map[string]string)
-	}
 	self.containerConfig.Labels[name] = value
 }
 

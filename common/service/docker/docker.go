@@ -84,6 +84,11 @@ func (self Builder) GetContainerCreateBuilder() *ContainerCreateBuilder {
 	builder := &ContainerCreateBuilder{
 		containerConfig: &container.Config{
 			ExposedPorts: make(nat.PortSet),
+			Labels: map[string]string{
+				"maintainer":             BuilderAuthor,
+				"com.dpanel.description": BuildDesc,
+				"com.dpanel.website":     BuildWebSite,
+			},
 		},
 		hostConfig: &container.HostConfig{
 			PortBindings: make(nat.PortMap),
