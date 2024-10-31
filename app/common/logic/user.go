@@ -8,6 +8,7 @@ import (
 )
 
 type UserInfo struct {
+	Fd           string `json:"fd"`
 	UserId       int32  `json:"userId"`
 	Username     string `json:"username"`
 	RoleIdentity string `json:"roleIdentity"`

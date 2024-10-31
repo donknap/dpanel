@@ -77,6 +77,7 @@ type recvMessageContent struct {
 }
 
 type respMessage struct {
+	Fd   string      `json:"fd"`
 	Type string      `json:"type"`
 	Data interface{} `json:"data"`
 }
@@ -160,10 +161,19 @@ func (self *Client) SendMessage() {
 /* 抢到chan里消息的ws发送消息时都给所有客户端发送 */
 func (self *Client) sendMessage(message *respMessage) {
 	lock.Lock()
-	for _, client := range wsCollect {
-		err := client.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
+	if message.Type == "event" {
+		err := self.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
 		if err != nil {
 			slog.Error("ws send message error", "fd", self.Id, "error", err.Error())
+		}
+	} else {
+		for _, client := range wsCollect {
+			message.Fd = client.Id
+			err := client.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
+			slog.Debug("ws", "id", self.Id, "message", string(message.ToJson()))
+			if err != nil {
+				slog.Error("ws send message error", "fd", self.Id, "error", err.Error())
+			}
 		}
 	}
 	lock.Unlock()

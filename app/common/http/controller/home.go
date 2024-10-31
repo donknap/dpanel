@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -42,6 +43,8 @@ func (self Home) WsNotice(http *gin.Context) {
 	}
 	go client.ReadMessage()
 	go client.SendMessage()
+
+	client.SendMessageQueue <- fmt.Sprintf("fd:%s", client.Id)
 }
 
 func (self Home) WsConsole(http *gin.Context) {
@@ -133,7 +136,21 @@ func (self Home) Info(http *gin.Context) {
 		return
 	}
 	info.Name = docker.Sdk.Client.DaemonHost()
+	self.JsonResponseWithoutError(http, gin.H{
+		"info":       info,
+		"sdkVersion": docker.Sdk.Client.ClientVersion(),
+		"dpanel": map[string]interface{}{
+			"version":       facade.GetConfig().GetString("app.version"),
+			"family":        facade.GetConfig().GetString("app.env"),
+			"release":       "",
+			"containerInfo": dpanelContainerInfo,
+		},
+		"plugin": plugin.Wrapper{}.GetPluginList(),
+	})
+	return
+}
 
+func (self Home) Usage(http *gin.Context) {
 	// 有些设备的docker获取磁盘占用比较耗时，跑一下后台协程去获取数据
 	go func() {
 		diskUsage, err := docker.Sdk.Client.DiskUsage(docker.Sdk.Ctx, types.DiskUsageOptions{
@@ -145,6 +162,16 @@ func (self Home) Info(http *gin.Context) {
 			},
 		})
 		if err == nil {
+			// 去掉无用的信息
+			for i, _ := range diskUsage.Containers {
+				diskUsage.Containers[i].Labels = make(map[string]string)
+			}
+			for i, _ := range diskUsage.Images {
+				diskUsage.Images[i].Labels = make(map[string]string)
+			}
+			for i, _ := range diskUsage.Volumes {
+				diskUsage.Volumes[i].Labels = make(map[string]string)
+			}
 			logic.Setting{}.Save(&entity.Setting{
 				GroupName: logic.SettingGroupSetting,
 				Name:      logic.SettingGroupSettingDiskUsage,
@@ -173,24 +200,14 @@ func (self Home) Info(http *gin.Context) {
 	backupData, _ := dao.Backup.Count()
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"info":       info,
-		"diskUsage":  diskUsage,
-		"sdkVersion": docker.Sdk.Client.ClientVersion(),
+		"diskUsage": diskUsage,
 		"total": map[string]int{
 			"network":       len(networkRow),
 			"containerTask": int(containerTask),
 			"imageTask":     int(imageTask),
 			"backup":        int(backupData),
 		},
-		"dpanel": map[string]interface{}{
-			"version":       facade.GetConfig().GetString("app.version"),
-			"family":        facade.GetConfig().GetString("app.env"),
-			"release":       "",
-			"containerInfo": dpanelContainerInfo,
-		},
-		"plugin": plugin.Wrapper{}.GetPluginList(),
 	})
-	return
 }
 
 func (self Home) GetStatList(http *gin.Context) {
