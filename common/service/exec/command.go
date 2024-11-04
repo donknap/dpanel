@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"bytes"
 	"github.com/creack/pty"
 	"io"
 	"log/slog"
@@ -19,37 +20,39 @@ type RunCommandOption struct {
 	WindowSize *pty.Winsize
 }
 
-func (self Command) RunInTerminal(option *RunCommandOption) {
+func (self Command) RunInTerminal(option *RunCommandOption) (io.Reader, error) {
 	slog.Debug("run command", option.CmdName, option.CmdArgs)
-	myWrite := &write{}
+
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
 	var out *os.File
 	var err error
+
 	if option.WindowSize != nil {
 		out, err = pty.StartWithSize(cmd, option.WindowSize)
 	} else {
 		out, err = pty.Start(cmd)
 	}
+
 	if err != nil {
-		slog.Debug(option.CmdName, err.Error())
+		return nil, err
 	}
-	_, _ = io.Copy(myWrite, out)
+	return out, err
 }
 
-func (self Command) Run(option *RunCommandOption) {
+func (self Command) Run(option *RunCommandOption) (io.Reader, error) {
 	slog.Debug("run command", option.CmdName, option.CmdArgs)
-
-	myWrite := &write{}
+	out := new(bytes.Buffer)
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
-	cmd.Stdout = myWrite
-	cmd.Stderr = myWrite
+	cmd.Stdout = out
+	cmd.Stderr = out
 	err := cmd.Run()
 	if err != nil {
 		slog.Debug(option.CmdName, err.Error())
 	}
+	return out, nil
 }
 
-func (self Command) RunWithOut(option *RunCommandOption) string {
+func (self Command) RunWithResult(option *RunCommandOption) string {
 	slog.Debug("run command", option.CmdName, option.CmdArgs)
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
 	out, err := cmd.CombinedOutput()
