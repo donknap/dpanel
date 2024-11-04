@@ -14,10 +14,12 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"log/slog"
 	"time"
 )
 
@@ -36,15 +38,21 @@ func (self Home) WsNotice(http *gin.Context) {
 		return
 	}
 
-	client, err := logic.NewClientConn(http, &logic.ClientOptions{})
+	client, err := ws.NewClient(http, ws.ClientOption{})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	go client.ReadMessage()
-	go client.SendMessage()
 
-	client.SendMessageQueue <- fmt.Sprintf("fd:%s", client.Id)
+	// 将自己的fd推回给客户端
+	err = client.SendMessage(&ws.RespMessage{
+		Type: ws.MessageTypeEventFd,
+		Data: []byte(client.Fd),
+	})
+	if err != nil {
+		slog.Error("websocket", "connect", err.Error())
+	}
 }
 
 func (self Home) WsConsole(http *gin.Context) {
@@ -98,15 +106,21 @@ func (self Home) WsConsole(http *gin.Context) {
 			Command string `json:"command"`
 		} `json:"content"`
 	}
-	client, err := logic.NewClientConn(http, &logic.ClientOptions{
+	client, err := ws.NewClient(http, ws.ClientOption{
 		CloseHandler: func() {
 			shell.Close()
 		},
-		MessageHandler: map[string]func(message []byte){
-			"console": func(message []byte) {
+		RecvMessageHandler: map[string]ws.RecvMessageHandlerFn{
+			"console": func(recvMessage *ws.RecvMessage) {
 				var cmd command
-				json.Unmarshal(message, &cmd)
-				shell.Conn.Write([]byte(cmd.Content.Command))
+				err = json.Unmarshal(recvMessage.Message, &cmd)
+				if err != nil {
+					slog.Error("console", "json unmarshal", err.Error())
+				}
+				_, err = shell.Conn.Write([]byte(cmd.Content.Command))
+				if err != nil {
+					slog.Error("console", "shell read", err.Error())
+				}
 			},
 		},
 	})
@@ -123,7 +137,13 @@ func (self Home) WsConsole(http *gin.Context) {
 				return
 			}
 			processedOutput := string(out[:n])
-			client.Conn.WriteMessage(websocket.TextMessage, []byte(processedOutput))
+			err = client.Conn.WriteMessage(websocket.TextMessage, ws.RespMessage{
+				Type: fmt.Sprintf(ws.MessageTypeConsole, params.Id),
+				Data: processedOutput,
+			}.ToJson())
+			if err != nil {
+				slog.Error("websocket", "shell write", err.Error())
+			}
 		}
 	}()
 }

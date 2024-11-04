@@ -33,7 +33,7 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 	}
 
 	result := make([]*statItemResult, 0)
-	response := exec.Command{}.RunWithOut(&exec.RunCommandOption{
+	response := exec.Command{}.RunWithResult(&exec.RunCommandOption{
 		CmdName: "docker",
 		CmdArgs: append(
 			docker.Sdk.ExtraParams,

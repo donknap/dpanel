@@ -412,13 +412,13 @@ func (self SiteDomain) UpdateDomain(http *gin.Context) {
 }
 
 func (self SiteDomain) RestartNginx(http *gin.Context) {
-	exec.Command{}.RunWithOut(&exec.RunCommandOption{
+	exec.Command{}.RunWithResult(&exec.RunCommandOption{
 		CmdName: "nginx",
 		CmdArgs: []string{
 			"-s", "stop",
 		},
 	})
-	exec.Command{}.RunWithOut(&exec.RunCommandOption{
+	exec.Command{}.RunWithResult(&exec.RunCommandOption{
 		CmdName: "nginx",
 	})
 	self.JsonSuccessResponse(http)
