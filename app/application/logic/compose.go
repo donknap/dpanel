@@ -64,7 +64,7 @@ func (self Compose) Ls() []*composeItem {
 		"--format", "json",
 		"--all",
 	}
-	out := exec.Command{}.RunWithOut(&exec.RunCommandOption{
+	out := exec.Command{}.RunWithResult(&exec.RunCommandOption{
 		CmdName: "docker",
 		CmdArgs: append(append(docker.Sdk.ExtraParams, "compose"), command...),
 	})
