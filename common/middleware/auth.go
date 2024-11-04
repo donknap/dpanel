@@ -57,6 +57,7 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 			http.AbortWithStatus(401)
 			return
 		}
+		myUserInfo.Fd = http.GetHeader("AuthorizationFd")
 		http.Set("userInfo", myUserInfo)
 		http.Next()
 		return
