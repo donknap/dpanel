@@ -84,7 +84,7 @@ func (self Acme) Issue(option *AcmeIssueOption) error {
 }
 
 func (self Acme) Info(serverName string) *acmeInfoResult {
-	out := exec.Command{}.RunWithOut(&exec.RunCommandOption{
+	out := exec.Command{}.RunWithResult(&exec.RunCommandOption{
 		CmdName: commandName,
 		CmdArgs: []string{
 			"--config-home", storage.Local{}.GetStorageLocalPath() + "/acme",

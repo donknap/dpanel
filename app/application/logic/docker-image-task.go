@@ -121,10 +121,10 @@ func (self DockerTask) ImageRemote(task *ImageRemoteOption) error {
 				}
 				if pd.Status == "Pull complete" {
 					pg[pd.Id].Extracting = 100
-					docker.QueueDockerImageDownloadMessage <- pg
+					docker.QueueDockerImagePullMessage <- pg
 				}
 				if pd.ProgressDetail.Total > 0 {
-					docker.QueueDockerImageDownloadMessage <- pg
+					docker.QueueDockerImagePullMessage <- pg
 				}
 			}
 			if message.Err != nil {
