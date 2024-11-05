@@ -33,10 +33,22 @@ func (self RunLog) Run(http *gin.Context) {
 		ShowStderr: true,
 		ShowStdout: true,
 		Tail:       strconv.Itoa(params.LineTotal),
-		Follow:     true,
+		Follow:     !params.Download,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.Download {
+		buffer, err := docker.GetContentFromStdFormat(response)
+		_ = response.Close()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		http.Header("Content-Type", "text/plain")
+		http.Header("Content-Disposition", "attachment; filename="+params.Md5+".log")
+		http.Data(200, "text/plain", buffer.Bytes())
 		return
 	}
 	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeContainerLog, params.Md5))
@@ -71,15 +83,8 @@ func (self RunLog) Run(http *gin.Context) {
 	//if err == nil {
 	//	out = stdout
 	//}
-	if params.Download {
-		http.Header("Content-Type", "text/plain")
-		http.Header("Content-Disposition", "attachment; filename="+params.Md5+".log")
-		//http.Data(200, "text/plain", []byte(out.String()))
-		return
-	} else {
-		self.JsonResponseWithoutError(http, gin.H{
-			"log": "",
-		})
-	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"log": "",
+	})
 	return
 }
