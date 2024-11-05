@@ -14,6 +14,9 @@ func NewProgressPip(messageType string) *ProgressPip {
 		ctx:         ctx,
 		cancel:      cancelFunc,
 	}
+	if progress, ok := collect.progressPip[messageType]; ok {
+		progress.cancel()
+	}
 	collect.progressPip[messageType] = process
 	return process
 }

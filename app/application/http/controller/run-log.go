@@ -21,7 +21,7 @@ type RunLog struct {
 func (self RunLog) Run(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5       string `json:"md5" binding:"required"`
-		LineTotal int    `json:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000"`
+		LineTotal int    `json:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000 5000 -1"`
 		Download  bool   `json:"download"`
 	}
 
@@ -29,12 +29,15 @@ func (self RunLog) Run(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	response, err := docker.Sdk.Client.ContainerLogs(docker.Sdk.Ctx, params.Md5, container.LogsOptions{
+	option := container.LogsOptions{
 		ShowStderr: true,
 		ShowStdout: true,
-		Tail:       strconv.Itoa(params.LineTotal),
 		Follow:     !params.Download,
-	})
+	}
+	if params.LineTotal > 0 {
+		option.Tail = strconv.Itoa(params.LineTotal)
+	}
+	response, err := docker.Sdk.Client.ContainerLogs(docker.Sdk.Ctx, params.Md5, option)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -53,6 +56,7 @@ func (self RunLog) Run(http *gin.Context) {
 	}
 	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeContainerLog, params.Md5))
 	progress.OnWrite = func(p string) error {
+		fmt.Printf("%v \n", p)
 		newReader := bytes.NewReader([]byte(p))
 		stdout := new(bytes.Buffer)
 		_, err = stdcopy.StdCopy(stdout, stdout, newReader)
