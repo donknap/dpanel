@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -10,7 +12,9 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -62,11 +66,21 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = tasker.Deploy()
+	response, err := tasker.Deploy()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, composeRow.ID))
+	defer wsBuffer.Close()
+
+	_, err = io.Copy(wsBuffer, response)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
 	// 部署完成后也上更新状态
 	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
 	if err != nil {
@@ -75,7 +89,8 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		composeRow.Setting.Status = composeRun.Status
 	}
 	_, _ = dao.Compose.Updates(composeRow)
-	notice.Message{}.Success("composeDeploy", composeRow.Name)
+
+	_ = notice.Message{}.Success("composeDeploy", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -102,7 +117,16 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = tasker.Destroy(params.DeleteImage, params.DeleteVolume)
+	response, err := tasker.Destroy(params.DeleteImage, params.DeleteVolume)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, composeRow.ID))
+	defer wsBuffer.Close()
+
+	_, err = io.Copy(wsBuffer, response)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -145,7 +169,6 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		Id int32  `json:"id" binding:"required"`
 		Op string `json:"op" binding:"required" oneof:"start restart stop pause unpause ls"`
 	}
-
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
@@ -160,11 +183,23 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = tasker.Ctrl(params.Op)
+	response, err := tasker.Ctrl(params.Op)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	buffer := new(bytes.Buffer)
+	_, err = io.Copy(buffer, response)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	ws.BroadcastMessage <- &ws.RespMessage{
+		Type: fmt.Sprintf("%s-%d", ws.MessageTypeCompose, composeRow.ID),
+		Data: buffer.String(),
+	}
+
 	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
 	if err != nil {
 		composeRow.Setting.Status = logic.ComposeStatusWaiting

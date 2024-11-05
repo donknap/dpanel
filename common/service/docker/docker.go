@@ -16,14 +16,12 @@ import (
 )
 
 var (
-	Sdk, _                      = NewDockerClient(NewDockerClientOption{})
-	QueueDockerProgressMessage  = make(chan *Progress, 999)
-	QueueDockerImagePullMessage = make(chan map[string]*ProgressDownloadImage, 999)
-	BuilderAuthor               = "DPanel"
-	BuildDesc                   = "DPanel is a docker web management panel"
-	BuildWebSite                = "https://dpanel.cc"
-	BuildVersion                = "1.0.0"
-	HostnameTemplate            = "%s.pod.dpanel.local"
+	Sdk, _           = NewDockerClient(NewDockerClientOption{})
+	BuilderAuthor    = "DPanel"
+	BuildDesc        = "DPanel is a docker web management panel"
+	BuildWebSite     = "https://dpanel.cc"
+	BuildVersion     = "1.0.0"
+	HostnameTemplate = "%s.pod.dpanel.local"
 )
 
 type Builder struct {

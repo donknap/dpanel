@@ -1,7 +1,11 @@
 package controller
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -12,10 +16,13 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 )
@@ -104,7 +111,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 		Name:     params.Tag,
 	})
 	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
-	if imageInfo.ID != "" {
+	if err == nil && imageInfo.ID != "" {
 		self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
 		return
 	}
@@ -113,34 +120,67 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	out, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageTar, false)
+	defer func() {
+		_ = os.Remove(imageTar.Name())
+	}()
+	_ = notice.Message{}.Info("imageBuild", "正在导入镜像，请查看控制台输出", params.Tag)
+	response, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageTar, false)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	progressChan := docker.Sdk.Progress(out.Body, imageName)
-	for {
-		select {
-		case message, ok := <-progressChan:
-			if !ok {
-				if err != nil {
-					self.JsonResponseWithError(http, message.Err, 500)
-					return
-				}
+	defer func() {
+		if response.Body.Close() != nil {
+			slog.Error("docker", "image import ", err)
+		}
+	}()
+
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImageImport, params.Tag))
+	defer wsBuffer.Close()
+
+	imageTag := ""
+	buffer := new(bytes.Buffer)
+	wsBuffer.OnWrite = func(p string) error {
+		fmt.Printf("%v \n", p)
+		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
+		for {
+			line, _, err := newReader.ReadLine()
+			if err == io.EOF {
+				break
 			}
-			if message.Stream != nil && strings.Contains(message.Stream.Stream, "Loaded image:") {
-				importImageName := strings.Split(message.Stream.Stream, "Loaded image:")[1]
-				err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, strings.TrimSpace(importImageName), imageName)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
+			msg := docker.BuildMessage{}
+			if err = json.Unmarshal(line, &msg); err == nil {
+				if msg.Stream != "" && strings.Contains(msg.Stream, "Loaded image:") {
+					imageTag = strings.Split(msg.Stream, "Loaded image:")[1]
 				}
-				_ = os.Remove(storage.Local{}.GetRealPath(params.Tar))
-				self.JsonSuccessResponse(http)
-				return
+				buffer.WriteString(fmt.Sprintf("\r%s: %s", msg.Id, msg.Progress))
+			} else {
+				slog.Error("docker", "image build task", err, "data", p)
+				return err
 			}
 		}
+		if buffer.Len() < 512 {
+			return nil
+		}
+		wsBuffer.BroadcastMessage(buffer.String())
+		buffer.Reset()
+		return nil
 	}
+	_, err = io.Copy(wsBuffer, response.Body)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if imageTag != "" {
+		err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, strings.TrimSpace(imageTag), imageName)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	self.JsonSuccessResponse(http)
+	return
 }
 
 func (self Image) CreateByDockerfile(http *gin.Context) {
@@ -251,14 +291,20 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		Arch: params.PlatformArch,
 	}
 
-	err := logic.DockerTask{}.ImageBuild(buildImageTask)
+	log, err := logic.DockerTask{}.ImageBuild(buildImageTask)
 	if err != nil {
+		imageRow.Status = logic.StatusError
+		imageRow.Message = log + "\n" + err.Error()
+		_, _ = dao.Image.Updates(imageRow)
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	dao.Image.Create(imageRow)
-
+	imageRow.Status = logic.StatusSuccess
+	imageRow.Message = log
+	imageRow.ImageInfo = &accessor.ImageInfoOption{
+		Id: imageName,
+	}
+	_, _ = dao.Image.Updates(imageRow)
 	self.JsonResponseWithoutError(http, gin.H{
 		"imageId": imageRow.ID,
 	})

@@ -6,24 +6,28 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
+	"io"
 	"strings"
 )
 
 // docker compose 任务执行，包含 部署，销毁，控制
 
 type Task struct {
-	Name     string
-	Composer *Wrapper
-	Original *Wrapper // 原始 compose
+	Name         string
+	Composer     *Wrapper
+	Original     *Wrapper // 原始 compose
+	ProgressChan chan []byte
 }
 
-func (self Task) Deploy() error {
+func (self Task) Deploy() (io.Reader, error) {
 	cmd := []string{
 		"--progress", "tty", "up", "-d",
 	}
 	cmd = append(cmd, self.Composer.GetServiceNameList()...)
-	self.runCommand(cmd)
-
+	response, err := self.runCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
 	for _, item := range self.Composer.Project.Networks {
 		for _, serviceItem := range self.Composer.Project.Services {
 			for _, linkItem := range serviceItem.ExternalLinks {
@@ -34,10 +38,10 @@ func (self Task) Deploy() error {
 			}
 		}
 	}
-	return nil
+	return response, nil
 }
 
-func (self Task) Destroy(deleteImage bool, deleteVolume bool) error {
+func (self Task) Destroy(deleteImage bool, deleteVolume bool) (io.Reader, error) {
 	cmd := []string{
 		"--progress", "tty", "down",
 	}
@@ -60,16 +64,14 @@ func (self Task) Destroy(deleteImage bool, deleteVolume bool) error {
 	if deleteVolume {
 		cmd = append(cmd, "--volumes")
 	}
-	self.runCommand(cmd)
-	return nil
+	return self.runCommand(cmd)
 }
 
-func (self Task) Ctrl(op string) error {
+func (self Task) Ctrl(op string) (io.Reader, error) {
 	cmd := []string{
 		"--progress", "tty", op,
 	}
-	self.runCommand(cmd)
-	return nil
+	return self.runCommand(cmd)
 }
 
 func (self Task) OriginalYaml() ([]byte, error) {
@@ -97,7 +99,7 @@ func (self Task) Ps() []*composeContainerResult {
 	cmd := self.Composer.GetBaseCommand()
 	cmd = append(cmd, "ps", "--format", "json", "--all")
 
-	out := exec.Command{}.RunWithOut(&exec.RunCommandOption{
+	out := exec.Command{}.RunWithResult(&exec.RunCommandOption{
 		CmdName: "docker",
 		CmdArgs: append(append(docker.Sdk.ExtraParams, "compose"), cmd...),
 	})
@@ -116,9 +118,9 @@ func (self Task) Ps() []*composeContainerResult {
 	return result
 }
 
-func (self Task) runCommand(command []string) {
+func (self Task) runCommand(command []string) (io.Reader, error) {
 	command = append(self.Composer.GetBaseCommand(), command...)
-	exec.Command{}.RunInTerminal(&exec.RunCommandOption{
+	return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
 		CmdName: "docker",
 		CmdArgs: append(
 			append(docker.Sdk.ExtraParams, "compose"),

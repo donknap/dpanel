@@ -86,7 +86,6 @@ func (self *imageBuildBuilder) makeTarByZip(tarWriter *tar.Writer) (err error) {
 
 func (self *imageBuildBuilder) Execute() (response types.ImageBuildResponse, err error) {
 	tarArchive, err := os.CreateTemp("", "dpanel")
-	slog.Info("build tar", "path", tarArchive.Name())
 	if err != nil {
 		return response, err
 	}
@@ -108,8 +107,14 @@ func (self *imageBuildBuilder) Execute() (response types.ImageBuildResponse, err
 			defer file.Close()
 			defer os.Remove(file.Name())
 
-			file.Write(self.dockerFileContent)
-			file.Seek(0, io.SeekStart)
+			_, err = file.Write(self.dockerFileContent)
+			if err != nil {
+				slog.Error("docker", "image build write dockerfile", err.Error())
+			}
+			_, err = file.Seek(0, io.SeekStart)
+			if err != nil {
+				slog.Error("docker", "image build seek dockerfile", err.Error())
+			}
 			fileInfo, _ := file.Stat()
 			fileInfoHeader, err := tar.FileInfoHeader(fileInfo, "")
 			if err != nil {
