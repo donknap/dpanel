@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -183,21 +182,19 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	response, err := tasker.Ctrl(params.Op)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	buffer := new(bytes.Buffer)
-	_, err = io.Copy(buffer, response)
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, composeRow.ID))
+	defer wsBuffer.Close()
+
+	_, err = io.Copy(wsBuffer, response)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
-	}
-
-	ws.BroadcastMessage <- &ws.RespMessage{
-		Type: fmt.Sprintf("%s-%d", ws.MessageTypeCompose, composeRow.ID),
-		Data: buffer.String(),
 	}
 
 	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
