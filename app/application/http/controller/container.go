@@ -346,3 +346,25 @@ func (self Container) Export(http *gin.Context) {
 	http.Data(200, "application/tar", data)
 	return
 }
+
+func (self Container) Commit(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5  string `json:"md5" binding:"required"`
+		Name string `json:"name" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	response, err := docker.Sdk.Client.ContainerCommit(docker.Sdk.Ctx, params.Md5, container.CommitOptions{
+		Reference: params.Name,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"md5": response.ID,
+	})
+	return
+}

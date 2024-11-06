@@ -51,7 +51,7 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 		Name:     params.Tag,
 	})
 	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
-	if imageInfo.ID != "" {
+	if err == nil && imageInfo.ID != "" {
 		self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
 		return
 	}
@@ -62,7 +62,9 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 	}
 	change := []string{
 		"CMD " + params.Cmd,
-		"WORKDIR " + params.WorkDir,
+	}
+	if params.WorkDir != "" {
+		change = append(change, "WORKDIR "+params.WorkDir)
 	}
 	for _, port := range params.Expose {
 		change = append(change, "EXPOSE "+port)
