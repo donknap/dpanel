@@ -20,6 +20,8 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"log/slog"
+	"sort"
+	"strconv"
 	"time"
 )
 
@@ -214,6 +216,53 @@ func (self Home) Usage(http *gin.Context) {
 		diskUsage = setting.Value.DiskUsage
 	}
 
+	type portItem struct {
+		Port accessor.PortItem `json:"port"`
+		Name string            `json:"name"`
+	}
+	ports := make([]*portItem, 0)
+	containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+		All: true,
+	})
+	if err == nil {
+		for _, item := range containerList {
+			usePort := make([]*portItem, 0)
+			if item.HostConfig.NetworkMode == "host" {
+				imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, item.ImageID)
+				if err == nil {
+					for port, _ := range imageInfo.Config.ExposedPorts {
+						usePort = append(usePort, &portItem{
+							Name: item.Names[0],
+							Port: accessor.PortItem{
+								Host:   port.Port(),
+								Dest:   port.Port(),
+								HostIp: "0.0.0.0",
+							},
+						})
+					}
+				}
+			} else {
+				for _, port := range item.Ports {
+					if port.PublicPort == 0 {
+						continue
+					}
+					usePort = append(usePort, &portItem{
+						Name: item.Names[0],
+						Port: accessor.PortItem{
+							Host:   strconv.Itoa(int(port.PublicPort)),
+							Dest:   strconv.Itoa(int(port.PrivatePort)),
+							HostIp: port.IP,
+						},
+					})
+				}
+			}
+			ports = append(ports, usePort...)
+		}
+		sort.Slice(ports, func(i, j int) bool {
+			return ports[i].Port.Host < ports[j].Port.Host
+		})
+	}
+
 	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, network.ListOptions{})
 	containerTask, _ := dao.Site.Where(dao.Site.DeletedAt.IsNotNull()).Unscoped().Count()
 	imageTask, _ := dao.Image.Count()
@@ -226,7 +275,9 @@ func (self Home) Usage(http *gin.Context) {
 			"containerTask": int(containerTask),
 			"imageTask":     int(imageTask),
 			"backup":        int(backupData),
+			"port":          len(ports),
 		},
+		"port": ports,
 	})
 }
 
