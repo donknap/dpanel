@@ -48,7 +48,7 @@ func NewClient(ctx *gin.Context, options ClientOption) (*Client, error) {
 	}
 	collect.Join(client)
 
-	slog.Info("ws connect", "fd", client.Fd, "goroutine", runtime.NumGoroutine(), "total", collect.Total())
+	slog.Info("ws connect", "fd", client.Fd, "goroutine", runtime.NumGoroutine(), "client total", collect.Total(), "progress total", len(collect.progressPip))
 	return client, nil
 }
 

@@ -15,7 +15,7 @@ var (
 
 func NewCollection() *Collection {
 	obj := &Collection{
-		clients:     make(map[string]*Client),
+		clients:     sync.Map{},
 		progressPip: make(map[string]*ProgressPip),
 	}
 	go obj.Broadcast()
@@ -23,20 +23,18 @@ func NewCollection() *Collection {
 }
 
 type Collection struct {
-	clients     map[string]*Client
+	clients     sync.Map
 	progressPip map[string]*ProgressPip
 	ctx         context.Context
 }
 
 func (self *Collection) Join(c *Client) {
-	self.clients[c.Fd] = c
+	self.clients.Store(c.Fd, c)
 }
 
 func (self *Collection) Leave(c *Client) {
-	if _, ok := self.clients[c.Fd]; ok {
-		delete(self.clients, c.Fd)
-	}
-	if len(self.clients) == 0 {
+	self.clients.Delete(c.Fd)
+	if self.Total() == 0 {
 		for key, pip := range self.progressPip {
 			pip.cancel()
 			delete(self.progressPip, key)
@@ -47,12 +45,14 @@ func (self *Collection) Leave(c *Client) {
 func (self *Collection) sendMessage(message *RespMessage) {
 	lock.Lock()
 	lock.Unlock()
-	for _, client := range self.clients {
-		err := client.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
+	self.clients.Range(func(key, value any) bool {
+		c := value.(*Client)
+		err := c.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
 		if err != nil {
-			slog.Error("ws broadcast error", "fd", client.Fd, "error", err.Error())
+			slog.Error("ws broadcast error", "fd", c.Fd, "error", err.Error())
 		}
-	}
+		return true
+	})
 }
 
 func (self *Collection) Broadcast() {
@@ -72,5 +72,12 @@ func (self *Collection) Broadcast() {
 }
 
 func (self *Collection) Total() int {
-	return len(self.clients)
+	lock.Lock()
+	lock.Unlock()
+	count := 0
+	self.clients.Range(func(key, value any) bool {
+		count += 1
+		return true
+	})
+	return count
 }
