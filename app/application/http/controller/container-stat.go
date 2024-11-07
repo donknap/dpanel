@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"bytes"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"io"
+	"log/slog"
 	http2 "net/http"
 )
 
@@ -15,20 +17,24 @@ func (self Container) GetStatInfo(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	statRow, err := docker.Sdk.Client.ContainerStats(docker.Sdk.Ctx, params.Id, false)
+	out, err := docker.Sdk.Client.ContainerStats(docker.Sdk.Ctx, params.Id, false)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	statInfo, err := io.ReadAll(statRow.Body)
+	defer func() {
+		if out.Body.Close() != nil {
+			slog.Error("container", "stat close", err)
+		}
+	}()
+	buffer := new(bytes.Buffer)
+	_, err = io.Copy(buffer, out.Body)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer statRow.Body.Close()
 	http.Header("Content-type", "application/json;charset=utf-8")
-	http.String(http2.StatusOK, string(statInfo))
+	http.String(http2.StatusOK, buffer.String())
 	return
 
 }
