@@ -19,6 +19,7 @@ type statItemResult struct {
 	BlockIO   ioItemResult `json:"blockIO"`
 	NetworkIO ioItemResult `json:"networkIO"`
 	Name      string       `json:"name"`
+	Container string       `json:"container"`
 }
 
 type ioItemResult struct {
@@ -43,12 +44,13 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 		),
 	})
 	statJsonItem := struct {
-		BlockIO  string
-		CPUPerc  string
-		MemPerc  string
-		MemUsage string
-		NetIO    string
-		Name     string
+		BlockIO   string
+		CPUPerc   string
+		MemPerc   string
+		MemUsage  string
+		NetIO     string
+		Name      string
+		Container string
 	}{}
 	for _, item := range strings.Split(response, "\n") {
 		if item == "" || !strings.Contains(item, "\"Name\":") {
@@ -59,7 +61,8 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 			return nil, err
 		}
 		r := &statItemResult{
-			Name: statJsonItem.Name,
+			Name:      statJsonItem.Name,
+			Container: statJsonItem.Container,
 		}
 		cpu, _ := strconv.ParseFloat(strings.TrimSuffix(statJsonItem.CPUPerc, "%"), 64)
 
