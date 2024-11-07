@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/app/ctrl"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -176,5 +177,6 @@ func main() {
 	// 注册业务 provider，此模块中需要使用 http server 和 console
 	new(common.Provider).Register(httpServer)
 	new(application.Provider).Register(httpServer)
+	new(ctrl.Provider).Register(facade.GetConsole())
 	app.RunConsole()
 }
