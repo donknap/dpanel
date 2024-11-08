@@ -143,7 +143,6 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 	imageTag := ""
 	buffer := new(bytes.Buffer)
 	wsBuffer.OnWrite = func(p string) error {
-		fmt.Printf("%v \n", p)
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
 		for {
 			line, _, err := newReader.ReadLine()

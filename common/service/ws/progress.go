@@ -2,33 +2,49 @@ package ws
 
 import (
 	"context"
+	"errors"
+	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/gin-gonic/gin"
 	"time"
 )
 
 type ProgressWrite func(p []byte) ([]byte, error)
 
-func NewProgressPip(messageType string) *ProgressPip {
+func NewProgressPip(messageType string) ProgressPip {
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	process := &ProgressPip{
+	process := ProgressPip{
 		messageType: messageType,
 		ctx:         ctx,
 		cancel:      cancelFunc,
 	}
-	if progress, ok := collect.progressPip[messageType]; ok {
-		progress.cancel()
+	if p, exists := collect.progressPip.LoadOrStore(messageType, process); exists {
+		p.(ProgressPip).Close()
 	}
-	collect.progressPip[messageType] = process
 	return process
 }
 
+func NewFdProgressPip(http *gin.Context, messageType string) (ProgressPip, error) {
+	fd := ""
+	if data, exists := http.Get("userInfo"); exists {
+		userInfo := data.(logic.UserInfo)
+		fd = userInfo.Fd
+	} else {
+		return ProgressPip{}, errors.New("fd not found")
+	}
+	process := NewProgressPip(messageType)
+	process.fd = fd
+	return process, nil
+}
+
 type ProgressPip struct {
+	fd          string
 	messageType string
 	ctx         context.Context
 	cancel      context.CancelFunc
 	OnWrite     func(p string) error
 }
 
-func (self *ProgressPip) Write(p []byte) (n int, err error) {
+func (self ProgressPip) Write(p []byte) (n int, err error) {
 	temp := string(p)
 	if self.OnWrite != nil {
 		err = self.OnWrite(temp)
@@ -41,7 +57,7 @@ func (self *ProgressPip) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (self *ProgressPip) BroadcastMessage(data interface{}) {
+func (self ProgressPip) BroadcastMessage(data interface{}) {
 	BroadcastMessage <- &RespMessage{
 		Type:   self.messageType,
 		Data:   data,
@@ -49,10 +65,9 @@ func (self *ProgressPip) BroadcastMessage(data interface{}) {
 	}
 }
 
-func (self *ProgressPip) Close() {
-	if pip, ok := collect.progressPip[self.messageType]; ok {
-		pip.cancel()
-		delete(collect.progressPip, self.messageType)
+func (self ProgressPip) Close() {
+	if p, exists := collect.progressPip.LoadAndDelete(self.messageType); exists {
+		p.(ProgressPip).cancel()
 	}
 }
 

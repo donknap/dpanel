@@ -74,6 +74,13 @@ func (self Task) Ctrl(op string) (io.Reader, error) {
 	return self.runCommand(cmd)
 }
 
+func (self Task) Logs() (io.ReadCloser, error) {
+	cmd := []string{
+		"--progress", "tty", "logs", "-f",
+	}
+	return self.runCommand(cmd)
+}
+
 func (self Task) OriginalYaml() ([]byte, error) {
 	return self.Original.Project.MarshalYAML()
 }
@@ -118,7 +125,7 @@ func (self Task) Ps() []*composeContainerResult {
 	return result
 }
 
-func (self Task) runCommand(command []string) (io.Reader, error) {
+func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 	command = append(self.Composer.GetBaseCommand(), command...)
 	return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
 		CmdName: "docker",

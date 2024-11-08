@@ -27,6 +27,18 @@ func NewClient(ctx *gin.Context, options ClientOption) (*Client, error) {
 	if options.RecvMessageHandler == nil {
 		options.RecvMessageHandler = map[string]RecvMessageHandlerFn{}
 	}
+	options.RecvMessageHandler[MessageTypeProgressClose] = func(message *RecvMessage) {
+		closeMessage := struct {
+			Type string `json:"type"`
+			Data string `json:"data"`
+		}{}
+		if err := json.Unmarshal(message.Message, &closeMessage); err == nil {
+			if p, exists := collect.progressPip.Load(closeMessage.Data); exists {
+				// 在 pip 的 close 方法中统一删除
+				p.(ProgressPip).Close()
+			}
+		}
+	}
 	ws := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -48,7 +60,7 @@ func NewClient(ctx *gin.Context, options ClientOption) (*Client, error) {
 	}
 	collect.Join(client)
 
-	slog.Info("ws connect", "fd", client.Fd, "goroutine", runtime.NumGoroutine(), "client total", collect.Total(), "progress total", len(collect.progressPip))
+	slog.Info("ws connect", "fd", client.Fd, "goroutine", runtime.NumGoroutine(), "client total", collect.Total(), "progress total", collect.ProgressTotal())
 	return client, nil
 }
 

@@ -7,15 +7,17 @@ import (
 )
 
 const (
-	MessageTypeEvent        = "event"
-	MessageTypeSignalAbort  = "signal:abort"
-	MessageTypeEventFd      = "event:fd"
-	MessageTypeCompose      = "compose:%d"
-	MessageTypeConsole      = "console:%s"
-	MessageTypeContainerLog = "container:log:%s"
-	MessageTypeImagePull    = "image:pull:%s"
-	MessageTypeImageBuild   = "image:build:%d"
-	MessageTypeImageImport  = "image:import:%s"
+	MessageTypeEvent         = "event"
+	MessageTypeSignalAbort   = "signal:abort"
+	MessageTypeEventFd       = "event:fd"
+	MessageTypeCompose       = "compose:%d"
+	MessageTypeComposeLog    = "compose:log:%d"
+	MessageTypeConsole       = "console:%s"
+	MessageTypeContainerLog  = "container:log:%s"
+	MessageTypeImagePull     = "image:pull:%s"
+	MessageTypeImageBuild    = "image:build:%d"
+	MessageTypeImageImport   = "image:import:%s"
+	MessageTypeProgressClose = "progress:close"
 )
 
 type RespMessage struct {
@@ -46,8 +48,7 @@ func (self RecvMessage) IsPing() bool {
 }
 
 type recvMessageContent struct {
-	Type    string
-	Content map[string]interface{}
+	Type string
 }
 
 type RecvMessageHandlerFn func(message *RecvMessage)

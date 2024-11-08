@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -214,6 +216,67 @@ func (self Compose) ContainerProcessKill(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Compose) ContainerLog(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	composeRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	if composeRow == nil {
+		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		return
+	}
+	tasker, err := logic.Compose{}.GetTasker(composeRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	response, err := tasker.Logs()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	wsBuffer, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeComposeLog, composeRow.ID))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer wsBuffer.Close()
+	go func() {
+		select {
+		case <-wsBuffer.Done():
+			err = response.Close()
+			slog.Debug("compose", "run log  response close", fmt.Sprintf(ws.MessageTypeComposeLog, composeRow.ID), "error", err)
+			if err != nil {
+				fmt.Printf("%v \n", err)
+			}
+		}
+	}()
+
+	wsBuffer.OnWrite = func(p string) error {
+		newReader := bytes.NewReader([]byte(p))
+		stdout := new(bytes.Buffer)
+		_, err = stdcopy.StdCopy(stdout, stdout, newReader)
+		if err != nil {
+			wsBuffer.BroadcastMessage(p)
+		} else {
+			wsBuffer.BroadcastMessage(stdout.String())
+		}
+		return nil
+	}
+	_, err = io.Copy(wsBuffer, response)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
 	self.JsonSuccessResponse(http)
 	return
 }

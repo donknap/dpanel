@@ -54,9 +54,12 @@ func (self RunLog) Run(http *gin.Context) {
 		http.Data(200, "text/plain", buffer.Bytes())
 		return
 	}
-	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeContainerLog, params.Md5))
+	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerLog, params.Md5))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	progress.OnWrite = func(p string) error {
-		fmt.Printf("%v \n", p)
 		newReader := bytes.NewReader([]byte(p))
 		stdout := new(bytes.Buffer)
 		_, err = stdcopy.StdCopy(stdout, stdout, newReader)
@@ -70,7 +73,7 @@ func (self RunLog) Run(http *gin.Context) {
 	go func() {
 		select {
 		case <-progress.Done():
-			slog.Debug("container", "run log", "close")
+			slog.Debug("container", "run log response close", fmt.Sprintf(ws.MessageTypeContainerLog, params.Md5))
 			_ = response.Close()
 		}
 	}()

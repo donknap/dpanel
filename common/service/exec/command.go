@@ -18,9 +18,10 @@ type RunCommandOption struct {
 	CmdName    string
 	CmdArgs    []string
 	WindowSize *pty.Winsize
+	Follow     bool
 }
 
-func (self Command) RunInTerminal(option *RunCommandOption) (io.Reader, error) {
+func (self Command) RunInTerminal(option *RunCommandOption) (io.ReadCloser, error) {
 	slog.Debug("run command", option.CmdName, option.CmdArgs)
 
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
@@ -36,7 +37,10 @@ func (self Command) RunInTerminal(option *RunCommandOption) (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	return out, err
+	return TerminalResult{
+		Conn: out,
+		cmd:  cmd,
+	}, err
 }
 
 func (self Command) Run(option *RunCommandOption) (io.Reader, error) {

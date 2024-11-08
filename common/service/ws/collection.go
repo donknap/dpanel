@@ -16,7 +16,7 @@ var (
 func NewCollection() *Collection {
 	obj := &Collection{
 		clients:     sync.Map{},
-		progressPip: make(map[string]*ProgressPip),
+		progressPip: sync.Map{},
 	}
 	go obj.Broadcast()
 	return obj
@@ -24,7 +24,7 @@ func NewCollection() *Collection {
 
 type Collection struct {
 	clients     sync.Map
-	progressPip map[string]*ProgressPip
+	progressPip sync.Map
 	ctx         context.Context
 }
 
@@ -34,11 +34,19 @@ func (self *Collection) Join(c *Client) {
 
 func (self *Collection) Leave(c *Client) {
 	self.clients.Delete(c.Fd)
-	if self.Total() == 0 {
-		for key, pip := range self.progressPip {
-			pip.cancel()
-			delete(self.progressPip, key)
+	self.progressPip.Range(func(key, value any) bool {
+		p := value.(ProgressPip)
+		if p.fd == c.Fd {
+			p.Close()
 		}
+		return true
+	})
+	if self.Total() == 0 {
+		self.progressPip.Range(func(key, value any) bool {
+			p := value.(ProgressPip)
+			p.Close()
+			return true
+		})
 	}
 }
 
@@ -76,6 +84,17 @@ func (self *Collection) Total() int {
 	lock.Unlock()
 	count := 0
 	self.clients.Range(func(key, value any) bool {
+		count += 1
+		return true
+	})
+	return count
+}
+
+func (self *Collection) ProgressTotal() int {
+	lock.Lock()
+	lock.Unlock()
+	count := 0
+	self.progressPip.Range(func(key, value any) bool {
 		count += 1
 		return true
 	})
