@@ -22,6 +22,10 @@ func NewCollection() *Collection {
 	return obj
 }
 
+func GetCollect() *Collection {
+	return collect
+}
+
 type Collection struct {
 	clients     sync.Map
 	progressPip sync.Map

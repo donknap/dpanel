@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -96,15 +97,17 @@ func (self Task) Project() *types.Project {
 }
 
 type composeContainerResult struct {
-	Name       string `json:"name"`
-	Publishers []struct {
-		URL           string `json:"url"`
-		TargetPort    int    `json:"targetPort"`
-		PublishedPort int    `json:"publishedPort"`
-		Protocol      string `json:"protocol"`
-	} `json:"publishers"`
-	State  string `json:"state"`
-	Status string `json:"status"`
+	Name       string                             `json:"name"`
+	Publishers []composeContainerPublishersResult `json:"publishers"`
+	State      string                             `json:"state"`
+	Status     string                             `json:"status"`
+}
+
+type composeContainerPublishersResult struct {
+	URL           string `json:"url"`
+	TargetPort    int    `json:"targetPort"`
+	PublishedPort int    `json:"publishedPort"`
+	Protocol      string `json:"protocol"`
 }
 
 func (self Task) Ps() []*composeContainerResult {
@@ -134,6 +137,32 @@ func (self Task) Ps() []*composeContainerResult {
 		if err == nil {
 			result = append(result, &temp)
 		}
+	}
+	return result
+}
+
+func (self Task) PsFromYaml() []*composeContainerResult {
+	result := make([]*composeContainerResult, 0)
+	if self.Name == "" {
+		return result
+	}
+	for _, item := range self.Composer.Project.Services {
+		container := &composeContainerResult{
+			Name:       item.Name,
+			Publishers: make([]composeContainerPublishersResult, 0),
+			State:      "waiting",
+			Status:     "",
+		}
+		for _, port := range item.Ports {
+			publicPort, _ := strconv.Atoi(port.Published)
+			container.Publishers = append(container.Publishers, composeContainerPublishersResult{
+				PublishedPort: publicPort,
+				TargetPort:    int(port.Target),
+				Protocol:      port.Protocol,
+				URL:           port.HostIP,
+			})
+		}
+		result = append(result, container)
 	}
 	return result
 }

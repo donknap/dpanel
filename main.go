@@ -13,6 +13,7 @@ import (
 	common2 "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/migrate"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/mcuadros/go-version"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -24,6 +25,7 @@ import (
 	http2 "net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 var (
@@ -52,7 +54,9 @@ func main() {
 	// 业务中需要使用 http server，这里需要先实例化
 	httpServer := new(http.Provider).Register(app.GetConfig(), app.GetConsole(), app.GetServerManager()).Export()
 	// 注册一些全局中间件，路由或是其它一些全局操作
-	httpServer.Use(middleware.GetPanicHandlerMiddleware())
+	httpServer.Use(func(context *gin.Context) {
+		slog.Info("runtime info", "goroutine", runtime.NumGoroutine(), "client total", ws.GetCollect().Total(), "progress total", ws.GetCollect().ProgressTotal())
+	}, middleware.GetPanicHandlerMiddleware())
 	// 全局登录判断
 	httpServer.Use(common2.AuthMiddleware{}.Process)
 	httpServer.RegisterRouters(

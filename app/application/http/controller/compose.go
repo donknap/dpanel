@@ -183,6 +183,8 @@ func (self Compose) GetDetail(http *gin.Context) {
 
 	if yamlRow.Setting.Status != logic.ComposeStatusWaiting {
 		data["containerList"] = tasker.Ps()
+	} else {
+		data["containerList"] = tasker.PsFromYaml()
 	}
 
 	self.JsonResponseWithoutError(http, data)
