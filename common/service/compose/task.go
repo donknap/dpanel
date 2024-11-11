@@ -1,6 +1,8 @@
 package compose
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/network"
@@ -94,7 +96,15 @@ func (self Task) Project() *types.Project {
 }
 
 type composeContainerResult struct {
-	Name string `json:"name"`
+	Name       string `json:"name"`
+	Publishers []struct {
+		URL           string `json:"url"`
+		TargetPort    int    `json:"targetPort"`
+		PublishedPort int    `json:"publishedPort"`
+		Protocol      string `json:"protocol"`
+	} `json:"publishers"`
+	State  string `json:"state"`
+	Status string `json:"status"`
 }
 
 func (self Task) Ps() []*composeContainerResult {
@@ -113,13 +123,16 @@ func (self Task) Ps() []*composeContainerResult {
 	if out == "" {
 		return result
 	}
-	for _, line := range strings.Split(out, "\n") {
-		if strings.HasPrefix(line, "{") {
-			temp := composeContainerResult{}
-			err := json.Unmarshal([]byte(line), &temp)
-			if err == nil {
-				result = append(result, &temp)
-			}
+	newReader := bufio.NewReader(bytes.NewReader([]byte(out)))
+	for {
+		line, _, err := newReader.ReadLine()
+		if err == io.EOF {
+			break
+		}
+		temp := composeContainerResult{}
+		err = json.Unmarshal(line, &temp)
+		if err == nil {
+			result = append(result, &temp)
 		}
 	}
 	return result

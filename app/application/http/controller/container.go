@@ -73,11 +73,12 @@ func (self Container) GetList(http *gin.Context) {
 		return
 	}
 
+	list := make([]types.Container, 0)
 	filter := filters.NewArgs()
 	if params.Md5 != "" {
 		filter.Add("id", params.Md5)
 	}
-	list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+	temp, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
 		All:     true,
 		Latest:  true,
 		Filters: filter,
@@ -85,6 +86,11 @@ func (self Container) GetList(http *gin.Context) {
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+	for _, item := range temp {
+		if _, ok := item.Labels["com.docker.compose.project"]; !ok {
+			list = append(list, item)
+		}
 	}
 
 	if function.IsEmptyArray(list) {
