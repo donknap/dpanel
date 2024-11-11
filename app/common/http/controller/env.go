@@ -163,13 +163,19 @@ func (self Env) Switch(http *gin.Context) {
 			}
 		}
 	}
-	options.Host = address
+	options.Address = address
+	options.Host = params.Name
+
 	if docker.Sdk.Client.DaemonHost() == address {
 		self.JsonSuccessResponse(http)
 		return
 	}
 	oldDockerClient := docker.Sdk
-	dockerClient, _ := docker.NewDockerClient(options)
+	dockerClient, err := docker.NewDockerClient(options)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	_, err = dockerClient.Client.Info(dockerClient.Ctx)
 	if err != nil {
 		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，请检查地址"), 500)

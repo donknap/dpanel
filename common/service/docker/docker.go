@@ -33,7 +33,8 @@ type Builder struct {
 }
 
 type NewDockerClientOption struct {
-	Host    string
+	Host    string // docker 客户端名称
+	Address string // docker 客户端地址
 	TlsCa   string
 	TlsCert string
 	TlsKey  string
@@ -48,9 +49,9 @@ func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
 	}
-	if option.Host != "" {
-		builder.ExtraParams = append(builder.ExtraParams, "-H", option.Host)
-		dockerOption = append(dockerOption, client.WithHost(option.Host))
+	if option.Address != "" {
+		builder.ExtraParams = append(builder.ExtraParams, "-H", option.Address)
+		dockerOption = append(dockerOption, client.WithHost(option.Address))
 	} else {
 		option.Host = "local"
 	}

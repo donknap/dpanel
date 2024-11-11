@@ -78,8 +78,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 	_, err = io.Copy(wsBuffer, response)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+		slog.Error("compose", "deploy copy error", err)
 	}
 
 	// 部署完成后也上更新状态
@@ -129,8 +128,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 
 	_, err = io.Copy(wsBuffer, response)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+		slog.Error("compose", "destroy copy error", err)
 	}
 	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
 	if err != nil {
@@ -140,18 +138,25 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	}
 	_, _ = dao.Compose.Updates(composeRow)
 
+	path := filepath.Join(filepath.Dir(tasker.Composer.Project.ComposeFiles[0]), logic.ComposeProjectDeployFileName)
+	err = os.Remove(path)
+	if err != nil {
+		slog.Debug("compose", "delete deploy file", err, "path", path)
+	}
+
 	if function.InArray([]string{
 		logic.ComposeTypeText, logic.ComposeTypeRemoteUrl,
 	}, composeRow.Setting.Type) {
-		err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), composeRow.Name))
+		dir, err := os.ReadDir(filepath.Join(storage.Local{}.GetComposePath(), composeRow.Name))
 		if err != nil {
-			slog.Debug("compose", "destroy", err)
+			self.JsonResponseWithError(http, err, 500)
+			return
 		}
-	} else {
-		path := filepath.Join(filepath.Dir(tasker.Composer.Project.ComposeFiles[0]), logic.ComposeProjectDeployFileName)
-		err = os.Remove(path)
-		if err != nil {
-			slog.Debug("compose", "delete deploy file", err, "path", path)
+		if len(dir) == 0 {
+			err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), composeRow.Name))
+			if err != nil {
+				slog.Debug("compose", "destroy", err)
+			}
 		}
 	}
 	if params.DeleteData {
@@ -272,10 +277,6 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		return nil
 	}
 	_, err = io.Copy(wsBuffer, response)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 
 	self.JsonSuccessResponse(http)
 	return

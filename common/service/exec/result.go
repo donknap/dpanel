@@ -1,9 +1,7 @@
 package exec
 
 import (
-	"errors"
-	"fmt"
-	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 )
@@ -14,21 +12,21 @@ type TerminalResult struct {
 }
 
 func (self TerminalResult) Close() error {
-	var errCmd error
-	var errConn error
-	if self.cmd != nil {
-		errCmd = self.cmd.Process.Kill()
-	}
 	if self.Conn != nil {
-		errConn = self.Conn.Close()
+		err := self.Conn.Close()
+		if err != nil {
+			slog.Debug("terminal result", err)
+		}
 	}
-	return errors.Join(errCmd, errConn)
+	if self.cmd != nil {
+		err := self.cmd.Process.Kill()
+		if err != nil {
+			slog.Debug("terminal result", err)
+		}
+	}
+	return nil
 }
 
 func (self TerminalResult) Read(p []byte) (n int, err error) {
-	fmt.Printf("%v \n", self.Conn)
-	if self.Conn == nil {
-		return 0, io.EOF
-	}
 	return self.Conn.Read(p)
 }

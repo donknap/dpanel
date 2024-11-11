@@ -185,6 +185,9 @@ func (self Compose) Sync() error {
 					// 查找当前目录是否包含 override yaml
 					for _, overridePath := range self.FindPathOverrideYaml(filepath.Dir(path)) {
 						rel, _ = filepath.Rel(rootDir, overridePath)
+						if findComposeList[name].Setting.Uri == nil {
+							findComposeList[name].Setting.Uri = make([]string, 0)
+						}
 						findComposeList[name].Setting.Uri = append(findComposeList[name].Setting.Uri, rel)
 					}
 				}
@@ -208,13 +211,23 @@ func (self Compose) Sync() error {
 			delete(findComposeList, dbComposeRow.Name)
 		}
 		//
-		if !has && function.InArray([]string{
-			ComposeTypeOutPath, ComposeTypeStoragePath,
-		}, dbComposeRow.Setting.Type) {
-			if dbComposeRow.Setting.Type == ComposeTypeOutPath {
-				_ = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), filepath.Dir(dbComposeRow.Setting.Uri[0])))
+		if !has {
+			if function.InArray([]string{
+				ComposeTypeOutPath, ComposeTypeStoragePath,
+			}, dbComposeRow.Setting.Type) {
+				if dbComposeRow.Setting.Type == ComposeTypeOutPath {
+					_ = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), filepath.Dir(dbComposeRow.Setting.Uri[0])))
+				}
+				_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Delete()
 			}
-			_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Delete()
+
+			if function.InArray([]string{
+				ComposeTypeText, ComposeTypeRemoteUrl,
+			}, dbComposeRow.Setting.Type) {
+				_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Updates(&entity.Compose{
+					Setting: dbComposeRow.Setting,
+				})
+			}
 		}
 	}
 
@@ -259,7 +272,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 			}
 		}
 	} else {
-		tempYamlFilePath := filepath.Join(taskFileDir, "compose.yaml")
+		tempYamlFilePath := filepath.Join(taskFileDir, ComposeProjectDeployFileName)
 		err := os.MkdirAll(filepath.Dir(tempYamlFilePath), os.ModePerm)
 		if err != nil {
 			return nil, err

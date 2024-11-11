@@ -157,7 +157,7 @@ func (self Home) Info(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	info.Name = docker.Sdk.Client.DaemonHost()
+	info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Host, docker.Sdk.Client.DaemonHost())
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,
 		"sdkVersion": docker.Sdk.Client.ClientVersion(),
