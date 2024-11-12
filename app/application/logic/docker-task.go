@@ -34,6 +34,7 @@ type ImageRemoteOption struct {
 	Type     string
 	Tag      string
 	Platform string
+	Proxy    string
 }
 
 type NoticeOption struct {

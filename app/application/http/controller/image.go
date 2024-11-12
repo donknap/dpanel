@@ -429,7 +429,7 @@ func (self Image) ImageDelete(http *gin.Context) {
 		for _, sha := range params.Md5 {
 			_, err := docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, sha, image.RemoveOptions{
 				PruneChildren: true,
-				Force:         params.Force,
+				Force:         true,
 			})
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)

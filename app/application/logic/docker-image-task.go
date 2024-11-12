@@ -101,7 +101,11 @@ func (self DockerTask) ImageRemote(task *ImageRemoteOption) error {
 		if task.Platform != "" {
 			pullOption.Platform = task.Platform
 		}
-		out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, task.Tag, pullOption)
+		tag := task.Tag
+		if task.Proxy != "" {
+			tag = task.Proxy + "/" + task.Tag
+		}
+		out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, tag, pullOption)
 	} else {
 		out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, task.Tag, image.PushOptions{
 			RegistryAuth: task.Auth,

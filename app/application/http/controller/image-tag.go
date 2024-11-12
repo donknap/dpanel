@@ -64,22 +64,21 @@ func (self Image) TagRemote(http *gin.Context) {
 			proxyList = append(proxyList, tagDetail.Registry)
 			var err error
 			for _, value := range proxyList {
-				proxyImageTag := strings.Trim(strings.TrimPrefix(value, "https://"), "/")
+				proxy := strings.Trim(strings.TrimPrefix(value, "https://"), "/")
 				if tagDetail.Registry == "docker.io" && strings.Count(tagDetail.ImageName, "/") == 0 {
-					proxyImageTag += "/library"
+					proxy += "/library"
 				}
-				proxyImageTag += "/" + tagDetail.ImageName
-
 				err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteOption{
 					Auth:     authString,
 					Type:     params.Type,
-					Tag:      proxyImageTag,
+					Tag:      params.Tag,
+					Proxy:    proxy,
 					Platform: params.Platform,
 				})
 				if err == nil {
 					proxyUrl = value
 					// 如果使用了加速，需要给镜像 tag 一个原来的名称
-					_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, proxyImageTag, params.Tag)
+					_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, proxy+"/"+tagDetail.Tag, params.Tag)
 					break
 				}
 			}
