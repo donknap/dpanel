@@ -48,6 +48,22 @@ func (self Compose) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 			return
 		}
+		yamlFilePath := ""
+		// 如果已经有数据，则将提交的内容先同步到文件内
+		if params.Type == logic.ComposeTypeServerPath {
+			yamlFilePath = yamlRow.Setting.Uri[0]
+		}
+		if params.Type == logic.ComposeTypeStoragePath {
+			yamlFilePath = filepath.Join(storage.Local{}.GetComposePath(), yamlRow.Setting.Uri[0])
+		}
+		if yamlFilePath != "" {
+			err := os.WriteFile(yamlFilePath, []byte(params.Yaml), 0644)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
+
 	} else {
 		if params.Type == logic.ComposeTypeStoragePath {
 			self.JsonResponseWithError(http, errors.New("存储路径类型不能手动添加，请挂载 /dpanel/compose 目录自动发现。"), 500)
@@ -71,10 +87,6 @@ func (self Compose) Create(http *gin.Context) {
 	case logic.ComposeTypeServerPath:
 		params.Yaml = ""
 		uri = append(uri, params.ServerPath)
-		overrideYamlList := logic.Compose{}.FindPathOverrideYaml(filepath.Dir(params.ServerPath))
-		if !function.IsEmptyArray(overrideYamlList) {
-			uri = append(uri, overrideYamlList...)
-		}
 		break
 	}
 
@@ -140,6 +152,61 @@ func (self Compose) GetList(http *gin.Context) {
 }
 
 func (self Compose) GetDetail(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	yamlRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	if yamlRow == nil {
+		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		return
+	}
+	if yamlRow.Setting.Type == logic.ComposeTypeRemoteUrl {
+		response, err := http2.Get(yamlRow.Setting.Uri[0])
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer func() {
+			_ = response.Body.Close()
+		}()
+		content, err := io.ReadAll(response.Body)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		yamlRow.Yaml = string(content)
+	} else {
+		if len(yamlRow.Setting.Uri) > 0 {
+			yamlFilePath := ""
+			if yamlRow.Setting.Type == logic.ComposeTypeServerPath {
+				yamlFilePath = yamlRow.Setting.Uri[0]
+			} else {
+				yamlFilePath = filepath.Join(storage.Local{}.GetComposePath(), yamlRow.Setting.Uri[0])
+			}
+			content, err := os.ReadFile(yamlFilePath)
+			if err == nil {
+				yamlRow.Yaml = string(content)
+			}
+		}
+	}
+	data := gin.H{
+		"detail":        yamlRow,
+		"containerList": "",
+	}
+	tasker, err := logic.Compose{}.GetTasker(yamlRow)
+	if err == nil {
+		data["containerList"] = tasker.PsFromYaml()
+	}
+	self.JsonResponseWithoutError(http, data)
+	return
+}
+
+func (self Compose) GetTask(http *gin.Context) {
+	// task 的 yaml 返回的是最终合并后的
 	type ParamsValidate struct {
 		Id int32 `json:"id" binding:"required"`
 	}
@@ -279,10 +346,12 @@ func (self Compose) Parse(http *gin.Context) {
 	if err == nil {
 		self.JsonResponseWithoutError(http, gin.H{
 			"project": composer.Project,
+			"error":   "",
 		})
 	} else {
 		self.JsonResponseWithoutError(http, gin.H{
 			"project": nil,
+			"error":   err.Error(),
 		})
 	}
 	return

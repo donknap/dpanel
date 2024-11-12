@@ -102,13 +102,15 @@ func (self Compose) Kill() error {
 func (self Compose) Sync() error {
 	rootDir := storage.Local{}.GetComposePath()
 
+	// 重置所有任务状态为等待
 	composeList, _ := dao.Compose.Find()
 	for i, _ := range composeList {
 		composeList[i].Setting.Status = ComposeStatusWaiting
 	}
 
 	// 查找部署过的compose任务，如果是 dpanel-c- 开头表示是系统部署的任务，需要重新定义一下 name
-	// 否则是外部的任务
+	// 运行中的任务如果是面板部署的，将数据库中的数据替换到查找到的运行任务
+	// 非面板部署的任务记录下 Yaml 所在位置，在管理页面中确认是否可以找到文件进行管理
 	findComposeList := make(map[string]*entity.Compose)
 	for _, item := range self.Ls() {
 		findRow := &entity.Compose{
@@ -123,7 +125,6 @@ func (self Compose) Sync() error {
 
 		has := false
 		if strings.HasPrefix(item.Name, "dpanel-c-") {
-			// 找到对应的任务，从数据库中获取数据
 			name := item.Name[9:]
 			exists, pos := function.FindArrayValueIndex(composeList, "Name", name)
 			if exists {
@@ -139,6 +140,12 @@ func (self Compose) Sync() error {
 		}
 	}
 
+	// 此时 findComposeList 中仅包含的是运行中的任务
+	// 遍历存储目录查找所有的任务文件
+	// 查找到任务文件如果在数据库中标记是文本或是远程地址，则直接跳过，此目录为系统生成的临时部署目录，用户修改无效。
+	// 目录中的任务已经在运行中，仅需要将 uri 重新赋值即可，状态这些不需要再重新赋值
+	// 目录中的任务没有运行，则还需要再去数据库中查找一下，需要将数据库中的数据同步到查找列表中
+	// 目录中的任务数据库中也没有，则添加需要创建
 	err := filepath.Walk(rootDir, func(path string, info fs.FileInfo, err error) error {
 		for _, suffix := range composeFileNameSuffix {
 			if strings.HasSuffix(path, suffix) {
@@ -148,24 +155,28 @@ func (self Compose) Sync() error {
 					// 强制转为小写
 					name := strings.ToLower(filepath.Dir(rel))
 					if _, ok := findComposeList[name]; ok {
-						if !function.InArray([]string{
+						if function.InArray([]string{
 							ComposeTypeText, ComposeTypeRemoteUrl,
 						}, findComposeList[name].Setting.Type) {
-							findComposeList[name].Setting.Uri = []string{
-								rel,
-							}
+							break
+						}
+						findComposeList[name].Setting.Uri = []string{
+							rel,
 						}
 					} else {
 						exists, pos := function.FindArrayValueIndex(composeList, "Name", name)
 						if exists {
 							dbComposeRow := composeList[pos[0]]
-							// 如果遇到与数据同名的非存储任务，则忽略
-							if !function.InArray([]string{
+							if function.InArray([]string{
 								ComposeTypeText, ComposeTypeRemoteUrl,
 							}, dbComposeRow.Setting.Type) {
-								dbComposeRow.Setting.Type = ComposeTypeStoragePath
-								findComposeList[dbComposeRow.Name] = dbComposeRow
+								break
 							}
+							dbComposeRow.Setting.Type = ComposeTypeStoragePath
+							dbComposeRow.Setting.Uri = []string{
+								rel,
+							}
+							findComposeList[dbComposeRow.Name] = dbComposeRow
 						} else {
 							findRow := &entity.Compose{
 								Name:  name,
@@ -182,14 +193,14 @@ func (self Compose) Sync() error {
 						}
 					}
 
-					// 查找当前目录是否包含 override yaml
-					for _, overridePath := range self.FindPathOverrideYaml(filepath.Dir(path)) {
-						rel, _ = filepath.Rel(rootDir, overridePath)
-						if findComposeList[name].Setting.Uri == nil {
-							findComposeList[name].Setting.Uri = make([]string, 0)
-						}
-						findComposeList[name].Setting.Uri = append(findComposeList[name].Setting.Uri, rel)
-					}
+					// 只查找非文本和远程类型的 override yaml
+					//for _, overridePath := range self.FindPathOverrideYaml(filepath.Dir(path)) {
+					//	rel, _ = filepath.Rel(rootDir, overridePath)
+					//	if findComposeList[name].Setting.Uri == nil {
+					//		findComposeList[name].Setting.Uri = make([]string, 0)
+					//	}
+					//	findComposeList[name].Setting.Uri = append(findComposeList[name].Setting.Uri, rel)
+					//}
 				}
 				break
 			}
