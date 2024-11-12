@@ -137,6 +137,16 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 			Value: value[1],
 		})
 	}
+	if !function.IsEmptyMap(info.Config.Labels) {
+		envOption.Label = make([]accessor.EnvItem, 0)
+		for key, value := range info.Config.Labels {
+			envOption.Label = append(envOption.Label, accessor.EnvItem{
+				Name:  key,
+				Value: value,
+			})
+		}
+	}
+
 	return envOption, nil
 }
 
