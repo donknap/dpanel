@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
-	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/app/ctrl"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -42,7 +41,7 @@ func main() {
 		os.Setenv("STORAGE_LOCAL_PATH", filepath.Dir(exePath))
 	}
 
-	app := app.NewApp(
+	myApp := app.NewApp(
 		app.Option{
 			Name: "w7-rangine-go-skeleton",
 		},
@@ -52,7 +51,7 @@ func main() {
 	slog.Debug("config", "db", facade.GetConfig().GetString("database.default.db_name"))
 
 	// 业务中需要使用 http server，这里需要先实例化
-	httpServer := new(http.Provider).Register(app.GetConfig(), app.GetConsole(), app.GetServerManager()).Export()
+	httpServer := new(http.Provider).Register(myApp.GetConfig(), myApp.GetConsole(), myApp.GetServerManager()).Export()
 	// 注册一些全局中间件，路由或是其它一些全局操作
 	httpServer.Use(func(context *gin.Context) {
 		slog.Info("runtime info", "goroutine", runtime.NumGoroutine(), "client total", ws.GetCollect().Total(), "progress total", ws.GetCollect().ProgressTotal())
@@ -100,7 +99,7 @@ func main() {
 			&migrate.Upgrade20240909{},
 		}
 		for _, updater := range migrateTableData {
-			if version.CompareSimple(updater.Version(), app.GetConfig().GetString("app.version")) == -1 {
+			if version.CompareSimple(updater.Version(), myApp.GetConfig().GetString("app.version")) == -1 {
 				continue
 			}
 			slog.Debug("main", "migrate", updater.Version())
@@ -110,31 +109,6 @@ func main() {
 			}
 		}
 
-		// 如果没有管理配置新建一条
-		founderSetting, _ := dao.Setting.
-			Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
-			Where(dao.Setting.Name.Eq(logic.SettingGroupUserFounder)).First()
-		if founderSetting == nil {
-			var (
-				username = "admin"
-				password = "admin"
-			)
-			if os.Getenv("INSTALL_USERNAME") != "" {
-				username = os.Getenv("INSTALL_USERNAME")
-			}
-			if os.Getenv("INSTALL_PASSWORD") != "" {
-				password = os.Getenv("INSTALL_PASSWORD")
-			}
-
-			_ = dao.Setting.Create(&entity.Setting{
-				GroupName: logic.SettingGroupUser,
-				Name:      logic.SettingGroupUserFounder,
-				Value: &accessor.SettingValueOption{
-					Password: logic.User{}.GetMd5Password(password, username),
-					Username: username,
-				},
-			})
-		}
 		registryRow, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq("docker.io")).First()
 		if registryRow == nil {
 			_ = dao.Registry.Create(&entity.Registry{
@@ -182,5 +156,5 @@ func main() {
 	new(common.Provider).Register(httpServer)
 	new(application.Provider).Register(httpServer)
 	new(ctrl.Provider).Register(facade.GetConsole())
-	app.RunConsole()
+	myApp.RunConsole()
 }

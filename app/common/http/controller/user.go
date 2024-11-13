@@ -3,6 +3,9 @@ package controller
 import (
 	"errors"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/accessor"
+	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/entity"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -15,13 +18,37 @@ type User struct {
 
 func (self User) Login(http *gin.Context) {
 	type ParamsValidate struct {
-		Username  string `json:"username" binding:"required"`
-		Password  string `json:"password" binding:"required"`
-		AutoLogin bool   `json:"autoLogin"`
+		Username        string `json:"username" binding:"required"`
+		Password        string `json:"password" binding:"required"`
+		ConfirmPassword string `json:"confirmPassword"`
+		AutoLogin       bool   `json:"autoLogin"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
+	}
+	if params.ConfirmPassword != "" {
+		founder, _ := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
+		if founder != nil {
+			self.JsonResponseWithError(http, errors.New("管理员配置已经存在，无法初始化。请去系统设置中修改"), 500)
+			return
+		}
+		if params.Password != params.ConfirmPassword {
+			self.JsonResponseWithError(http, errors.New("两次输入密码不一致"), 500)
+			return
+		}
+		err := dao.Setting.Create(&entity.Setting{
+			GroupName: logic.SettingGroupUser,
+			Name:      logic.SettingGroupUserFounder,
+			Value: &accessor.SettingValueOption{
+				Password: logic.User{}.GetMd5Password(params.Password, params.Username),
+				Username: params.Username,
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 	var expireAddTime time.Duration
 	if params.AutoLogin {
