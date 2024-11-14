@@ -200,8 +200,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 
 	_, err = io.Copy(wsBuffer, response)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+		slog.Error("compose", "destroy copy error", err)
 	}
 
 	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
