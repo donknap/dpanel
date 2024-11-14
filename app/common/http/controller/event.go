@@ -3,6 +3,7 @@ package controller
 import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
@@ -42,7 +43,13 @@ func (self Event) GetList(http *gin.Context) {
 
 func (self Event) Prune(http *gin.Context) {
 	oldRow, _ := dao.Event.Last()
-	dao.Event.Where(dao.Event.ID.Lte(oldRow.ID)).Delete()
+	_, _ = dao.Event.Where(dao.Event.ID.Lte(oldRow.ID)).Delete()
+	db, err := facade.GetDbFactory().Channel("default")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	db.Exec("vacuum")
 	self.JsonSuccessResponse(http)
 	return
 }
