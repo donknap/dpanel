@@ -168,6 +168,16 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		builder.WithExtraHosts(item.Name, item.Value)
 	}
 
+	if !function.IsEmptyArray(task.BuildParams.Device) {
+		for _, item := range task.BuildParams.Device {
+			builder.WithDevice(item.Host, item.Dest)
+		}
+	}
+
+	if task.BuildParams.Gpus != nil && task.BuildParams.Gpus.Enable {
+		builder.WithGpus(task.BuildParams.Gpus.Device, task.BuildParams.Gpus.Capabilities)
+	}
+
 	response, err := builder.Execute()
 	if err != nil {
 		return "", err
