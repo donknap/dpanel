@@ -72,6 +72,12 @@ type ReplaceItem struct {
 	Target string `json:"target"`
 }
 
+type GpusItem struct {
+	Enable       bool     `json:"enable"`
+	Device       []string `json:"device"`
+	Capabilities []string `json:"capabilities"`
+}
+
 type SiteEnvOption struct {
 	Name            string                `json:"name"`
 	ContainerName   string                `json:"containerName,omitempty"`
@@ -103,4 +109,6 @@ type SiteEnvOption struct {
 	IpV4            *ContainerNetworkItem `json:"ipV4,omitempty"`
 	IpV6            *ContainerNetworkItem `json:"ipV6,omitempty"`
 	Replace         []ReplaceItem         `json:"replace,omitempty"`
+	Device          []VolumeItem          `json:"device,omitempty"`
+	Gpus            *GpusItem             `json:"gpus,omitempty"`
 }

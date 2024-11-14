@@ -258,6 +258,39 @@ func (self *ContainerCreateBuilder) CreateOwnerNetwork(option network.CreateOpti
 	return err
 }
 
+func (self *ContainerCreateBuilder) WithDevice(host string, dest string) *ContainerCreateBuilder {
+	if self.hostConfig.Devices == nil {
+		self.hostConfig.Devices = make([]container.DeviceMapping, 0)
+	}
+	self.hostConfig.Devices = append(self.hostConfig.Devices, container.DeviceMapping{
+		PathOnHost:      host,
+		PathInContainer: dest,
+	})
+	return self
+}
+
+func (self *ContainerCreateBuilder) WithGpus(devices, capabilities []string) *ContainerCreateBuilder {
+	if self.hostConfig.DeviceRequests == nil {
+		self.hostConfig.DeviceRequests = make([]container.DeviceRequest, 0)
+	}
+	if function.IsEmptyArray(devices) {
+		devices = []string{
+			"all",
+		}
+	}
+	self.hostConfig.DeviceRequests = append(self.hostConfig.DeviceRequests, container.DeviceRequest{
+		DeviceIDs: devices,
+		Capabilities: [][]string{
+			{
+				"gpu",
+			},
+			capabilities,
+		},
+		Driver: "nvidia",
+	})
+	return self
+}
+
 func (self *ContainerCreateBuilder) Execute() (response container.CreateResponse, err error) {
 	if self.err != nil {
 		return response, self.err
