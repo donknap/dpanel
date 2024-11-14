@@ -63,7 +63,8 @@ func (self Env) Create(http *gin.Context) {
 		return
 	}
 	options := docker.NewDockerClientOption{
-		Host: params.Address,
+		Address: params.Address,
+		Host:    params.Name,
 	}
 	if params.EnableTLS {
 		if strings.HasSuffix(params.TlsCa, ".pem") {
@@ -106,7 +107,6 @@ func (self Env) Create(http *gin.Context) {
 			options.TlsCert = filepath.Join(certRootPath, "cert.pem")
 			options.TlsKey = filepath.Join(certRootPath, "key.pem")
 		}
-
 	}
 	dockerClient, err := docker.NewDockerClient(options)
 	if err != nil {
@@ -115,7 +115,7 @@ func (self Env) Create(http *gin.Context) {
 	}
 	_, err = dockerClient.Client.Info(docker.Sdk.Ctx)
 	if err != nil {
-		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，请检查地址"), 500)
+		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，错误信息："+err.Error()), 500)
 		return
 	}
 	logic.DockerEnv{}.UpdateEnv(&accessor.DockerClientResult{
