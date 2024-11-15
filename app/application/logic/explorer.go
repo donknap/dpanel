@@ -53,6 +53,7 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 	if err != nil {
 		return fileList, err
 	}
+
 	//lines := strings.Split(out, "\t")
 	// 这里不能单纯的用换行进行分隔，正常的数据中会有多余的 \n
 	lines := make([][]byte, 0)
