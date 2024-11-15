@@ -27,13 +27,14 @@
 > macos 下需要先将 docker.sock 文件 link 到 /var/run/docker.sock 目录中 \
 > ln -s -f /Users/用户/.docker/run/docker.sock  /var/run/docker.sock
 
-> 国内镜像 registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest
+> 国内镜像 \
+> registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest \
+> registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite
 
 ```
 docker run -it -d --name dpanel --restart=always \
  -p 80:80 -p 443:443 -p 8807:8080 -e APP_NAME=dpanel \
  -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
- -e INSTALL_USERNAME=admin -e INSTALL_PASSWORD=admin \
  dpanel/dpanel:latest 
 ```
 
@@ -45,13 +46,8 @@ lite 版去掉了域名转发相关，需要自行转发域名绑定容器，不
 docker run -it -d --name dpanel --restart=always \
  -p 8807:8080 -e APP_NAME=dpanel \
  -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
- -e INSTALL_USERNAME=admin -e INSTALL_PASSWORD=admin \
  dpanel/dpanel:lite
 ```
-
-### 默认帐号
-
-admin / admin
 
 #### 赞助
 
