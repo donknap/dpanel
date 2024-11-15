@@ -46,9 +46,9 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 	if err != nil {
 		return fileList, err
 	}
-
 	cmd := fmt.Sprintf("ls -AlhX --full-time %s%s \n", self.rootPath, path)
-	cmd = fmt.Sprintf("ls -AlhX --full-time %s%s | awk 'NR>1 {print \"`\" $1 \"` \" $2 \" \" $3 \" \" $4 \" \" $5 \" \" $6 \" \" $7 \" \" $8 \" \" $9 \" \" $11}' \n", self.rootPath, path)
+	cmd = fmt.Sprintf("ls -AlhX --full-time %s%s", self.rootPath, path)
+	cmd += " | awk 'NR>1 {printf \"{d>%s<d}\", $1;for (i=2; i<=NF; i++) printf \"{v>%s<v}\", $i;}'"
 	out, err := plugin.Command{}.Result(self.pluginName, cmd)
 	if err != nil {
 		return fileList, err
@@ -56,7 +56,7 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 	//lines := strings.Split(out, "\t")
 	// 这里不能单纯的用换行进行分隔，正常的数据中会有多余的 \n
 	lines := make([][]byte, 0)
-	reg := regexp.MustCompile("`[dlb-][a-zA-Z-]{3}[a-zA-Z-]{3}[a-zA-Z-]{3}`").FindAllStringIndex(string(out), -1)
+	reg := regexp.MustCompile(`\{d>[dlb-][a-zA-Z-]{3}[a-zA-Z-]{3}[a-zA-Z-]{3}<d\}`).FindAllStringIndex(string(out), -1)
 	for i, _ := range reg {
 		line := make([]byte, 0)
 		start, end := reg[i][0], 0
@@ -69,7 +69,12 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 		lines = append(lines, line)
 	}
 	for i, line := range lines {
-		row := strings.Fields(string(line))
+		// 只提取 {v>%s<v} 定位符之间的内容
+		row := make([]string, 0)
+		reg := regexp.MustCompile(`\{[v|d]>(.*?)<[v|d]\}`).FindAllIndex(line, -1)
+		for _, pos := range reg {
+			row = append(row, string(line[pos[0]+3:pos[1]-3]))
+		}
 		if len(row) < 8 {
 			slog.Debug("explorer", "get-path-list", i, "line", string(line))
 			return nil, errors.New("目录解析错误, 请反馈: " + string(line))
@@ -79,7 +84,7 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 		case 'd', 'l', '-', 'b':
 			if !function.IsEmptyArray(row) {
 				item := &fileItemResult{
-					ShowName: row[8],
+					ShowName: strings.Join(row[8:], " "),
 					IsDir:    row[0][0] == 'd',
 					Size:     row[4],
 					Mode:     row[0],
@@ -89,7 +94,7 @@ func (self explorer) GetListByPath(path string) (fileList []*fileItemResult, err
 					Group:    row[3],
 				}
 				if len(row) >= 10 && row[0][0] == 'l' {
-					item.LinkName = row[9]
+					item.LinkName = " "
 				}
 				item.Name = path + item.ShowName
 				fileList = append(fileList, item)
