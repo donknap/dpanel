@@ -78,6 +78,19 @@ type GpusItem struct {
 	Capabilities []string `json:"capabilities"`
 }
 
+type HookItem struct {
+	ContainerStart  string `json:"containerStart"`
+	ContainerCreate string `json:"containerCreate"`
+}
+
+type HealthcheckItem struct {
+	ShellType string `json:"shellType"`
+	Cmd       string `json:"cmd"`
+	Interval  int    `json:"interval"`
+	Timeout   int    `json:"timeout"`
+	Retries   int    `json:"retries"`
+}
+
 type SiteEnvOption struct {
 	Name            string                `json:"name"`
 	ContainerName   string                `json:"containerName,omitempty"`
@@ -111,4 +124,6 @@ type SiteEnvOption struct {
 	Replace         []ReplaceItem         `json:"replace,omitempty"`
 	Device          []VolumeItem          `json:"device,omitempty"`
 	Gpus            *GpusItem             `json:"gpus,omitempty"`
+	Hook            *HookItem             `json:"hook,omitempty"`
+	Healthcheck     *HealthcheckItem      `json:"healthcheck"`
 }

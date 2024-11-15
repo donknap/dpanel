@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/plugin"
 )
 
 func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, error) {
@@ -178,6 +179,16 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		builder.WithGpus(task.BuildParams.Gpus.Device, task.BuildParams.Gpus.Capabilities)
 	}
 
+	if task.BuildParams.Healthcheck != nil && task.BuildParams.Healthcheck.Cmd != "" {
+		builder.WithHealthcheck(
+			task.BuildParams.Healthcheck.ShellType,
+			task.BuildParams.Healthcheck.Cmd,
+			task.BuildParams.Healthcheck.Interval,
+			task.BuildParams.Healthcheck.Timeout,
+			task.BuildParams.Healthcheck.Retries,
+		)
+	}
+
 	response, err := builder.Execute()
 	if err != nil {
 		return "", err
@@ -238,6 +249,13 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	if err != nil {
 		//notice.Message{}.Error("containerCreate", err.Error())
 		return response.ID, err
+	}
+
+	if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
+		_, err := plugin.Command{}.Result(response.ID, task.BuildParams.Hook.ContainerCreate)
+		if err != nil {
+			_ = notice.Message{}.Info("containerCreate", err.Error())
+		}
 	}
 
 	_ = notice.Message{}.Success("containerCreate", task.SiteName)

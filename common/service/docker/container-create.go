@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 )
 
 type ContainerCreateBuilder struct {
@@ -288,6 +289,19 @@ func (self *ContainerCreateBuilder) WithGpus(devices, capabilities []string) *Co
 		},
 		Driver: "nvidia",
 	})
+	return self
+}
+
+func (self *ContainerCreateBuilder) WithHealthcheck(shellType, cmd string, interval, timeout, retries int) *ContainerCreateBuilder {
+	command := function.CommandSplit(cmd)
+	self.containerConfig.Healthcheck = &container.HealthConfig{
+		Timeout:  time.Duration(timeout) * time.Second,
+		Retries:  retries,
+		Interval: time.Duration(interval) * time.Second,
+		Test: append([]string{
+			shellType,
+		}, command...),
+	}
 	return self
 }
 
