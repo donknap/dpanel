@@ -96,8 +96,20 @@ func (self User) GetUserInfo(http *gin.Context) {
 		return
 	}
 	userInfo := data.(logic.UserInfo)
+
+	feature := struct {
+		ComposeStore bool `json:"composeStore"`
+	}{
+		ComposeStore: false,
+	}
+	count, _ := dao.Store.Count()
+	if count > 0 {
+		feature.ComposeStore = true
+	}
+
 	self.JsonResponseWithoutError(http, gin.H{
-		"user": userInfo,
+		"user":    userInfo,
+		"feature": feature,
 	})
 	return
 }

@@ -56,6 +56,12 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/env/create", controller.Env{}.Create)
 		cors.POST("/common/env/switch", controller.Env{}.Switch)
 		cors.POST("/common/env/delete", controller.Env{}.Delete)
+
+		// 应用商店
+		cors.POST("/common/store/create", controller.Store{}.Create)
+		cors.POST("/common/store/get-list", controller.Store{}.GetList)
+		cors.POST("/common/store/delete", controller.Store{}.Delete)
+		cors.POST("/common/store/update", controller.Store{}.Update)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

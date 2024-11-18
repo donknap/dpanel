@@ -13,7 +13,7 @@ ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
 ENV TZ=Asia/Shanghai
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-  apk add --no-cache --update musl docker-compose tzdata
+  apk add --no-cache --update musl docker-compose tzdata git
 
 COPY ./runtime/dpanel-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml

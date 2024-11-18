@@ -26,6 +26,7 @@ var (
 	Setting    *setting
 	Site       *site
 	SiteDomain *siteDomain
+	Store      *store
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
@@ -39,6 +40,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	Setting = &Q.Setting
 	Site = &Q.Site
 	SiteDomain = &Q.SiteDomain
+	Store = &Q.Store
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
@@ -53,6 +55,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Setting:    newSetting(db, opts...),
 		Site:       newSite(db, opts...),
 		SiteDomain: newSiteDomain(db, opts...),
+		Store:      newStore(db, opts...),
 	}
 }
 
@@ -68,6 +71,7 @@ type Query struct {
 	Setting    setting
 	Site       site
 	SiteDomain siteDomain
+	Store      store
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -84,6 +88,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Setting:    q.Setting.clone(db),
 		Site:       q.Site.clone(db),
 		SiteDomain: q.SiteDomain.clone(db),
+		Store:      q.Store.clone(db),
 	}
 }
 
@@ -107,6 +112,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Setting:    q.Setting.replaceDB(db),
 		Site:       q.Site.replaceDB(db),
 		SiteDomain: q.SiteDomain.replaceDB(db),
+		Store:      q.Store.replaceDB(db),
 	}
 }
 
@@ -120,6 +126,7 @@ type queryCtx struct {
 	Setting    ISettingDo
 	Site       ISiteDo
 	SiteDomain ISiteDomainDo
+	Store      IStoreDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
@@ -133,6 +140,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Setting:    q.Setting.WithContext(ctx),
 		Site:       q.Site.WithContext(ctx),
 		SiteDomain: q.SiteDomain.WithContext(ctx),
+		Store:      q.Store.WithContext(ctx),
 	}
 }
 

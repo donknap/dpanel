@@ -2,11 +2,14 @@ package exec
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"github.com/creack/pty"
 	"io"
 	"log/slog"
 	"os"
 	"os/exec"
+	"time"
 )
 
 var cmd *exec.Cmd
@@ -19,6 +22,7 @@ type RunCommandOption struct {
 	CmdArgs    []string
 	WindowSize *pty.Winsize
 	Follow     bool
+	Timeout    time.Duration
 }
 
 func (self Command) RunInTerminal(option *RunCommandOption) (io.ReadCloser, error) {
@@ -47,11 +51,24 @@ func (self Command) Run(option *RunCommandOption) (io.Reader, error) {
 	slog.Debug("run command", option.CmdName, option.CmdArgs)
 	out := new(bytes.Buffer)
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
+	if option.Timeout > 0 {
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(option.Timeout))
+		go func() {
+			select {
+			case <-ctx.Done():
+				cancel()
+				err := cmd.Process.Kill()
+				if err != nil {
+					slog.Error("run command timeout error", err)
+				}
+			}
+		}()
+	}
 	cmd.Stdout = out
 	cmd.Stderr = out
 	err := cmd.Run()
 	if err != nil {
-		slog.Debug(option.CmdName, err.Error())
+		return nil, errors.Join(err, errors.New(out.String()))
 	}
 	return out, nil
 }

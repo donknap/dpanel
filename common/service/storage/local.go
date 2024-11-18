@@ -30,6 +30,10 @@ func (self Local) GetComposePath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "compose")
 }
 
+func (self Local) GetStorePath() string {
+	return filepath.Join(self.GetStorageLocalPath(), "store")
+}
+
 func (self Local) GetStorageLocalPath() string {
 	return facade.GetConfig().GetString("storage.local.path")
 }

@@ -14,7 +14,7 @@ ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
 ENV TZ=Asia/Shanghai
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-  apk add --no-cache --update nginx musl inotify-tools docker-compose curl openssl tzdata && \
+  apk add --no-cache --update nginx musl inotify-tools docker-compose curl openssl tzdata git && \
   mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
   export ${PROXY} && curl https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh | sh -s -- --install-online --config-home /dpanel/acme
 

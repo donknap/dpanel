@@ -37,6 +37,11 @@ relation:
         serializer: json
   - table: ims_event
   - table: ims_notice
+  - table: ims_store
+    column:
+      setting:
+        type: StoreSettingOption
+        serializer: json
   - table: ims_compose
     column:
       setting:
