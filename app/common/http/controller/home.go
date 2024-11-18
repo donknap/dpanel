@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -158,12 +159,12 @@ func (self Home) Info(http *gin.Context) {
 		return
 	}
 	info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Host, docker.Sdk.Client.DaemonHost())
-
 	initUser := false
 	founder, err := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
 	if err != nil || founder == nil {
 		initUser = true
 	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,
 		"sdkVersion": docker.Sdk.Client.ClientVersion(),
@@ -231,8 +232,26 @@ func (self Home) Usage(http *gin.Context) {
 	containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
 		All: true,
 	})
+	containerRunningTotal := struct {
+		Stop      int `json:"stop"`
+		Pause     int `json:"pause"`
+		Unhealthy int `json:"unhealthy"`
+	}{
+		Stop:      0,
+		Pause:     0,
+		Unhealthy: 0,
+	}
 	if err == nil {
 		for _, item := range containerList {
+			if item.State == "exited" {
+				containerRunningTotal.Stop += 1
+			}
+			if item.State == "paused" {
+				containerRunningTotal.Pause += 1
+			}
+			if strings.Contains(item.Status, "unhealthy") {
+				containerRunningTotal.Unhealthy += 1
+			}
 			usePort := make([]*portItem, 0)
 			if item.HostConfig.NetworkMode == "host" {
 				imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, item.ImageID)
@@ -277,12 +296,13 @@ func (self Home) Usage(http *gin.Context) {
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"diskUsage": diskUsage,
-		"total": map[string]int{
-			"network":       len(networkRow),
-			"containerTask": int(containerTask),
-			"imageTask":     int(imageTask),
-			"backup":        int(backupData),
-			"port":          len(ports),
+		"total": map[string]interface{}{
+			"network":          len(networkRow),
+			"containerTask":    int(containerTask),
+			"containerRunning": containerRunningTotal,
+			"imageTask":        int(imageTask),
+			"backup":           int(backupData),
+			"port":             len(ports),
 		},
 		"port": ports,
 	})
