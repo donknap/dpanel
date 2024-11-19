@@ -2,14 +2,13 @@ package controller
 
 import (
 	"errors"
+	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
-	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,8 +24,7 @@ func (self Store) Create(http *gin.Context) {
 		Title string `json:"title" binding:"required"`
 		Type  string `json:"type" binding:"required"`
 		Name  string `json:"name" binding:"required"`
-		Git   string `json:"git"`
-		Url   string `json:"url"`
+		Url   string `json:"url" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -47,38 +45,13 @@ func (self Store) Create(http *gin.Context) {
 		}
 	}
 
-	if params.Type == accessor.StoreType1Panel {
-		err := os.RemoveAll(filepath.Join(storage.Local{}.GetStorePath(), params.Name))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		out, err := exec.Command{}.Run(&exec.RunCommandOption{
-			CmdName: "git",
-			CmdArgs: []string{
-				"clone", "--depth", "1",
-				params.Git, filepath.Join(storage.Local{}.GetStorePath(), params.Name),
-			},
-			Timeout: time.Second * 30,
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		_, err = io.Copy(os.Stdout, out)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-
 	storeNew := &entity.Store{
 		Title: params.Title,
 		Name:  params.Name,
 		Setting: &accessor.StoreSettingOption{
-			Type: params.Type,
-			Git:  params.Git,
-			Url:  params.Url,
+			Type:      params.Type,
+			Url:       params.Url,
+			UpdatedAt: time.Now().Unix(),
 		},
 	}
 	var err error
@@ -99,12 +72,39 @@ func (self Store) Create(http *gin.Context) {
 }
 
 func (self Store) Delete(http *gin.Context) {
+	type ParamsValidate struct {
+		Id []int32 `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	for _, id := range params.Id {
+		storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(id)).First()
+		if storeRow == nil {
+			self.JsonResponseWithError(http, errors.New("应用商店不存在"), 500)
+			return
+		}
+		err := os.RemoveAll(filepath.Join(storage.Local{}.GetStorePath(), storeRow.Name))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_, err = dao.Store.Where(dao.Store.ID.Eq(id)).Delete()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
 
+	self.JsonSuccessResponse(http)
+	return
 }
 
 func (self Store) GetList(http *gin.Context) {
 	type ParamsValidate struct {
 		Title string `json:"title"`
+		Name  string `json:"name"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -117,6 +117,9 @@ func (self Store) GetList(http *gin.Context) {
 	if params.Title != "" {
 		query = query.Where(dao.Store.Title.Like("%" + params.Title + "%"))
 	}
+	if params.Name != "" {
+		query = query.Where(dao.Store.Name.Like("%" + params.Name + "%"))
+	}
 	list, _ = query.Find()
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": list,
@@ -124,6 +127,50 @@ func (self Store) GetList(http *gin.Context) {
 	return
 }
 
-func (self Store) Update(http *gin.Context) {
+func (self Store) Sync(http *gin.Context) {
+	type ParamsValidate struct {
+		Id   int32  `json:"id"`
+		Name string `json:"name" binding:"required"`
+		Type string `json:"type" binding:"required"`
+		Url  string `json:"url" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	storeRootPath := filepath.Join(storage.Local{}.GetStorePath(), params.Name)
+	err := os.RemoveAll(storeRootPath)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.Type == accessor.StoreTypeOnePanel {
+		//err = logic.Store{}.SyncByGit(storeRootPath, params.Url)
+		//if err != nil {
+		//	self.JsonResponseWithError(http, err, 500)
+		//	return
+		//}
 
+	} else if params.Type == accessor.StoreTypeCasaOs {
+		err = logic.Store{}.SyncByZip(storeRootPath, params.Url)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	} else if params.Type == accessor.StoreTypePortainer {
+		err = logic.Store{}.SyncByJson(storeRootPath, params.Url)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	if params.Id > 0 {
+		storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(params.Id)).First()
+		storeRow.Setting.UpdatedAt = time.Now().Unix()
+		_, _ = dao.Store.Updates(storeRow)
+	}
+
+	self.JsonSuccessResponse(http)
+	return
 }

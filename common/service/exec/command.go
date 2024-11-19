@@ -23,6 +23,7 @@ type RunCommandOption struct {
 	WindowSize *pty.Winsize
 	Follow     bool
 	Timeout    time.Duration
+	Dir        string
 }
 
 func (self Command) RunInTerminal(option *RunCommandOption) (io.ReadCloser, error) {
@@ -51,6 +52,7 @@ func (self Command) Run(option *RunCommandOption) (io.Reader, error) {
 	slog.Debug("run command", option.CmdName, option.CmdArgs)
 	out := new(bytes.Buffer)
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
+
 	if option.Timeout > 0 {
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(option.Timeout))
 		go func() {
@@ -63,6 +65,9 @@ func (self Command) Run(option *RunCommandOption) (io.Reader, error) {
 				}
 			}
 		}()
+	}
+	if option.Dir != "" {
+		cmd.Dir = option.Dir
 	}
 	cmd.Stdout = out
 	cmd.Stderr = out

@@ -61,7 +61,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/store/create", controller.Store{}.Create)
 		cors.POST("/common/store/get-list", controller.Store{}.GetList)
 		cors.POST("/common/store/delete", controller.Store{}.Delete)
-		cors.POST("/common/store/update", controller.Store{}.Update)
+		cors.POST("/common/store/sync", controller.Store{}.Sync)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

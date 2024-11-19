@@ -112,12 +112,14 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/compose/delete", controller.Compose{}.Delete)
 			cors.POST("/app/compose/get-from-uri", controller.Compose{}.GetFromUri)
 			cors.POST("/app/compose/parse", controller.Compose{}.Parse)
+			cors.POST("/app/compose/store", controller.Compose{}.Store)
 
 			cors.POST("/app/compose/container-deploy", controller.Compose{}.ContainerDeploy)
 			cors.POST("/app/compose/container-destroy", controller.Compose{}.ContainerDestroy)
 			cors.POST("/app/compose/container-ctrl", controller.Compose{}.ContainerCtrl)
 			cors.POST("/app/compose/container-process-kill", controller.Compose{}.ContainerProcessKill)
 			cors.POST("/app/compose/container-log", controller.Compose{}.ContainerLog)
+
 		},
 	)
 }

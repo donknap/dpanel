@@ -356,3 +356,15 @@ func (self Compose) Parse(http *gin.Context) {
 	}
 	return
 }
+
+func (self Compose) Store(http *gin.Context) {
+	storeList, err := dao.Store.Find()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": storeList,
+	})
+	return
+}

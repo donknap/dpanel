@@ -25,8 +25,10 @@ type NetworkItem struct {
 }
 
 type EnvItem struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	Label   string `json:"label,omitempty" yaml:"label,omitempty"`
+	Default string `json:"default,omitempty" yaml:"default,omitempty"`
+	Name    string `json:"name"`
+	Value   string `json:"value"`
 }
 
 type PortItem struct {

@@ -48,6 +48,13 @@ var dockerEnvNameSuffix = []string{
 	".yaml", ".yml",
 }
 
+type StoreItem struct {
+	Title       string `json:"title"`
+	Name        string `json:"name"`
+	Logo        string `json:"logo"`
+	Description string `json:"description"`
+}
+
 type Compose struct {
 }
 
