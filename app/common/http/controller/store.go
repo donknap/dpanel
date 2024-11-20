@@ -20,11 +20,12 @@ type Store struct {
 
 func (self Store) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id    int32  `json:"id"`
-		Title string `json:"title" binding:"required"`
-		Type  string `json:"type" binding:"required"`
-		Name  string `json:"name" binding:"required"`
-		Url   string `json:"url" binding:"required"`
+		Id    int32                   `json:"id"`
+		Title string                  `json:"title" binding:"required"`
+		Type  string                  `json:"type" binding:"required"`
+		Name  string                  `json:"name" binding:"required"`
+		Url   string                  `json:"url" binding:"required"`
+		Apps  []accessor.StoreAppItem `json:"apps" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -52,6 +53,7 @@ func (self Store) Create(http *gin.Context) {
 			Type:      params.Type,
 			Url:       params.Url,
 			UpdatedAt: time.Now().Unix(),
+			Apps:      params.Apps,
 		},
 	}
 	var err error
@@ -144,13 +146,19 @@ func (self Store) Sync(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.Type == accessor.StoreTypeOnePanel {
-		//err = logic.Store{}.SyncByGit(storeRootPath, params.Url)
-		//if err != nil {
-		//	self.JsonResponseWithError(http, err, 500)
-		//	return
-		//}
 
+	appList := make([]accessor.StoreAppItem, 0)
+	if params.Type == accessor.StoreTypeOnePanel {
+		err = logic.Store{}.SyncByGit(storeRootPath, params.Url)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		appList, err = logic.Store{}.GetAppByOnePanel(params.Name)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	} else if params.Type == accessor.StoreTypeCasaOs {
 		err = logic.Store{}.SyncByZip(storeRootPath, params.Url)
 		if err != nil {
@@ -167,10 +175,13 @@ func (self Store) Sync(http *gin.Context) {
 
 	if params.Id > 0 {
 		storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(params.Id)).First()
+		storeRow.Setting.Apps = appList
 		storeRow.Setting.UpdatedAt = time.Now().Unix()
 		_, _ = dao.Store.Updates(storeRow)
 	}
 
-	self.JsonSuccessResponse(http)
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": appList,
+	})
 	return
 }

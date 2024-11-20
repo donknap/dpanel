@@ -1,10 +1,12 @@
 package compose
 
 import (
+	"errors"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/donknap/dpanel/common/function"
 	"os"
 	"path/filepath"
+	"reflect"
 )
 
 func NewComposeWithYaml(yaml []byte) (*Wrapper, error) {
@@ -86,4 +88,24 @@ func (self Wrapper) getProjectExt() (Ext, bool) {
 	ext := Ext{}
 	exists, _ := self.Project.Extensions.Get(ExtensionName, &ext)
 	return ext, exists
+}
+
+func (self *Wrapper) MarshalYAML() (interface{}, error) {
+	if self.Project == nil {
+		return nil, errors.New("project is nil")
+	}
+	projectType := reflect.TypeOf(self.Project).Elem()
+	projectValue := reflect.ValueOf(self.Project).Elem()
+
+	result := make(map[string]interface{})
+
+	// 遍历结构体的字段
+	for i := 0; i < projectType.NumField(); i++ {
+		field := projectType.Field(i)
+		if field.Tag.Get("yaml") == "-" || field.Tag.Get("yaml") == "" {
+			continue
+		}
+		result[field.Name] = projectValue.Field(i).Interface()
+	}
+	return result, nil
 }

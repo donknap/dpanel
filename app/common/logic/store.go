@@ -7,8 +7,10 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/donknap/dpanel/common/service/storage"
 	"gopkg.in/yaml.v3"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,15 +22,11 @@ type Store struct {
 }
 
 func (self Store) SyncByGit(path, gitUrl string) error {
-	gitPath, _ := os.MkdirTemp("", "dpanel-store")
-	defer func() {
-		_ = os.RemoveAll(gitPath)
-	}()
 	out, err := exec.Command{}.Run(&exec.RunCommandOption{
 		CmdName: "git",
 		CmdArgs: []string{
 			"clone", "--depth", "1",
-			gitUrl, gitPath,
+			gitUrl, path,
 		},
 		Timeout: time.Second * 30,
 	})
@@ -39,36 +37,55 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 	if err != nil {
 		return err
 	}
-	savePath := filepath.Join(path, "app.zip")
-	_ = os.MkdirAll(filepath.Dir(savePath), os.ModePerm)
-	out, err = exec.Command{}.Run(&exec.RunCommandOption{
-		CmdName: "git",
-		CmdArgs: []string{
-			"archive", "--format", "zip", "-o", filepath.Join(path, "app.zip"), "HEAD",
-		},
-		Timeout: time.Second * 30,
-		Dir:     gitPath,
-	})
 	return nil
 }
 
 func (self Store) SyncByZip(path, zipUrl string) error {
+	zipTempFile, _ := os.CreateTemp("", "dpanel-store")
+	defer func() {
+		_ = zipTempFile.Close()
+		_ = os.RemoveAll(zipTempFile.Name())
+	}()
+
 	response, err := http.Get(zipUrl)
 	if err != nil {
 		return err
 	}
-	savePath := filepath.Join(path, "app.zip")
-	_ = os.MkdirAll(filepath.Dir(savePath), os.ModePerm)
-	zipFile, _ := os.OpenFile(savePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	defer func() {
 		_ = response.Body.Close()
 	}()
 	if response.StatusCode != http.StatusOK {
 		return errors.New("下载 zip 失败" + response.Status)
 	}
-	_, err = io.Copy(zipFile, response.Body)
+	_, err = io.Copy(zipTempFile, response.Body)
 	if err != nil {
 		return err
+	}
+	zipArchive, err := zip.OpenReader(zipTempFile.Name())
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = zipArchive.Close()
+	}()
+	for _, file := range zipArchive.File {
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		if strings.HasPrefix(file.Name, "__MACOSX") {
+			continue
+		}
+		targetFilePath := filepath.Join(path, file.Name)
+		err = os.MkdirAll(filepath.Dir(targetFilePath), os.ModePerm)
+		if err != nil {
+			return err
+		}
+		targetFile, err := os.OpenFile(targetFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+		if err != nil {
+			return err
+		}
+		sourceFile, _ := file.Open()
+		_, _ = io.Copy(targetFile, sourceFile)
 	}
 	return nil
 }
@@ -97,66 +114,65 @@ func (self Store) SyncByJson(path, jsonUrl string) error {
 	return nil
 }
 
-func (self Store) GetAppByOnePanel(appZipPath string) ([]accessor.StoreAppItem, error) {
-	result := make([]accessor.StoreAppItem, 0)
-	zipReader, err := zip.OpenReader(appZipPath)
-	if err != nil {
-		return nil, err
+func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, error) {
+	if !filepath.IsAbs(storePath) {
+		storePath = filepath.Join(storage.Local{}.GetStorePath(), storePath, "apps")
 	}
+	fmt.Printf("%v \n", storePath)
+	result := make([]accessor.StoreAppItem, 0)
 	item := accessor.StoreAppItem{
 		Version: make(map[string]accessor.StoreAppVersionItem),
 	}
 
-	for _, file := range zipReader.File {
-		if file.FileInfo().IsDir() {
-			continue
-		}
-		if !strings.HasPrefix(file.Name, "apps") {
-			continue
-		}
-		fileReader, err := file.Open()
+	err := filepath.Walk(storePath, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
-			return nil, err
+			return err
 		}
-		segments := strings.Split(filepath.Clean(file.Name), string(filepath.Separator))
+		if info.IsDir() {
+			return nil
+		}
+		relPath, _ := filepath.Rel(storePath, path)
+		segments := strings.Split(filepath.Clean(relPath), string(filepath.Separator))
 
 		if item.Name == "" {
-			item.Name = segments[1]
+			item.Name = segments[0]
 		}
 
-		if segments[1] != item.Name {
+		if segments[0] != item.Name {
 			result = append(result, item)
 			item = accessor.StoreAppItem{
-				Name:    segments[1],
+				Name:    segments[0],
 				Version: make(map[string]accessor.StoreAppVersionItem),
+				Logo:    fmt.Sprintf("%s/logo.png", segments[0]),
 			}
 		}
 
-		if strings.HasSuffix(file.Name, "data.yml") {
-			content, err := io.ReadAll(fileReader)
+		if strings.HasSuffix(relPath, "data.yml") {
+			content, err := os.ReadFile(path)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			yamlData := new(function.YamlGetter)
 			err = yaml.Unmarshal(content, &yamlData)
 			if err != nil {
-				return nil, err
+				return err
 			}
+
 			// 应用介绍信息 data.yaml
-			if len(segments) == 3 {
-				item.Name = segments[1]
+			if len(segments) == 2 {
+				item.Name = segments[0]
 				item.Description = yamlData.GetString("description")
 				item.Tag = yamlData.GetStringSlice("tags")
 			}
+
 			// 安装配置信息
-			if len(segments) == 4 {
+			if len(segments) == 3 {
 				versionItem := accessor.StoreAppVersionItem{
 					Environment: make([]accessor.EnvItem, 0),
 				}
-				if _, ok := item.Version[segments[2]]; ok {
-					versionItem = item.Version[segments[2]]
+				if _, ok := item.Version[segments[1]]; ok {
+					versionItem = item.Version[segments[1]]
 				}
-				fmt.Printf("%v \n", file.Name)
 				fields := yamlData.GetSliceStringMapString("additionalProperties.formFields")
 				for _, field := range fields {
 					versionItem.Environment = append(versionItem.Environment, accessor.EnvItem{
@@ -165,25 +181,22 @@ func (self Store) GetAppByOnePanel(appZipPath string) ([]accessor.StoreAppItem, 
 						Label: field["labelZh"],
 					})
 				}
-				item.Version[segments[2]] = versionItem
+				item.Version[segments[1]] = versionItem
 			}
 		}
-		if strings.HasSuffix(file.Name, "docker-compose.yml") {
+		if strings.HasSuffix(relPath, "docker-compose.yml") {
 			versionItem := accessor.StoreAppVersionItem{}
-			if _, ok := item.Version[segments[2]]; ok {
-				versionItem = item.Version[segments[2]]
+			if _, ok := item.Version[segments[1]]; ok {
+				versionItem = item.Version[segments[1]]
 			}
-			versionItem.File = file.Name
-			versionItem.Name = segments[2]
-			item.Version[segments[2]] = versionItem
+			versionItem.File = relPath
+			versionItem.Name = segments[1]
+			item.Version[segments[1]] = versionItem
 		}
-		if strings.HasSuffix(file.Name, "logo.png") {
-			//content, err := io.ReadAll(fileReader)
-			//if err != nil {
-			//	return nil, err
-			//}
-			//item.Logo = fmt.Sprintf("data:image/png;base64,%s", base64.StdEncoding.EncodeToString(content))
-		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return result, nil
 }
