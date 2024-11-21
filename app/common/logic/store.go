@@ -228,15 +228,15 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 			if err != nil {
 				fmt.Printf("%v \n", err)
 			}
-			storeItem.Logo = logoPath
+			storeItem.Logo = fmt.Sprintf("file://%s", logoPath)
 		}
 
 		if strings.HasSuffix(relPath, "README.md") {
-			content, err := os.ReadFile(path)
+			readmePath, err := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), path)
 			if err != nil {
-				return err
+				fmt.Printf("%v \n", err)
 			}
-			storeItem.Content = string(content)
+			storeItem.Content = fmt.Sprintf("file://%s", readmePath)
 		}
 
 		return nil
