@@ -18,6 +18,14 @@ import (
 	"time"
 )
 
+type StoreLogoFileSystem struct {
+	fs.FS
+}
+
+func (self StoreLogoFileSystem) Open(name string) (fs.File, error) {
+	return os.Open(filepath.Join(storage.Local{}.GetStorePath(), name))
+}
+
 type Store struct {
 }
 
@@ -118,9 +126,9 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 	if !filepath.IsAbs(storePath) {
 		storePath = filepath.Join(storage.Local{}.GetStorePath(), storePath, "apps")
 	}
-	fmt.Printf("%v \n", storePath)
 	result := make([]accessor.StoreAppItem, 0)
-	item := accessor.StoreAppItem{
+
+	storeItem := accessor.StoreAppItem{
 		Version: make(map[string]accessor.StoreAppVersionItem),
 	}
 
@@ -134,17 +142,37 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 		relPath, _ := filepath.Rel(storePath, path)
 		segments := strings.Split(filepath.Clean(relPath), string(filepath.Separator))
 
-		if item.Name == "" {
-			item.Name = segments[0]
+		if storeItem.Name == "" {
+			storeItem.Name = segments[0]
 		}
 
-		if segments[0] != item.Name {
-			result = append(result, item)
-			item = accessor.StoreAppItem{
+		if segments[0] != storeItem.Name {
+			result = append(result, storeItem)
+
+			storeItem = accessor.StoreAppItem{
 				Name:    segments[0],
 				Version: make(map[string]accessor.StoreAppVersionItem),
-				Logo:    fmt.Sprintf("%s/logo.png", segments[0]),
 			}
+		}
+
+		storeVersionItem := accessor.StoreAppVersionItem{
+			Script:      &accessor.StoreAppVersionScriptItem{},
+			Environment: make([]accessor.EnvItem, 0),
+		}
+
+		if len(segments) >= 2 {
+			if _, ok := storeItem.Version[segments[1]]; ok {
+				storeVersionItem = storeItem.Version[segments[1]]
+			}
+			defer func() {
+				if storeVersionItem.Name != "" ||
+					len(storeVersionItem.Environment) > 0 ||
+					storeVersionItem.Script.Install != "" ||
+					storeVersionItem.Script.Upgrade != "" ||
+					storeVersionItem.Script.Uninstall != "" {
+					storeItem.Version[segments[1]] = storeVersionItem
+				}
+			}()
 		}
 
 		if strings.HasSuffix(relPath, "data.yml") {
@@ -160,39 +188,123 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 
 			// 应用介绍信息 data.yaml
 			if len(segments) == 2 {
-				item.Name = segments[0]
-				item.Description = yamlData.GetString("description")
-				item.Tag = yamlData.GetStringSlice("tags")
+				storeItem.Description = yamlData.GetString("additionalProperties.shortDescZh")
+				storeItem.Tag = yamlData.GetStringSlice("additionalProperties.tags")
+				storeItem.Website = yamlData.GetString("additionalProperties.website")
 			}
 
-			// 安装配置信息
+			// 版本配置信息一个 data.yaml 为一个版本
 			if len(segments) == 3 {
-				versionItem := accessor.StoreAppVersionItem{
-					Environment: make([]accessor.EnvItem, 0),
-				}
-				if _, ok := item.Version[segments[1]]; ok {
-					versionItem = item.Version[segments[1]]
-				}
 				fields := yamlData.GetSliceStringMapString("additionalProperties.formFields")
+				env := make([]accessor.EnvItem, 0)
 				for _, field := range fields {
-					versionItem.Environment = append(versionItem.Environment, accessor.EnvItem{
+					env = append(env, accessor.EnvItem{
 						Name:  field["envKey"],
 						Value: field["default"],
 						Label: field["labelZh"],
 					})
 				}
-				item.Version[segments[1]] = versionItem
+				storeVersionItem.Environment = env
 			}
 		}
+
+		if strings.HasSuffix(relPath, "/scripts/install.sh") {
+			storeVersionItem.Script.Install = relPath
+		}
+		if strings.HasSuffix(relPath, "/scripts/uninstall.sh") {
+			storeVersionItem.Script.Uninstall = relPath
+		}
+		if strings.HasSuffix(relPath, "/scripts/upgrade.sh") {
+			storeVersionItem.Script.Upgrade = relPath
+		}
+
 		if strings.HasSuffix(relPath, "docker-compose.yml") {
-			versionItem := accessor.StoreAppVersionItem{}
-			if _, ok := item.Version[segments[1]]; ok {
-				versionItem = item.Version[segments[1]]
-			}
-			versionItem.File = relPath
-			versionItem.Name = segments[1]
-			item.Version[segments[1]] = versionItem
+			storeVersionItem.File = relPath
+			storeVersionItem.Name = segments[1]
 		}
+
+		if strings.HasSuffix(relPath, "logo.png") {
+			logoPath, err := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), path)
+			if err != nil {
+				fmt.Printf("%v \n", err)
+			}
+			storeItem.Logo = logoPath
+		}
+
+		if strings.HasSuffix(relPath, "README.md") {
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			storeItem.Content = string(content)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (self Store) GetAppByCasaos(storePath string) ([]accessor.StoreAppItem, error) {
+	if !filepath.IsAbs(storePath) {
+		storePath = filepath.Join(storage.Local{}.GetStorePath(), storePath, "Apps")
+	}
+	result := make([]accessor.StoreAppItem, 0)
+
+	storeItem := accessor.StoreAppItem{
+		Version: make(map[string]accessor.StoreAppVersionItem),
+	}
+
+	err := filepath.Walk(storePath, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		relPath, _ := filepath.Rel(storePath, path)
+		segments := strings.Split(filepath.Clean(relPath), string(filepath.Separator))
+
+		if storeItem.Name == "" {
+			storeItem.Name = segments[0]
+		}
+
+		if segments[0] != storeItem.Name {
+			result = append(result, storeItem)
+
+			storeItem = accessor.StoreAppItem{
+				Name:    segments[0],
+				Version: make(map[string]accessor.StoreAppVersionItem),
+			}
+		}
+
+		if strings.HasSuffix(relPath, "docker-compose.yml") {
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			yamlData := new(function.YamlGetter)
+			err = yaml.Unmarshal(content, &yamlData)
+			if err != nil {
+				return err
+			}
+
+			storeItem.Description = yamlData.GetString("x-casaos.description.zh_cn")
+			storeItem.Tag = []string{
+				yamlData.GetString("x-casaos.category"),
+			}
+			storeItem.Logo = yamlData.GetString("x-casaos.icon")
+			storeItem.Content = yamlData.GetString("x-casaos.tips.before_install.zh_cn")
+			storeItem.Version["latest"] = accessor.StoreAppVersionItem{
+				Name:        "latest",
+				File:        relPath,
+				Environment: make([]accessor.EnvItem, 0),
+			}
+		}
+
+		fmt.Printf("%v \n", segments)
 		return nil
 	})
 	if err != nil {

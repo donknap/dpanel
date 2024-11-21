@@ -57,14 +57,13 @@ func main() {
 		slog.Info("runtime info", "goroutine", runtime.NumGoroutine(), "client total", ws.GetCollect().Total(), "progress total", ws.GetCollect().ProgressTotal())
 	}, middleware.GetPanicHandlerMiddleware())
 	// 全局登录判断
-	httpServer.Use(common2.AuthMiddleware{}.Process)
+	httpServer.Use(common2.AuthMiddleware{}.Process, common2.CacheMiddleware{}.Process)
 	httpServer.RegisterRouters(
 		func(engine *gin.Engine) {
 			subFs, _ := fs.Sub(Asset, "asset/static")
-			engine.StaticFS("/dpanel/static", http2.FS(subFs))
+			engine.StaticFS("/dpanel/static/asset", http2.FS(subFs))
 			engine.StaticFileFS("/favicon.ico", "icon.jpg", http2.FS(subFs))
 			engine.NoRoute(func(http *gin.Context) {
-
 				indexHtml, _ := Asset.ReadFile("asset/static/index.html")
 				http.Data(http2.StatusOK, "text/html; charset=UTF-8", indexHtml)
 				return

@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
+	"net/http"
 )
 
 type Provider struct {
@@ -62,6 +63,8 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/store/get-list", controller.Store{}.GetList)
 		cors.POST("/common/store/delete", controller.Store{}.Delete)
 		cors.POST("/common/store/sync", controller.Store{}.Sync)
+
+		engine.StaticFS("/dpanel/static/store/logo", http.FS(logic.StoreLogoFileSystem{}))
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

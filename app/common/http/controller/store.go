@@ -165,6 +165,11 @@ func (self Store) Sync(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		appList, err = logic.Store{}.GetAppByCasaos(params.Name)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	} else if params.Type == accessor.StoreTypePortainer {
 		err = logic.Store{}.SyncByJson(storeRootPath, params.Url)
 		if err != nil {
