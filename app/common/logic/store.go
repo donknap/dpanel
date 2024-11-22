@@ -122,6 +122,7 @@ func (self Store) SyncByJson(path, jsonUrl string) error {
 	return nil
 }
 
+// 1panel 需要创建 1panel-network 网络
 func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, error) {
 	if !filepath.IsAbs(storePath) {
 		storePath = filepath.Join(storage.Local{}.GetStorePath(), storePath, "apps")

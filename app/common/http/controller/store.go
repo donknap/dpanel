@@ -2,11 +2,13 @@ package controller
 
 import (
 	"errors"
+	"github.com/docker/docker/api/types/network"
 	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -155,6 +157,14 @@ func (self Store) Sync(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		_, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, "1panel-network", network.InspectOptions{})
+		if err != nil {
+			_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, "1panel-network", network.CreateOptions{})
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
 		appList, err = logic.Store{}.GetAppByOnePanel(params.Name)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -201,7 +211,7 @@ func (self Store) Deploy(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	err := dao.Compose.Create(&entity.Compose{
+	composeNew := &entity.Compose{
 		Name:  params.Name,
 		Title: "",
 		Yaml:  "",
@@ -213,7 +223,8 @@ func (self Store) Deploy(http *gin.Context) {
 			},
 			Override: make(map[string]accessor.SiteEnvOption),
 		},
-	})
+	}
+	err := dao.Compose.Create(composeNew)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

@@ -184,6 +184,8 @@ func (self Compose) GetDetail(http *gin.Context) {
 			yamlFilePath := ""
 			if yamlRow.Setting.Type == logic.ComposeTypeServerPath {
 				yamlFilePath = yamlRow.Setting.Uri[0]
+			} else if yamlRow.Setting.Type == logic.ComposeTypeStore {
+				yamlFilePath = filepath.Join(storage.Local{}.GetStorePath(), yamlRow.Setting.Uri[0])
 			} else {
 				yamlFilePath = filepath.Join(storage.Local{}.GetComposePath(), yamlRow.Setting.Uri[0])
 			}
@@ -285,7 +287,7 @@ func (self Compose) Delete(http *gin.Context) {
 			return
 		}
 		if function.InArray([]string{
-			logic.ComposeTypeText, logic.ComposeTypeRemoteUrl,
+			logic.ComposeTypeText, logic.ComposeTypeRemoteUrl, logic.ComposeTypeStore,
 		}, row.Setting.Type) {
 			err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), row.Name))
 			if err != nil {
