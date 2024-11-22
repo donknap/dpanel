@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -189,4 +190,38 @@ func (self Store) Sync(http *gin.Context) {
 		"list": appList,
 	})
 	return
+}
+
+func (self Store) Deploy(http *gin.Context) {
+	type ParamsValidate struct {
+		Name        string `json:"name" binding:"required"`
+		ComposeFile string `json:"composeFile" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	err := dao.Compose.Create(&entity.Compose{
+		Name:  params.Name,
+		Title: "",
+		Yaml:  "",
+		Setting: &accessor.ComposeSettingOption{
+			Status: "waiting",
+			Type:   logic2.ComposeTypeStore,
+			Uri: []string{
+				params.ComposeFile,
+			},
+			Override: make(map[string]accessor.SiteEnvOption),
+		},
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	targetPath := filepath.Join(storage.Local{}.GetComposePath(), params.Name)
+	err = os.CopyFS(targetPath, os.DirFS(filepath.Join(storage.Local{}.GetStorePath(), filepath.Dir(params.ComposeFile))))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 }

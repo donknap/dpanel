@@ -90,6 +90,7 @@ func main() {
 			&entity.SiteDomain{},
 			&entity.Compose{},
 			&entity.Backup{},
+			&entity.Store{},
 		)
 		if err != nil {
 			panic(err)

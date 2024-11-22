@@ -219,24 +219,19 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 		}
 
 		if strings.HasSuffix(relPath, "docker-compose.yml") {
-			storeVersionItem.File = relPath
+			versionPath, _ := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), path)
+			storeVersionItem.ComposeFile = versionPath
 			storeVersionItem.Name = segments[1]
 		}
 
 		if strings.HasSuffix(relPath, "logo.png") {
-			logoPath, err := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), path)
-			if err != nil {
-				fmt.Printf("%v \n", err)
-			}
-			storeItem.Logo = fmt.Sprintf("file://%s", logoPath)
+			logoPath, _ := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), path)
+			storeItem.Logo = fmt.Sprintf("image://%s", logoPath)
 		}
 
 		if strings.HasSuffix(relPath, "README.md") {
-			readmePath, err := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), path)
-			if err != nil {
-				fmt.Printf("%v \n", err)
-			}
-			storeItem.Content = fmt.Sprintf("file://%s", readmePath)
+			readmePath, _ := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), path)
+			storeItem.Content = fmt.Sprintf("markdown-file://%s", readmePath)
 		}
 
 		return nil
@@ -296,15 +291,14 @@ func (self Store) GetAppByCasaos(storePath string) ([]accessor.StoreAppItem, err
 				yamlData.GetString("x-casaos.category"),
 			}
 			storeItem.Logo = yamlData.GetString("x-casaos.icon")
-			storeItem.Content = yamlData.GetString("x-casaos.tips.before_install.zh_cn")
+			storeItem.Content = "markdown://" + yamlData.GetString("x-casaos.tips.before_install.zh_cn")
+			versionPath, _ := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), path)
 			storeItem.Version["latest"] = accessor.StoreAppVersionItem{
 				Name:        "latest",
-				File:        relPath,
+				ComposeFile: versionPath,
 				Environment: make([]accessor.EnvItem, 0),
 			}
 		}
-
-		fmt.Printf("%v \n", segments)
 		return nil
 	})
 	if err != nil {

@@ -24,7 +24,7 @@ type StoreAppVersionScriptItem struct {
 
 type StoreAppVersionItem struct {
 	Name        string                     `json:"name"`
-	File        string                     `json:"file"`
+	ComposeFile string                     `json:"composeFile"`
 	Environment []EnvItem                  `json:"environment,omitempty"`
 	Script      *StoreAppVersionScriptItem `json:"script,omitempty"`
 }

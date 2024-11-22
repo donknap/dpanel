@@ -30,6 +30,7 @@ const (
 	ComposeTypeServerPath        = "serverPath"
 	ComposeTypeStoragePath       = "storagePath"
 	ComposeTypeOutPath           = "outPath"
+	ComposeTypeStore             = "store"
 	ComposeStatusWaiting         = "waiting"
 	ComposeProjectName           = "dpanel-c-%s"
 	ComposeProjectDeployFileName = "dpanel-deploy.yaml"
@@ -163,7 +164,7 @@ func (self Compose) Sync() error {
 					name := strings.ToLower(filepath.Dir(rel))
 					if _, ok := findComposeList[name]; ok {
 						if function.InArray([]string{
-							ComposeTypeText, ComposeTypeRemoteUrl,
+							ComposeTypeText, ComposeTypeRemoteUrl, ComposeTypeStore,
 						}, findComposeList[name].Setting.Type) {
 							break
 						}
@@ -174,15 +175,21 @@ func (self Compose) Sync() error {
 						exists, pos := function.FindArrayValueIndex(composeList, "Name", name)
 						if exists {
 							dbComposeRow := composeList[pos[0]]
+							// 文本和远程地址是主动添加，无论如何都要保留记录
 							if function.InArray([]string{
 								ComposeTypeText, ComposeTypeRemoteUrl,
 							}, dbComposeRow.Setting.Type) {
 								break
 							}
-							dbComposeRow.Setting.Type = ComposeTypeStoragePath
-							dbComposeRow.Setting.Uri = []string{
-								rel,
+							if dbComposeRow.Setting.Type == ComposeTypeStore {
+
+							} else {
+								dbComposeRow.Setting.Type = ComposeTypeStoragePath
+								dbComposeRow.Setting.Uri = []string{
+									rel,
+								}
 							}
+
 							findComposeList[dbComposeRow.Name] = dbComposeRow
 						} else {
 							findRow := &entity.Compose{
@@ -231,9 +238,9 @@ func (self Compose) Sync() error {
 		//
 		if !has {
 			if function.InArray([]string{
-				ComposeTypeOutPath, ComposeTypeStoragePath,
+				ComposeTypeOutPath, ComposeTypeStoragePath, ComposeTypeStore,
 			}, dbComposeRow.Setting.Type) {
-				if dbComposeRow.Setting.Type == ComposeTypeOutPath {
+				if dbComposeRow.Setting.Type == ComposeTypeOutPath || dbComposeRow.Setting.Type == ComposeTypeStore {
 					_ = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), filepath.Dir(dbComposeRow.Setting.Uri[0])))
 				}
 				_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Delete()
@@ -427,8 +434,8 @@ func (self Compose) FindPathOverrideYaml(path string) []string {
 func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
 	if !bytes.Contains(yaml, []byte("!!!dpanel")) {
 		yaml = append([]byte(`# !!!dpanel
-# 此文件由 dpanel 面板自动生成，为最终的部署文件，请勿手动修改！
-# 如果有修改需求，请操作原始 yaml 文件，或是新建 override.yaml 覆盖文件
+# 此文件由 dpanel 面板自动生成，为格式化后的最终的部署文件，请勿手动修改！！！
+# 如果有修改需求，请编辑原始 yaml 文件
 `), yaml...)
 	}
 	return yaml

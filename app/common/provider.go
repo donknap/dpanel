@@ -63,8 +63,9 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/store/get-list", controller.Store{}.GetList)
 		cors.POST("/common/store/delete", controller.Store{}.Delete)
 		cors.POST("/common/store/sync", controller.Store{}.Sync)
+		cors.POST("/common/store/deploy", controller.Store{}.Deploy)
 
-		engine.StaticFS("/dpanel/static/store/logo", http.FS(logic.StoreLogoFileSystem{}))
+		engine.StaticFS("/dpanel/static/store/file", http.FS(logic.StoreLogoFileSystem{}))
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
