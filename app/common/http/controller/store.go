@@ -3,7 +3,6 @@ package controller
 import (
 	"errors"
 	"github.com/docker/docker/api/types/network"
-	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -217,11 +216,10 @@ func (self Store) Deploy(http *gin.Context) {
 		Yaml:  "",
 		Setting: &accessor.ComposeSettingOption{
 			Status: "waiting",
-			Type:   logic2.ComposeTypeStore,
+			Type:   accessor.ComposeTypeStore,
 			Uri: []string{
 				params.ComposeFile,
 			},
-			Override: make(map[string]accessor.SiteEnvOption),
 		},
 	}
 	err := dao.Compose.Create(composeNew)

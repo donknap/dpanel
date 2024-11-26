@@ -127,5 +127,5 @@ type SiteEnvOption struct {
 	Device          []VolumeItem          `json:"device,omitempty"`
 	Gpus            *GpusItem             `json:"gpus,omitempty"`
 	Hook            *HookItem             `json:"hook,omitempty"`
-	Healthcheck     *HealthcheckItem      `json:"healthcheck"`
+	Healthcheck     *HealthcheckItem      `json:"healthcheck,omitempty"`
 }
