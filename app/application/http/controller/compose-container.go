@@ -6,13 +6,10 @@ import (
 	"fmt"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/app/application/logic"
-	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"io"
@@ -23,11 +20,17 @@ import (
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
 	type ParamsValidate struct {
-		Id          int32                         `json:"id" binding:"required"`
-		Environment map[string][]accessor.EnvItem `json:"environment"`
+		Id                int32              `json:"id" binding:"required"`
+		Environment       []accessor.EnvItem `json:"environment"`
+		DeployServiceName []string           `json:"deployServiceName"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
+		return
+	}
+
+	if function.IsEmptyArray(params.DeployServiceName) {
+		self.JsonResponseWithError(http, errors.New("至少选择一个服务部署"), 500)
 		return
 	}
 
@@ -36,38 +39,16 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
 	}
-	if params.Environment != nil {
-		// 添加当前自定义环境变量到当前docker环境中
-		if docker.Sdk.Host != "" {
-			dockerEnv, err := logic2.DockerEnv{}.GetEnvByName(docker.Sdk.Host)
-			if err != nil {
-				self.JsonResponseWithError(http, errors.New("未找到当前docker环境配置，请先添加docker客户端"), 500)
-				return
-			}
-			dockerEnv.Environment = params.Environment
-			logic2.DockerEnv{}.UpdateEnv(dockerEnv)
-		}
-		if composeRow.Setting.Override == nil {
-			composeRow.Setting.Override = make(map[string]accessor.SiteEnvOption)
-		}
-		for name, item := range params.Environment {
-			if override, ok := composeRow.Setting.Override[name]; ok {
-				override.Environment = item
-				composeRow.Setting.Override[name] = override
-			} else {
-				override = accessor.SiteEnvOption{
-					Environment: item,
-				}
-				composeRow.Setting.Override[name] = override
-			}
-		}
+	if !function.IsEmptyArray(params.Environment) {
+		composeRow.Setting.Environment = params.Environment
 	}
+
 	tasker, err := logic.Compose{}.GetTasker(composeRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	response, err := tasker.Deploy()
+	response, err := tasker.Deploy(params.DeployServiceName...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -84,7 +65,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	// 部署完成后也上更新状态
 	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
 	if err != nil {
-		composeRow.Setting.Status = logic.ComposeStatusWaiting
+		composeRow.Setting.Status = accessor.ComposeStatusWaiting
 	} else {
 		composeRow.Setting.Status = composeRun.Status
 	}
@@ -101,6 +82,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		DeleteImage  bool  `json:"deleteImage"`
 		DeleteVolume bool  `json:"deleteVolume"`
 		DeleteData   bool  `json:"deleteData"`
+		DeletePath   bool  `json:"deletePath"`
 	}
 
 	params := ParamsValidate{}
@@ -132,7 +114,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	}
 	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
 	if err != nil {
-		composeRow.Setting.Status = logic.ComposeStatusWaiting
+		composeRow.Setting.Status = accessor.ComposeStatusWaiting
 	} else {
 		composeRow.Setting.Status = composeRun.Status
 	}
@@ -144,23 +126,20 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		slog.Debug("compose", "delete deploy file", err, "path", path)
 	}
 
-	if function.InArray([]string{
-		logic.ComposeTypeText, logic.ComposeTypeRemoteUrl,
-	}, composeRow.Setting.Type) {
-		dir, err := os.ReadDir(filepath.Join(storage.Local{}.GetComposePath(), composeRow.Name))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		if len(dir) == 0 {
-			err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), composeRow.Name))
-			if err != nil {
-				slog.Debug("compose", "destroy", err)
-			}
-		}
-	}
 	if params.DeleteData {
 		_, err = dao.Compose.Where(dao.Compose.ID.Eq(composeRow.ID)).Delete()
+		if err != nil {
+			slog.Debug("compose", "destroy", err)
+		}
+	}
+
+	if params.DeletePath {
+		if !params.DeleteData {
+			self.JsonResponseWithError(http, errors.New("删除数据文件时必须同时删除任务数据"), 500)
+			return
+		}
+		err = os.Remove(filepath.Join(filepath.Dir(composeRow.Setting.GetUriFilePath()), logic.ComposeProjectEnvFileName))
+		err = os.RemoveAll(filepath.Dir(composeRow.Setting.GetUriFilePath()))
 		if err != nil {
 			slog.Debug("compose", "destroy", err)
 		}
@@ -205,7 +184,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 
 	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
 	if err != nil {
-		composeRow.Setting.Status = logic.ComposeStatusWaiting
+		composeRow.Setting.Status = accessor.ComposeStatusWaiting
 	} else {
 		composeRow.Setting.Status = composeRun.Status
 	}

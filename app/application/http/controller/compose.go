@@ -26,21 +26,19 @@ type Compose struct {
 
 func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id          int32                             `json:"id"`
-		Title       string                            `json:"title"`
-		Name        string                            `json:"name" binding:"required,lowercase"`
-		Type        string                            `json:"type" binding:"required"`
-		Yaml        string                            `json:"yaml"`
-		RemoteUrl   string                            `json:"remoteUrl"`
-		ServerPath  string                            `json:"serverPath"`
-		Environment []accessor.EnvItem                `json:"environment"`
-		Override    map[string]accessor.SiteEnvOption `json:"override"`
+		Id           int32              `json:"id"`
+		Title        string             `json:"title"`
+		Name         string             `json:"name" binding:"required,lowercase"`
+		Type         string             `json:"type" binding:"required"`
+		Yaml         string             `json:"yaml"`
+		YamlOverride string             `json:"yamlOverride"`
+		RemoteUrl    string             `json:"remoteUrl"`
+		Environment  []accessor.EnvItem `json:"environment"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
 	var yamlRow *entity.Compose
 	if params.Id > 0 {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
@@ -48,25 +46,13 @@ func (self Compose) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 			return
 		}
-		yamlFilePath := ""
-		// 如果已经有数据，则将提交的内容先同步到文件内
-		if params.Type == logic.ComposeTypeServerPath {
-			yamlFilePath = yamlRow.Setting.Uri[0]
-		}
-		if params.Type == logic.ComposeTypeStoragePath {
-			yamlFilePath = filepath.Join(storage.Local{}.GetComposePath(), yamlRow.Setting.Uri[0])
-		}
-		if yamlFilePath != "" {
-			err := os.WriteFile(yamlFilePath, []byte(params.Yaml), 0644)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
-
 	} else {
-		if params.Type == logic.ComposeTypeStoragePath {
+		if params.Type == accessor.ComposeTypeStoragePath {
 			self.JsonResponseWithError(http, errors.New("存储路径类型不能手动添加，请挂载 /dpanel/compose 目录自动发现。"), 500)
+			return
+		}
+		if params.Type == accessor.ComposeTypeStore {
+			self.JsonResponseWithError(http, errors.New("请先添加应用商店后，在商店中完成安装"), 500)
 			return
 		}
 		yamlExist, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
@@ -74,43 +60,63 @@ func (self Compose) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, errors.New("站点标识已经存在，请更换"), 500)
 			return
 		}
+		yamlRow = &entity.Compose{
+			Title: params.Title,
+			Name:  params.Name,
+			Setting: &accessor.ComposeSettingOption{
+				Status:      accessor.ComposeStatusWaiting,
+				Type:        params.Type,
+				Environment: params.Environment,
+				Uri:         make([]string, 0),
+				RemoteUrl:   params.RemoteUrl,
+			},
+		}
+		if function.InArray([]string{
+			accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl,
+		}, params.Type) {
+			yamlRow.Setting.Uri = []string{
+				filepath.Join(params.Name, logic.ComposeProjectDeployFileName),
+			}
+		}
 	}
 
-	uri := make([]string, 0)
-	switch params.Type {
-	case logic.ComposeTypeText:
-		break
-	case logic.ComposeTypeRemoteUrl:
-		params.Yaml = ""
-		uri = append(uri, params.RemoteUrl)
-		break
-	case logic.ComposeTypeServerPath:
-		params.Yaml = ""
-		uri = append(uri, params.ServerPath)
-		break
+	if params.Yaml != "" {
+		err := os.MkdirAll(filepath.Dir(yamlRow.Setting.GetUriFilePath()), os.ModePerm)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		err = os.WriteFile(yamlRow.Setting.GetUriFilePath(), []byte(params.Yaml), 0644)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	if params.YamlOverride != "" {
+		overrideYamlFilePath := filepath.Join(filepath.Dir(yamlRow.Setting.GetUriFilePath()), "dpanel-override.yaml")
+		err := os.MkdirAll(filepath.Dir(overrideYamlFilePath), os.ModePerm)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		err = os.WriteFile(overrideYamlFilePath, []byte(params.YamlOverride), 0644)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
+		rel, _ := filepath.Rel(storage.Local{}.GetComposePath(), overrideYamlFilePath)
+		if !function.InArray(yamlRow.Setting.Uri, rel) {
+			yamlRow.Setting.Uri = append(yamlRow.Setting.Uri, rel)
+		}
 	}
 
 	if params.Id > 0 {
 		yamlRow.Title = params.Title
-		yamlRow.Setting.Override = params.Override
-		if params.Type != logic.ComposeTypeStoragePath {
-			yamlRow.Setting.Type = params.Type
-			yamlRow.Setting.Uri = uri
-			yamlRow.Yaml = params.Yaml
-		}
+		yamlRow.Setting.Environment = params.Environment
 		_, _ = dao.Compose.Updates(yamlRow)
 	} else {
-		yamlRow = &entity.Compose{
-			Title: params.Title,
-			Name:  params.Name,
-			Yaml:  params.Yaml,
-			Setting: &accessor.ComposeSettingOption{
-				Status:   logic.ComposeStatusWaiting,
-				Type:     params.Type,
-				Uri:      uri,
-				Override: params.Override,
-			},
-		}
 		_ = dao.Compose.Create(yamlRow)
 	}
 	self.JsonResponseWithoutError(http, gin.H{
@@ -164,51 +170,20 @@ func (self Compose) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
 	}
-	if yamlRow.Setting.Type == logic.ComposeTypeRemoteUrl {
-		response, err := http2.Get(yamlRow.Setting.Uri[0])
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer func() {
-			_ = response.Body.Close()
-		}()
-		content, err := io.ReadAll(response.Body)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		yamlRow.Yaml = string(content)
-	} else {
-		if len(yamlRow.Setting.Uri) > 0 {
-			yamlFilePath := ""
-			if yamlRow.Setting.Type == logic.ComposeTypeServerPath {
-				yamlFilePath = yamlRow.Setting.Uri[0]
-			} else if yamlRow.Setting.Type == logic.ComposeTypeStore {
-				yamlFilePath = filepath.Join(storage.Local{}.GetStorePath(), yamlRow.Setting.Uri[0])
-			} else {
-				yamlFilePath = filepath.Join(storage.Local{}.GetComposePath(), yamlRow.Setting.Uri[0])
-			}
-			content, err := os.ReadFile(yamlFilePath)
-			if err == nil {
-				yamlRow.Yaml = string(content)
-			}
-		}
+	yaml, err := yamlRow.Setting.GetYaml()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 	data := gin.H{
-		"detail":        yamlRow,
-		"containerList": "",
-	}
-	tasker, err := logic.Compose{}.GetTasker(yamlRow)
-	if err == nil {
-		data["containerList"] = tasker.PsFromYaml()
+		"detail": yamlRow,
+		"yaml":   yaml,
 	}
 	self.JsonResponseWithoutError(http, data)
 	return
 }
 
 func (self Compose) GetTask(http *gin.Context) {
-	// task 的 yaml 返回的是最终合并后的
 	type ParamsValidate struct {
 		Id int32 `json:"id" binding:"required"`
 	}
@@ -221,16 +196,17 @@ func (self Compose) GetTask(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
 	}
-
+	yaml, err := yamlRow.Setting.GetYaml()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
 		// 如果是外部任务并且获取不到yaml，则直接返回基本状态
-		if yamlRow.Setting.Type == logic.ComposeTypeOutPath {
+		if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
 			data := gin.H{
 				"detail": yamlRow,
-			}
-			if yamlRow.Setting.Status != logic.ComposeStatusWaiting {
-				data["containerPrefix"] = yamlRow.Name // 尝试用名称去获取所属容器
 			}
 			self.JsonResponseWithoutError(http, data)
 			return
@@ -238,19 +214,14 @@ func (self Compose) GetTask(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	yaml, err := tasker.Yaml()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	yamlRow.Yaml = string(yaml)
 
 	data := gin.H{
 		"detail":  yamlRow,
 		"project": tasker.Project(),
+		"yaml":    yaml,
 	}
 
-	if yamlRow.Setting.Status != logic.ComposeStatusWaiting {
+	if yamlRow.Setting.Status != accessor.ComposeStatusWaiting {
 		data["containerList"] = tasker.Ps()
 	} else {
 		data["containerList"] = tasker.PsFromYaml()
@@ -287,7 +258,7 @@ func (self Compose) Delete(http *gin.Context) {
 			return
 		}
 		if function.InArray([]string{
-			logic.ComposeTypeText, logic.ComposeTypeRemoteUrl, logic.ComposeTypeStore,
+			accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl, accessor.ComposeTypeStore,
 		}, row.Setting.Type) {
 			err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), row.Name))
 			if err != nil {

@@ -1,12 +1,9 @@
 package compose
 
 import (
-	"errors"
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/donknap/dpanel/common/function"
 	"os"
 	"path/filepath"
-	"reflect"
 )
 
 func NewComposeWithYaml(yaml []byte) (*Wrapper, error) {
@@ -49,63 +46,20 @@ func (self Wrapper) GetService(name string) (types.ServiceConfig, ExtService, er
 
 func (self Wrapper) GetBaseCommand() []string {
 	cmd := make([]string, 0)
-	cmd = append(cmd, "-f", self.Project.ComposeFiles[0])
+	for _, file := range self.Project.ComposeFiles {
+		cmd = append(cmd, "-f", file)
+	}
+
 	cmd = append(cmd, "-p", self.Project.Name)
 
-	envFilePath := filepath.Join(self.Project.WorkingDir, ".env")
-	_, err := os.Stat(envFilePath)
-	if err == nil {
-		cmd = append(cmd, "--env-file", envFilePath)
+	for _, envFileName := range []string{
+		".env", ".dpanel.env",
+	} {
+		envFilePath := filepath.Join(self.Project.WorkingDir, envFileName)
+		_, err := os.Stat(envFilePath)
+		if err == nil {
+			cmd = append(cmd, "--env-file", envFilePath)
+		}
 	}
 	return cmd
-}
-
-// 获取compose中的服务名称，并过滤掉不需要部署的
-func (self Wrapper) GetServiceNameList() []string {
-	serviceNames := make([]string, 0)
-
-	list, err := self.Project.GetServices()
-	if err != nil {
-		return serviceNames
-	}
-
-	ext, exists := self.getProjectExt()
-
-	for _, item := range list {
-		if exists && !function.IsEmptyArray(ext.DisabledServices) {
-			if !function.InArray(ext.DisabledServices, item.Name) {
-				serviceNames = append(serviceNames, item.Name)
-			}
-		} else {
-			serviceNames = append(serviceNames, item.Name)
-		}
-	}
-
-	return serviceNames
-}
-
-func (self Wrapper) getProjectExt() (Ext, bool) {
-	ext := Ext{}
-	exists, _ := self.Project.Extensions.Get(ExtensionName, &ext)
-	return ext, exists
-}
-
-func (self *Wrapper) MarshalYAML() (interface{}, error) {
-	if self.Project == nil {
-		return nil, errors.New("project is nil")
-	}
-	projectType := reflect.TypeOf(self.Project).Elem()
-	projectValue := reflect.ValueOf(self.Project).Elem()
-
-	result := make(map[string]interface{})
-
-	// 遍历结构体的字段
-	for i := 0; i < projectType.NumField(); i++ {
-		field := projectType.Field(i)
-		if field.Tag.Get("yaml") == "-" || field.Tag.Get("yaml") == "" {
-			continue
-		}
-		result[field.Name] = projectValue.Field(i).Interface()
-	}
-	return result, nil
 }

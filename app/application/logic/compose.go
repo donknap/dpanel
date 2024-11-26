@@ -25,28 +25,14 @@ import (
 )
 
 const (
-	ComposeTypeText              = "text"
-	ComposeTypeRemoteUrl         = "remoteUrl"
-	ComposeTypeServerPath        = "serverPath"
-	ComposeTypeStoragePath       = "storagePath"
-	ComposeTypeOutPath           = "outPath"
-	ComposeTypeStore             = "store"
-	ComposeStatusWaiting         = "waiting"
 	ComposeProjectName           = "dpanel-c-%s"
 	ComposeProjectDeployFileName = "dpanel-deploy.yaml"
+	ComposeProjectEnvFileName    = ".dpanel.env"
 )
-
-var overrideFileNameSuffix = []string{
-	"override.yaml", "override.yml",
-}
 
 var composeFileNameSuffix = []string{
 	"docker-compose.yml", "docker-compose.yaml",
 	"compose.yml", "compose.yaml",
-}
-
-var dockerEnvNameSuffix = []string{
-	".yaml", ".yml",
 }
 
 type StoreItem struct {
@@ -109,13 +95,11 @@ func (self Compose) Kill() error {
 // Sync 同步存储目录中的任务及已运行的外部任务，并同步当前任务的状态
 func (self Compose) Sync() error {
 	rootDir := storage.Local{}.GetComposePath()
-
 	// 重置所有任务状态为等待
 	composeList, _ := dao.Compose.Find()
 	for i, _ := range composeList {
-		composeList[i].Setting.Status = ComposeStatusWaiting
+		composeList[i].Setting.Status = accessor.ComposeStatusWaiting
 	}
-
 	// 查找部署过的compose任务，如果是 dpanel-c- 开头表示是系统部署的任务，需要重新定义一下 name
 	// 运行中的任务如果是面板部署的，将数据库中的数据替换到查找到的运行任务
 	// 非面板部署的任务记录下 Yaml 所在位置，在管理页面中确认是否可以找到文件进行管理
@@ -127,7 +111,7 @@ func (self Compose) Sync() error {
 			Setting: &accessor.ComposeSettingOption{
 				Status: item.Status,
 				Uri:    item.ConfigFileList,
-				Type:   ComposeTypeOutPath,
+				Type:   accessor.ComposeTypeOutPath,
 			},
 		}
 
@@ -162,42 +146,38 @@ func (self Compose) Sync() error {
 				if segments := strings.Split(filepath.Clean(rel), string(filepath.Separator)); len(segments) == 2 {
 					// 强制转为小写
 					name := strings.ToLower(filepath.Dir(rel))
+
 					if _, ok := findComposeList[name]; ok {
 						if function.InArray([]string{
-							ComposeTypeText, ComposeTypeRemoteUrl, ComposeTypeStore,
+							accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl, accessor.ComposeTypeStore,
 						}, findComposeList[name].Setting.Type) {
 							break
 						}
-						findComposeList[name].Setting.Uri = []string{
-							rel,
-						}
+						findComposeList[name].Setting.Uri[0] = rel
 					} else {
 						exists, pos := function.FindArrayValueIndex(composeList, "Name", name)
 						if exists {
 							dbComposeRow := composeList[pos[0]]
 							// 文本和远程地址是主动添加，无论如何都要保留记录
 							if function.InArray([]string{
-								ComposeTypeText, ComposeTypeRemoteUrl,
+								accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl,
 							}, dbComposeRow.Setting.Type) {
 								break
 							}
-							if dbComposeRow.Setting.Type == ComposeTypeStore {
+							if dbComposeRow.Setting.Type == accessor.ComposeTypeStore {
 
 							} else {
-								dbComposeRow.Setting.Type = ComposeTypeStoragePath
-								dbComposeRow.Setting.Uri = []string{
-									rel,
-								}
+								dbComposeRow.Setting.Type = accessor.ComposeTypeStoragePath
+								dbComposeRow.Setting.Uri[0] = rel
 							}
-
 							findComposeList[dbComposeRow.Name] = dbComposeRow
 						} else {
 							findRow := &entity.Compose{
 								Name:  name,
 								Title: "",
 								Setting: &accessor.ComposeSettingOption{
-									Type:   ComposeTypeStoragePath,
-									Status: ComposeStatusWaiting,
+									Type:   accessor.ComposeTypeStoragePath,
+									Status: accessor.ComposeStatusWaiting,
 									Uri: []string{
 										rel,
 									},
@@ -206,15 +186,6 @@ func (self Compose) Sync() error {
 							findComposeList[name] = findRow
 						}
 					}
-
-					// 只查找非文本和远程类型的 override yaml
-					//for _, overridePath := range self.FindPathOverrideYaml(filepath.Dir(path)) {
-					//	rel, _ = filepath.Rel(rootDir, overridePath)
-					//	if findComposeList[name].Setting.Uri == nil {
-					//		findComposeList[name].Setting.Uri = make([]string, 0)
-					//	}
-					//	findComposeList[name].Setting.Uri = append(findComposeList[name].Setting.Uri, rel)
-					//}
 				}
 				break
 			}
@@ -238,16 +209,16 @@ func (self Compose) Sync() error {
 		//
 		if !has {
 			if function.InArray([]string{
-				ComposeTypeOutPath, ComposeTypeStoragePath, ComposeTypeStore,
+				accessor.ComposeTypeOutPath, accessor.ComposeTypeStoragePath, accessor.ComposeTypeStore,
 			}, dbComposeRow.Setting.Type) {
-				if dbComposeRow.Setting.Type == ComposeTypeOutPath || dbComposeRow.Setting.Type == ComposeTypeStore {
+				if dbComposeRow.Setting.Type == accessor.ComposeTypeOutPath || dbComposeRow.Setting.Type == accessor.ComposeTypeStore {
 					_ = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), filepath.Dir(dbComposeRow.Setting.Uri[0])))
 				}
 				_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Delete()
 			}
 
 			if function.InArray([]string{
-				ComposeTypeText, ComposeTypeRemoteUrl,
+				accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl,
 			}, dbComposeRow.Setting.Type) {
 				_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Updates(&entity.Compose{
 					Setting: dbComposeRow.Setting,
@@ -265,29 +236,50 @@ func (self Compose) Sync() error {
 }
 
 func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
-	var taskFileDir string
-	if entity.Setting.Type == ComposeTypeStoragePath {
-		taskFileDir = filepath.Join(storage.Local{}.GetComposePath(), filepath.Dir(entity.Setting.Uri[0]))
-	} else {
-		taskFileDir = filepath.Join(storage.Local{}.GetComposePath(), entity.Name)
-	}
-	workingDir := ""
+	workingDir := storage.Local{}.GetComposePath()
+
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
 	dpanelContainerInfo, _ := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
 	for _, mount := range dpanelContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" {
-			workingDir = filepath.Join(mount.Source, "compose", filepath.Base(taskFileDir))
+			workingDir = filepath.Join(mount.Source, "compose")
 		}
 	}
 
-	yamlFilePath := make([]string, 0)
-	if entity.Setting.Type == ComposeTypeServerPath {
-		yamlFilePath = entity.Setting.Uri
-	} else if entity.Setting.Type == ComposeTypeStoragePath {
-		for _, item := range entity.Setting.Uri {
-			yamlFilePath = append(yamlFilePath, filepath.Join(taskFileDir, filepath.Base(item)))
+	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
+	if entity.Setting.Type == accessor.ComposeTypeRemoteUrl {
+		tempYamlFilePath := entity.Setting.GetUriFilePath()
+		err := os.MkdirAll(filepath.Dir(tempYamlFilePath), os.ModePerm)
+		if err != nil {
+			return nil, err
 		}
-	} else if entity.Setting.Type == ComposeTypeOutPath {
+		response, err := http.Get(entity.Setting.RemoteUrl)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			_ = response.Body.Close()
+		}()
+		content, err := io.ReadAll(response.Body)
+		if err != nil {
+			return nil, err
+		}
+		err = os.WriteFile(tempYamlFilePath, self.makeDeployYamlHeader(content), 0666)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var taskFileDir string
+	if entity.Setting.Type == accessor.ComposeTypeRemoteUrl {
+		taskFileDir = filepath.Join(workingDir, filepath.Dir(entity.Setting.Uri[0]))
+	} else {
+		taskFileDir = filepath.Join(workingDir, entity.Name)
+	}
+
+	yamlFilePath := make([]string, 0)
+
+	if entity.Setting.Type == accessor.ComposeTypeOutPath {
 		// 外部路径分两种，一种是原目录挂载，二是将Yaml文件放置到存储目录中
 		for _, item := range entity.Setting.Uri {
 			if filepath.IsAbs(item) {
@@ -297,145 +289,57 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 			}
 		}
 	} else {
-		tempYamlFilePath := filepath.Join(taskFileDir, ComposeProjectDeployFileName)
-		err := os.MkdirAll(filepath.Dir(tempYamlFilePath), os.ModePerm)
-		if err != nil {
-			return nil, err
+		for _, item := range entity.Setting.Uri {
+			yamlFilePath = append(yamlFilePath, filepath.Join(taskFileDir, filepath.Base(item)))
 		}
-		yaml := []byte(entity.Yaml)
-		if entity.Setting.Type == ComposeTypeRemoteUrl {
-			response, err := http.Get(entity.Setting.Uri[0])
-			if err != nil {
-				return nil, err
-			}
-			defer func() {
-				_ = response.Body.Close()
-			}()
-			content, err := io.ReadAll(response.Body)
-			if err != nil {
-				return nil, err
-			}
-			yaml = content
-		}
-		if !strings.Contains(entity.Yaml, "!!!dpanel") && entity.Setting.Type == ComposeTypeRemoteUrl {
-			yaml = append([]byte("# !!!dpanel 此文件由 dpanel 面板生成，请勿修改！ \n"), yaml...)
-		}
-		err = os.WriteFile(tempYamlFilePath, yaml, 0666)
-		if err != nil {
-			return nil, err
-		}
-		yamlFilePath = append(yamlFilePath, tempYamlFilePath)
 	}
-	options := []cli.ProjectOptionsFn{}
+
+	options := make([]cli.ProjectOptionsFn, 0)
 	for _, path := range yamlFilePath {
 		options = append(options, compose.WithYamlPath(path))
 	}
-	if workingDir != "" {
-		options = append(options, cli.WithWorkingDirectory(workingDir))
+
+	if !function.IsEmptyArray(entity.Setting.Environment) {
+		globalEnv := make([]string, 0)
+		for _, item := range entity.Setting.Environment {
+			globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, item.Value))
+		}
+		envFileName := filepath.Join(taskFileDir, ComposeProjectEnvFileName)
+		err := os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
+		err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
+		options = append(options, cli.WithEnvFiles(envFileName))
+		options = append(options, cli.WithEnv(globalEnv))
 	}
+
+	projectName := fmt.Sprintf(ComposeProjectName, entity.Name)
+	if entity.Setting.Type == accessor.ComposeTypeOutPath {
+		// compose 项止名称不允许有大小写，但是compose的目录名可以包含特殊字符，这里统一用id进行区分
+		// 如果是外部任务，则保持原有名称
+		projectName = entity.Name
+	}
+	options = append(options, cli.WithName(projectName))
+
 	// 最终Yaml需要用到原始的compose，创建一个原始的对象
 	originalComposer, err := compose.NewCompose(options...)
 	if err != nil {
 		return nil, err
 	}
 
-	// 最终部署 yaml 文件
-	// 先用原始 compose 生成该文件，再添加面板数据库中的 override 参数，再生成一次
-	yamlDeployFileName := filepath.Join(taskFileDir, ComposeProjectDeployFileName)
-	err = os.MkdirAll(filepath.Dir(yamlDeployFileName), os.ModePerm)
-	if err != nil {
-		return nil, err
-	}
-	overrideYaml, err := originalComposer.Project.MarshalYAML()
-	if err != nil {
-		return nil, err
-	}
-	err = os.WriteFile(yamlDeployFileName, self.makeDeployYamlHeader(overrideYaml), 0666)
-	if err != nil {
-		return nil, err
-	}
-
-	projectName := fmt.Sprintf(ComposeProjectName, entity.Name)
-	options = make([]cli.ProjectOptionsFn, 0)
-	if entity.Setting.Type == ComposeTypeOutPath {
-		// compose 项止名称不允许有大小写，但是compose的目录名可以包含特殊字符，这里统一用id进行区分
-		// 如果是外部任务，则保持原有名称
-		projectName = entity.Name
-	}
-	options = append(options, cli.WithName(projectName))
-	options = append(options, compose.WithYamlPath(yamlDeployFileName))
-
-	if workingDir != "" {
-		options = append(options, cli.WithWorkingDirectory(workingDir))
-	}
-
-	extProject := compose.Ext{}
-	options = append(options, cli.WithExtension(compose.ExtensionName, &extProject))
-
-	// 根据数据库中的覆盖配置生成覆盖 yaml
-	overrideFileName := filepath.Join(taskFileDir, "dpanel-override.yaml")
-	overrideYaml, err = originalComposer.GetOverrideYaml(entity.Setting.Override)
-	if err != nil {
-		return nil, err
-	}
-	err = os.WriteFile(overrideFileName, overrideYaml, 0666)
-	if err != nil {
-		return nil, err
-	}
-	options = append(options, compose.WithYamlPath(overrideFileName))
-	defer os.Remove(overrideFileName)
-
-	// 最后再添加附加环境 yaml
-	for _, suffix := range dockerEnvNameSuffix {
-		path := filepath.Join(taskFileDir, docker.Sdk.Host+suffix)
-		_, err = os.Stat(filepath.Join(taskFileDir, docker.Sdk.Host+suffix))
-		if err == nil {
-			options = append(options, compose.WithYamlPath(path))
-			break
-		}
-	}
-
-	composer, err := compose.NewCompose(options...)
-	if err != nil {
-		return nil, err
-	}
-	overrideYaml, err = composer.Project.MarshalYAML()
-	if err != nil {
-		return nil, err
-	}
-	err = os.WriteFile(yamlDeployFileName, self.makeDeployYamlHeader(overrideYaml), 0666)
-	if err != nil {
-		return nil, err
-	}
 	tasker := &compose.Task{
 		Name:     projectName,
-		Composer: composer,
-		Original: originalComposer,
+		Composer: originalComposer,
 	}
 	return tasker, nil
-}
-
-func (self Compose) FindPathOverrideYaml(path string) []string {
-	find := make([]string, 0)
-	fileList, err := filepath.Glob(filepath.Join(path, "*"))
-	if err == nil {
-		for _, overridePath := range fileList {
-			for _, overrideSuffix := range overrideFileNameSuffix {
-				if strings.Contains(overridePath, overrideSuffix) {
-					find = append(find, overridePath)
-					continue
-				}
-			}
-		}
-	}
-	return find
 }
 
 func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
 	if !bytes.Contains(yaml, []byte("!!!dpanel")) {
 		yaml = append([]byte(`# !!!dpanel
-# 此文件由 dpanel 面板自动生成，为格式化后的最终的部署文件，请勿手动修改！！！
-# 如果有修改需求，请编辑原始 yaml 文件
+# 此文件由 dpanel 面板自动生成，请勿手动修改！！！
+# 如果有修改需求，请编辑原始 yaml 文件或是 Compose 任务。
 `), yaml...)
 	}
 	return yaml

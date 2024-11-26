@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/network"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"io"
@@ -18,15 +19,18 @@ import (
 type Task struct {
 	Name         string
 	Composer     *Wrapper
-	Original     *Wrapper // 原始 compose
 	ProgressChan chan []byte
 }
 
-func (self Task) Deploy() (io.Reader, error) {
+func (self Task) Deploy(serviceName ...string) (io.Reader, error) {
 	cmd := []string{
 		"--progress", "tty", "up", "-d",
 	}
-	cmd = append(cmd, self.Composer.GetServiceNameList()...)
+
+	if !function.IsEmptyArray(serviceName) {
+		cmd = append(cmd, serviceName...)
+	}
+
 	response, err := self.runCommand(cmd)
 	if err != nil {
 		return nil, err
@@ -82,14 +86,6 @@ func (self Task) Logs() (io.ReadCloser, error) {
 		"--progress", "tty", "logs", "-f",
 	}
 	return self.runCommand(cmd)
-}
-
-func (self Task) OriginalYaml() ([]byte, error) {
-	return self.Original.Project.MarshalYAML()
-}
-
-func (self Task) Yaml() ([]byte, error) {
-	return self.Composer.Project.MarshalYAML()
 }
 
 func (self Task) Project() *types.Project {
