@@ -242,6 +242,14 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	dpanelContainerInfo, _ := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
 	for _, mount := range dpanelContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" {
+			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
+			if _, err := os.Stat(mount.Source); err != nil {
+				_ = os.MkdirAll(mount.Source, os.ModePerm)
+				err = os.Symlink(storage.Local{}.GetComposePath(), filepath.Join(mount.Source, "compose"))
+				if err != nil {
+					return nil, err
+				}
+			}
 			workingDir = filepath.Join(mount.Source, "compose")
 		}
 	}

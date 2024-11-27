@@ -202,6 +202,7 @@ func (self Compose) GetTask(http *gin.Context) {
 		if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
 			data := gin.H{
 				"detail": yamlRow,
+				"yaml":   [2]string{},
 			}
 			self.JsonResponseWithoutError(http, data)
 			return
@@ -222,8 +223,6 @@ func (self Compose) GetTask(http *gin.Context) {
 
 	if yamlRow.Setting.Status != accessor.ComposeStatusWaiting {
 		data["containerList"] = tasker.Ps()
-	} else {
-		data["containerList"] = tasker.PsFromYaml()
 	}
 
 	self.JsonResponseWithoutError(http, data)
