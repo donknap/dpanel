@@ -196,11 +196,6 @@ func (self Compose) GetTask(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
 	}
-	yaml, err := yamlRow.Setting.GetYaml()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
 		// 如果是外部任务并且获取不到yaml，则直接返回基本状态
@@ -214,7 +209,11 @@ func (self Compose) GetTask(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
+	yaml, err := tasker.GetYaml()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	data := gin.H{
 		"detail":  yamlRow,
 		"project": tasker.Project(),

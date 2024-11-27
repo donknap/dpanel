@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -161,6 +162,19 @@ func (self Task) PsFromYaml() []*composeContainerResult {
 		result = append(result, container)
 	}
 	return result
+}
+
+func (self Task) GetYaml() ([2]string, error) {
+	yaml := [2]string{
+		"", "",
+	}
+	for i, uri := range self.Project().ComposeFiles {
+		content, err := os.ReadFile(uri)
+		if err == nil {
+			yaml[i] = string(content)
+		}
+	}
+	return yaml, nil
 }
 
 func (self Task) runCommand(command []string) (io.ReadCloser, error) {

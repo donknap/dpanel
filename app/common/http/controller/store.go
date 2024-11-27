@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -203,11 +204,23 @@ func (self Store) Sync(http *gin.Context) {
 
 func (self Store) Deploy(http *gin.Context) {
 	type ParamsValidate struct {
+		StoreId     int32  `json:"storeId" binding:"required"`
 		Name        string `json:"name" binding:"required"`
 		ComposeFile string `json:"composeFile" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
+		return
+	}
+	storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(params.StoreId)).First()
+	if storeRow == nil {
+		self.JsonResponseWithError(http, errors.New("商店不存在"), 500)
+		return
+	}
+
+	composeRow, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
+	if composeRow != nil {
+		self.JsonResponseWithError(http, errors.New("该标识已经创建过任务，请先删除，"+params.Name), 500)
 		return
 	}
 	composeNew := &entity.Compose{
@@ -217,8 +230,9 @@ func (self Store) Deploy(http *gin.Context) {
 		Setting: &accessor.ComposeSettingOption{
 			Status: "waiting",
 			Type:   accessor.ComposeTypeStore,
+			Store:  fmt.Sprintf("%s@%s", storeRow.Title, storeRow.Setting.Url),
 			Uri: []string{
-				params.ComposeFile,
+				filepath.Join(params.Name, filepath.Base(params.ComposeFile)),
 			},
 		},
 	}
@@ -233,4 +247,8 @@ func (self Store) Deploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"id": composeNew.ID,
+	})
+	return
 }
