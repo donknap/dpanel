@@ -286,7 +286,6 @@ func (self Store) GetAppByCasaos(storePath string) ([]accessor.StoreAppItem, err
 			if err != nil {
 				return err
 			}
-
 			storeItem.Description = yamlData.GetString("x-casaos.description.zh_cn")
 			storeItem.Tag = []string{
 				yamlData.GetString("x-casaos.category"),

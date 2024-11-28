@@ -15,10 +15,6 @@ func (self YamlGetter) GetStringSlice(path string) []string {
 	return cast.ToStringSlice(self.getValueInterface(path))
 }
 
-func (self YamlGetter) GetSlice(path string) []interface{} {
-	return cast.ToSlice(self.getValueInterface(path))
-}
-
 func (self YamlGetter) GetSliceStringMapString(path string) []map[string]string {
 	result := make([]map[string]string, 0)
 	slice := cast.ToSlice(self.getValueInterface(path))
