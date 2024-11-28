@@ -129,13 +129,16 @@ func (self DockerTask) ImageRemote(task *ImageRemoteOption) error {
 
 	wsBuffer.OnWrite = func(p string) error {
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
-		pd := docker.PullMessage{}
+		pd := docker.BuildMessage{}
 		for {
 			line, _, err := newReader.ReadLine()
 			if err == io.EOF {
 				break
 			}
 			if err := json.Unmarshal(line, &pd); err == nil {
+				if pd.ErrorDetail.Message != "" {
+					return errors.New(pd.ErrorDetail.Message)
+				}
 				if pd.Status == "Pulling fs layer" {
 					pg[pd.Id] = &docker.PullProgress{
 						Extracting:  0,
