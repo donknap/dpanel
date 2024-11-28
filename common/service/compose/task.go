@@ -168,7 +168,7 @@ func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 		return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
 			CmdName: "docker",
 			CmdArgs: append(
-				append(docker.Sdk.ExtraParams, "compose"),
+				append(docker.Sdk.ExtraParams, "compose", "--progress", "tty"),
 				command...,
 			),
 		})

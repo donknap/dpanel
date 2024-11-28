@@ -49,9 +49,7 @@ func (self Wrapper) GetBaseCommand() []string {
 	for _, file := range self.Project.ComposeFiles {
 		cmd = append(cmd, "-f", file)
 	}
-
 	cmd = append(cmd, "-p", self.Project.Name)
-
 	for _, envFileName := range []string{
 		".env", ".dpanel.env",
 	} {
