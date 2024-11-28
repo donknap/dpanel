@@ -383,8 +383,16 @@ func (self Image) GetList(http *gin.Context) {
 		result = imageList
 	}
 
+	titleList := make(map[string]string)
+	imageDbList, err := dao.Image.Find()
+	if err == nil {
+		for _, item := range imageDbList {
+			titleList[item.Tag] = item.Title
+		}
+	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": result,
+		"list":  result,
+		"title": titleList,
 	})
 	return
 }
@@ -489,5 +497,30 @@ func (self Image) Export(http *gin.Context) {
 		return
 	}
 	http.File(tempFile.Name())
+	return
+}
+
+func (self Image) UpdateTitle(http *gin.Context) {
+	type ParamsValidate struct {
+		Tag   string `json:"tag" binding:"required"`
+		Title string `json:"title" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	imageBuildRow, _ := dao.Image.Where(dao.Image.Tag.Eq(params.Tag)).First()
+	if imageBuildRow != nil {
+		dao.Image.Where(dao.Image.Tag.Eq(params.Tag)).Updates(&entity.Image{
+			Title: params.Title,
+		})
+	} else {
+		_ = dao.Image.Create(&entity.Image{
+			Title:     params.Title,
+			Tag:       params.Tag,
+			BuildType: "pull",
+		})
+	}
+	self.JsonSuccessResponse(http)
 	return
 }

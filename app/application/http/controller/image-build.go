@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/entity"
 	"github.com/gin-gonic/gin"
 )
 
@@ -74,30 +73,5 @@ func (self Image) GetListBuild(http *gin.Context) {
 		"page":  params.Page,
 		"list":  list,
 	})
-	return
-}
-
-func (self Image) UpdateTitle(http *gin.Context) {
-	type ParamsValidate struct {
-		Tag   string `json:"tag" binding:"required"`
-		Title string `json:"title" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	imageBuildRow, _ := dao.Image.Where(dao.Image.Tag.Eq(params.Tag)).First()
-	if imageBuildRow != nil {
-		dao.Image.Where(dao.Image.Tag.Eq(params.Tag)).Updates(&entity.Image{
-			Title: params.Title,
-		})
-	} else {
-		dao.Image.Create(&entity.Image{
-			Title:     params.Title,
-			Tag:       params.Tag,
-			BuildType: "pull",
-		})
-	}
-	self.JsonSuccessResponse(http)
 	return
 }
