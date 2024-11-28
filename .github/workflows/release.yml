@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         platform: [ ubuntu-latest]
-        go-version: [ '1.22' ]
+        go-version: [ '1.23' ]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Test Env
@@ -80,6 +80,21 @@ jobs:
           make build PROJECT_NAME=dpanel-musl-arm CGO_ENABLED=1 GOARM=7 GOARCH=arm GOOS=linux \
           CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc \
           CXX=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-g++
+          
+          # 群辉 arm
+          curl -Lo armv8-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz 
+          tar -Jvxf armv8-synology.txz
+          make build PROJECT_NAME=dpanel-synology-arm64 CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux \
+          CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-none-linux-gnu-gcc \
+          CXX=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-none-linux-gnu-g++
+          
+          # 群辉 amd64
+          curl -Lo amd64-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
+          tar -Jvxf amd64-synology.txz
+          make build PROJECT_NAME=dpanel-synology-amd64 CGO_ENABLED=1 \
+          CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-linux-musl-gcc \
+          CXX=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-linux-musl-g++
+
       - name: Docker BuildX
         run: |
           docker buildx build \
