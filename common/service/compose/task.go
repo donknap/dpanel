@@ -11,6 +11,7 @@ import (
 	"github.com/donknap/dpanel/common/service/exec"
 	"io"
 	"os"
+	exec2 "os/exec"
 	"strings"
 )
 
@@ -153,11 +154,19 @@ func (self Task) GetYaml() ([2]string, error) {
 
 func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 	command = append(self.Composer.GetBaseCommand(), command...)
-	return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
-		CmdName: "docker",
-		CmdArgs: append(
-			append(docker.Sdk.ExtraParams, "compose"),
-			command...,
-		),
-	})
+	if _, err := exec2.LookPath("docker-compose"); err == nil {
+		// todo 旧的compose命令如何管理远程？
+		return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
+			CmdName: "docker-compose",
+			CmdArgs: command,
+		})
+	} else {
+		return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
+			CmdName: "docker",
+			CmdArgs: append(
+				append(docker.Sdk.ExtraParams, "compose"),
+				command...,
+			),
+		})
+	}
 }

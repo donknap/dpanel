@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	exec2 "os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -30,6 +31,9 @@ type Store struct {
 }
 
 func (self Store) SyncByGit(path, gitUrl string) error {
+	if _, err := exec2.LookPath("git"); err != nil {
+		return errors.New("同步商店仓库需要使用 git 命令，请先安装")
+	}
 	out, err := exec.Command{}.Run(&exec.RunCommandOption{
 		CmdName: "git",
 		CmdArgs: []string{
