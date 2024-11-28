@@ -120,12 +120,6 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	}
 	_, _ = dao.Compose.Updates(composeRow)
 
-	path := filepath.Join(filepath.Dir(tasker.Composer.Project.ComposeFiles[0]), logic.ComposeProjectDeployFileName)
-	err = os.Remove(path)
-	if err != nil {
-		slog.Debug("compose", "delete deploy file", err, "path", path)
-	}
-
 	if params.DeleteData {
 		_, err = dao.Compose.Where(dao.Compose.ID.Eq(composeRow.ID)).Delete()
 		if err != nil {
