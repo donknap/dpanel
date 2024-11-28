@@ -125,7 +125,7 @@ jobs:
     strategy:
       matrix:
         platform: [ 'macos-12', 'macos-latest' ]
-        go-version: [ '1.22' ]
+        go-version: [ '1.23' ]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Test Env
@@ -156,7 +156,7 @@ jobs:
     strategy:
       matrix:
         platform: [ 'windows-latest' ]
-        go-version: [ '1.22' ]
+        go-version: [ '1.23' ]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Test Env
