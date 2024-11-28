@@ -361,6 +361,14 @@ func (self Image) GetList(http *gin.Context) {
 				imageList[key].RepoTags = append(summary.RepoTags, "none")
 			}
 		}
+
+		imageDetail, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, summary.ID)
+		if err == nil {
+			if summary.Labels == nil {
+				imageList[key].Labels = make(map[string]string)
+			}
+			imageList[key].Labels["com.dpanel.image.arch"] = imageDetail.Architecture
+		}
 	}
 
 	if !function.IsEmptyArray(filterTagList) {
