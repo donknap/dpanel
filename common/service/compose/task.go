@@ -25,7 +25,8 @@ type Task struct {
 
 func (self Task) Deploy(serviceName ...string) (io.Reader, error) {
 	cmd := []string{
-		"--progress", "tty", "up", "-d",
+		//"--progress", "tty",
+		"up", "-d",
 	}
 
 	if !function.IsEmptyArray(serviceName) {
@@ -51,7 +52,8 @@ func (self Task) Deploy(serviceName ...string) (io.Reader, error) {
 
 func (self Task) Destroy(deleteImage bool, deleteVolume bool) (io.Reader, error) {
 	cmd := []string{
-		"--progress", "tty", "down",
+		//"--progress", "tty",
+		"down",
 	}
 	// 删除compose 前需要先把关联的已有容器网络退出
 	for _, item := range self.Composer.Project.Networks {
@@ -77,14 +79,16 @@ func (self Task) Destroy(deleteImage bool, deleteVolume bool) (io.Reader, error)
 
 func (self Task) Ctrl(op string) (io.Reader, error) {
 	cmd := []string{
-		"--progress", "tty", op,
+		//"--progress", "tty",
+		op,
 	}
 	return self.runCommand(cmd)
 }
 
 func (self Task) Logs() (io.ReadCloser, error) {
 	cmd := []string{
-		"--progress", "tty", "logs", "-f",
+		//"--progress", "tty",
+		"logs", "-f",
 	}
 	return self.runCommand(cmd)
 }
