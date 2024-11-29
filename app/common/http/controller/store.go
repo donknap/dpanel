@@ -14,6 +14,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -224,7 +225,7 @@ func (self Store) Deploy(http *gin.Context) {
 		return
 	}
 	composeNew := &entity.Compose{
-		Name:  params.Name,
+		Name:  strings.ToLower(params.Name),
 		Title: "",
 		Yaml:  "",
 		Setting: &accessor.ComposeSettingOption{

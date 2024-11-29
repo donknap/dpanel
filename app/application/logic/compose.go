@@ -278,12 +278,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		}
 	}
 
-	var taskFileDir string
-	if entity.Setting.Type == accessor.ComposeTypeRemoteUrl {
-		taskFileDir = filepath.Join(workingDir, filepath.Dir(entity.Setting.Uri[0]))
-	} else {
-		taskFileDir = filepath.Join(workingDir, entity.Name)
-	}
+	taskFileDir := filepath.Join(workingDir, filepath.Dir(entity.Setting.Uri[0]))
 
 	yamlFilePath := make([]string, 0)
 
