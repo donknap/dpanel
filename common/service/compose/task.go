@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"io"
+	"log/slog"
 	"os"
 	exec2 "os/exec"
 	"strings"
@@ -137,19 +138,30 @@ func (self Task) Ps() []*composeContainerResult {
 	if out == "" {
 		return result
 	}
-	newReader := bufio.NewReader(bytes.NewReader([]byte(out)))
-	for {
-		line, _, err := newReader.ReadLine()
-		if err == io.EOF {
-			break
+	if strings.HasPrefix(out, "[{") {
+		// 兼容 docker-compose ps 返回数据
+		temp := make([]*composeContainerResult, 0)
+		err := json.Unmarshal([]byte(out), &temp)
+		if err != nil {
+			slog.Debug("compose task docker-compose failed", err.Error())
+			return nil
 		}
-		temp := composeContainerResult{}
-		err = json.Unmarshal(line, &temp)
-		if err == nil {
-			result = append(result, &temp)
+		return temp
+	} else {
+		newReader := bufio.NewReader(bytes.NewReader([]byte(out)))
+		for {
+			line, _, err := newReader.ReadLine()
+			if err == io.EOF {
+				break
+			}
+			temp := composeContainerResult{}
+			err = json.Unmarshal(line, &temp)
+			if err == nil {
+				result = append(result, &temp)
+			}
 		}
+		return result
 	}
-	return result
 }
 
 func (self Task) GetYaml() ([2]string, error) {
