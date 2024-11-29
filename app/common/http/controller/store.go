@@ -172,7 +172,7 @@ func (self Store) Sync(http *gin.Context) {
 			return
 		}
 	} else if params.Type == accessor.StoreTypeCasaOs {
-		err = logic.Store{}.SyncByZip(storeRootPath, params.Url)
+		err = logic.Store{}.SyncByZip(storeRootPath, params.Url, "Apps")
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
