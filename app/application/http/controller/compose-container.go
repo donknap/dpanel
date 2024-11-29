@@ -23,6 +23,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		Id                int32              `json:"id" binding:"required"`
 		Environment       []accessor.EnvItem `json:"environment"`
 		DeployServiceName []string           `json:"deployServiceName"`
+		CreatePath        bool               `json:"createPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -48,6 +49,19 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	// 尝试创建 compose 挂载的目录，如果运行在容器内创建也无效
+	if params.CreatePath {
+		for _, service := range tasker.Project().Services {
+			for _, volume := range service.Volumes {
+				if filepath.IsAbs(volume.Source) {
+					if _, err = os.Stat(volume.Source); err != nil {
+						_ = os.MkdirAll(volume.Source, os.ModePerm)
+					}
+				}
+			}
+		}
+	}
+
 	response, err := tasker.Deploy(params.DeployServiceName...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
