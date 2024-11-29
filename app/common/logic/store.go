@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/storage"
 	"gopkg.in/yaml.v3"
@@ -202,6 +203,11 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 			if len(segments) == 3 {
 				fields := yamlData.GetSliceStringMapString("additionalProperties.formFields")
 				env := make([]accessor.EnvItem, 0)
+				env = append(env, accessor.EnvItem{
+					Name:  "CONTAINER_NAME",
+					Label: "容器名称",
+					Value: compose.ContainerDefaultName,
+				})
 				for _, field := range fields {
 					env = append(env, accessor.EnvItem{
 						Name:  field["envKey"],

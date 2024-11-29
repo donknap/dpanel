@@ -317,7 +317,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	if !function.IsEmptyArray(entity.Setting.Environment) {
 		globalEnv := make([]string, 0)
 		for _, item := range entity.Setting.Environment {
-			globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, item.Value))
+			globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, compose.ReplacePlaceholder(item.Value)))
 		}
 		envFileName := filepath.Join(taskFileDir, ComposeProjectEnvFileName)
 		err := os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
