@@ -20,6 +20,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	exec2 "os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -58,10 +59,21 @@ func (self Compose) Ls() []*composeItem {
 		"--format", "json",
 		"--all",
 	}
-	out := exec.Command{}.RunWithResult(&exec.RunCommandOption{
-		CmdName: "docker",
-		CmdArgs: append(append(docker.Sdk.ExtraParams, "compose"), command...),
-	})
+
+	out := ""
+	if _, err := exec2.LookPath("docker-compose"); err == nil {
+		out = exec.Command{}.RunWithResult(&exec.RunCommandOption{
+			CmdName: "docker-compose",
+			CmdArgs: command,
+			Env:     append(os.Environ(), docker.Sdk.Env...),
+		})
+	} else {
+		out = exec.Command{}.RunWithResult(&exec.RunCommandOption{
+			CmdName: "docker",
+			CmdArgs: append(append(docker.Sdk.ExtraParams, "compose"), command...),
+		})
+	}
+
 	result := make([]*composeItem, 0)
 	err := json.Unmarshal([]byte(out), &result)
 	if err != nil {
