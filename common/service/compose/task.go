@@ -121,10 +121,19 @@ func (self Task) Ps() []*composeContainerResult {
 	cmd := self.Composer.GetBaseCommand()
 	cmd = append(cmd, "ps", "--format", "json", "--all")
 
-	out := exec.Command{}.RunWithResult(&exec.RunCommandOption{
-		CmdName: "docker",
-		CmdArgs: append(append(docker.Sdk.ExtraParams, "compose"), cmd...),
-	})
+	out := ""
+	if _, err := exec2.LookPath("docker-compose"); err == nil {
+		out = exec.Command{}.RunWithResult(&exec.RunCommandOption{
+			CmdName: "docker-compose",
+			CmdArgs: cmd,
+			Env:     append(os.Environ(), docker.Sdk.Env...),
+		})
+	} else {
+		out = exec.Command{}.RunWithResult(&exec.RunCommandOption{
+			CmdName: "docker",
+			CmdArgs: append(append(docker.Sdk.ExtraParams, "compose"), cmd...),
+		})
+	}
 	if out == "" {
 		return result
 	}
@@ -159,10 +168,10 @@ func (self Task) GetYaml() ([2]string, error) {
 func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 	command = append(self.Composer.GetBaseCommand(), command...)
 	if _, err := exec2.LookPath("docker-compose"); err == nil {
-		// todo 旧的compose命令如何管理远程？
 		return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
 			CmdName: "docker-compose",
 			CmdArgs: command,
+			Env:     append(os.Environ(), docker.Sdk.Env...),
 		})
 	} else {
 		return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
