@@ -12,6 +12,6 @@ func ReplacePlaceholder(str string) string {
 	if value, ok := placeholderList[str]; ok {
 		return value
 	} else {
-		return ""
+		return str
 	}
 }
