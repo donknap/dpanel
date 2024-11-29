@@ -65,7 +65,7 @@ func (self User) Login(http *gin.Context) {
 	password := logic.User{}.GetMd5Password(params.Password, params.Username)
 	if params.Username == currentUser.Value.Username && currentUser.Value.Password == password {
 		jwtSecret := logic.User{}.GetJwtSecret()
-		jwt := jwt.NewWithClaims(jwt.SigningMethodHS256, logic.UserInfo{
+		jwtClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, logic.UserInfo{
 			UserId:       currentUser.ID,
 			Username:     currentUser.Value.Username,
 			RoleIdentity: currentUser.Name,
@@ -73,7 +73,7 @@ func (self User) Login(http *gin.Context) {
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(expireAddTime)),
 			},
 		})
-		code, err := jwt.SignedString(jwtSecret)
+		code, err := jwtClaims.SignedString(jwtSecret)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -100,13 +100,8 @@ func (self User) GetUserInfo(http *gin.Context) {
 	feature := struct {
 		ComposeStore bool `json:"composeStore"`
 	}{
-		ComposeStore: false,
+		ComposeStore: true,
 	}
-	count, _ := dao.Store.Count()
-	if count > 0 {
-		feature.ComposeStore = true
-	}
-
 	self.JsonResponseWithoutError(http, gin.H{
 		"user":    userInfo,
 		"feature": feature,
