@@ -12,6 +12,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/donknap/dpanel/common/service/storage"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"log/slog"
 	"path/filepath"
 	"strings"
 )
@@ -73,6 +74,7 @@ func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
 			"DOCKER_TLS_VERIFY=1",
 			"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCa)),
 		)
+		slog.Debug("docker connect tls", "docker option", dockerOption, "extra params", builder.ExtraParams, "env", builder.Env)
 	}
 	obj, err := client.NewClientWithOpts(dockerOption...)
 	if err != nil {
