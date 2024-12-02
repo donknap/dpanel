@@ -55,7 +55,7 @@ func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
 	}
 	if option.Address != "" {
 		builder.ExtraParams = append(builder.ExtraParams, "-H", option.Address)
-		builder.Env = append(builder.Env, fmt.Sprintf("DOKCER_HOST=%s", option.Address))
+		builder.Env = append(builder.Env, fmt.Sprintf("DOCKER_HOST=%s", option.Address))
 		dockerOption = append(dockerOption, client.WithHost(option.Address))
 	} else {
 		option.Host = "local"
@@ -74,7 +74,7 @@ func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
 			"DOCKER_TLS_VERIFY=1",
 			"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCa)),
 		)
-		slog.Debug("docker connect tls", "docker option", dockerOption, "extra params", builder.ExtraParams, "env", builder.Env)
+		slog.Debug("docker connect tls", "extra params", builder.ExtraParams, "env", builder.Env)
 	}
 	obj, err := client.NewClientWithOpts(dockerOption...)
 	if err != nil {
