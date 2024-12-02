@@ -101,7 +101,7 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 func (self Image) ImportByImageTar(http *gin.Context) {
 	type ParamsValidate struct {
 		Tar      string `json:"tar" binding:"required"`
-		Tag      string `json:"tag" binding:"required"`
+		Tag      string `json:"tag"`
 		Registry string `json:"registry"`
 	}
 	params := ParamsValidate{}
@@ -140,7 +140,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImageImport, params.Tag))
 	defer wsBuffer.Close()
 
-	imageTag := ""
+	imageTag := make([]string, 0)
 	buffer := new(bytes.Buffer)
 	wsBuffer.OnWrite = func(p string) error {
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
@@ -152,7 +152,9 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 			msg := docker.BuildMessage{}
 			if err = json.Unmarshal(line, &msg); err == nil {
 				if msg.Stream != "" && strings.Contains(msg.Stream, "Loaded image:") {
-					imageTag = strings.Split(msg.Stream, "Loaded image:")[1]
+					if _, after, exists := strings.Cut(msg.Stream, "Loaded image: "); exists {
+						imageTag = append(imageTag, after)
+					}
 				}
 				buffer.WriteString(fmt.Sprintf("\r%s: %s", msg.Id, msg.Progress))
 			} else {
@@ -172,15 +174,16 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if imageTag != "" {
-		err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, strings.TrimSpace(imageTag), imageName)
+	if imageTag != nil && len(imageTag) == 1 && params.Tag != "" {
+		err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, strings.TrimSpace(imageTag[0]), imageName)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 	}
-
-	self.JsonSuccessResponse(http)
+	self.JsonResponseWithoutError(http, gin.H{
+		"tag": imageTag,
+	})
 	return
 }
 
@@ -479,33 +482,36 @@ func (self Image) BuildPrune(http *gin.Context) {
 
 func (self Image) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 string `json:"md5" binding:"required"`
+		Md5 []string `json:"md5" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	out, err := docker.Sdk.Client.ImageSave(docker.Sdk.Ctx, imageInfo.RepoTags)
+	out, err := docker.Sdk.Client.ImageSave(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	defer out.Close()
-	tempFile, _ := os.CreateTemp("", "dpanel")
-	defer tempFile.Close()
-	defer os.Remove(tempFile.Name())
-	_, err = io.Copy(tempFile, out)
+
+	_, err = io.Copy(http.Writer, out)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	http.File(tempFile.Name())
+	self.JsonSuccessResponse(http)
 	return
+	//tempFile, _ := os.CreateTemp("", "dpanel")
+	//defer tempFile.Close()
+	//defer os.Remove(tempFile.Name())
+	//_, err = io.Copy(tempFile, out)
+	//if err != nil {
+	//	self.JsonResponseWithError(http, err, 500)
+	//	return
+	//}
+	//http.File(tempFile.Name())
+	//return
 }
 
 func (self Image) UpdateTitle(http *gin.Context) {
