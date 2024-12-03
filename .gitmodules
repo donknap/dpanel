@@ -1,0 +1,3 @@
+[submodule "app/pro"]
+	path = app/pro
+	url = https://github.com/donknap/dpanel-pro.git
