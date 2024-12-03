@@ -11,10 +11,13 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"html/template"
+	"io"
+	"log/slog"
 	"os"
 	"strings"
 )
@@ -284,7 +287,7 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		serverNameList = append(serverNameList, domain.ServerName)
 	}
 
-	err := logic.Acme{}.Issue(&logic.AcmeIssueOption{
+	response, err := logic.Acme{}.Issue(&logic.AcmeIssueOption{
 		ServerName:  serverNameList,
 		Email:       params.Email,
 		CertServer:  params.CertServer,
@@ -292,12 +295,17 @@ func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 		Renew:       params.Renew,
 		Debug:       params.Debug,
 	})
-
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	wsBuffer := ws.NewProgressPip(ws.MessageTypeDomainApply)
+	defer wsBuffer.Close()
 
+	_, err = io.Copy(wsBuffer, response)
+	if err != nil {
+		slog.Error("compose", "deploy copy error", err)
+	}
 	siteNginxSetting := logic.Site{}.GetSiteNginxSetting(serverNameList[0])
 	certContent, err := siteNginxSetting.GetCertContent()
 	if os.IsNotExist(err) {

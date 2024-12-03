@@ -18,6 +18,7 @@ const (
 	MessageTypeImageBuild    = "image:build:%d"
 	MessageTypeImageImport   = "image:import:%s"
 	MessageTypeProgressClose = "progress:close"
+	MessageTypeDomainApply   = "domain:apply"
 )
 
 type RespMessage struct {

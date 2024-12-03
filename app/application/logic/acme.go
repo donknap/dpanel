@@ -5,6 +5,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/storage"
+	"io"
 	"strings"
 )
 
@@ -65,22 +66,24 @@ func (self AcmeIssueOption) to() ([]string, error) {
 	return command, nil
 }
 
-func (self Acme) Issue(option *AcmeIssueOption) error {
+func (self Acme) Issue(option *AcmeIssueOption) (io.ReadCloser, error) {
 	command, err := option.to()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if option.Renew {
 		command = append(command, "--renew", "--force")
 	} else {
 		command = append(command, "--issue")
 	}
-
-	exec.Command{}.Run(&exec.RunCommandOption{
+	out, err := exec.Command{}.RunInTerminal(&exec.RunCommandOption{
 		CmdName: commandName,
 		CmdArgs: command,
 	})
-	return nil
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (self Acme) Info(serverName string) *acmeInfoResult {
