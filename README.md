@@ -49,7 +49,7 @@ docker run -it -d --name dpanel --restart=always \
  dpanel/dpanel:lite
 ```
 
-#### 赞助
+#### 为爱发电
 
 DPanel 是一个开源软件。
 
@@ -57,9 +57,13 @@ DPanel 是一个开源软件。
 
 https://afdian.com/a/dpanel
 
-##### 服务器 & CDN
+#### 赞助感谢
 
-<a href="https://www.anycast.ai" target="_blank"><img src="https://doc.dpanel.cc/storage/image/sponsor-server.png" width="150" /></a>
+###### 服务器 & CDN
+
+<a href="https://www.anycast.ai" target="_blank">
+<img src="https://doc.dpanel.cc/storage/image/sponsor-server.png" width="200" />
+</a>
 
 #### 交流群
 
