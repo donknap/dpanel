@@ -6,8 +6,10 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"time"
 )
@@ -106,5 +108,24 @@ func (self User) GetUserInfo(http *gin.Context) {
 		"user":    userInfo,
 		"feature": feature,
 	})
+	return
+}
+
+func (self User) LoginInfo(http *gin.Context) {
+	result := gin.H{
+		"showRegister":  false,
+		"showBuildName": true,
+		"version":       facade.GetConfig().GetString("app.version"),
+		"family":        facade.GetConfig().GetString("app.env"),
+	}
+	_, err := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
+	if err == nil {
+		result["showBuildName"] = false
+	}
+	founder, err := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
+	if err != nil || founder == nil {
+		result["showRegister"] = true
+	}
+	self.JsonResponseWithoutError(http, result)
 	return
 }

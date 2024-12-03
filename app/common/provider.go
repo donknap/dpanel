@@ -40,6 +40,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 		// 用户
 		cors.POST("/common/user/login", controller.User{}.Login)
+		cors.POST("/common/user/login-info", controller.User{}.LoginInfo)
 		cors.POST("/common/user/get-user-info", controller.User{}.GetUserInfo)
 
 		// 配置

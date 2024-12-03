@@ -15,7 +15,6 @@ type AuthMiddleware struct {
 
 func (self AuthMiddleware) Process(http *gin.Context) {
 	if strings.Contains(http.Request.URL.Path, "/api/common/user/login") ||
-		strings.Contains(http.Request.URL.Path, "/api/common/home/info") ||
 		!strings.Contains(http.Request.URL.Path, "/api") {
 		http.Next()
 		return
