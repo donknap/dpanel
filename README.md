@@ -57,6 +57,10 @@ DPanel 是一个开源软件。
 
 https://afdian.com/a/dpanel
 
+##### 服务器 & CDN
+
+<a href="https://www.anycast.ai" target="_blank"><img src="https://doc.dpanel.cc/storage/image/sponsor-server.png" width="150" /></a>
+
 #### 交流群
 
 QQ: 837583876
