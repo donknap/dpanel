@@ -1,0 +1,30 @@
+FROM alpine
+
+ARG APP_VERSION
+ARG TARGETARCH
+ARG PROXY="proxy=0"
+
+ENV APP_ENV=demo
+ENV APP_NAME=dpanel
+ENV APP_VERSION=$APP_VERSION
+ENV APP_SERVER_PORT=8080
+ENV DOCKER_HOST=unix:///var/run/docker.sock
+ENV STORAGE_LOCAL_PATH=/dpanel
+ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
+ENV DB_MODE=ro
+ENV TZ=Asia/Shanghai
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
+  apk add --no-cache --update musl tzdata
+
+COPY ./runtime/dpanel-musl-${TARGETARCH} /app/server/dpanel
+COPY ./runtime/config.yaml /app/server/config.yaml
+
+WORKDIR /app
+VOLUME [ "/dpanel" ]
+
+EXPOSE 443
+EXPOSE 80
+EXPOSE 8080
+
+ENTRYPOINT [ "sh", "-c", "/app/server/dpanel server:start -f /app/server/config.yaml" ]

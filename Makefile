@@ -52,14 +52,21 @@ all: clean-source js amd64 arm64 armv7
 test: all
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION}-lite \
-	--platform linux/arm64,linux/amd64,linux/arm/v7 \
+	--platform linux/arm64,linux/amd64 \
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile-lite \
 	. --push
-	#docker buildx build \
+#	docker buildx build \
 #	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION} \
-#	--platform linux/arm64,linux/amd64,linux/arm/v7 \
+#	--platform linux/arm64,linux/amd64 \
 #	--build-arg APP_VERSION=${VERSION} \
 #	--build-arg PROXY="https_proxy=http://172.16.1.198:7890 http_proxy=http://172.16.1.198:7890" \
 #	-f Dockerfile \
 #	. --push
+demo: clean-source js amd64
+	docker buildx build \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:demo \
+	--platform linux/amd64 \
+	--build-arg APP_VERSION=${VERSION} \
+	-f Dockerfile-demo \
+	. --push
