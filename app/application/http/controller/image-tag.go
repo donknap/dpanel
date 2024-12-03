@@ -80,6 +80,11 @@ func (self Image) TagRemote(http *gin.Context) {
 					// 如果使用了加速，需要给镜像 tag 一个原来的名称
 					_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, proxy+"/"+tagDetail.Tag, params.Tag)
 					break
+				} else {
+					if strings.Contains(err.Error(), "not found:") {
+						self.JsonResponseWithError(http, err, 500)
+						return
+					}
 				}
 			}
 			if err != nil {
