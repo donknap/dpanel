@@ -115,6 +115,13 @@ jobs:
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
           . --push
+          
+          docker buildx build \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:demo \
+          --platform linux/amd64 \
+          --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
+          -f Dockerfile-demo \
+          . --push
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
