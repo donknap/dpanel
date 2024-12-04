@@ -6,6 +6,7 @@ TRIM_PATH=/Users/renchao
 JS_SOURCE_DIR=$(GO_SOURCE_DIR)/../../js/d-panel
 VERSION=1.0.0
 COMMON_PARAMS=-ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}"
+FAMILY=ce
 
 help:
 	@echo "make build"
@@ -17,7 +18,7 @@ amd64:
 	# brew tap messense/macos-cross-toolchains && brew install x86_64-linux-musl
 	# apk add musl
 	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ \
-	go build ${COMMON_PARAMS} -o ${GO_TARGET_DIR}/${PROJECT_NAME}-musl-amd64 ${GO_SOURCE_DIR}/*.go
+	go build ${COMMON_PARAMS} -tags ${FAMILY} -o ${GO_TARGET_DIR}/${PROJECT_NAME}-musl-amd64 ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 arm64:
 	# brew tap messense/macos-cross-toolchains && brew install aarch64-unknown-linux-musl
