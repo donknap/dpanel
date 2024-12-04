@@ -23,6 +23,7 @@ func (self TerminalResult) Close() error {
 		if err != nil {
 			slog.Debug("terminal result", err)
 		}
+		return self.cmd.Wait()
 	}
 	return nil
 }
