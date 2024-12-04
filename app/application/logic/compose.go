@@ -65,7 +65,7 @@ func (self Compose) Ls() []*composeItem {
 		out = exec.Command{}.RunWithResult(&exec.RunCommandOption{
 			CmdName: "docker-compose",
 			CmdArgs: command,
-			Env:     append(os.Environ(), docker.Sdk.Env...),
+			Env:     docker.Sdk.Env,
 		})
 	} else {
 		out = exec.Command{}.RunWithResult(&exec.RunCommandOption{

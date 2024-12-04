@@ -308,12 +308,30 @@ func (self Compose) GetFromUri(http *gin.Context) {
 func (self Compose) Parse(http *gin.Context) {
 	type ParamsValidate struct {
 		Yaml string `json:"yaml" binding:"required"`
+		Id   int32  `json:"id"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	composer, err := compose.NewComposeWithYaml([]byte(params.Yaml))
+	var composer *compose.Wrapper
+	var err error
+
+	if params.Id > 0 {
+		composeRow, err := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		tasker, err := logic.Compose{}.GetTasker(composeRow)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		composer = tasker.Composer
+	} else {
+		composer, err = compose.NewComposeWithYaml([]byte(params.Yaml))
+	}
 	if err == nil {
 		self.JsonResponseWithoutError(http, gin.H{
 			"project": composer.Project,

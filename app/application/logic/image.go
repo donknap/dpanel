@@ -51,6 +51,7 @@ type imageTagDetail struct {
 }
 
 func (self Image) GetImageTagDetail(tag string) *imageTagDetail {
+	tag = strings.TrimPrefix(strings.TrimPrefix(tag, "http://"), "https://")
 	result := &imageTagDetail{}
 	if !strings.Contains(tag, ":") {
 		tag += ":latest"

@@ -127,7 +127,7 @@ func (self Task) Ps() []*composeContainerResult {
 		out = exec.Command{}.RunWithResult(&exec.RunCommandOption{
 			CmdName: "docker-compose",
 			CmdArgs: cmd,
-			Env:     append(os.Environ(), docker.Sdk.Env...),
+			Env:     docker.Sdk.Env,
 		})
 	} else {
 		out = exec.Command{}.RunWithResult(&exec.RunCommandOption{
@@ -183,7 +183,7 @@ func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 		return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
 			CmdName: "docker-compose",
 			CmdArgs: command,
-			Env:     append(os.Environ(), docker.Sdk.Env...),
+			Env:     docker.Sdk.Env,
 		})
 	} else {
 		return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
