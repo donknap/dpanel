@@ -69,6 +69,15 @@ func (self Command) RunWithResult(option *RunCommandOption) string {
 }
 
 func (self Command) getCommand(option *RunCommandOption) *exec.Cmd {
+	if cmd != nil && cmd.Process.Pid > 0 {
+		// 将上一条命令中止掉
+		if err := cmd.Process.Kill(); err == nil {
+			_, err = cmd.Process.Wait()
+			if err != nil {
+				slog.Debug("command kill error", err.Error())
+			}
+		}
+	}
 	slog.Debug("run command", option.CmdName, option.CmdArgs)
 	cmd = exec.Command(option.CmdName, option.CmdArgs...)
 	if option.Timeout > 0 {
@@ -95,7 +104,11 @@ func (self Command) getCommand(option *RunCommandOption) *exec.Cmd {
 
 func (self Command) Kill() error {
 	if cmd != nil {
-		return cmd.Process.Kill()
+		err := cmd.Process.Kill()
+		if err != nil {
+			return err
+		}
+		return cmd.Wait()
 	}
 	return nil
 }

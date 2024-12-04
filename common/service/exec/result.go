@@ -15,15 +15,16 @@ func (self TerminalResult) Close() error {
 	if self.Conn != nil {
 		err := self.Conn.Close()
 		if err != nil {
-			slog.Debug("terminal result", err)
+			slog.Debug("terminal result close", "error", err.Error())
 		}
 	}
 	if self.cmd != nil {
 		err := self.cmd.Process.Kill()
 		if err != nil {
-			slog.Debug("terminal result", err)
+			slog.Debug("terminal result close", "error", err.Error())
+		} else {
+			return self.cmd.Wait()
 		}
-		return self.cmd.Wait()
 	}
 	return nil
 }
