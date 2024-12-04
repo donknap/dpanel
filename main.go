@@ -3,12 +3,15 @@ package main
 import (
 	"embed"
 	_ "embed"
+	"github.com/donknap/dpanel/app/application"
+	"github.com/donknap/dpanel/app/common"
+	"github.com/donknap/dpanel/app/ctrl"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	common2 "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/migrate"
-	"github.com/donknap/dpanel/common/service/provider"
+	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
@@ -149,7 +152,11 @@ func main() {
 	_ = facade.GetContainer().NamedSingleton("asset", func() embed.FS {
 		return Asset
 	})
-	new(provider.Provider).Register(httpServer, facade.GetConsole())
+
+	new(family.Provider).Register(httpServer, facade.GetConsole())
+	new(common.Provider).Register(httpServer)
+	new(application.Provider).Register(httpServer)
+	new(ctrl.Provider).Register(facade.GetConsole())
 
 	myApp.RunConsole()
 }

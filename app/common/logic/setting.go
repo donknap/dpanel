@@ -11,6 +11,7 @@ var (
 	SettingGroupSetting          = "setting"
 	SettingGroupSettingServer    = "server" // 服务器
 	SettingGroupSettingDocker    = "docker" // docker env
+	SettingGroupSettingTwoFa     = "twoFa"  // 双因素
 	SettingGroupSettingDiskUsage = "diskUsage"
 )
 
@@ -63,4 +64,12 @@ func (self Setting) GetValueById(id int32) (*entity.Setting, error) {
 		return nil, errors.New("配置不存在")
 	}
 	return setting, nil
+}
+
+func (self Setting) Delete(groupName string, name string) error {
+	_, _ = dao.Setting.Where(
+		dao.Setting.GroupName.Eq(groupName),
+		dao.Setting.Name.Eq(name),
+	).Delete()
+	return nil
 }

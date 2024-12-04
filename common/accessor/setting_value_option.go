@@ -12,6 +12,7 @@ type SettingValueOption struct {
 	RequestTimeout int                            `json:"requestTimeout,omitempty"`
 	Docker         map[string]*DockerClientResult `json:"docker,omitempty"`
 	DiskUsage      *DiskUsage                     `json:"diskUsage,omitempty"`
+	TwoFa          *TwoFa                         `json:"twoFa,omitempty"`
 }
 
 type DockerClientResult struct {
@@ -29,4 +30,11 @@ type DockerClientResult struct {
 type DiskUsage struct {
 	Usage     *types.DiskUsage `json:"usage,omitempty"`
 	UpdatedAt time.Time        `json:"updatedAt,omitempty"`
+}
+
+type TwoFa struct {
+	Secret string `json:"secret,omitempty"`
+	Enable bool   `json:"enable,omitempty"`
+	Email  string `json:"email,omitempty"`
+	QrCode string `json:"qrCode,omitempty"`
 }
