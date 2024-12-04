@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
@@ -70,12 +71,18 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, composeRow.ID))
 	defer wsBuffer.Close()
-
+	wsBuffer.OnWrite = func(p string) error {
+		wsBuffer.BroadcastMessage(p)
+		if strings.Contains(p, "denied: You may not login") {
+			_ = notice.Message{}.Error("imagePull", "拉取镜失败，仓库没有权限。")
+			return errors.New("image pull denied")
+		}
+		return nil
+	}
 	_, err = io.Copy(wsBuffer, response)
 	if err != nil {
 		slog.Error("compose", "deploy copy error", err)
 	}
-
 	// 部署完成后也上更新状态
 	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
 	if err != nil {
@@ -244,9 +251,8 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		select {
 		case <-wsBuffer.Done():
 			err = response.Close()
-			slog.Debug("compose", "run log  response close", fmt.Sprintf(ws.MessageTypeComposeLog, composeRow.ID), "error", err)
 			if err != nil {
-				fmt.Printf("%v \n", err)
+				slog.Debug("compose", "run log  response close", fmt.Sprintf(ws.MessageTypeComposeLog, composeRow.ID), "error", err)
 			}
 		}
 	}()
