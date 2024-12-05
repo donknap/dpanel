@@ -71,3 +71,11 @@ demo: clean-source js amd64
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile-demo \
 	. --push
+pe:
+	docker buildx build \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION}-lite-pe \
+	--platform linux/amd64 \
+	--build-arg APP_VERSION=${VERSION} \
+	--build-arg APP_FAMILY=pe \
+	-f Dockerfile-lite \
+	. --push

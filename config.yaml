@@ -2,6 +2,7 @@ app:
   name: ${APP_NAME-dpanel}
   version: ${APP_VERSION}
   env: ${APP_ENV-lite}
+  family: ${APP_FAMILY-ce}
   server: http
   cors:
     - http://localhost:8000
