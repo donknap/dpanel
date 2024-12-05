@@ -61,7 +61,7 @@ https://afdian.com/a/dpanel
 
 ###### 服务器 & CDN
 
-<a href="https://www.anycast.ai" target="_blank">
+<a href="https://anycast.ai" target="_blank">
 <img src="https://doc.dpanel.cc/storage/image/sponsor-server.png" width="200" />
 </a>
 
