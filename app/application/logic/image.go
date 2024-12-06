@@ -1,8 +1,10 @@
 package logic
 
 import (
+	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"log/slog"
 	"strings"
 )
 
@@ -84,14 +86,13 @@ func (self Image) GetRegistryAuthString(serverAddress string, username string, p
 		return ""
 	}
 	password, _ = function.AseDecode(facade.GetConfig().GetString("app.name"), password)
-	authString := function.Base64Encode(struct {
-		Username      string `json:"username"`
-		Password      string `json:"password"`
-		ServerAddress string `json:"serveraddress"`
-	}{
-		Username:      username,
-		Password:      password,
-		ServerAddress: serverAddress,
+	authString, err := registry.EncodeAuthConfig(registry.AuthConfig{
+		Username: username,
+		Password: password,
 	})
+	if err != nil {
+		slog.Debug("get registry auth string", err.Error())
+		return ""
+	}
 	return authString
 }

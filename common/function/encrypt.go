@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 )
 
@@ -51,17 +49,6 @@ func PKCS5UnPadding(origData []byte) []byte {
 	length := len(origData)
 	unpadding := int(origData[length-1])
 	return origData[:(length - unpadding)]
-}
-
-func Base64Encode(obj interface{}) string {
-	var buf bytes.Buffer
-	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
-	err := json.NewEncoder(encoder).Encode(obj)
-	if err != nil {
-		return ""
-	}
-	encoder.Close()
-	return buf.String()
 }
 
 func URIEncodeComponent(s string, excluded ...[]byte) string {
