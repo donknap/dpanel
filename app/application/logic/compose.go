@@ -223,9 +223,6 @@ func (self Compose) Sync() error {
 			if function.InArray([]string{
 				accessor.ComposeTypeOutPath, accessor.ComposeTypeStoragePath, accessor.ComposeTypeStore,
 			}, dbComposeRow.Setting.Type) {
-				if dbComposeRow.Setting.Type == accessor.ComposeTypeOutPath || dbComposeRow.Setting.Type == accessor.ComposeTypeStore {
-					_ = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), filepath.Dir(dbComposeRow.Setting.Uri[0])))
-				}
 				_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Delete()
 			}
 

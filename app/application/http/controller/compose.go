@@ -255,13 +255,9 @@ func (self Compose) Delete(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		if function.InArray([]string{
-			accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl, accessor.ComposeTypeStore,
-		}, row.Setting.Type) {
-			err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), row.Name))
-			if err != nil {
-				slog.Error("compose", "delete", err.Error())
-			}
+		err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), row.Name))
+		if err != nil {
+			slog.Error("compose", "delete", err.Error())
 		}
 	}
 	self.JsonSuccessResponse(http)
