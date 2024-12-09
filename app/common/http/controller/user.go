@@ -117,6 +117,9 @@ func (self User) GetUserInfo(http *gin.Context) {
 	feature := []string{
 		"composeStore",
 	}
+	if facade.GetConfig().GetString("app.env") != "lite" {
+		feature = append(feature, "containerDomain")
+	}
 	feature = append(feature, family.Provider{}.Feature()...)
 
 	self.JsonResponseWithoutError(http, gin.H{
