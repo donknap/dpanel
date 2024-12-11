@@ -5,7 +5,9 @@ import (
 	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
+	"github.com/donknap/dpanel/common/dao"
 	common "github.com/donknap/dpanel/common/middleware"
+	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
@@ -67,6 +69,11 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/store/deploy", controller.Store{}.Deploy)
 
 		engine.StaticFS("/dpanel/static/store/file", http.FS(logic.StoreLogoFileSystem{}))
+
+		// 计划任务
+		cors.POST("/common/cron/create", controller.Cron{}.Create)
+		cors.POST("/common/cron/get-list", controller.Cron{}.GetList)
+		cors.POST("/common/cron/delete", controller.Cron{}.Delete)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
@@ -89,5 +96,24 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	_, err = docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err == nil {
 		go logic.EventLogic{}.MonitorLoop()
+	}
+
+	// 启动时，初始化计划任务
+	if cronList, err := dao.Cron.Order(dao.Cron.ID.Desc()).Find(); err == nil {
+		for _, task := range cronList {
+			expression := make([]string, 0)
+			for _, item := range task.Setting.Expression {
+				expression = append(expression, item.ToString())
+			}
+			ids, err := crontab.Wrapper.AddJob(expression, &crontab.Job{
+				Script: task.Setting.Script,
+				Id:     task.ID,
+			})
+			if err == nil {
+				task.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(ids...)
+				task.Setting.JobIds = ids
+			}
+			_, _ = dao.Cron.Updates(task)
+		}
 	}
 }

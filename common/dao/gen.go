@@ -19,6 +19,7 @@ var (
 	Q          = new(Query)
 	Backup     *backup
 	Compose    *compose
+	Cron       *cron
 	Event      *event
 	Image      *image
 	Notice     *notice
@@ -33,6 +34,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	Backup = &Q.Backup
 	Compose = &Q.Compose
+	Cron = &Q.Cron
 	Event = &Q.Event
 	Image = &Q.Image
 	Notice = &Q.Notice
@@ -48,6 +50,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		db:         db,
 		Backup:     newBackup(db, opts...),
 		Compose:    newCompose(db, opts...),
+		Cron:       newCron(db, opts...),
 		Event:      newEvent(db, opts...),
 		Image:      newImage(db, opts...),
 		Notice:     newNotice(db, opts...),
@@ -64,6 +67,7 @@ type Query struct {
 
 	Backup     backup
 	Compose    compose
+	Cron       cron
 	Event      event
 	Image      image
 	Notice     notice
@@ -81,6 +85,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		db:         db,
 		Backup:     q.Backup.clone(db),
 		Compose:    q.Compose.clone(db),
+		Cron:       q.Cron.clone(db),
 		Event:      q.Event.clone(db),
 		Image:      q.Image.clone(db),
 		Notice:     q.Notice.clone(db),
@@ -105,6 +110,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		db:         db,
 		Backup:     q.Backup.replaceDB(db),
 		Compose:    q.Compose.replaceDB(db),
+		Cron:       q.Cron.replaceDB(db),
 		Event:      q.Event.replaceDB(db),
 		Image:      q.Image.replaceDB(db),
 		Notice:     q.Notice.replaceDB(db),
@@ -119,6 +125,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 type queryCtx struct {
 	Backup     IBackupDo
 	Compose    IComposeDo
+	Cron       ICronDo
 	Event      IEventDo
 	Image      IImageDo
 	Notice     INoticeDo
@@ -133,6 +140,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
 		Backup:     q.Backup.WithContext(ctx),
 		Compose:    q.Compose.WithContext(ctx),
+		Cron:       q.Cron.WithContext(ctx),
 		Event:      q.Event.WithContext(ctx),
 		Image:      q.Image.WithContext(ctx),
 		Notice:     q.Notice.WithContext(ctx),

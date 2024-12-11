@@ -92,6 +92,7 @@ func main() {
 			&entity.Compose{},
 			&entity.Backup{},
 			&entity.Store{},
+			&entity.Cron{},
 		)
 		if err != nil {
 			panic(err)

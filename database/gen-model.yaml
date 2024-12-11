@@ -47,3 +47,8 @@ relation:
       setting:
         type: ComposeSettingOption
         serializer: json
+  - table: ims_cron
+    column:
+      setting:
+        type: CronSettingOption
+        serializer: json
