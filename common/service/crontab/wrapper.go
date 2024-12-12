@@ -1,6 +1,7 @@
 package crontab
 
 import (
+	"errors"
 	"github.com/robfig/cron/v3"
 	"os"
 	"time"
@@ -23,6 +24,7 @@ func NewCronWrapper() *wrapper {
 		),
 		parser: specParser,
 	}
+
 	cronWrapper.Cron.Start()
 	return cronWrapper
 }
@@ -42,7 +44,10 @@ func (self wrapper) CheckExpression(expression []string) error {
 	return nil
 }
 
-func (self wrapper) AddJob(expression []string, job *Job) ([]cron.EntryID, error) {
+func (self wrapper) AddJob(expression []string, job cron.Job) ([]cron.EntryID, error) {
+	if job == nil {
+		return nil, errors.New("invalid job")
+	}
 	ids := make([]cron.EntryID, 0)
 	for _, item := range expression {
 		id, err := self.Cron.AddJob(item, job)

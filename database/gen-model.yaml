@@ -52,3 +52,8 @@ relation:
       setting:
         type: CronSettingOption
         serializer: json
+  - table: ims_cron_log
+    column:
+      value:
+        type: CronLogValueOption
+        serializer: json

@@ -1,25 +1,43 @@
 package crontab
 
 import (
-	"fmt"
-	"github.com/donknap/dpanel/common/dao"
+	"log/slog"
 )
 
+type RunFunc func() error
+
+type Option func(job *Job)
+
+func WithRunFunc(callback RunFunc) Option {
+	return func(job *Job) {
+		job.runFunc = append(job.runFunc, callback)
+	}
+}
+
+func New(opts ...Option) *Job {
+	c := &Job{
+		runFunc: make([]RunFunc, 0),
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
 type Job struct {
-	Id            int32
-	Script        string
-	ContainerName string
+	runFunc []RunFunc
 }
 
 func (self Job) Run() {
-	fmt.Printf("%v \n", self.Script)
-	fmt.Printf("%v \n", self.Id)
-	self.updateNextRunTime()
-}
-
-func (self Job) updateNextRunTime() {
-	if task, err := dao.Cron.Where(dao.Cron.ID.Eq(self.Id)).First(); err == nil {
-		task.Setting.NextRunTime = Wrapper.GetNextRunTime(task.Setting.JobIds...)
-		_, _ = dao.Cron.Updates(task)
+	if self.runFunc != nil {
+		for _, runFunc := range self.runFunc {
+			err := runFunc()
+			if err != nil {
+				slog.Debug("crontab crash ", "err", err.Error())
+				return
+			}
+		}
+	} else {
+		slog.Debug("invalid crontab job")
 	}
 }

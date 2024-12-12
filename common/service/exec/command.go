@@ -21,7 +21,6 @@ type RunCommandOption struct {
 	CmdName    string
 	CmdArgs    []string
 	WindowSize *pty.Winsize
-	Follow     bool
 	Timeout    time.Duration
 	Dir        string
 	Env        []string

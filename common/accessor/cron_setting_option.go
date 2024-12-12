@@ -46,9 +46,6 @@ type CronSettingOption struct {
 	Expression    []CronSettingExpression `json:"expression,omitempty"`
 	ContainerName string                  `json:"containerName,omitempty"`
 	Script        string                  `json:"script,omitempty"`
+	ScriptType    string                  `json:"scriptType,omitempty"`
 	JobIds        []cron.EntryID          `json:"jobIds,omitempty"`
-}
-
-func (self CronSettingOption) Run() {
-	fmt.Printf("%v \n", self.Script)
 }

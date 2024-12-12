@@ -3,8 +3,8 @@ package controller
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"errors"
-	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type Explorer struct {
@@ -95,23 +96,31 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("请指定绝对路径"), 500)
 		return
 	}
-	tempFileDir, _ := os.MkdirTemp("", "dpanel-explorer")
-	tempFilePath := fmt.Sprintf("%s%s", strings.TrimSuffix(tempFileDir, "/"), params.File)
-	err := os.MkdirAll(filepath.Dir(tempFilePath), os.ModePerm)
-	if err != nil {
-		slog.Error("explorer", "import file content", err.Error())
-	}
-	err = os.WriteFile(tempFilePath, []byte(params.Content), 0o666)
-	if err != nil {
+	buf := new(bytes.Buffer)
+
+	tarWriter := tar.NewWriter(buf)
+	defer func() {
+		_ = tarWriter.Close()
+	}()
+
+	if err := tarWriter.WriteHeader(&tar.Header{
+		Name:    params.File,
+		Size:    int64(len(params.Content)),
+		Mode:    0666,
+		ModTime: time.Now(),
+	}); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer os.RemoveAll(tempFileDir)
-	tarReader, err := archive.Tar(tempFileDir, archive.Uncompressed)
-	err = docker.Sdk.Client.CopyToContainer(docker.Sdk.Ctx,
+	if _, err := tarWriter.Write([]byte(params.Content)); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	err := docker.Sdk.Client.CopyToContainer(docker.Sdk.Ctx,
 		params.Md5,
 		params.DestPath,
-		tarReader,
+		buf,
 		container.CopyToContainerOptions{},
 	)
 	if err != nil {

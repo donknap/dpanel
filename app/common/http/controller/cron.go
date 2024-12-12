@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -20,8 +21,9 @@ func (self Cron) Create(http *gin.Context) {
 		Id            int32                            `json:"id"`
 		Title         string                           `json:"title" binding:"required"`
 		Expression    []accessor.CronSettingExpression `json:"expression" binding:"required"`
-		ContainerName string                           `json:"containerName" binding:"required"`
+		ContainerName string                           `json:"containerName"`
 		Script        string                           `json:"script" binding:"required"`
+		ScriptType    string                           `json:"scriptType" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -38,10 +40,19 @@ func (self Cron) Create(http *gin.Context) {
 	}
 
 	var taskRow *entity.Cron
+
 	if params.Id > 0 {
 		taskRow, _ = dao.Cron.Where(dao.Cron.ID.Eq(params.Id)).First()
+		if taskRow == nil {
+			self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+			return
+		}
 		crontab.Wrapper.RemoveJob(taskRow.Setting.JobIds...)
+
 		taskRow.Setting.Expression = params.Expression
+		taskRow.Setting.Script = params.Script
+		taskRow.Setting.ScriptType = params.ScriptType
+		taskRow.Setting.ContainerName = params.ContainerName
 	} else {
 		if _, err := dao.Cron.Where(dao.Cron.Title.Like(params.Title)).First(); err == nil {
 			self.JsonResponseWithError(http, errors.New("任务名称已经存在"), 500)
@@ -54,23 +65,14 @@ func (self Cron) Create(http *gin.Context) {
 				Expression:    params.Expression,
 				ContainerName: params.ContainerName,
 				Script:        params.Script,
+				ScriptType:    params.ScriptType,
 				JobIds:        make([]cron.EntryID, 0),
 			},
 		}
 		err = dao.Cron.Create(taskRow)
 	}
 
-	ids, err := crontab.Wrapper.AddJob(allExpression, &crontab.Job{
-		Script: params.Script,
-		Id:     taskRow.ID,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	taskRow.Setting.JobIds = ids
-	taskRow.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(ids...)
-	_, err = dao.Cron.Updates(taskRow)
+	err = logic.Cron{}.AddJob(taskRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -124,4 +126,29 @@ func (self Cron) Delete(http *gin.Context) {
 	}
 	self.JsonSuccessResponse(http)
 	return
+}
+
+func (self Cron) GetLogList(http *gin.Context) {
+	type ParamsValidate struct {
+		Id       int32 `json:"id" binding:"required"`
+		Page     int   `form:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize int   `form:"pageSize" binding:"omitempty"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if params.Page < 1 {
+		params.Page = 1
+	}
+	if params.PageSize < 1 {
+		params.PageSize = 10
+	}
+	query := dao.CronLog.Order(dao.CronLog.ID.Desc()).Where(dao.CronLog.CronID.Eq(params.Id))
+	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
+	self.JsonResponseWithoutError(http, gin.H{
+		"total": total,
+		"page":  params.Page,
+		"list":  list,
+	})
 }
