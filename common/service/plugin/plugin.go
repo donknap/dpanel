@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"bytes"
 	"embed"
 	"errors"
 	"github.com/docker/docker/api/types/container"
@@ -41,14 +42,12 @@ func NewPlugin(name string, composeData map[string]*TemplateParser) (*plugin, er
 	if err != nil {
 		return nil, err
 	}
-
-	yamlResult := newResult()
-	err = parser.Execute(yamlResult, composeData)
+	buffer := new(bytes.Buffer)
+	err = parser.Execute(buffer, composeData)
 	if err != nil {
 		return nil, err
 	}
-
-	composer, err := compose.NewComposeWithYaml(yamlResult.GetData())
+	composer, err := compose.NewComposeWithYaml(buffer.Bytes())
 	if err != nil {
 		return nil, err
 	}

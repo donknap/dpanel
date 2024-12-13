@@ -7,11 +7,14 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	common "github.com/donknap/dpanel/common/middleware"
+	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
+	"github.com/robfig/cron/v3"
 	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 type Provider struct {
@@ -75,6 +78,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/cron/get-list", controller.Cron{}.GetList)
 		cors.POST("/common/cron/delete", controller.Cron{}.Delete)
 		cors.POST("/common/cron/get-log-list", controller.Cron{}.GetLogList)
+		cors.POST("/common/cron/prune-log", controller.Cron{}.PruneLog)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
@@ -102,10 +106,16 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	// 启动时，初始化计划任务
 	if cronList, err := dao.Cron.Order(dao.Cron.ID.Desc()).Find(); err == nil {
 		for _, task := range cronList {
-			err = logic.Cron{}.AddJob(task)
+			jobIds, err := logic.Cron{}.AddJob(task)
 			if err != nil {
+				task.Setting.NextRunTime = make([]time.Time, 0)
+				task.Setting.JobIds = make([]cron.EntryID, 0)
 				slog.Debug("init crontab task error", "error", err.Error())
+			} else {
+				task.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(jobIds...)
+				task.Setting.JobIds = jobIds
 			}
+			_, _ = dao.Cron.Updates(task)
 		}
 	}
 }

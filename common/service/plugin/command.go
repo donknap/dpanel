@@ -1,9 +1,12 @@
 package plugin
 
 import (
+	"bytes"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"io"
 	"log/slog"
 )
 
@@ -29,22 +32,33 @@ func (self Command) Result(containerName string, cmd string) (string, error) {
 		"-c",
 		cmd,
 	})
-	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, execConfig)
+	response, err := self.Exec(containerName, execConfig)
 	if err != nil {
 		return "", err
 	}
-	o := &Hijacked{
-		Id: exec.ID,
-	}
-	o.conn, err = docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, container.ExecStartOptions{
-		Tty: false,
-	})
-	defer o.Close()
+	defer response.Close()
 
-	out := o.Out()
-	cleanOut := self.Clean(out)
+	buffer := new(bytes.Buffer)
+	_, err = io.Copy(buffer, response.Reader)
+	if err != nil {
+		return "", err
+	}
+	cleanOut := self.Clean(buffer.Bytes())
 	slog.Debug("command", "clear result", cleanOut)
 	return cleanOut, nil
+}
+
+func (self Command) Exec(containerName string, option container.ExecOptions) (types.HijackedResponse, error) {
+	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, option)
+	if err != nil {
+		return types.HijackedResponse{}, err
+	}
+	execAttachOption := container.ExecStartOptions{
+		Tty:         option.Tty,
+		ConsoleSize: option.ConsoleSize,
+		Detach:      option.Detach,
+	}
+	return docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, execAttachOption)
 }
 
 func (self Command) Clean(str []byte) string {

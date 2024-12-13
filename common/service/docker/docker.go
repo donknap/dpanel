@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,9 +14,12 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/donknap/dpanel/common/service/storage"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var (
@@ -129,7 +134,7 @@ func (self Builder) GetImageBuildBuilder() *imageBuildBuilder {
 	return builder
 }
 
-// ContainerByField 获取单条容器 field 支持 id,name
+// 获取单条容器 field 支持 id,name
 func (self Builder) ContainerByField(field string, name ...string) (result map[string]*types.Container, err error) {
 	if len(name) == 0 {
 		return nil, errors.New("please specify a container name")
@@ -195,4 +200,71 @@ func (self Builder) GetRestartPolicyByString(restartType string) (mode container
 	} else {
 		return container.RestartPolicyDisabled
 	}
+}
+
+func (self Builder) CopyContentToContainer(containerName, fileName, content string, perm os.FileMode) error {
+	buf := new(bytes.Buffer)
+	tarWriter := tar.NewWriter(buf)
+	defer func() {
+		_ = tarWriter.Close()
+	}()
+	if err := tarWriter.WriteHeader(&tar.Header{
+		Name:    fileName,
+		Size:    int64(len(content)),
+		Mode:    int64(perm),
+		ModTime: time.Now(),
+	}); err != nil {
+		return err
+	}
+	if _, err := tarWriter.Write([]byte(content)); err != nil {
+		return err
+	}
+
+	if err := self.Client.CopyToContainer(self.Ctx,
+		containerName,
+		"/",
+		buf,
+		container.CopyToContainerOptions{},
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self Builder) CopyPathToContainer(containerName, containerDestPath string, file []string) error {
+	buf := new(bytes.Buffer)
+	tarWriter := tar.NewWriter(buf)
+	defer func() {
+		_ = tarWriter.Close()
+	}()
+	for _, item := range file {
+		sourceFile, err := os.Open(item)
+		if err != nil {
+			return err
+		}
+		fileInfo, _ := sourceFile.Stat()
+		if err := tarWriter.WriteHeader(&tar.Header{
+			Name:    filepath.Base(item),
+			Size:    fileInfo.Size(),
+			Mode:    int64(fileInfo.Mode()),
+			ModTime: fileInfo.ModTime(),
+		}); err != nil {
+			return err
+		}
+		content, err := io.ReadAll(sourceFile)
+		if _, err := tarWriter.Write(content); err != nil {
+			return err
+		}
+		_ = sourceFile.Close()
+	}
+
+	if err := self.Client.CopyToContainer(self.Ctx,
+		containerName,
+		containerDestPath,
+		buf,
+		container.CopyToContainerOptions{},
+	); err != nil {
+		return err
+	}
+	return nil
 }

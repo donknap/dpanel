@@ -1,7 +1,9 @@
 package logic
 
 import (
-	"errors"
+	"bytes"
+	"fmt"
+	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -9,18 +11,24 @@ import (
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/robfig/cron/v3"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"io"
+	"log/slog"
+	"sync"
 	"time"
 )
 
 const (
-	CronRunDockerExec  = "dockerExec"
-	CronRunDockerShell = "dockerShell"
+	CronRunDockerExec = "dockerExec"
+)
+
+var (
+	lock = sync.RWMutex{}
 )
 
 type Cron struct {
 }
 
-func (self Cron) AddJob(task *entity.Cron) error {
+func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 	option := make([]crontab.Option, 0)
 
 	expression := make([]string, 0)
@@ -28,71 +36,70 @@ func (self Cron) AddJob(task *entity.Cron) error {
 		expression = append(expression, item.ToString())
 	}
 
-	switch task.Setting.ScriptType {
-	case CronRunDockerExec:
-		option = append(option, crontab.WithRunFunc(func() error {
-			startTime := time.Now()
-			containerName := task.Setting.ContainerName
-			if containerName == "" {
-				containerName = facade.GetConfig().GetString("app.name")
+	option = append(option, crontab.WithRunFunc(func() error {
+		if task.Setting.EnableRunBlock {
+			if lock.TryLock() {
+				defer lock.Unlock()
+			} else {
+				slog.Debug("task skipped")
+				return nil
 			}
-			out, err := plugin.Command{}.Result(containerName, task.Setting.Script)
-			if err != nil {
-				_ = dao.CronLog.Create(&entity.CronLog{
-					CronID: task.ID,
-					Value: &accessor.CronLogValueOption{
-						Error:   err.Error(),
-						RunTime: startTime,
-					},
-				})
-				return err
-			}
-			_ = dao.CronLog.Create(&entity.CronLog{
-				CronID: task.ID,
-				Value: &accessor.CronLogValueOption{
-					Message: out,
-					RunTime: startTime,
-					UseTime: time.Now().Sub(startTime).Seconds(),
-				},
-			})
-			return nil
-		}))
-		break
-	case CronRunDockerShell:
-		option = append(option, crontab.WithRunFunc(func() error {
-			startTime := time.Now()
-			containerName := task.Setting.ContainerName
-			if containerName == "" {
-				containerName = facade.GetConfig().GetString("app.name")
-			}
-			out, err := plugin.Shell{}.Result(containerName, task.Setting.Script)
-			if err != nil {
-				_ = dao.CronLog.Create(&entity.CronLog{
-					CronID: task.ID,
-					Value: &accessor.CronLogValueOption{
-						Error:   err.Error(),
-						RunTime: startTime,
-					},
-				})
-				return err
-			}
-			_ = dao.CronLog.Create(&entity.CronLog{
-				CronID: task.ID,
-				Value: &accessor.CronLogValueOption{
-					Message: out,
-					RunTime: startTime,
-					UseTime: time.Now().Sub(startTime).Seconds(),
-				},
-			})
-			return nil
-		}))
-	default:
-		task.Setting.NextRunTime = make([]time.Time, 0)
-		task.Setting.JobIds = make([]cron.EntryID, 0)
-		_, _ = dao.Cron.Updates(task)
+		}
+		startTime := time.Now()
+		containerName := task.Setting.ContainerName
+		if containerName == "" {
+			containerName = facade.GetConfig().GetString("app.name")
+		}
 
-		return errors.New("unsupported crontab task type: " + task.Setting.ScriptType)
-	}
+		globalEnv := make([]string, 0)
+		for _, item := range task.Setting.Environment {
+			globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, item.Value))
+		}
+		response, err := plugin.Command{}.Exec(containerName, container.ExecOptions{
+			Privileged:   true,
+			Tty:          true,
+			AttachStdin:  false,
+			AttachStdout: true,
+			AttachStderr: false,
+			Cmd: []string{
+				"/bin/sh",
+				"-c",
+				task.Setting.Script,
+			},
+			Env: globalEnv,
+		})
+		defer response.Close()
+		buffer := new(bytes.Buffer)
+		_, err = io.Copy(buffer, response.Reader)
+		if err != nil {
+			_ = dao.CronLog.Create(&entity.CronLog{
+				CronID: task.ID,
+				Value: &accessor.CronLogValueOption{
+					Error:   err.Error(),
+					RunTime: startTime,
+				},
+			})
+			return err
+		}
+		_ = dao.CronLog.Create(&entity.CronLog{
+			CronID: task.ID,
+			Value: &accessor.CronLogValueOption{
+				Message: buffer.String(),
+				RunTime: startTime,
+				UseTime: time.Now().Sub(startTime).Seconds(),
+			},
+		})
+		keepLogTotal := task.Setting.KeepLogTotal
+		if keepLogTotal <= 0 {
+			keepLogTotal = 10
+		}
+		logIds := make([]int32, 0)
+		_ = dao.CronLog.Where(dao.CronLog.CronID.Eq(task.ID)).Order(dao.CronLog.ID.Desc()).Limit(keepLogTotal).Pluck(dao.CronLog.ID, &logIds)
+		if len(logIds) >= keepLogTotal {
+			_, _ = dao.CronLog.Where(dao.CronLog.CronID.Eq(task.ID)).Where(dao.CronLog.ID.NotIn(logIds...)).Delete()
+		}
+		return nil
+	}))
 
 	option = append(option, crontab.WithRunFunc(func() error {
 		task.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(task.Setting.JobIds...)
@@ -101,17 +108,5 @@ func (self Cron) AddJob(task *entity.Cron) error {
 	}))
 
 	cronJob := crontab.New(option...)
-
-	if ids, err := crontab.Wrapper.AddJob(expression, cronJob); err == nil {
-		task.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(ids...)
-		task.Setting.JobIds = ids
-		_, _ = dao.Cron.Updates(task)
-	} else {
-		task.Setting.NextRunTime = make([]time.Time, 0)
-		task.Setting.JobIds = make([]cron.EntryID, 0)
-		_, _ = dao.Cron.Updates(task)
-		return err
-	}
-
-	return nil
+	return crontab.Wrapper.AddJob(expression, cronJob)
 }

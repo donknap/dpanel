@@ -9,7 +9,9 @@ import (
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"time"
 )
 
 type Cron struct {
@@ -18,17 +20,20 @@ type Cron struct {
 
 func (self Cron) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id            int32                            `json:"id"`
-		Title         string                           `json:"title" binding:"required"`
-		Expression    []accessor.CronSettingExpression `json:"expression" binding:"required"`
-		ContainerName string                           `json:"containerName"`
-		Script        string                           `json:"script" binding:"required"`
-		ScriptType    string                           `json:"scriptType" binding:"required"`
+		Id             int32                            `json:"id"`
+		Title          string                           `json:"title" binding:"required"`
+		Expression     []accessor.CronSettingExpression `json:"expression" binding:"required"`
+		ContainerName  string                           `json:"containerName"`
+		Script         string                           `json:"script" binding:"required"`
+		Environment    []accessor.EnvItem               `json:"environment"`
+		EnableRunBlock bool                             `json:"enableRunBlock"`
+		KeepLogTotal   int                              `json:"keepLogTotal"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+
 	allExpression := make([]string, 0)
 	for _, expression := range params.Expression {
 		allExpression = append(allExpression, expression.ToString())
@@ -40,7 +45,6 @@ func (self Cron) Create(http *gin.Context) {
 	}
 
 	var taskRow *entity.Cron
-
 	if params.Id > 0 {
 		taskRow, _ = dao.Cron.Where(dao.Cron.ID.Eq(params.Id)).First()
 		if taskRow == nil {
@@ -49,10 +53,14 @@ func (self Cron) Create(http *gin.Context) {
 		}
 		crontab.Wrapper.RemoveJob(taskRow.Setting.JobIds...)
 
+		taskRow.Setting.NextRunTime = make([]time.Time, 0)
+		taskRow.Setting.JobIds = make([]cron.EntryID, 0)
 		taskRow.Setting.Expression = params.Expression
 		taskRow.Setting.Script = params.Script
-		taskRow.Setting.ScriptType = params.ScriptType
 		taskRow.Setting.ContainerName = params.ContainerName
+		taskRow.Setting.EnableRunBlock = params.EnableRunBlock
+		taskRow.Setting.Environment = params.Environment
+		taskRow.Setting.KeepLogTotal = params.KeepLogTotal
 	} else {
 		if _, err := dao.Cron.Where(dao.Cron.Title.Like(params.Title)).First(); err == nil {
 			self.JsonResponseWithError(http, errors.New("任务名称已经存在"), 500)
@@ -61,18 +69,26 @@ func (self Cron) Create(http *gin.Context) {
 		taskRow = &entity.Cron{
 			Title: params.Title,
 			Setting: &accessor.CronSettingOption{
-				NextRunTime:   nil,
-				Expression:    params.Expression,
-				ContainerName: params.ContainerName,
-				Script:        params.Script,
-				ScriptType:    params.ScriptType,
-				JobIds:        make([]cron.EntryID, 0),
+				NextRunTime:    make([]time.Time, 0),
+				Expression:     params.Expression,
+				ContainerName:  params.ContainerName,
+				Script:         params.Script,
+				JobIds:         make([]cron.EntryID, 0),
+				EnableRunBlock: params.EnableRunBlock,
+				Environment:    params.Environment,
+				KeepLogTotal:   params.KeepLogTotal,
 			},
 		}
 		err = dao.Cron.Create(taskRow)
 	}
 
-	err = logic.Cron{}.AddJob(taskRow)
+	jobIds, err := logic.Cron{}.AddJob(taskRow)
+	if err == nil {
+		taskRow.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(jobIds...)
+		taskRow.Setting.JobIds = jobIds
+	}
+	_, _ = dao.Cron.Updates(taskRow)
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -151,4 +167,29 @@ func (self Cron) GetLogList(http *gin.Context) {
 		"page":  params.Page,
 		"list":  list,
 	})
+}
+
+func (self Cron) PruneLog(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	oldRow, _ := dao.CronLog.Where(dao.CronLog.CronID.Eq(params.Id)).Last()
+	_, _ = dao.CronLog.Where(dao.CronLog.ID.Lte(oldRow.ID)).Delete()
+	db, err := facade.GetDbFactory().Channel("default")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	db.Exec("vacuum")
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Cron) Template(http *gin.Context) {
+
 }

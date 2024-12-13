@@ -42,10 +42,12 @@ func (self CronSettingExpression) ToString() string {
 }
 
 type CronSettingOption struct {
-	NextRunTime   []time.Time             `json:"nextRunTime,omitempty"`
-	Expression    []CronSettingExpression `json:"expression,omitempty"`
-	ContainerName string                  `json:"containerName,omitempty"`
-	Script        string                  `json:"script,omitempty"`
-	ScriptType    string                  `json:"scriptType,omitempty"`
-	JobIds        []cron.EntryID          `json:"jobIds,omitempty"`
+	NextRunTime    []time.Time             `json:"nextRunTime,omitempty"`
+	Expression     []CronSettingExpression `json:"expression,omitempty"`
+	ContainerName  string                  `json:"containerName,omitempty"`
+	Script         string                  `json:"script,omitempty"`
+	JobIds         []cron.EntryID          `json:"jobIds,omitempty"`
+	Environment    []EnvItem               `json:"environment,omitempty"`
+	EnableRunBlock bool                    `json:"enableRunBlock,omitempty"`
+	KeepLogTotal   int                     `json:"keepLogTotal,omitempty"`
 }
