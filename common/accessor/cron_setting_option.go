@@ -50,4 +50,5 @@ type CronSettingOption struct {
 	Environment    []EnvItem               `json:"environment,omitempty"`
 	EnableRunBlock bool                    `json:"enableRunBlock,omitempty"`
 	KeepLogTotal   int                     `json:"keepLogTotal,omitempty"`
+	Disable        bool                    `json:"disable,omitempty"`
 }

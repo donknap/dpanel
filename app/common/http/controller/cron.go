@@ -28,6 +28,7 @@ func (self Cron) Create(http *gin.Context) {
 		Environment    []accessor.EnvItem               `json:"environment"`
 		EnableRunBlock bool                             `json:"enableRunBlock"`
 		KeepLogTotal   int                              `json:"keepLogTotal"`
+		Disable        bool                             `json:"disable"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -61,6 +62,7 @@ func (self Cron) Create(http *gin.Context) {
 		taskRow.Setting.EnableRunBlock = params.EnableRunBlock
 		taskRow.Setting.Environment = params.Environment
 		taskRow.Setting.KeepLogTotal = params.KeepLogTotal
+		taskRow.Setting.Disable = params.Disable
 	} else {
 		if _, err := dao.Cron.Where(dao.Cron.Title.Like(params.Title)).First(); err == nil {
 			self.JsonResponseWithError(http, errors.New("任务名称已经存在"), 500)
@@ -77,18 +79,19 @@ func (self Cron) Create(http *gin.Context) {
 				EnableRunBlock: params.EnableRunBlock,
 				Environment:    params.Environment,
 				KeepLogTotal:   params.KeepLogTotal,
+				Disable:        params.Disable,
 			},
 		}
 		err = dao.Cron.Create(taskRow)
 	}
-
-	jobIds, err := logic.Cron{}.AddJob(taskRow)
-	if err == nil {
-		taskRow.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(jobIds...)
-		taskRow.Setting.JobIds = jobIds
+	if !params.Disable {
+		jobIds, err := logic.Cron{}.AddJob(taskRow)
+		if err == nil {
+			taskRow.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(jobIds...)
+			taskRow.Setting.JobIds = jobIds
+		}
 	}
 	_, _ = dao.Cron.Updates(taskRow)
-
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -138,9 +141,51 @@ func (self Cron) Delete(http *gin.Context) {
 		for _, item := range list {
 			crontab.Wrapper.RemoveJob(item.Setting.JobIds...)
 			_, _ = dao.Cron.Delete(item)
+			_, _ = dao.CronLog.Where(dao.CronLog.CronID.Eq(item.ID)).Delete()
 		}
 	}
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Cron) RunOnce(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	cronRow, _ := dao.Cron.Where(dao.Cron.ID.In(params.Id)).First()
+	if cronRow == nil {
+		self.JsonResponseWithError(http, errors.New("计划任务不存在"), 500)
+		return
+	}
+	if cronRow.Setting.JobIds == nil || len(cronRow.Setting.Expression) == 0 {
+		self.JsonResponseWithError(http, errors.New("没有可执行的计划任务"), 500)
+		return
+	}
+	crontab.Wrapper.Cron.Entry(cronRow.Setting.JobIds[0]).Job.Run()
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Cron) GetDetail(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	cronRow, _ := dao.Cron.Where(dao.Cron.ID.In(params.Id)).First()
+	if cronRow == nil {
+		self.JsonResponseWithError(http, errors.New("计划任务不存在"), 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"detail": cronRow,
+	})
 	return
 }
 
@@ -191,5 +236,13 @@ func (self Cron) PruneLog(http *gin.Context) {
 }
 
 func (self Cron) Template(http *gin.Context) {
-
+	template, err := logic.CronTemplate{}.Template()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": template,
+	})
+	return
 }

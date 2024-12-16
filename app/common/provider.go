@@ -76,9 +76,12 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		// 计划任务
 		cors.POST("/common/cron/create", controller.Cron{}.Create)
 		cors.POST("/common/cron/get-list", controller.Cron{}.GetList)
+		cors.POST("/common/cron/get-detail", controller.Cron{}.GetDetail)
 		cors.POST("/common/cron/delete", controller.Cron{}.Delete)
+		cors.POST("/common/cron/run-once", controller.Cron{}.RunOnce)
 		cors.POST("/common/cron/get-log-list", controller.Cron{}.GetLogList)
 		cors.POST("/common/cron/prune-log", controller.Cron{}.PruneLog)
+		cors.POST("/common/cron/template", controller.Cron{}.Template)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

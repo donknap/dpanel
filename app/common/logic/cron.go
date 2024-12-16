@@ -68,6 +68,16 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 			},
 			Env: globalEnv,
 		})
+		if err != nil {
+			_ = dao.CronLog.Create(&entity.CronLog{
+				CronID: task.ID,
+				Value: &accessor.CronLogValueOption{
+					Error:   err.Error(),
+					RunTime: startTime,
+				},
+			})
+			return err
+		}
 		defer response.Close()
 		buffer := new(bytes.Buffer)
 		_, err = io.Copy(buffer, response.Reader)
