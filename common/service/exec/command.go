@@ -62,18 +62,19 @@ func (self Command) RunWithResult(option *RunCommandOption) string {
 	cmd = self.getCommand(option)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		slog.Debug(option.CmdName, option.CmdArgs, err.Error())
+		slog.Debug(option.CmdName, "arg", option.CmdArgs, "error", err.Error())
 	}
 	return string(out)
 }
 
 func (self Command) getCommand(option *RunCommandOption) *exec.Cmd {
-	if cmd != nil && cmd.Process.Pid > 0 {
+	if cmd != nil && cmd.Process != nil && cmd.Process.Pid > 0 {
+		slog.Debug("command kill debug", "cmd", cmd, "process", cmd.Process, "pid", cmd.Process.Pid)
 		// 将上一条命令中止掉
 		if err := cmd.Process.Kill(); err == nil {
 			_, err = cmd.Process.Wait()
 			if err != nil {
-				slog.Debug("command kill error", err.Error())
+				slog.Debug("command kill", "error", err.Error())
 			}
 		}
 	}
