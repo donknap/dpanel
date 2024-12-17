@@ -19,6 +19,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/re
 
 COPY ./runtime/dpanel-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml
+COPY ./docker/script /app/script
 
 WORKDIR /app
 VOLUME [ "/dpanel" ]

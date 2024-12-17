@@ -93,6 +93,7 @@ func main() {
 			&entity.Backup{},
 			&entity.Store{},
 			&entity.Cron{},
+			&entity.CronLog{},
 		)
 		if err != nil {
 			panic(err)

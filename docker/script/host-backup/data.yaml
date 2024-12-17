@@ -1,0 +1,22 @@
+task:
+  name: host-backup
+  descriptionZh: |
+    备份宿主机的某个目录
+  descriptionEn: |
+    Backup a directory in the host
+  script: |
+    BACKUP_FILE_NAME=$(echo $BACKUP_SOURCE_PATH | tr "/" "_")_$(date +"%Y%m%d%H%M%S").tar
+    docker run -it --rm --name dpanel-host-backup \
+    -v ${BACKUP_SOURCE_PATH}:/source -v ${BACKUP_TARGET_PATH}:/backup busybox \
+    tar czvf /backup/${BACKUP_FILE_NAME} /source
+    echo "备份完成，备份文件位于: ${BACKUP_PATH}/${BACKUP_FILE_NAME}"
+  tag:
+    - dpanel
+    - run-in-dpanel
+  environment:
+    - name: BACKUP_SOURCE_PATH
+      labelZh: 需要备份的主机目录
+      labelEn: backup source path of host
+    - name: BACKUP_TARGET_PATH
+      labelZh: 备份到主机目录
+      labelEn: backup target path of host

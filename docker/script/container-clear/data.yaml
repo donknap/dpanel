@@ -1,0 +1,18 @@
+task:
+  name: container-clear
+  descriptionZh: 清理删除容器内的目录或是文件
+  descriptionEn: rm container path or file
+  script: |
+    docker exec -it ${CONTAINER_NAME} \
+    ls ${PATH_OR_FILE} && rm -rf ${PATH_OR_FILE} && \
+    echo 上方文件或是目录已被删除
+  tag:
+    - dpanel
+    - run-in-dpanel
+  environment:
+    - name: CONTAINER_NAME
+      labelZh: 容器名称
+      labelEn: container name
+    - name: PATH_OR_FILE
+      labelZh: 容器内的目录或是文件
+      labelEn: path or file in container

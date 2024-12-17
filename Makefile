@@ -64,7 +64,7 @@ test: all
 #	--build-arg PROXY="https_proxy=http://172.16.1.198:7890 http_proxy=http://172.16.1.198:7890" \
 #	-f Dockerfile \
 #	. --push
-demo: clean-source js amd64
+demo: amd64
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:demo \
 	--platform linux/amd64 \

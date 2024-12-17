@@ -237,7 +237,11 @@ func (self Cron) PruneLog(http *gin.Context) {
 }
 
 func (self Cron) Template(http *gin.Context) {
-	dpanelTemplate, err := logic.CronTemplate{}.Template("/app/script")
+	dpanelScriptPath := "/app/script"
+	if facade.GetConfig().GetString("app.env") == "debug" {
+		dpanelScriptPath = "./docker/script"
+	}
+	dpanelTemplate, err := logic.CronTemplate{}.Template(dpanelScriptPath)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
