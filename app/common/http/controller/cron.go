@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/crontab"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -236,13 +237,18 @@ func (self Cron) PruneLog(http *gin.Context) {
 }
 
 func (self Cron) Template(http *gin.Context) {
-	template, err := logic.CronTemplate{}.Template()
+	dpanelTemplate, err := logic.CronTemplate{}.Template("/app/script")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	template, err := logic.CronTemplate{}.Template(storage.Local{}.GetScriptTemplatePath())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": template,
+		"list": append(dpanelTemplate, template...),
 	})
 	return
 }

@@ -39,7 +39,7 @@ func (self Local) GetLicenseFilePath() string {
 }
 
 func (self Local) GetScriptTemplatePath() string {
-	return filepath.Join(self.GetStorageLocalPath(), "task")
+	return filepath.Join(self.GetStorageLocalPath(), "script")
 }
 
 func (self Local) GetStorageLocalPath() string {

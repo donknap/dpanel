@@ -139,6 +139,8 @@ func main() {
 				"acme",
 				"cert",
 				"compose",
+				"store",
+				"script",
 			)
 		}
 		for _, path := range initPath {

@@ -3,7 +3,6 @@ package logic
 import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/storage"
 	"gopkg.in/yaml.v3"
 	"io/fs"
 	"os"
@@ -17,14 +16,15 @@ type CronTemplateItem struct {
 	Script      string             `json:"script"`
 	Description string             `json:"description"`
 	Tag         []string           `json:"tag"`
+	Project     string             `json:"project"`
 }
 
 type CronTemplate struct {
 }
 
-func (self CronTemplate) Template() ([]CronTemplateItem, error) {
+func (self CronTemplate) Template(dir string) ([]CronTemplateItem, error) {
 	result := make([]CronTemplateItem, 0)
-	err := filepath.Walk(storage.Local{}.GetScriptTemplatePath(), func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
 		if strings.HasSuffix(path, "data.yaml") {
 			content, err := os.ReadFile(path)
 			if err != nil {
@@ -41,6 +41,12 @@ func (self CronTemplate) Template() ([]CronTemplateItem, error) {
 				Environment: make([]accessor.EnvItem, 0),
 				Description: yamlData.GetString("task.descriptionZh"),
 				Tag:         yamlData.GetStringSlice("task.tag"),
+				Project:     "dpanel",
+			}
+			relPath, _ := filepath.Rel(dir, path)
+			segments := strings.Split(filepath.Clean(relPath), string(filepath.Separator))
+			if len(segments) == 3 {
+				item.Project = segments[0]
 			}
 			fields := yamlData.GetSliceStringMapString("task.environment")
 			for _, field := range fields {
