@@ -128,4 +128,5 @@ type SiteEnvOption struct {
 	Gpus            *GpusItem             `json:"gpus,omitempty"`
 	Hook            *HookItem             `json:"hook,omitempty"`
 	Healthcheck     *HealthcheckItem      `json:"healthcheck,omitempty"`
+	HostPid         bool                  `json:"hostPid,omitempty"`
 }

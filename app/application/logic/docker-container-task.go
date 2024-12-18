@@ -106,6 +106,11 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		builder.WithPrivileged()
 	}
 
+	//host pid
+	if task.BuildParams.HostPid {
+		builder.WithPid("host")
+	}
+
 	// AutoRemove
 	if task.BuildParams.AutoRemove {
 		builder.WithAutoRemove()
