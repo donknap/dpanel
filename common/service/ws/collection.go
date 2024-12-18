@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/gorilla/websocket"
 	"log/slog"
 	"sync"
@@ -51,6 +52,16 @@ func (self *Collection) Leave(c *Client) {
 			p.Close()
 			return true
 		})
+		// 没有任何用户时，中断 docker 的所有请求
+		slog.Debug("docker client cancel")
+		//docker.Sdk.CtxCancelFunc()
+		//docker.Sdk.Client.Close()
+		//ctx, cancelFunc := context.WithCancel(context.Background())
+		//docker.Sdk.Ctx = ctx
+		//docker.Sdk.CtxCancelFunc = cancelFunc
+		//go logic.EventLogic{}.MonitorLoop()
+		explorer, _ := plugin.NewPlugin(plugin.PluginExplorer, nil)
+		_ = explorer.Destroy()
 	}
 }
 
