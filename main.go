@@ -63,7 +63,7 @@ func main() {
 		func(engine *gin.Engine) {
 			subFs, _ := fs.Sub(Asset, "asset/static")
 			engine.StaticFS("/dpanel/static/asset", http2.FS(subFs))
-			engine.StaticFileFS("/favicon.ico", "icon.jpg", http2.FS(subFs))
+			engine.StaticFileFS("/favicon.ico", "dpanel.ico", http2.FS(subFs))
 			engine.NoRoute(func(http *gin.Context) {
 				indexHtml, _ := Asset.ReadFile("asset/static/index.html")
 				http.Data(http2.StatusOK, "text/html; charset=UTF-8", indexHtml)
