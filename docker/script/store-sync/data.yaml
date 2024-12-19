@@ -1,0 +1,15 @@
+task:
+  name: store-sync
+  descriptionZh: |
+    同步某个应用商店应用
+  descriptionEn: |
+    sync appstore
+  script: |
+    /app/server/dpanel store:sync -f /app/server/config.yaml --name=${STORE_NAME}
+  tag:
+    - dpanel
+    - run-in-dpanel
+  environment:
+    - name: STORE_NAME
+      labelZh: 商店名称
+      labelEn: name of appstore

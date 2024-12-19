@@ -4,6 +4,7 @@
     <working_directory value="$PROJECT_DIR$" />
     <go_parameters value="-tags pe" />
     <parameters value="server:start -f config.yaml" />
+<!--    <parameters value="store:sync -f config.yaml &#45;&#45;name=onepanel" />-->
     <envs>
       <env name="STORAGE_LOCAL_PATH" value="$PROJECT_DIR$/data" />
       <env name="DOCKER_HOST" value="unix://$USER_HOME$/.docker/run/docker.sock" />

@@ -50,7 +50,7 @@ clean:
 	docker buildx prune -a -f
 	docker stop buildx_buildkit_dpanel-builder0 && docker rm /buildx_buildkit_dpanel-builder0
 all: clean-source js amd64 arm64 armv7
-test: all
+test:
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION}-lite \
 	--platform linux/arm64,linux/amd64 \

@@ -1,4 +1,4 @@
-package command
+package user
 
 import (
 	"github.com/donknap/dpanel/app/common/logic"
@@ -8,24 +8,24 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 )
 
-type UserReset struct {
+type Reset struct {
 	console.Abstract
 }
 
-func (self UserReset) GetName() string {
+func (self Reset) GetName() string {
 	return "user:reset"
 }
 
-func (self UserReset) GetDescription() string {
+func (self Reset) GetDescription() string {
 	return "重置面板用户名或是密码"
 }
 
-func (self UserReset) Configure(command *cobra.Command) {
+func (self Reset) Configure(command *cobra.Command) {
 	command.Flags().String("password", "", "重置管理员密码")
 	command.Flags().String("username", "", "重置管理员用户名")
 }
 
-func (self UserReset) Handle(cmd *cobra.Command, args []string) {
+func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	founder, _ := dao.Setting.
 		Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
 		Where(dao.Setting.Name.Eq(logic.SettingGroupUserFounder)).First()

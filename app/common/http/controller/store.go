@@ -190,11 +190,12 @@ func (self Store) Sync(http *gin.Context) {
 		}
 	}
 
-	if params.Id > 0 {
-		storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(params.Id)).First()
-		storeRow.Setting.Apps = appList
-		storeRow.Setting.UpdatedAt = time.Now().Unix()
-		_, _ = dao.Store.Updates(storeRow)
+	if params.Id > 0 && len(appList) > 0 {
+		if storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(params.Id)).First(); storeRow != nil {
+			storeRow.Setting.Apps = appList
+			storeRow.Setting.UpdatedAt = time.Now().Unix()
+			_, _ = dao.Store.Updates(storeRow)
+		}
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
