@@ -7,6 +7,7 @@ var (
 )
 
 type StoreAppItem struct {
+	Title       string                         `json:"title"`
 	Name        string                         `json:"name"`
 	Logo        string                         `json:"logo"`
 	Content     string                         `json:"content"`

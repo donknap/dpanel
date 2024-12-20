@@ -208,6 +208,7 @@ func (self Store) Deploy(http *gin.Context) {
 	type ParamsValidate struct {
 		StoreId     int32              `json:"storeId" binding:"required"`
 		Name        string             `json:"name" binding:"required"`
+		Title       string             `json:"title"`
 		ComposeFile string             `json:"composeFile" binding:"required"`
 		Environment []accessor.EnvItem `json:"environment"`
 	}
@@ -228,7 +229,7 @@ func (self Store) Deploy(http *gin.Context) {
 	}
 	composeNew := &entity.Compose{
 		Name:  strings.ToLower(params.Name),
-		Title: "",
+		Title: params.Title,
 		Yaml:  "",
 		Setting: &accessor.ComposeSettingOption{
 			Status:      "waiting",
