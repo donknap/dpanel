@@ -52,6 +52,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/setting/save", controller.Setting{}.Save)
 		cors.POST("/common/setting/founder", controller.Setting{}.Founder)
 		cors.POST("/common/setting/get-setting", controller.Setting{}.GetSetting)
+		cors.POST("/common/setting/get-server-ip", controller.Setting{}.GetServerIp)
 
 		cors.POST("/common/home/info", controller.Home{}.Info)
 		cors.POST("/common/home/usage", controller.Home{}.Usage)
