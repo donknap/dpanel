@@ -29,6 +29,7 @@ func (self Image) TagRemote(http *gin.Context) {
 	// 从官方仓库拉取镜像不用权限
 	registry, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(tagDetail.Registry)).Find()
 	for _, registryRow := range registry {
+		// 类似于腾讯云，同一个仓库地址，但是可能根据不同的命令空间指定权限
 		if registryRow.Setting.Username == tagDetail.Namespace {
 			authString = logic.Image{}.GetRegistryAuthString(registryRow.ServerAddress, registryRow.Setting.Username, registryRow.Setting.Password)
 		}

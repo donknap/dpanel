@@ -3,6 +3,7 @@ package logic
 import (
 	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/function"
+	registry2 "github.com/donknap/dpanel/common/service/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"log/slog"
 	"strings"
@@ -44,41 +45,8 @@ func (self Image) GetImageName(option *ImageNameOption) (imageName string) {
 	return imageName
 }
 
-type imageTagDetail struct {
-	Registry  string
-	Namespace string
-	ImageName string
-	Version   string
-	Tag       string
-}
-
-func (self Image) GetImageTagDetail(tag string) *imageTagDetail {
-	tag = strings.TrimPrefix(strings.TrimPrefix(tag, "http://"), "https://")
-	result := &imageTagDetail{}
-	if !strings.Contains(tag, ":") {
-		tag += ":latest"
-	}
-	result.Tag = tag
-	// 如果没有指定仓库地址，则默认为 docker.io
-	temp := strings.Split(tag, "/")
-	if !strings.Contains(temp[0], ".") || len(temp) == 1 {
-		tag = "docker.io/" + tag
-	}
-
-	temp = strings.Split(tag, "/")
-	result.Registry = temp[0]
-	result.ImageName = strings.Join(temp[1:], "/")
-
-	if len(temp) <= 2 {
-		temp = strings.Split(result.ImageName, ":")
-		result.Namespace = temp[0]
-		result.Version = temp[1]
-	} else {
-		result.Namespace = temp[1]
-		temp = strings.Split(result.ImageName, ":")
-		result.Version = temp[1]
-	}
-	return result
+func (self Image) GetImageTagDetail(tag string) *registry2.ImageTagDetail {
+	return registry2.GetImageTagDetail(tag)
 }
 
 func (self Image) GetRegistryAuthString(serverAddress string, username string, password string) string {
@@ -95,4 +63,12 @@ func (self Image) GetRegistryAuthString(serverAddress string, username string, p
 		return ""
 	}
 	return authString
+}
+
+func (self Image) GetRegistryAuth(username string, password string) (exists bool, u string, p string) {
+	if password == "" || username == "" {
+		return false, "", ""
+	}
+	password, _ = function.AseDecode(facade.GetConfig().GetString("app.name"), password)
+	return true, username, password
 }
