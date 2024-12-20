@@ -98,7 +98,7 @@ jobs:
       - name: Docker BuildX
         run: |
           VERSION_TAG=${GITHUB_REF_NAME#v}
-          VERSION_GROUP_TAG=${VERSION_TAG%.*}
+          VERSION_GROUP_TAG=${VERSION_TAG%.*.*}
           
           docker buildx build \
           -t dpanel/dpanel:lite \

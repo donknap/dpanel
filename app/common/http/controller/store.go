@@ -145,12 +145,7 @@ func (self Store) Sync(http *gin.Context) {
 		return
 	}
 	storeRootPath := filepath.Join(storage.Local{}.GetStorePath(), params.Name)
-	err := os.RemoveAll(storeRootPath)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
+	var err error
 	appList := make([]accessor.StoreAppItem, 0)
 	if params.Type == accessor.StoreTypeOnePanel {
 		err = logic.Store{}.SyncByGit(storeRootPath, params.Url)
