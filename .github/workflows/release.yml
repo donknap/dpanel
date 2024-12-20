@@ -102,29 +102,31 @@ jobs:
           
           docker buildx build \
           -t dpanel/dpanel:lite \
-          -t dpanel/dpanel:${GITHUB_REF_NAME#v}-lite \
+          -t dpanel/dpanel:${VERSION_TAG}-lite \
+          -t dpanel/dpanel:${VERSION_GROUP_TAG}-lite \
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${GITHUB_REF_NAME#v}-lite \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_TAG}-lite \
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG}-lite \
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
+          --build-arg APP_VERSION=${VERSION_TAG} \
           -f Dockerfile-lite \
           . --push
 
           docker buildx build \
           -t dpanel/dpanel:latest \
-          -t dpanel/dpanel:${GITHUB_REF_NAME#v} \
+          -t dpanel/dpanel:${VERSION_TAG} \
+          -t dpanel/dpanel:${VERSION_GROUP_TAG} \
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${GITHUB_REF_NAME#v}-latest \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG}-latest \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_TAG} \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG} \
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
+          --build-arg APP_VERSION=${VERSION_TAG} \
           . --push
           
           docker buildx build \
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:demo \
           --platform linux/amd64 \
-          --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
+          --build-arg APP_VERSION=${VERSION_TAG} \
           -f Dockerfile-demo \
           . --push
       - name: upload artifact
