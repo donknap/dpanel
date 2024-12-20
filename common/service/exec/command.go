@@ -68,7 +68,8 @@ func (self Command) RunWithResult(option *RunCommandOption) string {
 }
 
 func (self Command) getCommand(option *RunCommandOption) *exec.Cmd {
-	if cmd != nil && cmd.Process != nil && cmd.Process.Pid > 0 {
+	// 配置了超时退出，则不杀掉上一个进程
+	if option.Timeout == 0 && cmd != nil && cmd.Process != nil && cmd.Process.Pid > 0 {
 		slog.Debug("command kill debug", "cmd", cmd, "process", cmd.Process, "pid", cmd.Process.Pid)
 		// 将上一条命令中止掉
 		if err := cmd.Process.Kill(); err == nil {
