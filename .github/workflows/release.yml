@@ -102,6 +102,7 @@ jobs:
           -t dpanel/dpanel:${GITHUB_REF_NAME#v}-lite \
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite \
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${GITHUB_REF_NAME#v}-lite \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${${GITHUB_REF_NAME#v}%.*}-lite \
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
           -f Dockerfile-lite \
@@ -112,6 +113,7 @@ jobs:
           -t dpanel/dpanel:${GITHUB_REF_NAME#v} \
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest \
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${GITHUB_REF_NAME#v}-latest \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${${GITHUB_REF_NAME#v}%.*}-latest \
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${GITHUB_REF_NAME#v} \
           . --push
