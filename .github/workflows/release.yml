@@ -19,6 +19,9 @@ jobs:
           echo "Tag name from github.ref: ${{  github.ref }}"
           echo "Runs name: ${{runner.os}}"
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -69,6 +72,10 @@ jobs:
           CC=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc \
           CXX=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-g++
           
+          make build PROJECT_NAME=dpanel-pe-musl-amd64 CGO_ENABLED=1 VERSION=${VERSION_TAG} FAMILY=pe  \
+          CC=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc \
+          CXX=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-g++
+          
           # arm64-musl
           curl -Lo arm64-musl.tgz https://musl.cc/aarch64-linux-musl-cross.tgz
           tar xzf arm64-musl.tgz
@@ -76,10 +83,18 @@ jobs:
           CC=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
           CXX=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-g++
           
+          make build PROJECT_NAME=dpanel-pe-musl-arm64 CGO_ENABLED=1 VERSION=${VERSION_TAG} FAMILY=pe  GOARM=7 GOARCH=arm64 GOOS=linux  \
+          CC=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
+          CXX=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-g++
+          
           # arm-musl 
           curl -Lo arm-musl.tgz https://musl.cc/arm-linux-musleabihf-cross.tgz
           tar zxf arm-musl.tgz
           make build PROJECT_NAME=dpanel-musl-arm CGO_ENABLED=1 VERSION=${VERSION_TAG}  GOARM=7 GOARCH=arm GOOS=linux \
+          CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc \
+          CXX=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-g++
+          
+          make build PROJECT_NAME=dpanel-pe-musl-arm CGO_ENABLED=1 VERSION=${VERSION_TAG} FAMILY=pe  GOARM=7 GOARCH=arm GOOS=linux \
           CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc \
           CXX=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-g++
           
@@ -123,6 +138,33 @@ jobs:
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG} \
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${VERSION_TAG} \
+          . --push
+          
+          # pe
+          
+          docker buildx build \
+          -t dpanel/dpanel:pe-lite \
+          -t dpanel/dpanel:pe-${VERSION_TAG}-lite \
+          -t dpanel/dpanel:pe-${VERSION_GROUP_TAG}-lite \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:pe-lite \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_TAG}-pe-lite \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG}-pe-lite \
+          --platform linux/arm64,linux/amd64,linux/arm/v7 \
+          --build-arg APP_VERSION=${VERSION_TAG} \
+          --build-arg APP_FAMILY=pe \
+          -f Dockerfile-lite \
+          . --push
+
+          docker buildx build \
+          -t dpanel/dpanel:pe-latest \
+          -t dpanel/dpanel:pe-${VERSION_TAG} \
+          -t dpanel/dpanel:pe-${VERSION_GROUP_TAG} \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:pe \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_TAG}-pe \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG}-pe \
+          --platform linux/arm64,linux/amd64,linux/arm/v7 \
+          --build-arg APP_VERSION=${VERSION_TAG} \
+          --build-arg APP_FAMILY=pe \
           . --push
           
           docker buildx build \

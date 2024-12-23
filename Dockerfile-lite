@@ -18,7 +18,7 @@ ENV TZ=Asia/Shanghai
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update musl docker-compose tzdata git
 
-COPY ./runtime/dpanel-musl-${TARGETARCH} /app/server/dpanel
+COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
 

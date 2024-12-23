@@ -25,7 +25,7 @@ COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/nginx/include /etc/nginx/conf.d/include
 COPY ./docker/script /app/script
 
-COPY ./runtime/dpanel-musl-${TARGETARCH} /app/server/dpanel
+COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml
 
 COPY ./docker/entrypoint.sh /docker/entrypoint.sh

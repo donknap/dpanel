@@ -32,7 +32,7 @@ armv7:
 	go build ${COMMON_PARAMS} -tags ${FAMILY} -o ${GO_TARGET_DIR}/${PROJECT_NAME}-musl-arm ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 build:
-	CGO_ENABLED=1 go build ${COMMON_PARAMS} -o ${GO_TARGET_DIR}/${PROJECT_NAME} ${GO_SOURCE_DIR}/*.go
+	CGO_ENABLED=1 go build ${COMMON_PARAMS} -tags ${FAMILY}  -o ${GO_TARGET_DIR}/${PROJECT_NAME} ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 js:
 	rm -f ${GO_SOURCE_DIR}/asset/static/*.js ${GO_SOURCE_DIR}/asset/static/*.css ${GO_SOURCE_DIR}/asset/static/index.html
@@ -49,7 +49,7 @@ clean:
 	docker buildx prune -a -f
 	docker stop buildx_buildkit_dpanel-builder0 && docker rm /buildx_buildkit_dpanel-builder0
 all: clean-source js amd64 arm64 armv7
-test:
+test: amd64 arm64
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION}-lite \
 	--platform linux/arm64,linux/amd64 \
@@ -68,13 +68,14 @@ demo: amd64
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:demo \
 	--platform linux/amd64 \
 	--build-arg APP_VERSION=${VERSION} \
+	--build-arg APP_FAMILY=pe \
 	-f Dockerfile-demo \
 	. --push
-pe:
+test-pe: amd64 arm64
 	docker buildx build \
-	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:pe \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION}-pe-lite \
 	--platform linux/amd64 \
 	--build-arg APP_VERSION=${VERSION} \
 	--build-arg APP_FAMILY=pe \
-	-f Dockerfile \
+	-f Dockerfile-lite \
 	. --push
