@@ -8,6 +8,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Stat struct {
@@ -42,7 +43,7 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 			"--format", "json",
 			"--no-stream",
 		),
-		//Timeout: time.Second * 60,
+		Timeout: time.Second * 60,
 	})
 	statJsonItem := struct {
 		BlockIO   string
