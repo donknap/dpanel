@@ -153,22 +153,14 @@ func (self Home) WsConsole(http *gin.Context) {
 
 func (self Home) Info(http *gin.Context) {
 	dpanelContainerInfo, _ := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
-	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Host, docker.Sdk.Client.DaemonHost())
-	initUser := false
-	founder, err := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
-	if err != nil || founder == nil {
-		initUser = true
+	info, _ := docker.Sdk.Client.Info(docker.Sdk.Ctx)
+	if info.ID != "" {
+		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Host, docker.Sdk.Client.DaemonHost())
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,
 		"sdkVersion": docker.Sdk.Client.ClientVersion(),
-		"initUser":   initUser,
 		"dpanel": map[string]interface{}{
 			"version":       facade.GetConfig().GetString("app.version"),
 			"family":        facade.GetConfig().GetString("app.family"),

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"database/sql/driver"
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -13,12 +14,15 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Container struct {
@@ -220,9 +224,81 @@ func (self Container) Update(http *gin.Context) {
 	return
 }
 
+func (self Container) Upgrade(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5       string `json:"md5" binding:"required"`
+		ImageTag  string `json:"imageTag"`
+		EnableBak bool   `json:"enableBak"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	bakContainerName := containerInfo.Name
+	if params.EnableBak {
+		bakContainerName = fmt.Sprintf("%s-%s", containerInfo.Name, time.Now().Format(function.YmdHis))
+		_ = notice.Message{}.Info("containerUpgrade", "正在停止当前容器并备份旧容器", bakContainerName)
+		err = docker.Sdk.Client.ContainerRename(
+			docker.Sdk.Ctx,
+			containerInfo.Name,
+			bakContainerName,
+		)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	if params.ImageTag != "" {
+		containerInfo.Image = params.ImageTag
+	}
+	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, bakContainerName, container.StopOptions{})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	// 未备份旧容器，需要先删除，否则名称会冲突
+	if !params.EnableBak {
+		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, bakContainerName, container.RemoveOptions{})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	_ = notice.Message{}.Info("containerUpgrade", "正在更新容器", containerInfo.Name)
+	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
+		EndpointsConfig: containerInfo.NetworkSettings.Networks,
+	}, &v1.Platform{}, containerInfo.Name)
+
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, containerInfo.Name, container.StartOptions{})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"containerId": out.ID,
+	})
+	return
+}
+
 func (self Container) Prune(http *gin.Context) {
 	filter := filters.NewArgs()
-	docker.Sdk.Client.ContainersPrune(docker.Sdk.Ctx, filter)
+	info, err := docker.Sdk.Client.ContainersPrune(docker.Sdk.Ctx, filter)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	_ = notice.Message{}.Info("containerPrune", fmt.Sprintf("%d", len(info.ContainersDeleted)))
 	self.JsonSuccessResponse(http)
 	return
 }

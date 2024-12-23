@@ -37,6 +37,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/container/get-list", controller.Container{}.GetList)
 			cors.POST("/app/container/get-detail", controller.Container{}.GetDetail)
 			cors.POST("/app/container/update", controller.Container{}.Update)
+			cors.POST("/app/container/upgrade", controller.Container{}.Upgrade)
 			cors.POST("/app/container/prune", controller.Container{}.Prune)
 			cors.POST("/app/container/delete", controller.Container{}.Delete)
 			cors.POST("/app/container/export", controller.Container{}.Export)

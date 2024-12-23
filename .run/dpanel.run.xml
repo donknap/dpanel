@@ -2,12 +2,11 @@
   <configuration default="false" name="dpanel" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="dpanel" />
     <working_directory value="$PROJECT_DIR$" />
-    <go_parameters value="-tags pe" />
+    <go_parameters value="-tags pe -ldflags &quot;-X main.DPanelVersion=&quot;" />
     <parameters value="server:start -f config.yaml" />
-<!--    <parameters value="store:sync -f config.yaml &#45;&#45;name=onepanel" />-->
     <envs>
       <env name="STORAGE_LOCAL_PATH" value="$PROJECT_DIR$/data" />
-      <env name="DOCKER_HOST" value="unix://$USER_HOME$/.docker/run/docker.sock" />
+<!--      <env name="DOCKER_HOST" value="unix://$USER_HOME$/.docker/run/docker.sock" />-->
       <env name="APP_ENV" value="debug" />
       <env name="APP_FAMILY" value="pe" />
       <env name="APP_VERSION" value="1.3.0" />

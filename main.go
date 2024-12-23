@@ -32,7 +32,8 @@ var (
 	//go:embed config.yaml
 	ConfigFile []byte
 	//go:embed asset
-	Asset embed.FS
+	Asset         embed.FS
+	DPanelVersion = ""
 )
 
 func main() {
@@ -44,12 +45,18 @@ func main() {
 
 	myApp := app.NewApp(
 		app.Option{
-			Name: "w7-rangine-go-skeleton",
+			Name:    "w7-rangine-go-skeleton",
+			Version: DPanelVersion,
 		},
 	)
+
 	slog.Debug("config", "env", facade.GetConfig().GetString("app.env"))
+	slog.Debug("config", "version", DPanelVersion)
 	slog.Debug("config", "storage", storage.Local{}.GetStorageLocalPath())
 	slog.Debug("config", "db", facade.GetConfig().GetString("database.default.db_name"))
+	if DPanelVersion != "" {
+		facade.GetConfig().Set("app.version", DPanelVersion)
+	}
 
 	// 业务中需要使用 http server，这里需要先实例化
 	httpServer := new(http.Provider).Register(myApp.GetConfig(), myApp.GetConsole(), myApp.GetServerManager()).Export()

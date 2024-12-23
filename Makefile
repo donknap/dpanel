@@ -4,8 +4,7 @@ GO_SOURCE_DIR=$(shell pwd)
 GO_TARGET_DIR=$(GO_SOURCE_DIR)/runtime
 TRIM_PATH=/Users/renchao
 JS_SOURCE_DIR=$(GO_SOURCE_DIR)/../../js/d-panel
-VERSION=1.0.0
-COMMON_PARAMS=-ldflags '-s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}"
+COMMON_PARAMS=-ldflags '-X main.DPanelVersion=${VERSION} -s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}"
 FAMILY=ce
 
 help:

@@ -13,6 +13,10 @@ type AuthMiddleware struct {
 	middleware.Abstract
 }
 
+var (
+	ErrLogin = errors.New("请先登录")
+)
+
 func (self AuthMiddleware) Process(http *gin.Context) {
 	if strings.Contains(http.Request.URL.Path, "/api/common/user/login") ||
 		!strings.Contains(http.Request.URL.Path, "/api") {
@@ -28,13 +32,13 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 	}
 
 	if authToken == "" {
-		self.JsonResponseWithError(http, errors.New("请先登录"), 401)
+		self.JsonResponseWithError(http, ErrLogin, 401)
 		http.AbortWithStatus(401)
 		return
 	}
 	authCode := strings.Split(authToken, "Bearer ")
 	if len(authCode) != 2 {
-		self.JsonResponseWithError(http, errors.New("请先登录"), 401)
+		self.JsonResponseWithError(http, ErrLogin, 401)
 		http.AbortWithStatus(401)
 		return
 	}
@@ -45,14 +49,14 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		return jwtSecret, nil
 	}, jwt.WithValidMethods([]string{"HS256"}))
 	if err != nil {
-		self.JsonResponseWithError(http, err, 401)
+		self.JsonResponseWithError(http, ErrLogin, 401)
 		http.AbortWithStatus(401)
 		return
 	}
 	if token.Valid {
 		_, err := logic.Setting{}.GetValueById(myUserInfo.UserId)
 		if err != nil {
-			self.JsonResponseWithError(http, err, 401)
+			self.JsonResponseWithError(http, ErrLogin, 401)
 			http.AbortWithStatus(401)
 			return
 		}
@@ -61,7 +65,7 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		http.Next()
 		return
 	}
-	self.JsonResponseWithError(http, errors.New("请先登录"), 401)
+	self.JsonResponseWithError(http, ErrLogin, 401)
 	http.AbortWithStatus(401)
 	return
 }
