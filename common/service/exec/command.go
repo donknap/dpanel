@@ -87,9 +87,11 @@ func (self Command) getCommand(option *RunCommandOption) *exec.Cmd {
 			select {
 			case <-ctx.Done():
 				cancel()
-				err := cmd.Process.Kill()
-				if err != nil {
-					slog.Error("run command timeout error", err)
+				if cmd.Process.Pid > 0 {
+					err := cmd.Process.Kill()
+					if err != nil {
+						slog.Error("run command timeout error", "error", err)
+					}
 				}
 			}
 		}()
