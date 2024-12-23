@@ -113,10 +113,18 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	defer func() {
+		dockerClient.CtxCancelFunc()
+		_ = dockerClient.Client.Close()
+	}()
 	_, err = dockerClient.Client.Info(docker.Sdk.Ctx)
 	if err != nil {
 		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，错误信息："+err.Error()), 500)
 		return
+	}
+	defaultEnv := false
+	if params.Name == "local" {
+		defaultEnv = true
 	}
 	logic.DockerEnv{}.UpdateEnv(&accessor.DockerClientResult{
 		Name:      params.Name,
@@ -126,6 +134,7 @@ func (self Env) Create(http *gin.Context) {
 		TlsCert:   options.TlsCert,
 		TlsKey:    options.TlsKey,
 		EnableTLS: params.EnableTLS,
+		Default:   defaultEnv,
 	})
 	self.JsonSuccessResponse(http)
 	return
@@ -148,19 +157,15 @@ func (self Env) Switch(http *gin.Context) {
 
 	options := docker.NewDockerClientOption{}
 	address := ""
-	if params.Name == "local" {
-		address = ""
+	if row, ok := setting.Value.Docker[params.Name]; !ok {
+		self.JsonResponseWithError(http, errors.New("Docker 客户端不存在，请先添加"), 500)
+		return
 	} else {
-		if row, ok := setting.Value.Docker[params.Name]; !ok {
-			self.JsonResponseWithError(http, errors.New("Docker 客户端不存在，请先添加"), 500)
-			return
-		} else {
-			address = row.Address
-			if row.EnableTLS {
-				options.TlsCa = row.TlsCa
-				options.TlsCert = row.TlsCert
-				options.TlsKey = row.TlsKey
-			}
+		address = row.Address
+		if row.EnableTLS {
+			options.TlsCa = row.TlsCa
+			options.TlsCert = row.TlsCert
+			options.TlsKey = row.TlsKey
 		}
 	}
 	options.Address = address
@@ -182,7 +187,7 @@ func (self Env) Switch(http *gin.Context) {
 		return
 	}
 	oldDockerClient.CtxCancelFunc()
-	oldDockerClient.Client.Close()
+	_ = oldDockerClient.Client.Close()
 
 	docker.Sdk = dockerClient
 	go logic.EventLogic{}.MonitorLoop()

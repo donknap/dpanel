@@ -14,6 +14,7 @@ import (
 	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -93,15 +94,24 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	})
 
 	// 当前如果有连接，则添加一条docker环境数据
-	_, err := logic.DockerEnv{}.GetEnvByName("local")
-	if err != nil {
-		logic.DockerEnv{}.UpdateEnv(&accessor.DockerClientResult{
-			Name:    "local",
-			Title:   "本机",
-			Address: client.DefaultDockerHost,
-			Default: true,
-		})
+	defaultDockerHost := client.DefaultDockerHost
+	if e := os.Getenv(client.EnvOverrideHost); e != "" {
+		defaultDockerHost = e
 	}
+	defaultDockerEnv, err := logic.DockerEnv{}.GetEnvByName("local")
+	if err != nil {
+		defaultDockerEnv = &accessor.DockerClientResult{
+			Name:    "local",
+			Title:   "默认",
+			Address: defaultDockerHost,
+			Default: true,
+		}
+		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
+	}
+	docker.Sdk, err = docker.NewDockerClient(docker.NewDockerClientOption{
+		Host:    defaultDockerEnv.Name,
+		Address: defaultDockerEnv.Address,
+	})
 	_, err = docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err == nil {
 		go logic.EventLogic{}.MonitorLoop()

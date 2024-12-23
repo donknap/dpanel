@@ -27,14 +27,14 @@ type RunCommandOption struct {
 }
 
 func (self Command) RunInTerminal(option *RunCommandOption) (io.ReadCloser, error) {
-	cmd = self.getCommand(option)
+	localCmd := self.getCommand(option)
 	var out *os.File
 	var err error
 
 	if option.WindowSize != nil {
-		out, err = pty.StartWithSize(cmd, option.WindowSize)
+		out, err = pty.StartWithSize(localCmd, option.WindowSize)
 	} else {
-		out, err = pty.Start(cmd)
+		out, err = pty.Start(localCmd)
 	}
 
 	if err != nil {
@@ -42,16 +42,16 @@ func (self Command) RunInTerminal(option *RunCommandOption) (io.ReadCloser, erro
 	}
 	return TerminalResult{
 		Conn: out,
-		cmd:  cmd,
+		cmd:  localCmd,
 	}, err
 }
 
 func (self Command) Run(option *RunCommandOption) (io.Reader, error) {
 	out := new(bytes.Buffer)
-	cmd = self.getCommand(option)
-	cmd.Stdout = out
-	cmd.Stderr = out
-	err := cmd.Run()
+	localCmd := self.getCommand(option)
+	localCmd.Stdout = out
+	localCmd.Stderr = out
+	err := localCmd.Run()
 	if err != nil {
 		return nil, errors.Join(err, errors.New(out.String()))
 	}
@@ -59,10 +59,10 @@ func (self Command) Run(option *RunCommandOption) (io.Reader, error) {
 }
 
 func (self Command) RunWithResult(option *RunCommandOption) string {
-	cmd = self.getCommand(option)
-	out, err := cmd.CombinedOutput()
+	localCmd := self.getCommand(option)
+	out, err := localCmd.CombinedOutput()
 	if err != nil {
-		slog.Debug(option.CmdName, "arg", option.CmdArgs, "error", err.Error())
+		slog.Debug("run command with result", "cmd", option.CmdName, "arg", option.CmdArgs, "error", err.Error())
 	}
 	return string(out)
 }
@@ -74,33 +74,20 @@ func (self Command) getCommand(option *RunCommandOption) *exec.Cmd {
 	if option.Timeout == 0 {
 		// 没有配置超时时间，则先杀掉上一个进程
 		if cmd != nil && cmd.Process != nil && cmd.Process.Pid > 0 {
-			slog.Debug("command kill global cmd", "cmd", cmd, "process", cmd.Process, "pid", cmd.Process.Pid)
+			slog.Debug("run command kill global cmd", "cmd", cmd, "process", cmd.Process, "pid", cmd.Process.Pid)
 			// 将上一条命令中止掉
 			if err := cmd.Process.Kill(); err == nil {
 				_, err = cmd.Process.Wait()
 				if err != nil {
-					slog.Debug("command kill", "error", err.Error())
+					slog.Debug("run command kill global cmd", "error", err.Error())
 				}
 			}
 		}
 		newCmd = exec.Command(option.CmdName, option.CmdArgs...)
 	} else {
 		// 配置超时间后
-		newCmd = exec.Command(option.CmdName, option.CmdArgs...)
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(option.Timeout))
-		go func() {
-			select {
-			case <-ctx.Done():
-				slog.Debug("command kill timeout cmd", "cmd", cmd, "pid", cmd.Process.Pid, "status", cmd.ProcessState.String())
-				cancel()
-				if newCmd != nil && newCmd.Process != nil && !newCmd.ProcessState.Exited() {
-					err := newCmd.Process.Kill()
-					if err != nil {
-						slog.Error("run command timeout error", "error", err)
-					}
-				}
-			}
-		}()
+		ctx, _ := context.WithDeadline(context.Background(), time.Now().Add(option.Timeout))
+		newCmd = exec.CommandContext(ctx, option.CmdName, option.CmdArgs...)
 	}
 
 	if option.Dir != "" {

@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	Sdk, _           = NewDockerClient(NewDockerClientOption{})
+	Sdk              = &Builder{}
 	BuilderAuthor    = "DPanel"
 	BuildDesc        = "DPanel is a docker web management panel"
 	BuildWebSite     = "https://dpanel.cc"
@@ -58,6 +58,7 @@ func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
 	}
+	fmt.Printf("%v \n", os.Environ())
 	if option.Address != "" {
 		builder.ExtraParams = append(builder.ExtraParams, "-H", option.Address)
 		builder.Env = append(builder.Env, fmt.Sprintf("DOCKER_HOST=%s", option.Address))
