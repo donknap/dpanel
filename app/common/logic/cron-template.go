@@ -1,8 +1,8 @@
 package logic
 
 import (
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	"gopkg.in/yaml.v3"
 	"io/fs"
 	"os"
@@ -11,12 +11,12 @@ import (
 )
 
 type CronTemplateItem struct {
-	Name        string             `json:"name"`
-	Environment []accessor.EnvItem `json:"environment"`
-	Script      string             `json:"script"`
-	Description string             `json:"description"`
-	Tag         []string           `json:"tag"`
-	Project     string             `json:"project"`
+	Name        string           `json:"name"`
+	Environment []docker.EnvItem `json:"environment"`
+	Script      string           `json:"script"`
+	Description string           `json:"description"`
+	Tag         []string         `json:"tag"`
+	Project     string           `json:"project"`
 }
 
 type CronTemplate struct {
@@ -38,7 +38,7 @@ func (self CronTemplate) Template(dir string) ([]CronTemplateItem, error) {
 			item := CronTemplateItem{
 				Name:        yamlData.GetString("task.name"),
 				Script:      yamlData.GetString("task.script"),
-				Environment: make([]accessor.EnvItem, 0),
+				Environment: make([]docker.EnvItem, 0),
 				Description: yamlData.GetString("task.descriptionZh"),
 				Tag:         yamlData.GetStringSlice("task.tag"),
 				Project:     "dpanel",
@@ -50,7 +50,7 @@ func (self CronTemplate) Template(dir string) ([]CronTemplateItem, error) {
 			}
 			fields := yamlData.GetSliceStringMapString("task.environment")
 			for _, field := range fields {
-				item.Environment = append(item.Environment, accessor.EnvItem{
+				item.Environment = append(item.Environment, docker.EnvItem{
 					Name:  field["name"],
 					Label: field["labelZh"],
 				})

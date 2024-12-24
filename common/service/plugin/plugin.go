@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	builder "github.com/donknap/dpanel/common/service/docker/container"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"html/template"
 	"io"
@@ -105,40 +106,38 @@ func (self plugin) Create() (string, error) {
 		}
 	}
 
-	builder := docker.Sdk.GetContainerCreateBuilder()
-	builder.WithImage(imageUrl, imageTryPull)
-	builder.WithContainerName(service.ContainerName)
-
-	if service.Labels != nil {
-		for name, value := range service.Labels {
-			builder.WithLabel(name, value)
-		}
+	options := []builder.Option{
+		builder.WithImage(imageUrl, imageTryPull),
+		builder.WithContainerName(service.ContainerName),
+		builder.WithLabel(docker.NewValueItemFromMap(service.Labels)...),
+		builder.WithPrivileged(service.Privileged),
+		builder.WithAutoRemove(serviceExt.AutoRemove),
+		builder.WithRestartPolicy(service.Restart),
+		builder.WithPid(service.Pid),
+		builder.WithVolumesFromContainerName(serviceExt.External.VolumesFrom...),
+		builder.WithCommand(service.Command),
 	}
-	if service.Privileged {
-		builder.WithPrivileged()
-	}
-	if serviceExt.AutoRemove {
-		builder.WithAutoRemove()
-	}
-	if service.Restart != "" {
-		builder.WithRestart(service.Restart)
-	}
-	if service.Pid != "" {
-		builder.WithPid(service.Pid)
-	}
-	for _, item := range serviceExt.External.VolumesFrom {
-		builder.WithContainerVolume(item)
-	}
-	builder.WithCommand(service.Command)
 
 	for _, item := range service.Volumes {
-		builder.WithVolume(item.Source, item.Target, false)
+		options = append(options, builder.WithVolume(docker.VolumeItem{
+			Host:       item.Source,
+			Dest:       item.Target,
+			Permission: "write",
+		}))
 	}
 	for _, item := range serviceExt.External.Volumes {
 		path := strings.Split(item, ":")
-		builder.WithVolume(path[0], path[1], false)
+		options = append(options, builder.WithVolume(docker.VolumeItem{
+			Host:       path[0],
+			Dest:       path[1],
+			Permission: "write",
+		}))
 	}
-	response, err := builder.Execute()
+	b, err := builder.New(options...)
+	if err != nil {
+		return "", err
+	}
+	response, err := b.Execute()
 	if err != nil {
 		return "", err
 	}

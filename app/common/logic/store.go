@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/storage"
 	"gopkg.in/yaml.v3"
@@ -188,7 +189,7 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 
 		storeVersionItem := accessor.StoreAppVersionItem{
 			Script:      &accessor.StoreAppVersionScriptItem{},
-			Environment: make([]accessor.EnvItem, 0),
+			Environment: make([]docker.EnvItem, 0),
 		}
 
 		if len(segments) >= 2 {
@@ -228,14 +229,14 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 			// 版本配置信息一个 data.yaml 为一个版本
 			if len(segments) == 3 {
 				fields := yamlData.GetSliceStringMapString("additionalProperties.formFields")
-				env := make([]accessor.EnvItem, 0)
-				env = append(env, accessor.EnvItem{
+				env := make([]docker.EnvItem, 0)
+				env = append(env, docker.EnvItem{
 					Name:  "CONTAINER_NAME",
 					Label: "容器名称",
 					Value: compose.ContainerDefaultName,
 				})
 				for _, field := range fields {
-					env = append(env, accessor.EnvItem{
+					env = append(env, docker.EnvItem{
 						Name:  field["envKey"],
 						Value: field["default"],
 						Label: field["labelZh"],
@@ -336,7 +337,7 @@ func (self Store) GetAppByCasaos(storePath string) ([]accessor.StoreAppItem, err
 			storeItem.Version["latest"] = accessor.StoreAppVersionItem{
 				Name:        "latest",
 				ComposeFile: versionPath,
-				Environment: make([]accessor.EnvItem, 0),
+				Environment: make([]docker.EnvItem, 0),
 			}
 		}
 

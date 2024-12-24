@@ -1,6 +1,7 @@
 package accessor
 
 import (
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"os"
 	"path/filepath"
@@ -16,12 +17,12 @@ const (
 )
 
 type ComposeSettingOption struct {
-	Status      string    `json:"status,omitempty"`
-	Type        string    `json:"type"`
-	Uri         []string  `json:"uri,omitempty"`
-	RemoteUrl   string    `json:"remoteUrl,omitempty"`
-	Store       string    `json:"store,omitempty"`
-	Environment []EnvItem `json:"environment,omitempty"`
+	Status      string           `json:"status,omitempty"`
+	Type        string           `json:"type"`
+	Uri         []string         `json:"uri,omitempty"`
+	RemoteUrl   string           `json:"remoteUrl,omitempty"`
+	Store       string           `json:"store,omitempty"`
+	Environment []docker.EnvItem `json:"environment,omitempty"`
 }
 
 func (self ComposeSettingOption) GetUriFilePath() string {

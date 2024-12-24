@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
@@ -21,10 +22,10 @@ import (
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
 	type ParamsValidate struct {
-		Id                int32              `json:"id" binding:"required"`
-		Environment       []accessor.EnvItem `json:"environment"`
-		DeployServiceName []string           `json:"deployServiceName"`
-		CreatePath        bool               `json:"createPath"`
+		Id                int32            `json:"id" binding:"required"`
+		Environment       []docker.EnvItem `json:"environment"`
+		DeployServiceName []string         `json:"deployServiceName"`
+		CreatePath        bool             `json:"createPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

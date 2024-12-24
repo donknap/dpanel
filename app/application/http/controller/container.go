@@ -199,7 +199,7 @@ func (self Container) Update(http *gin.Context) {
 	}
 	if params.Restart != "" {
 		restartPolicy := container.RestartPolicy{
-			Name: docker.Sdk.GetRestartPolicyByString(params.Restart),
+			Name: docker.GetRestartPolicyByString(params.Restart),
 		}
 		if params.Restart == "on-failure" {
 			restartPolicy.MaximumRetryCount = 5
@@ -280,6 +280,14 @@ func (self Container) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	if siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
+		ID: params.Md5,
+	})).First(); siteRow != nil {
+		siteRow.ContainerInfo.ID = out.ID
+		_, _ = dao.Site.Updates(siteRow)
+	}
+
 	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, containerInfo.Name, container.StartOptions{})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

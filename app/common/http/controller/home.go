@@ -217,8 +217,8 @@ func (self Home) Usage(http *gin.Context) {
 	}
 
 	type portItem struct {
-		Port accessor.PortItem `json:"port"`
-		Name string            `json:"name"`
+		Port docker.PortItem `json:"port"`
+		Name string          `json:"name"`
 	}
 	ports := make([]*portItem, 0)
 	containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
@@ -251,7 +251,7 @@ func (self Home) Usage(http *gin.Context) {
 					for port, _ := range imageInfo.Config.ExposedPorts {
 						usePort = append(usePort, &portItem{
 							Name: item.Names[0],
-							Port: accessor.PortItem{
+							Port: docker.PortItem{
 								Host:   port.Port(),
 								Dest:   port.Port(),
 								HostIp: "0.0.0.0",
@@ -266,7 +266,7 @@ func (self Home) Usage(http *gin.Context) {
 					}
 					usePort = append(usePort, &portItem{
 						Name: item.Names[0],
-						Port: accessor.PortItem{
+						Port: docker.PortItem{
 							Host:   strconv.Itoa(int(port.PublicPort)),
 							Dest:   strconv.Itoa(int(port.PrivatePort)),
 							HostIp: port.IP,

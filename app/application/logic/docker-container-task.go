@@ -1,200 +1,91 @@
 package logic
 
 import (
-	"fmt"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	builder "github.com/donknap/dpanel/common/service/docker/container"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
 )
 
 func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, error) {
-	_ = notice.Message{}.Info("containerCreate", "正在部署", task.SiteName)
-	builder := docker.Sdk.GetContainerCreateBuilder()
-	builder.WithImage(task.BuildParams.ImageName, false)
-	builder.WithContainerName(task.SiteName)
 
-	// 如果绑定了ipv6 需要先创建一个ipv6的自身网络
-	// 如果容器配置了Ip，需要先创一个自身网络
+	var err error
+	var containerOwnerNetwork string
+
+	// 如果绑定了 ipv6 需要先创建一个 ipv6 的自身网络
+	// 如果容器配置了 Ip，需要先创建一个自身网络
+	// 如果容器关联了其它容器，需要先创建一个自身网络
 	if task.BuildParams.BindIpV6 ||
 		!function.IsEmptyArray(task.BuildParams.Links) ||
 		task.BuildParams.IpV4 != nil || task.BuildParams.IpV6 != nil {
-
-		option := network.CreateOptions{
-			IPAM: &network.IPAM{
-				Driver:  "default",
-				Options: map[string]string{},
-				Config:  []network.IPAMConfig{},
-			},
+		// 删除掉的网络
+		err = docker.Sdk.NetworkRemove(task.SiteName)
+		if err != nil {
+			return "", err
 		}
-		if task.BuildParams.BindIpV6 {
-			option.EnableIPv6 = function.PtrBool(true)
-		}
-		if task.BuildParams.IpV4 != nil {
-			option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
-				Subnet:  task.BuildParams.IpV4.Subnet,
-				Gateway: task.BuildParams.IpV4.Gateway,
-			})
-		}
-		if task.BuildParams.IpV6 != nil {
-			option.EnableIPv6 = function.PtrBool(true)
-			option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
-				Subnet:  task.BuildParams.IpV6.Subnet,
-				Gateway: task.BuildParams.IpV6.Gateway,
-			})
-		}
-		err := builder.CreateOwnerNetwork(option)
+		containerOwnerNetwork, err = docker.Sdk.NetworkCreate(task.SiteName, task.BuildParams.IpV4, task.BuildParams.IpV6)
 		if err != nil {
 			return "", err
 		}
 	}
+	options := make([]builder.Option, 0)
 
-	// Environment
-	if task.BuildParams.Environment != nil {
-		for _, value := range task.BuildParams.Environment {
-			if value.Name == "" {
-				continue
-			}
-			builder.WithEnv(value.Name, value.Value)
+	if oldContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, task.SiteName); err == nil {
+		_ = notice.Message{}.Info("containerCreate", "正在停止旧容器")
+		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, oldContainerInfo.ID, container.StopOptions{})
+		if err != nil {
+			return "", err
 		}
-	}
-
-	// Links Volume
-	// 避免其它容器先抢占了本身容器配置的ip，需要在容器都完成创建后，统一加入网络
-	if !function.IsEmptyArray(task.BuildParams.Links) {
-		for _, value := range task.BuildParams.Links {
-			if value.Volume {
-				builder.WithContainerVolume(value.Name)
-			}
+		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, oldContainerInfo.ID, container.RemoveOptions{})
+		if err != nil {
+			return "", err
 		}
+		options = append(options, builder.WithContainerInfo(oldContainerInfo))
 	}
 
-	// Ports PublishAllPorts
-	if task.BuildParams.Ports != nil {
-		for _, value := range task.BuildParams.Ports {
-			builder.WithPort(value.HostIp, value.Host, value.Dest)
-		}
-	}
-	if task.BuildParams.PublishAllPorts {
-		builder.PublishAllPorts()
-	}
+	options = append(options, []builder.Option{
+		builder.WithContainerName(task.SiteName),
+		builder.WithImage(task.BuildParams.ImageName, false),
+		builder.WithEnv(task.BuildParams.Environment...),
+		builder.WithVolumesFrom(task.BuildParams.Links...),
+		builder.WithPort(task.BuildParams.Ports...),
+		builder.WithPublishAllPorts(task.BuildParams.PublishAllPorts),
+		builder.WithVolume(task.BuildParams.Volumes...),
+		builder.WithPrivileged(task.BuildParams.Privileged),
+		builder.WithAutoRemove(task.BuildParams.AutoRemove),
+		builder.WithRestartPolicy(task.BuildParams.Restart),
+		builder.WithCpus(task.BuildParams.Cpus),
+		builder.WithMemory(task.BuildParams.Memory),
+		builder.WithShmSize(task.BuildParams.ShmSize),
+		builder.WithWorkDir(task.BuildParams.WorkDir),
+		builder.WithUser(task.BuildParams.User),
+		builder.WithCommandStr(task.BuildParams.Command),
+		builder.WithEntrypointStr(task.BuildParams.Entrypoint),
+		builder.WithLog(task.BuildParams.Log),
+		builder.WithDns(task.BuildParams.Dns),
+		builder.WithLabel(task.BuildParams.Label...),
+		builder.WithExtraHosts(task.BuildParams.ExtraHosts...),
+		builder.WithDevice(task.BuildParams.Device...),
+		builder.WithGpus(task.BuildParams.Gpus),
+		builder.WithHealthcheck(task.BuildParams.Healthcheck),
+	}...)
 
-	// VolumesDefault  Volumes
-	if !function.IsEmptyArray(task.BuildParams.VolumesDefault) {
-		for _, item := range task.BuildParams.VolumesDefault {
-			if item.Dest == "" {
-				continue
-			}
-			builder.WithDefaultVolume(item.Dest)
-		}
-	}
-
-	if task.BuildParams.Volumes != nil {
-		for _, value := range task.BuildParams.Volumes {
-			if value.Host == "" || value.Dest == "" {
-				continue
-			}
-			builder.WithVolume(value.Host, value.Dest, value.Permission == "readonly")
-		}
-	}
-
-	// Privileged
-	if task.BuildParams.Privileged {
-		builder.WithPrivileged()
-	}
-
-	//host pid
 	if task.BuildParams.HostPid {
-		builder.WithPid("host")
+		options = append(options, builder.WithHostPid())
 	}
-
-	// AutoRemove
-	if task.BuildParams.AutoRemove {
-		builder.WithAutoRemove()
-	}
-
-	// Restart
-	builder.WithRestart(task.BuildParams.Restart)
-
-	// cpus
-	if task.BuildParams.Cpus != 0 {
-		builder.WithCpus(task.BuildParams.Cpus)
-	}
-
-	// memory
-	if task.BuildParams.Memory != 0 {
-		builder.WithMemory(task.BuildParams.Memory)
-	}
-
-	// shmsize
-	if task.BuildParams.ShmSize != "" {
-		size, _ := units.RAMInBytes(task.BuildParams.ShmSize)
-		builder.WithShmSize(size)
-	}
-
-	// workDir
-	if task.BuildParams.WorkDir != "" {
-		builder.WithWorkDir(task.BuildParams.WorkDir)
-	}
-
-	if task.BuildParams.User != "" {
-		builder.WithWorkDir(task.BuildParams.WorkDir)
-	}
-
-	if task.BuildParams.Command != "" {
-		builder.WithCommandStr(task.BuildParams.Command)
-	}
-
-	if task.BuildParams.Entrypoint != "" {
-		builder.WithEntrypointStr(task.BuildParams.Entrypoint)
-	}
-
 	if task.BuildParams.UseHostNetwork {
-		builder.WithNetworkMode(network.NetworkHost)
+		options = append(options, builder.WithHostNetwork())
 	}
 
-	if task.BuildParams.Log != nil && task.BuildParams.Log.Driver != "" {
-		builder.WithLog(
-			task.BuildParams.Log.Driver,
-			task.BuildParams.Log.MaxSize,
-			task.BuildParams.Log.MaxFile,
-		)
+	b, err := builder.New(options...)
+	if err != nil {
+		return "", err
 	}
 
-	builder.WithDns(task.BuildParams.Dns)
-
-	for _, item := range task.BuildParams.Label {
-		builder.WithLabel(item.Name, item.Value)
-	}
-
-	for _, item := range task.BuildParams.ExtraHosts {
-		builder.WithExtraHosts(item.Name, item.Value)
-	}
-
-	if !function.IsEmptyArray(task.BuildParams.Device) {
-		for _, item := range task.BuildParams.Device {
-			builder.WithDevice(item.Host, item.Dest)
-		}
-	}
-
-	if task.BuildParams.Gpus != nil && task.BuildParams.Gpus.Enable {
-		builder.WithGpus(task.BuildParams.Gpus.Device, task.BuildParams.Gpus.Capabilities)
-	}
-
-	if task.BuildParams.Healthcheck != nil && task.BuildParams.Healthcheck.Cmd != "" {
-		builder.WithHealthcheck(
-			task.BuildParams.Healthcheck.ShellType,
-			task.BuildParams.Healthcheck.Cmd,
-			task.BuildParams.Healthcheck.Interval,
-			task.BuildParams.Healthcheck.Timeout,
-			task.BuildParams.Healthcheck.Retries,
-		)
-	}
-
-	response, err := builder.Execute()
+	_ = notice.Message{}.Info("containerCreate", "正在部署", task.SiteName)
+	response, err := b.Execute()
 	if err != nil {
 		return "", err
 	}
@@ -205,29 +96,41 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		return response.ID, err
 	}
 
-	// 仅当容器有关联时，才加新建自己的网络。对于ipv6支持，必须加入一个ipv6的网络
-	if task.BuildParams.BindIpV6 || !function.IsEmptyArray(task.BuildParams.Links) || task.BuildParams.IpV4 != nil || task.BuildParams.IpV6 != nil {
-		endpointSetting := &network.EndpointSettings{
-			Aliases: []string{
-				fmt.Sprintf("%s.pod.dpanel.local", task.SiteName),
-			},
-			IPAMConfig: &network.EndpointIPAMConfig{},
-		}
-		if task.BuildParams.IpV4 != nil {
-			endpointSetting.IPAMConfig.IPv4Address = task.BuildParams.IpV4.Address
+	// 当前如果新建了容器自身网络，创建完后加入
+	// 如果在创建时加入，则会丢失 bridge 网络
+	if containerOwnerNetwork != "" {
+		o := docker.NetworkItem{
+			Name: containerOwnerNetwork,
 		}
 		if task.BuildParams.IpV6 != nil {
-			endpointSetting.IPAMConfig.IPv6Address = task.BuildParams.IpV6.Address
+			o.IpV6 = task.BuildParams.IpV6.Address
 		}
-		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, task.SiteName, response.ID, endpointSetting)
+		if task.BuildParams.IpV4 != nil {
+			o.IpV4 = task.BuildParams.IpV4.Address
+		}
+		err = docker.Sdk.NetworkConnect(o, task.SiteName)
+		if err != nil {
+			return "", err
+		}
 	}
 
+	// 利用Network关联容器
+	// 每次创建自身网络时，先删除掉，最后再统一将关联和自身加入进来
+	// 容器关联时必须采用 hostname 以保证容器可以访问
 	if !function.IsEmptyArray(task.BuildParams.Links) {
 		for _, value := range task.BuildParams.Links {
 			if value.Alise == "" {
 				value.Alise = value.Name
 			}
-			builder.WithLink(value.Name, value.Alise)
+			err = docker.Sdk.NetworkConnect(docker.NetworkItem{
+				Name: containerOwnerNetwork,
+				Alise: []string{
+					value.Alise,
+				},
+			}, value.Name)
+			if err != nil {
+				return "", err
+			}
 		}
 	}
 
@@ -241,19 +144,11 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 			if value.Name == "host" {
 				continue
 			}
-			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, value.Name, response.ID, &network.EndpointSettings{
-				Aliases: value.Alise,
-				IPAMConfig: &network.EndpointIPAMConfig{
-					IPv4Address: value.IpV4,
-					IPv6Address: value.IpV6,
-				},
-			})
+			err = docker.Sdk.NetworkConnect(value, task.SiteName)
+			if err != nil {
+				return "", err
+			}
 		}
-	}
-
-	if err != nil {
-		//notice.Message{}.Error("containerCreate", err.Error())
-		return response.ID, err
 	}
 
 	if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {

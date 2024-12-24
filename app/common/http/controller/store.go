@@ -201,11 +201,11 @@ func (self Store) Sync(http *gin.Context) {
 
 func (self Store) Deploy(http *gin.Context) {
 	type ParamsValidate struct {
-		StoreId     int32              `json:"storeId" binding:"required"`
-		Name        string             `json:"name" binding:"required"`
-		Title       string             `json:"title"`
-		ComposeFile string             `json:"composeFile" binding:"required"`
-		Environment []accessor.EnvItem `json:"environment"`
+		StoreId     int32            `json:"storeId" binding:"required"`
+		Name        string           `json:"name" binding:"required"`
+		Title       string           `json:"title"`
+		ComposeFile string           `json:"composeFile" binding:"required"`
+		Environment []docker.EnvItem `json:"environment"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

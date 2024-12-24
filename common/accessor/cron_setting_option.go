@@ -2,6 +2,7 @@ package accessor
 
 import (
 	"fmt"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/robfig/cron/v3"
 	"time"
 )
@@ -47,7 +48,7 @@ type CronSettingOption struct {
 	ContainerName  string                  `json:"containerName,omitempty"`
 	Script         string                  `json:"script,omitempty"`
 	JobIds         []cron.EntryID          `json:"jobIds,omitempty"`
-	Environment    []EnvItem               `json:"environment,omitempty"`
+	Environment    []docker.EnvItem        `json:"environment,omitempty"`
 	EnableRunBlock bool                    `json:"enableRunBlock,omitempty"`
 	KeepLogTotal   int                     `json:"keepLogTotal,omitempty"`
 	Disable        bool                    `json:"disable,omitempty"`

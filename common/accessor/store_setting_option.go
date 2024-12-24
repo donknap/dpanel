@@ -1,5 +1,7 @@
 package accessor
 
+import "github.com/donknap/dpanel/common/service/docker"
+
 var (
 	StoreTypeOnePanel  = "1panel"
 	StoreTypePortainer = "portainer"
@@ -26,7 +28,7 @@ type StoreAppVersionScriptItem struct {
 type StoreAppVersionItem struct {
 	Name        string                     `json:"name"`
 	ComposeFile string                     `json:"composeFile"`
-	Environment []EnvItem                  `json:"environment,omitempty"`
+	Environment []docker.EnvItem           `json:"environment,omitempty"`
 	Script      *StoreAppVersionScriptItem `json:"script,omitempty"`
 }
 

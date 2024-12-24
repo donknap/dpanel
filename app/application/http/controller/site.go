@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -9,11 +10,9 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/gorm"
-	"log/slog"
 	"net"
 	"strings"
 )
@@ -25,7 +24,7 @@ type Site struct {
 func (self Site) CreateByImage(http *gin.Context) {
 	type ParamsValidate struct {
 		Id          int32  `json:"id"`
-		SiteTitle   string `json:"siteTitle" binding:"required"`
+		SiteTitle   string `json:"siteTitle"`
 		SiteName    string `json:"siteName" binding:"required"`
 		ImageName   string `json:"imageName" binding:"required"`
 		ContainerId string `json:"containerId"`
@@ -62,15 +61,6 @@ func (self Site) CreateByImage(http *gin.Context) {
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
-		}
-	}
-
-	for _, itemDefault := range buildParams.VolumesDefault {
-		for _, item := range buildParams.Volumes {
-			if item.Dest == itemDefault.Dest {
-				self.JsonResponseWithError(http, errors.New("容器内的 "+item.Dest+" 目录重复绑定存储"), 500)
-				return
-			}
 		}
 	}
 
@@ -122,22 +112,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 	// 重新部署，先删掉之前的容器
 	if params.Id != 0 || params.ContainerId != "" {
-		_ = notice.Message{}.Info("containerCreate", "正在停止旧容器")
-		if oldContainerInfo.ContainerJSONBase != nil && oldContainerInfo.ID != "" {
-			err := docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, params.SiteName, container.StopOptions{})
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, params.SiteName, container.RemoveOptions{})
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				slog.Debug("remove container", "name", params.SiteName, "error", err.Error())
-				return
-			}
-			// 删除容器时，先把记录设置为软删除，部署失败后在回收站中可以查看
-			_, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
-		}
+		// 删除容器时，先把记录设置为软删除，部署失败后在回收站中可以查看
+		_, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
 	}
 
 	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.ImageName)
@@ -146,6 +122,16 @@ func (self Site) CreateByImage(http *gin.Context) {
 		return
 	}
 	buildParams.ImageId = imageInfo.ID
+
+	for i, volume := range buildParams.Volumes {
+		if volume.Host == "" {
+			buildParams.Volumes[i].Host = fmt.Sprintf("dpanel.%s.%s",
+				params.SiteName,
+				strings.Join(strings.Split(volume.Dest, "/"), "-"),
+			)
+		}
+	}
+
 	_, err = dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

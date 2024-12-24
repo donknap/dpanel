@@ -8,6 +8,7 @@ import (
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	"strconv"
 	"strings"
 )
@@ -114,16 +115,6 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 			}
 		}
 
-		if !function.IsEmptyArray(siteOption.Replace) {
-			for _, item := range siteOption.Replace {
-				// 替换compose中服务时，部署时需要过滤掉
-				if item.Depend != "" && item.Target != "" {
-					service.ExternalLinks = append(service.ExternalLinks, fmt.Sprintf("%s:%s", item.Target, item.Depend))
-					extProject.DisabledServices = append(extProject.DisabledServices, item.Depend)
-				}
-			}
-		}
-
 		for _, item := range siteOption.Ports {
 			target, _ := strconv.Atoi(item.Dest)
 			service.Ports = append(service.Ports, types.ServicePortConfig{
@@ -154,19 +145,6 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 			}
 		}
 
-		for _, item := range siteOption.VolumesDefault {
-			volumePath := fmt.Sprintf("%s.%s", siteOption.Name, strings.Join(strings.Split(item.Dest, "/"), "-"))
-			service.Volumes = append(service.Volumes, types.ServiceVolumeConfig{
-				Source:   volumePath,
-				Target:   item.Dest,
-				ReadOnly: item.Permission == "read",
-				Type:     types.VolumeTypeVolume,
-			})
-			project.Volumes[volumePath] = types.VolumeConfig{
-				Name: volumePath,
-			}
-		}
-
 		for _, item := range siteOption.Network {
 			service.Networks[item.Name] = &types.ServiceNetworkConfig{
 				Aliases:     item.Alise,
@@ -186,11 +164,11 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 		}
 
 		if siteOption.Command != "" {
-			service.Command = function.CommandSplit(siteOption.Command)
+			service.Command = docker.CommandSplit(siteOption.Command)
 		}
 
 		if siteOption.Entrypoint != "" {
-			service.Entrypoint = function.CommandSplit(siteOption.Entrypoint)
+			service.Entrypoint = docker.CommandSplit(siteOption.Entrypoint)
 		}
 
 		if siteOption.UseHostNetwork {

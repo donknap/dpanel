@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -26,14 +27,14 @@ type Compose struct {
 
 func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id           int32              `json:"id"`
-		Title        string             `json:"title"`
-		Name         string             `json:"name" binding:"required,lowercase"`
-		Type         string             `json:"type" binding:"required"`
-		Yaml         string             `json:"yaml"`
-		YamlOverride string             `json:"yamlOverride"`
-		RemoteUrl    string             `json:"remoteUrl"`
-		Environment  []accessor.EnvItem `json:"environment"`
+		Id           int32            `json:"id"`
+		Title        string           `json:"title"`
+		Name         string           `json:"name" binding:"required,lowercase"`
+		Type         string           `json:"type" binding:"required"`
+		Yaml         string           `json:"yaml"`
+		YamlOverride string           `json:"yamlOverride"`
+		RemoteUrl    string           `json:"remoteUrl"`
+		Environment  []docker.EnvItem `json:"environment"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

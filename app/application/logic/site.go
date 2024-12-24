@@ -40,7 +40,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	if !function.IsEmptyArray(info.Config.Env) {
 		for _, item := range info.Config.Env {
 			if envs := strings.Split(item, "="); len(envs) > 0 {
-				envOption.Environment = append(envOption.Environment, accessor.EnvItem{
+				envOption.Environment = append(envOption.Environment, docker.EnvItem{
 					Name:  envs[0],
 					Value: envs[1],
 				})
@@ -52,7 +52,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	if !function.IsEmptyArray(info.HostConfig.Links) {
 		for _, item := range info.HostConfig.Links {
 			if temp := strings.Split(item, ":"); len(temp) > 0 {
-				envOption.Links = append(envOption.Links, accessor.LinkItem{
+				envOption.Links = append(envOption.Links, docker.LinkItem{
 					Name:  temp[0],
 					Alise: temp[1][len(info.Name) : len(temp[1])-1],
 				})
@@ -64,7 +64,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 			if name == "bridge" {
 				continue
 			}
-			network := accessor.NetworkItem{
+			network := docker.NetworkItem{
 				Name:  name,
 				Alise: item.Aliases,
 			}
@@ -79,7 +79,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	if !function.IsEmptyMap(info.HostConfig.PortBindings) {
 		for port, bindings := range info.HostConfig.PortBindings {
 			for _, binding := range bindings {
-				envOption.Ports = append(envOption.Ports, accessor.PortItem{
+				envOption.Ports = append(envOption.Ports, docker.PortItem{
 					HostIp: binding.HostIP,
 					Host:   binding.HostPort,
 					Dest:   string(port),
@@ -90,7 +90,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 
 	if !function.IsEmptyArray(info.Mounts) {
 		for _, mount := range info.Mounts {
-			item := accessor.VolumeItem{
+			item := docker.VolumeItem{
 				Host: "",
 				Dest: mount.Destination,
 			}
@@ -122,29 +122,51 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	envOption.Command = strings.Join(info.Config.Cmd, " ")
 	envOption.Entrypoint = strings.Join(info.Config.Entrypoint, " ")
 	envOption.UseHostNetwork = info.HostConfig.NetworkMode.IsHost()
-	envOption.Log = &accessor.LogDriverItem{
+	envOption.Log = &docker.LogDriverItem{
 		Driver:  info.HostConfig.LogConfig.Type,
 		MaxFile: info.HostConfig.LogConfig.Config["max-file"],
 		MaxSize: info.HostConfig.LogConfig.Config["max-size"],
 	}
 	envOption.Dns = info.HostConfig.DNS
 	envOption.PublishAllPorts = info.HostConfig.PublishAllPorts
-	envOption.ExtraHosts = make([]accessor.EnvItem, 0)
+	envOption.ExtraHosts = make([]docker.ValueItem, 0)
 	for _, host := range info.HostConfig.ExtraHosts {
 		value := strings.Split(host, ":")
-		envOption.ExtraHosts = append(envOption.ExtraHosts, accessor.EnvItem{
+		envOption.ExtraHosts = append(envOption.ExtraHosts, docker.ValueItem{
 			Name:  value[0],
 			Value: value[1],
 		})
 	}
 	if !function.IsEmptyMap(info.Config.Labels) {
-		envOption.Label = make([]accessor.EnvItem, 0)
+		envOption.Label = make([]docker.ValueItem, 0)
 		for key, value := range info.Config.Labels {
-			envOption.Label = append(envOption.Label, accessor.EnvItem{
+			envOption.Label = append(envOption.Label, docker.ValueItem{
 				Name:  key,
 				Value: value,
 			})
 		}
+	}
+
+	envOption.Device = make([]docker.DeviceItem, 0)
+	for _, device := range info.HostConfig.Devices {
+		envOption.Device = append(envOption.Device, docker.DeviceItem{
+			Host: device.PathOnHost,
+			Dest: device.PathInContainer,
+		})
+	}
+
+	if info.Config != nil && info.Config.Healthcheck != nil {
+		envOption.Healthcheck = &docker.HealthcheckItem{
+			ShellType: info.Config.Healthcheck.Test[0],
+			Cmd:       strings.Join(info.Config.Healthcheck.Test[1:], " "),
+			Interval:  int(info.Config.Healthcheck.Interval.Seconds()),
+			Timeout:   int(info.Config.Healthcheck.Timeout.Seconds()),
+			Retries:   info.Config.Healthcheck.Retries,
+		}
+	}
+
+	if info.HostConfig.PidMode.IsHost() {
+		envOption.HostPid = true
 	}
 
 	return envOption, nil
