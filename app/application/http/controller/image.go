@@ -17,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
@@ -529,5 +530,50 @@ func (self Image) UpdateTitle(http *gin.Context) {
 		})
 	}
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Image) CheckUpgrade(http *gin.Context) {
+	type ParamsValidate struct {
+		Tag string `json:"tag" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Tag)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	digest := ""
+	registryList, exists, username, password := logic.Image{}.GetRegistryList(params.Tag)
+	for _, s := range registryList {
+		option := make([]registry.Option, 0)
+		if exists {
+			option = append(option, registry.WithCredentials(username, password))
+		}
+		option = append(option, registry.WithRegistryHost(s))
+		reg := registry.New(option...)
+		if digest, err = reg.Repository.GetImageDigest(params.Tag); err == nil {
+			slog.Debug("image check upgrade", "remote digest", fmt.Sprintf("%s@%s", params.Tag, digest), "local digest", imageInfo.RepoDigests)
+			if !function.InArrayWalk(imageInfo.RepoDigests, func(i string) bool {
+				return strings.HasSuffix(i, digest)
+			}) {
+				self.JsonResponseWithoutError(http, gin.H{
+					"upgrade": true,
+					"digest":  digest,
+				})
+				return
+			}
+		}
+		if err != nil {
+			slog.Debug("image check upgrade", "err", err.Error())
+		}
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"upgrade": false,
+		"digest":  digest,
+	})
 	return
 }

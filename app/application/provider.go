@@ -69,6 +69,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/image/get-build-task", controller.Image{}.GetBuildTask)
 			cors.POST("/app/image/delete-build-task", controller.Image{}.DeleteBuildTask)
 			cors.POST("/app/image/update-title", controller.Image{}.UpdateTitle)
+			cors.POST("/app/image/check-upgrade", controller.Image{}.CheckUpgrade)
 
 			// 文件相关
 			cors.POST("/app/explorer/export", controller.Explorer{}.Export)

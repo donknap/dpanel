@@ -53,7 +53,7 @@ func (self Registry) accessToken(scope string) (string, error) {
 	}()
 
 	challenge := strings.ToLower(response.Header.Get(ChallengeHeader))
-	slog.Debug("Got response to challenge request", response.Status, challenge)
+	slog.Debug("got response to challenge request", "status code", response.Status, "challenge", challenge)
 
 	if strings.HasPrefix(challenge, "basic") {
 		if self.authString == "" {

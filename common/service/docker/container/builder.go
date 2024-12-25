@@ -55,3 +55,7 @@ func (self *Builder) Execute() (response container.CreateResponse, err error) {
 		self.containerName,
 	)
 }
+
+func (self *Builder) GetConfig() (*container.Config, *container.HostConfig, *network.NetworkingConfig) {
+	return self.containerConfig, self.hostConfig, self.networkingConfig
+}

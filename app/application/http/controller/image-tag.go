@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
+	"log/slog"
 	"strings"
 )
 
@@ -66,7 +67,7 @@ func (self Image) TagRemote(http *gin.Context) {
 			var err error
 			for _, value := range proxyList {
 				proxy := strings.Trim(strings.TrimPrefix(value, "https://"), "/")
-				if tagDetail.Registry == "docker.io" && strings.Count(tagDetail.ImageName, "/") == 0 {
+				if tagDetail.Registry == "docker.io" && strings.HasPrefix(tagDetail.ImageName, "library/") {
 					proxy += "/library"
 				}
 				err = logic.DockerTask{}.ImageRemote(&logic.ImageRemoteOption{
@@ -86,6 +87,7 @@ func (self Image) TagRemote(http *gin.Context) {
 						self.JsonResponseWithError(http, err, 500)
 						return
 					}
+					slog.Debug("image tag pull", "proxy", proxyUrl, "error", err.Error())
 				}
 			}
 			if err != nil {

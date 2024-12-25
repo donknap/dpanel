@@ -68,7 +68,7 @@ func (self Builder) ContainerInfo(md5 string) (info types.ContainerJSON, err err
 	return info, nil
 }
 
-func (self Builder) ContentCopyToContainer(containerName, fileName, content string, perm os.FileMode) error {
+func (self Builder) ContainerCopyContentIn(containerName, fileName, content string, perm os.FileMode) error {
 	buf := new(bytes.Buffer)
 	tarWriter := tar.NewWriter(buf)
 	defer func() {
@@ -97,7 +97,7 @@ func (self Builder) ContentCopyToContainer(containerName, fileName, content stri
 	return nil
 }
 
-func (self Builder) ContainerCopyPathToHost(containerName, containerDestPath string, file []string) error {
+func (self Builder) ContainerCopyPathIn(containerName, containerDestPath string, file []string) error {
 	buf := new(bytes.Buffer)
 	tarWriter := tar.NewWriter(buf)
 	defer func() {

@@ -239,35 +239,52 @@ func (self Container) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	_ = notice.Message{}.Info("containerUpgrade", "正在备份当前容器和镜像", containerInfo.Name)
 
-	bakContainerName := containerInfo.Name
-	if params.EnableBak {
-		bakContainerName = fmt.Sprintf("%s-%s", containerInfo.Name, time.Now().Format(function.YmdHis))
-		_ = notice.Message{}.Info("containerUpgrade", "正在停止当前容器并备份旧容器", bakContainerName)
-		err = docker.Sdk.Client.ContainerRename(
-			docker.Sdk.Ctx,
-			containerInfo.Name,
-			bakContainerName,
-		)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-	if params.ImageTag != "" {
-		containerInfo.Image = params.ImageTag
-	}
-	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, bakContainerName, container.StopOptions{})
+	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.Name, container.StopOptions{})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	bakTime := time.Now().Format(function.YmdHis)
+	bakContainerName := fmt.Sprintf("%s-%s", containerInfo.Name, bakTime)
+	bakImageName := fmt.Sprintf("%s-%s", containerInfo.Config.Image, bakTime)
+
+	// 备份旧镜像
+	err = docker.Sdk.Client.ImageTag(
+		docker.Sdk.Ctx,
+		containerInfo.Image,
+		bakImageName,
+	)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = docker.Sdk.Client.ContainerRename(
+		docker.Sdk.Ctx,
+		containerInfo.Name,
+		bakContainerName,
+	)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	if params.ImageTag != "" {
+		containerInfo.Image = params.ImageTag
+	}
+
 	// 未备份旧容器，需要先删除，否则名称会冲突
 	if !params.EnableBak {
 		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, bakContainerName, container.RemoveOptions{})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
+		}
+		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, bakImageName, image.RemoveOptions{})
+		if err != nil {
+			slog.Debug("container upgrade delete image", "error", err.Error())
 		}
 	}
 

@@ -27,6 +27,23 @@ func InArray[T cmp.Ordered](v []T, item T) bool {
 	return false
 }
 
+func InArrayWalk[T interface{}](v []T, walk func(i T) bool) bool {
+	exists, _ := IndexArrayWalk(v, walk)
+	return exists
+}
+
+func IndexArrayWalk[T interface{}](v []T, walk func(i T) bool) (exists bool, index int) {
+	if v == nil {
+		return false, 0
+	}
+	for i, t := range v {
+		if walk(t) {
+			return true, i
+		}
+	}
+	return false, 0
+}
+
 func ConvertArray[T any](interfaces []interface{}) []T {
 	slice := make([]T, len(interfaces))
 	for i, v := range interfaces {

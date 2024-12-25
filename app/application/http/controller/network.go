@@ -247,12 +247,12 @@ func (self Network) Connect(http *gin.Context) {
 	for _, item := range params.ContainerAlise {
 		alise = append(alise, strings.TrimPrefix(item, "/"))
 	}
-	err := docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, params.Name, params.ContainerName, &network.EndpointSettings{
-		Aliases: alise,
-		IPAMConfig: &network.EndpointIPAMConfig{
-			IPv4Address: params.IpV4,
-		},
-	})
+	err := docker.Sdk.NetworkConnect(docker.NetworkItem{
+		Name:  params.Name,
+		Alise: alise,
+		IpV4:  params.IpV4,
+	}, params.ContainerName)
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

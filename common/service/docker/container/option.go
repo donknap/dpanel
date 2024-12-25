@@ -13,6 +13,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -22,9 +23,6 @@ func WithContainerInfo(containerInfo types.ContainerJSON) Option {
 	return func(self *Builder) error {
 		self.containerConfig = containerInfo.Config
 		self.hostConfig = containerInfo.HostConfig
-		self.networkingConfig = &network.NetworkingConfig{
-			EndpointsConfig: containerInfo.NetworkSettings.Networks,
-		}
 		return nil
 	}
 }
@@ -44,9 +42,8 @@ func WithContainerName(name string) Option {
 
 func WithEnv(item ...docker.EnvItem) Option {
 	return func(self *Builder) error {
-		if self.containerConfig.Env == nil {
-			self.containerConfig.Env = make([]string, 0)
-		}
+		self.containerConfig.Env = make([]string, 0)
+
 		for _, envItem := range item {
 			if envItem.Name == "" {
 				continue
@@ -99,6 +96,7 @@ func WithPrivileged(b bool) Option {
 func WithVolume(item ...docker.VolumeItem) Option {
 	return func(self *Builder) error {
 		self.hostConfig.Binds = make([]string, 0)
+
 		for _, volumeItem := range item {
 			if volumeItem.Dest == "" || volumeItem.Host == "" {
 				return errors.New("volume host path or dest path is empty")
@@ -107,24 +105,27 @@ func WithVolume(item ...docker.VolumeItem) Option {
 			if volumeItem.Permission == "readonly" {
 				permission = "ro"
 			}
-			self.hostConfig.Binds = append(self.hostConfig.Binds, fmt.Sprintf("%s:%s:%s", volumeItem.Host, volumeItem.Dest, permission))
+			bind := fmt.Sprintf("%s:%s:%s", volumeItem.Host, volumeItem.Dest, permission)
+			if exists, index := function.IndexArrayWalk(self.hostConfig.Binds, func(i string) bool {
+				return strings.Contains(i, ":"+volumeItem.Dest+":")
+			}); exists {
+				self.hostConfig.Binds[index] = bind
+			} else {
+				self.hostConfig.Binds = append(self.hostConfig.Binds, bind)
+			}
 		}
 		return nil
 	}
 }
 
 func WithVolumesFrom(item ...docker.LinkItem) Option {
-	return func(self *Builder) error {
-		if self.hostConfig.VolumesFrom == nil {
-			self.hostConfig.VolumesFrom = make([]string, 0)
+	containerList := make([]string, 0)
+	for _, linkItem := range item {
+		if linkItem.Volume {
+			containerList = append(containerList, linkItem.Name)
 		}
-		for _, linkItem := range item {
-			if linkItem.Volume {
-				self.hostConfig.VolumesFrom = append(self.hostConfig.VolumesFrom, linkItem.Name)
-			}
-		}
-		return nil
 	}
+	return WithVolumesFromContainerName(containerList...)
 }
 
 func WithVolumesFromContainerName(item ...string) Option {
@@ -133,7 +134,9 @@ func WithVolumesFromContainerName(item ...string) Option {
 			self.hostConfig.VolumesFrom = make([]string, 0)
 		}
 		for _, containerName := range item {
-			self.hostConfig.VolumesFrom = append(self.hostConfig.VolumesFrom, containerName)
+			if !function.InArray(self.hostConfig.VolumesFrom, containerName) {
+				self.hostConfig.VolumesFrom = append(self.hostConfig.VolumesFrom, containerName)
+			}
 		}
 		return nil
 	}
@@ -278,17 +281,11 @@ func WithEntrypoint(cmd []string) Option {
 }
 
 func WithHostPid() Option {
-	return func(self *Builder) error {
-		self.hostConfig.PidMode = "host"
-		return nil
-	}
+	return WithPid("host")
 }
 
 func WithContainerPid(containerName string) Option {
-	return func(self *Builder) error {
-		self.hostConfig.PidMode = container.PidMode(fmt.Sprintf("container:%s", containerName))
-		return nil
-	}
+	return WithPid(fmt.Sprintf("container:%s", containerName))
 }
 
 func WithPid(s string) Option {
@@ -352,11 +349,12 @@ func WithLabel(item ...docker.ValueItem) Option {
 func WithExtraHosts(item ...docker.ValueItem) Option {
 	return func(self *Builder) error {
 		self.hostConfig.ExtraHosts = make([]string, 0)
+
 		for _, valueItem := range item {
-			self.hostConfig.ExtraHosts = append(
-				self.hostConfig.ExtraHosts,
-				fmt.Sprintf("%s:%s", valueItem.Name, valueItem.Value),
-			)
+			host := fmt.Sprintf("%s:%s", valueItem.Name, valueItem.Value)
+			if !function.InArray(self.hostConfig.ExtraHosts, host) {
+				self.hostConfig.ExtraHosts = append(self.hostConfig.ExtraHosts, host)
+			}
 		}
 		return nil
 	}
@@ -381,9 +379,8 @@ func WithGpus(item *docker.GpusItem) Option {
 		if item == nil || !item.Enable {
 			return nil
 		}
-		if self.hostConfig.DeviceRequests == nil {
-			self.hostConfig.DeviceRequests = make([]container.DeviceRequest, 0)
-		}
+		self.hostConfig.DeviceRequests = make([]container.DeviceRequest, 0)
+
 		if function.IsEmptyArray(item.Device) {
 			item.Device = []string{
 				"all",
