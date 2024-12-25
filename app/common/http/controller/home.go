@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -65,6 +66,8 @@ func (self Home) WsConsole(http *gin.Context) {
 	}
 	type ParamsValidate struct {
 		Id      string `uri:"id" binding:"required"`
+		Width   uint   `form:"width"`
+		Height  uint   `form:"height"`
 		Cmd     string `form:"cmd,default=/bin/sh"`
 		WorkDir string `form:"workDir"`
 	}
@@ -88,6 +91,9 @@ func (self Home) WsConsole(http *gin.Context) {
 		AttachStderr: true,
 		Cmd: []string{
 			params.Cmd,
+		},
+		ConsoleSize: &[2]uint{
+			params.Height, params.Width,
 		},
 		WorkingDir: params.WorkDir,
 	})
@@ -131,6 +137,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	lock := sync.RWMutex{}
 	go client.ReadMessage()
 	go func() {
 		out := make([]byte, 2028)
@@ -140,10 +147,12 @@ func (self Home) WsConsole(http *gin.Context) {
 				return
 			}
 			processedOutput := string(out[:n])
+			lock.Lock()
 			err = client.Conn.WriteMessage(websocket.TextMessage, ws.RespMessage{
 				Type: fmt.Sprintf(ws.MessageTypeConsole, params.Id),
 				Data: processedOutput,
 			}.ToJson())
+			lock.Unlock()
 			if err != nil {
 				slog.Error("websocket", "shell write", err.Error())
 			}
