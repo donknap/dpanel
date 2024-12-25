@@ -3,7 +3,6 @@ package docker
 import (
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/service/storage"
 	"log/slog"
@@ -80,22 +79,4 @@ func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
 	builder.CtxCancelFunc = cancelFunc
 	builder.Host = option.Host
 	return builder, nil
-}
-
-func (self Builder) GetImageBuildBuilder() *imageBuildBuilder {
-	builder := &imageBuildBuilder{
-		imageBuildOption: types.ImageBuildOptions{
-			Dockerfile: "Dockerfile", // 默认在根目录
-			Remove:     true,
-			NoCache:    true,
-			Labels: map[string]string{
-				"BuildAuthor":  BuilderAuthor,
-				"BuildDesc":    BuildDesc,
-				"BuildWebSite": BuildWebSite,
-				"buildVersion": BuildVersion,
-			},
-			BuildArgs: map[string]*string{},
-		},
-	}
-	return builder
 }

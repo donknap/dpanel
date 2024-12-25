@@ -219,7 +219,6 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		Name:     params.Tag,
 	})
 
-	mustHasZipFile := false
 	buildImageTask := &logic.BuildImageOption{
 		Tag: imageName,
 	}
@@ -227,21 +226,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	if params.BuildRoot != "" {
 		buildImageTask.Context = "./" + strings.Trim(strings.Trim(strings.Trim(params.BuildRoot, ""), "./"), "/")
 	}
-	addStr := []string{
-		"ADD",
-		"COPY",
-	}
-	for _, str := range addStr {
-		if strings.HasPrefix(strings.ToUpper(params.BuildDockerfile), str) {
-			mustHasZipFile = true
-		}
-	}
-	if mustHasZipFile {
-		if params.BuildZip == "" && params.BuildGit == "" {
-			self.JsonResponseWithError(http, errors.New("Dockerfile中包含添加文件操作，请上传对应的Zip包或是指定Git仓库"), 500)
-			return
-		}
-	}
+
 	if params.BuildZip != "" {
 		path := storage.Local{}.GetRealPath(params.BuildZip)
 		_, err := os.Stat(path)
@@ -290,7 +275,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	}
 	buildImageTask.ImageId = imageRow.ID
 
-	buildImageTask.Platform = &logic.Platform{
+	buildImageTask.Platform = &docker.ImagePlatform{
 		Type: params.Platform,
 		Arch: params.PlatformArch,
 	}
@@ -308,7 +293,11 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	imageRow.ImageInfo = &accessor.ImageInfoOption{
 		Id: imageName,
 	}
-	_, _ = dao.Image.Updates(imageRow)
+	if imageRow.ID == 0 {
+		_ = dao.Image.Create(imageNew)
+	} else {
+		_, _ = dao.Image.Updates(imageRow)
+	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"imageId": imageRow.ID,
 	})
@@ -463,7 +452,11 @@ func (self Image) ImageDelete(http *gin.Context) {
 func (self Image) ImagePrune(http *gin.Context) {
 	filter := filters.NewArgs()
 	filter.Add("dangling", "0")
-	docker.Sdk.Client.ImagesPrune(docker.Sdk.Ctx, filter)
+	_, err := docker.Sdk.Client.ImagesPrune(docker.Sdk.Ctx, filter)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	self.JsonSuccessResponse(http)
 	return
 }

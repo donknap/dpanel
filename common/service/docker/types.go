@@ -120,3 +120,8 @@ type NetworkCreateItem struct {
 	Subnet  string `json:"subnet"`
 	Gateway string `json:"gateway"`
 }
+
+type ImagePlatform struct {
+	Type string
+	Arch string
+}

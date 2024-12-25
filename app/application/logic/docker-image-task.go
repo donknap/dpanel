@@ -8,34 +8,31 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/common/service/docker"
+	builder "github.com/donknap/dpanel/common/service/docker/image"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ws"
 	"io"
 	"log/slog"
 	"math"
+	"strings"
 	"time"
 )
 
-func (self DockerTask) ImageBuild(buildImageTask *BuildImageOption) (string, error) {
-	_ = notice.Message{}.Info("imageBuild", "正在构建镜像，请查看控制台输出", buildImageTask.Tag)
-	builder := docker.Sdk.GetImageBuildBuilder()
-	if buildImageTask.ZipPath != "" {
-		builder.WithZipFilePath(buildImageTask.ZipPath)
+func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
+	_ = notice.Message{}.Info("imageBuild", "正在构建镜像，请查看控制台输出", task.Tag)
+
+	b, err := builder.New(
+		builder.WithZipFilePath(task.ZipPath),
+		builder.WithDockerFileContent(task.DockerFileContent),
+		builder.WithDockerFilePath(task.Context),
+		builder.WithGitUrl(task.GitUrl),
+		builder.WithPlatform(task.Platform),
+		builder.WithTag(task.Tag),
+	)
+	if err != nil {
+		return "", err
 	}
-	if buildImageTask.DockerFileContent != nil {
-		builder.WithDockerFileContent(buildImageTask.DockerFileContent)
-	}
-	if buildImageTask.Context != "" {
-		builder.WithDockerFilePath(buildImageTask.Context)
-	}
-	if buildImageTask.GitUrl != "" {
-		builder.WithGitUrl(buildImageTask.GitUrl)
-	}
-	if buildImageTask.Platform != nil {
-		builder.WithPlatform(buildImageTask.Platform.Type, buildImageTask.Platform.Arch)
-	}
-	builder.WithTag(buildImageTask.Tag)
-	response, err := builder.Execute()
+	response, err := b.Execute()
 	if err != nil {
 		return "", err
 	}
@@ -45,7 +42,7 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageOption) (string, err
 		}
 	}()
 
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImageBuild, buildImageTask.ImageId))
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImageBuild, task.ImageId))
 	defer wsBuffer.Close()
 
 	log := new(bytes.Buffer)
@@ -63,6 +60,9 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageOption) (string, err
 				if msg.ErrorDetail.Message != "" {
 					buffer.WriteString(msg.ErrorDetail.Message)
 					wsBuffer.BroadcastMessage(buffer.String())
+					if strings.Contains(msg.ErrorDetail.Message, "ADD failed") || strings.Contains(msg.ErrorDetail.Message, "COPY failed") {
+						return errors.New("dockerfile 中包含添加文件操作，请使用 Zip 包或是 Git 源码仓库方式创建镜像")
+					}
 					return errors.New(msg.ErrorDetail.Message)
 				} else if msg.PullMessage.Id != "" {
 					buffer.WriteString(fmt.Sprintf("\r%s: %s", msg.PullMessage.Id, msg.PullMessage.Progress))
@@ -75,7 +75,6 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageOption) (string, err
 			}
 		}
 		log.WriteString(buffer.String())
-
 		if buffer.Len() < 512 {
 			return nil
 		}
@@ -87,7 +86,7 @@ func (self DockerTask) ImageBuild(buildImageTask *BuildImageOption) (string, err
 	if err != nil {
 		return log.String(), err
 	}
-	_ = notice.Message{}.Success("imageBuild", buildImageTask.Tag)
+	_ = notice.Message{}.Success("imageBuild", task.Tag)
 	return log.String(), nil
 }
 
