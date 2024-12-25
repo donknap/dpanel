@@ -2,8 +2,10 @@ package controller
 
 import (
 	"errors"
+	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
+	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
@@ -12,6 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 type Env struct {
@@ -192,6 +195,17 @@ func (self Env) Switch(http *gin.Context) {
 	docker.Sdk = dockerClient
 	go logic.EventLogic{}.MonitorLoop()
 
+	// 清除掉统计数据
+	logic.Setting{}.Save(&entity.Setting{
+		GroupName: logic.SettingGroupSetting,
+		Name:      logic.SettingGroupSettingDiskUsage,
+		Value: &accessor.SettingValueOption{
+			DiskUsage: &accessor.DiskUsage{
+				Usage:     &types.DiskUsage{},
+				UpdatedAt: time.Now(),
+			},
+		},
+	})
 	self.JsonSuccessResponse(http)
 	return
 }
