@@ -19,6 +19,7 @@ import (
 
 const PluginExplorer = "explorer"
 const PluginBackup = "backup"
+const PluginWebShell = "webshell"
 
 type TemplateParser struct {
 	Volumes []string

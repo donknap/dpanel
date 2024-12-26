@@ -1,0 +1,18 @@
+services:
+  webshell:
+    image: dpanel/explorer
+    container_name: dpanel-plugin-webshell
+    restart: no
+    privileged: true
+    pid: host
+    labels:
+      - "com.dpanel.container.title=dpanel webshell 助手"
+    command:
+      - /bin/sh
+      - "-c"
+      - "nsenter --target 1 --net --mount"
+    x-dpanel-service:
+      image_tar:
+        amd64: asset/plugin/explorer/image-amd64.tar
+        arm64: asset/plugin/explorer/image-arm64.tar
+        arm: asset/plugin/explorer/image-arm.tar

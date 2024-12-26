@@ -80,10 +80,23 @@ func (self Home) WsConsole(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("请指定容器Id"), 500)
 		return
 	}
+	containerName := params.Id
+	if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
+		webShellPlugin, err := plugin.NewPlugin(pluginName, nil)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		containerName, err = webShellPlugin.Create()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
 	if params.WorkDir == "" {
 		params.WorkDir = "/"
 	}
-	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, params.Id, container.ExecOptions{
+	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, container.ExecOptions{
 		Privileged:   true,
 		Tty:          true,
 		AttachStdin:  true,
@@ -98,7 +111,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		WorkingDir: params.WorkDir,
 	})
 	if err != nil {
-		notice.Message{}.Error("console", err.Error())
+		_ = notice.Message{}.Error("console", err.Error())
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -117,6 +130,12 @@ func (self Home) WsConsole(http *gin.Context) {
 	}
 	client, err := ws.NewClient(http, ws.ClientOption{
 		CloseHandler: func() {
+			if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
+				_ = notice.Message{}.Info("consoleDestroyPlugin")
+				if webShellPlugin, err := plugin.NewPlugin(pluginName, nil); err == nil {
+					_ = webShellPlugin.Destroy()
+				}
+			}
 			shell.Close()
 		},
 		RecvMessageHandler: map[string]ws.RecvMessageHandlerFn{
