@@ -93,7 +93,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 	_, _ = dao.Compose.Updates(composeRow)
 
-	_ = notice.Message{}.Success("composeDeploy", composeRow.Name)
+	_ = notice.Message{}.Info("composeDeploy", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
 }

@@ -217,13 +217,16 @@ func (self Compose) GetTask(http *gin.Context) {
 		return
 	}
 	data := gin.H{
-		"detail":  yamlRow,
-		"project": tasker.Project(),
-		"yaml":    yaml,
+		"detail":        yamlRow,
+		"project":       tasker.Project(),
+		"yaml":          yaml,
+		"containerList": make([]interface{}, 0),
 	}
 
 	if yamlRow.Setting.Status != accessor.ComposeStatusWaiting {
-		data["containerList"] = tasker.Ps()
+		if list := tasker.Ps(); list != nil {
+			data["containerList"] = list
+		}
 	}
 
 	self.JsonResponseWithoutError(http, data)
