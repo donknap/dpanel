@@ -417,3 +417,19 @@ func WithHealthcheck(item *docker.HealthcheckItem) Option {
 		return nil
 	}
 }
+
+func WithCap(caps ...string) Option {
+	return func(self *Builder) error {
+		if function.IsEmptyArray(caps) {
+			return nil
+		}
+		if function.InArray(caps, "ALL") {
+			self.hostConfig.CapAdd = []string{
+				"ALL",
+			}
+		} else {
+			self.hostConfig.CapAdd = caps
+		}
+		return nil
+	}
+}

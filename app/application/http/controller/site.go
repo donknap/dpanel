@@ -291,6 +291,7 @@ func (self Site) GetDetail(http *gin.Context) {
 		siteRow.Env = &runOption
 	}
 	siteRow.Env.Network = runOption.Network
+	siteRow.Env.CapAdd = runOption.CapAdd
 	self.JsonResponseWithoutError(http, siteRow)
 	return
 }

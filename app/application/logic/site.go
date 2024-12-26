@@ -3,6 +3,7 @@ package logic
 import (
 	"embed"
 	"errors"
+	"github.com/docker/docker/oci/caps"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
@@ -167,6 +168,12 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 
 	if info.HostConfig.PidMode.IsHost() {
 		envOption.HostPid = true
+	}
+
+	if info.HostConfig.CapAdd == nil {
+		envOption.CapAdd = caps.DefaultCapabilities()
+	} else {
+		envOption.CapAdd = info.HostConfig.CapAdd
 	}
 
 	return envOption, nil

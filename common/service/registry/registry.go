@@ -86,6 +86,7 @@ func (self Registry) accessToken(scope string) (string, error) {
 		body, _ := io.ReadAll(authResponse.Body)
 		token := TokenResponse{}
 		if err = json.Unmarshal(body, &token); err == nil {
+			slog.Debug("registry", "access-token", token.AccessToken)
 			return fmt.Sprintf("Bearer %s", token.AccessToken), nil
 		}
 		return "", err

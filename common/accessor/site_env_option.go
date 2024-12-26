@@ -38,4 +38,5 @@ type SiteEnvOption struct {
 	Hook            *docker.HookItem          `json:"hook,omitempty"`
 	Healthcheck     *docker.HealthcheckItem   `json:"healthcheck,omitempty"`
 	HostPid         bool                      `json:"hostPid,omitempty"`
+	CapAdd          []string                  `json:"capAdd,omitempty"`
 }
