@@ -149,16 +149,22 @@ func (self Task) Ps() []*composeContainerResult {
 		return temp
 	} else {
 		newReader := bufio.NewReader(bytes.NewReader([]byte(out)))
+		line := make([]byte, 0)
 		for {
-			line, _, err := newReader.ReadLine()
+			t, isPrefix, err := newReader.ReadLine()
 			if err == io.EOF {
 				break
+			}
+			line = append(line, t...)
+			if isPrefix {
+				continue
 			}
 			temp := composeContainerResult{}
 			err = json.Unmarshal(line, &temp)
 			if err == nil {
 				result = append(result, &temp)
 			}
+			line = make([]byte, 0)
 		}
 		return result
 	}
