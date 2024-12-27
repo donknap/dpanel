@@ -19,7 +19,7 @@ import (
 )
 
 func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
-	_ = notice.Message{}.Info("imageBuild", "正在构建镜像，请查看控制台输出", task.Tag)
+	_ = notice.Message{}.Info("imageBuild", "tag", task.Tag)
 
 	b, err := builder.New(
 		builder.WithZipFilePath(task.ZipPath),
@@ -86,7 +86,6 @@ func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
 	if err != nil {
 		return log.String(), err
 	}
-	_ = notice.Message{}.Success("imageBuild", task.Tag)
 	return log.String(), nil
 }
 

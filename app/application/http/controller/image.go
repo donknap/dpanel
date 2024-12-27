@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -126,7 +127,8 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 	defer func() {
 		_ = os.Remove(imageTar.Name())
 	}()
-	_ = notice.Message{}.Info("imageBuild", "正在导入镜像，请查看控制台输出", params.Tag)
+	_ = notice.Message{}.Info("imageBuild", params.Tag)
+
 	response, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageTar, false)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -453,23 +455,25 @@ func (self Image) ImageDelete(http *gin.Context) {
 func (self Image) ImagePrune(http *gin.Context) {
 	filter := filters.NewArgs()
 	filter.Add("dangling", "0")
-	_, err := docker.Sdk.Client.ImagesPrune(docker.Sdk.Ctx, filter)
+	res, err := docker.Sdk.Client.ImagesPrune(docker.Sdk.Ctx, filter)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	_ = notice.Message{}.Info("imagePrune", "size", units.HumanSize(float64(res.SpaceReclaimed)), "count", fmt.Sprintf("%d", len(res.ImagesDeleted)))
 	self.JsonSuccessResponse(http)
 	return
 }
 
 func (self Image) BuildPrune(http *gin.Context) {
-	_, err := docker.Sdk.Client.BuildCachePrune(docker.Sdk.Ctx, types.BuildCachePruneOptions{
+	res, err := docker.Sdk.Client.BuildCachePrune(docker.Sdk.Ctx, types.BuildCachePruneOptions{
 		All: true,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	_ = notice.Message{}.Info("imageBuildPrune", "size", units.HumanSize(float64(res.SpaceReclaimed)))
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -546,6 +550,8 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	_ = notice.Message{}.Info("imageCheckUpgrade", "tag", params.Tag)
+
 	digest := ""
 	registryList, exists, username, password := logic.Image{}.GetRegistryList(params.Tag)
 	for _, s := range registryList {
@@ -570,6 +576,10 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		if err != nil {
 			slog.Debug("image check upgrade", "err", err.Error())
 		}
+	}
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"upgrade": false,

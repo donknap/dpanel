@@ -42,14 +42,15 @@ func (self Event) GetList(http *gin.Context) {
 }
 
 func (self Event) Prune(http *gin.Context) {
-	oldRow, _ := dao.Event.Last()
-	_, _ = dao.Event.Where(dao.Event.ID.Lte(oldRow.ID)).Delete()
-	db, err := facade.GetDbFactory().Channel("default")
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	if oldRow, _ := dao.Event.Last(); oldRow != nil {
+		_, _ = dao.Event.Where(dao.Event.ID.Lte(oldRow.ID)).Delete()
+		db, err := facade.GetDbFactory().Channel("default")
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		db.Exec("vacuum")
 	}
-	db.Exec("vacuum")
 	self.JsonSuccessResponse(http)
 	return
 }

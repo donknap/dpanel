@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/gorilla/websocket"
@@ -85,9 +86,20 @@ func (self *Collection) Broadcast() {
 			self.sendMessage(message)
 
 		case message := <-notice.QueueNoticePushMessage:
+			m := make([]string, 0)
+			_ = json.Unmarshal([]byte(message.Message), &m)
+			if m == nil {
+				m = []string{
+					"",
+				}
+			}
 			data := &RespMessage{
 				Type: "notice",
-				Data: message,
+				Data: map[string]interface{}{
+					"title":   message.Title,
+					"message": m,
+					"type":    message.Type,
+				},
 			}
 			self.sendMessage(data)
 		}

@@ -1,11 +1,11 @@
 package notice
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"runtime"
-	"strings"
 	"time"
 )
 
@@ -35,9 +35,10 @@ func (self Message) Success(title string, message ...string) error {
 }
 
 func (self Message) push(level string, title string, message []string) error {
+	jsonMessage, _ := json.Marshal(message)
 	row := &entity.Notice{
 		Title:     title,
-		Message:   strings.Join(message, " "),
+		Message:   string(jsonMessage),
 		Type:      level,
 		CreatedAt: time.Now().Local(),
 	}

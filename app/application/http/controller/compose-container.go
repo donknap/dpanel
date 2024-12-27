@@ -75,7 +75,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	wsBuffer.OnWrite = func(p string) error {
 		wsBuffer.BroadcastMessage(p)
 		if strings.Contains(p, "denied: You may not login") {
-			_ = notice.Message{}.Error("imagePull", "拉取镜失败，仓库没有权限。")
+			_ = notice.Message{}.Error("imagePullInvalidAuth")
 			return errors.New("image pull denied")
 		}
 		return nil
@@ -160,7 +160,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			slog.Debug("compose", "destroy", err)
 		}
 	}
-	_ = notice.Message{}.Success("composeDestroy", composeRow.Name)
+	_ = notice.Message{}.Success("composeDestroy", "name", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
 }

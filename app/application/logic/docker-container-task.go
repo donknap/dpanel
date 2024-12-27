@@ -7,6 +7,7 @@ import (
 	builder "github.com/donknap/dpanel/common/service/docker/container"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
+	"log/slog"
 )
 
 func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, error) {
@@ -33,10 +34,12 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	options := make([]builder.Option, 0)
 
 	if oldContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, task.SiteName); err == nil {
-		_ = notice.Message{}.Info("containerCreate", "正在停止旧容器")
-		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, oldContainerInfo.ID, container.StopOptions{})
-		if err != nil {
-			return "", err
+		_ = notice.Message{}.Info("containerRemove", task.SiteName)
+		if oldContainerInfo.State.Running {
+			err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, oldContainerInfo.ID, container.StopOptions{})
+			if err != nil {
+				return "", err
+			}
 		}
 		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, oldContainerInfo.ID, container.RemoveOptions{})
 		if err != nil {
@@ -85,7 +88,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		return "", err
 	}
 
-	_ = notice.Message{}.Info("containerCreate", "正在部署", task.SiteName)
+	_ = notice.Message{}.Info("containerCreate", task.SiteName)
 	response, err := b.Execute()
 	if err != nil {
 		return "", err
@@ -93,7 +96,6 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 
 	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
 	if err != nil {
-		//notice.Message{}.Error("containerCreate", err.Error())
 		return response.ID, err
 	}
 
@@ -155,7 +157,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
 		_, err := plugin.Command{}.Result(response.ID, task.BuildParams.Hook.ContainerCreate)
 		if err != nil {
-			_ = notice.Message{}.Info("containerCreate", err.Error())
+			slog.Debug("container create run hook", "hook", "container create", "error", err.Error())
 		}
 	}
 

@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"log/slog"
 	"strings"
@@ -80,11 +81,12 @@ func (self Image) TagRemote(http *gin.Context) {
 				if err == nil {
 					proxyUrl = value
 					// 如果使用了加速，需要给镜像 tag 一个原来的名称
+					_ = notice.Message{}.Info("imagePullUseProxy", "name", proxy)
 					_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, proxy+"/"+tagDetail.Tag, params.Tag)
 					break
 				} else {
 					if strings.Contains(err.Error(), "not found:") {
-						self.JsonResponseWithError(http, err, 500)
+						self.JsonResponseWithError(http, errors.New("ImagePullNotFound"), 500)
 						return
 					}
 					slog.Debug("image tag pull", "proxy", proxyUrl, "error", err.Error())
@@ -160,6 +162,7 @@ func (self Image) TagAdd(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	_ = notice.Message{}.Success("imageTagCreate", params.Tag)
 	self.JsonResponseWithoutError(http, gin.H{
 		"tag": params.Tag,
 	})

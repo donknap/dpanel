@@ -1,7 +1,7 @@
 services:
   webshell:
     image: dpanel/explorer
-    container_name: dpanel-plugin-webshell
+    container_name: {{.webshell.ContainerName}}
     restart: no
     privileged: true
     pid: host
