@@ -82,16 +82,7 @@ func (self Home) WsConsole(http *gin.Context) {
 	}
 	containerName := params.Id
 	if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
-		webShellPlugin, err := plugin.NewPlugin(pluginName, nil)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		containerName, err = webShellPlugin.Create()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
+		containerName = pluginName
 	}
 	if params.WorkDir == "" {
 		params.WorkDir = "/"
@@ -111,7 +102,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		WorkingDir: params.WorkDir,
 	})
 	if err != nil {
-		_ = notice.Message{}.Error("console", err.Error())
+		_ = notice.Message{}.Error("consoleError", err.Error())
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -131,8 +122,13 @@ func (self Home) WsConsole(http *gin.Context) {
 	client, err := ws.NewClient(http, ws.ClientOption{
 		CloseHandler: func() {
 			if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
-				_ = notice.Message{}.Info("consoleDestroyPlugin")
-				if webShellPlugin, err := plugin.NewPlugin(pluginName, nil); err == nil {
+				_ = notice.Message{}.Info("consoleDestroyPlugin", pluginName)
+
+				if webShellPlugin, err := plugin.NewPlugin(plugin.PluginWebShell, map[string]*plugin.TemplateParser{
+					"webshell": &plugin.TemplateParser{
+						ContainerName: pluginName,
+					},
+				}); err == nil {
 					_ = webShellPlugin.Destroy()
 				}
 			}

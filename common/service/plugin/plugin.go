@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 )
 
 const PluginExplorer = "explorer"
@@ -22,8 +23,9 @@ const PluginBackup = "backup"
 const PluginWebShell = "webshell"
 
 type TemplateParser struct {
-	Volumes []string
-	Command []string
+	Volumes       []string
+	Command       []string
+	ContainerName string
 	compose.ExtService
 }
 
@@ -146,7 +148,13 @@ func (self plugin) Create() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return service.ContainerName, nil
+	for {
+		if _, err := docker.Sdk.ContainerInfo(response.ID); err == nil {
+			return service.ContainerName, nil
+		} else {
+			time.Sleep(time.Second)
+		}
+	}
 }
 
 func (self plugin) Destroy() error {
@@ -154,11 +162,13 @@ func (self plugin) Destroy() error {
 	if err != nil {
 		return err
 	}
-	_, err = docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, service.ContainerName)
+	containerRow, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, service.ContainerName)
 	if err == nil {
-		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, service.ContainerName, container.StopOptions{})
-		if err != nil {
-			return err
+		if containerRow.State.Running {
+			err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, service.ContainerName, container.StopOptions{})
+			if err != nil {
+				return err
+			}
 		}
 		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, service.ContainerName, container.RemoveOptions{})
 		if err != nil {
