@@ -39,7 +39,7 @@ func (self Sync) Handle(cmd *cobra.Command, args []string) {
 		color.Error.Println("商店不存在，请先添加")
 		return
 	}
-	out, err := logic.Proxy{}.Post("/api/common/store/sync", code, gin.H{
+	out, _, err := logic.Proxy{}.Post("/api/common/store/sync", code, gin.H{
 		"id":   store.ID,
 		"name": store.Name,
 		"type": store.Setting.Type,
