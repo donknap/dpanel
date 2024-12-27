@@ -2,6 +2,7 @@ package controller
 
 import (
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -76,7 +77,6 @@ func (self Container) GetList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-
 	list := make([]types.Container, 0)
 	filter := filters.NewArgs()
 	if params.Md5 != "" {
@@ -239,44 +239,64 @@ func (self Container) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_ = notice.Message{}.Info("containerUpgrade", "正在备份当前容器和镜像", containerInfo.Name)
-
-	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.Name, container.StopOptions{})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
 	bakTime := time.Now().Format(function.YmdHis)
-	bakContainerName := fmt.Sprintf("%s-%s", containerInfo.Name, bakTime)
-	bakImageName := fmt.Sprintf("%s-%s", containerInfo.Config.Image, bakTime)
 
-	// 备份旧镜像
-	err = docker.Sdk.Client.ImageTag(
-		docker.Sdk.Ctx,
-		containerInfo.Image,
-		bakImageName,
-	)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	err = docker.Sdk.Client.ContainerRename(
-		docker.Sdk.Ctx,
-		containerInfo.Name,
-		bakContainerName,
-	)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
+	// 更新容器时可以更改镜像 tag
 	if params.ImageTag != "" {
 		containerInfo.Image = params.ImageTag
 	}
 
+	// 成功的创建一个新的容器后再对旧的进停止或是删除操作
+	_ = notice.Message{}.Info("containerCreate", containerInfo.Name)
+	newContainerName := fmt.Sprintf("%s-%s-new", containerInfo.Name, bakTime)
+	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
+		EndpointsConfig: containerInfo.NetworkSettings.Networks,
+	}, &v1.Platform{}, newContainerName)
+
+	if err != nil {
+		errRemove := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, newContainerName, container.RemoveOptions{})
+		self.JsonResponseWithError(http, errors.Join(err, errRemove), 500)
+		return
+	}
+
+	_ = notice.Message{}.Info("containerBakup", "name", containerInfo.Name)
+
+	if containerInfo.State.Running {
+		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.Name, container.StopOptions{})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	bakContainerName := fmt.Sprintf("%s-bak-%s", containerInfo.Name, bakTime)
+	bakImageName := fmt.Sprintf("%s-bak-%s", containerInfo.Config.Image, bakTime)
+
 	// 未备份旧容器，需要先删除，否则名称会冲突
-	if !params.EnableBak {
+	if params.EnableBak {
+		// 备份旧容器
+		err = docker.Sdk.Client.ContainerRename(
+			docker.Sdk.Ctx,
+			containerInfo.Name,
+			bakContainerName,
+		)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
+		// 备份旧镜像
+		err = docker.Sdk.Client.ImageTag(
+			docker.Sdk.Ctx,
+			containerInfo.Image,
+			bakImageName,
+		)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
+	} else {
 		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, bakContainerName, container.RemoveOptions{})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -288,11 +308,11 @@ func (self Container) Upgrade(http *gin.Context) {
 		}
 	}
 
-	_ = notice.Message{}.Info("containerUpgrade", "正在更新容器", containerInfo.Name)
-	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
-		EndpointsConfig: containerInfo.NetworkSettings.Networks,
-	}, &v1.Platform{}, containerInfo.Name)
-
+	err = docker.Sdk.Client.ContainerRename(
+		docker.Sdk.Ctx,
+		newContainerName,
+		containerInfo.Name,
+	)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -323,7 +343,7 @@ func (self Container) Prune(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_ = notice.Message{}.Info("containerPrune", fmt.Sprintf("%d", len(info.ContainersDeleted)))
+	_ = notice.Message{}.Info("containerPrune", "count", fmt.Sprintf("%d", len(info.ContainersDeleted)))
 	self.JsonSuccessResponse(http)
 	return
 }
