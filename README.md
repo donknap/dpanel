@@ -15,11 +15,29 @@
 [**官网**](https://dpanel.cc/) &nbsp; |
 &nbsp; [**演示**](https://demo.dpanel.cc/) &nbsp; |
 &nbsp; [**文档**](https://doc.dpanel.cc/#/zh-cn/install/docker) &nbsp; |
-&nbsp; [**视频教程**](https://space.bilibili.com/346309066) &nbsp; |
+&nbsp; [**Pro版**](https://dpanel.cc/#/zh-cn/manual/pro) &nbsp; |
 &nbsp; [**交流群**](https://qm.qq.com/q/2v4x9x8q4k) &nbsp; |
 &nbsp; [**赞助**](https://afdian.com/a/dpanel) &nbsp;
 
 </div>
+
+### Pro 版
+
+Pro 版仅是社区版的一个增强和补充，对于通用的、广泛的功能需求不会收录到 Pro 版中。
+针对社区版中的部分功能进行强化、升级或是一些极其个性化的需求功能。
+
+如果你热衷于开源产品，并且想获得更多有意思的新特性， Pro 版是适合你的，感谢支持与厚爱。
+
+##### 专属功能及开发计划
+
+- [x] 可开启登录 2Fa 验证
+- [x] 镜像详情页面可查看所有远程 Tag
+- [x] 宿主机 WebShell，可在面板直接进入宿主机命令行
+- [x] 多语言（中、英双语）
+- [ ] 容器迁移
+- [ ] 概览页面中查看当前所有容器是否有新版镜像
+- [ ] 配置标题、logo、底部信息
+- [ ] 登录页面可配置背景图片
 
 ### 开始使用
 
@@ -62,7 +80,7 @@ https://afdian.com/a/dpanel
 ###### 服务器 & CDN
 
 <a href="https://anycast.ai" target="_blank">
-<img src="https://doc.dpanel.cc/storage/image/sponsor-server.png" width="200" />
+<img src="https://dpanel.cc/storage/image/sponsor-server.png" width="200" />
 </a>
 
 #### 交流群
