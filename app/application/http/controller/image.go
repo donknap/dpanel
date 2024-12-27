@@ -95,7 +95,6 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 		return
 	}
 	_ = os.Remove(storage.Local{}.GetRealPath(params.Tar))
-
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -540,12 +539,13 @@ func (self Image) UpdateTitle(http *gin.Context) {
 func (self Image) CheckUpgrade(http *gin.Context) {
 	type ParamsValidate struct {
 		Tag string `json:"tag" binding:"required"`
+		Md5 string `json:"md5" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Tag)
+	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

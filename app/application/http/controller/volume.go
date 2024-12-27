@@ -1,10 +1,13 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
+	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"sort"
@@ -176,7 +179,7 @@ func (self Volume) Prune(http *gin.Context) {
 	}
 
 	filter := filters.NewArgs()
-	_, err := docker.Sdk.Client.VolumesPrune(docker.Sdk.Ctx, filter)
+	res, err := docker.Sdk.Client.VolumesPrune(docker.Sdk.Ctx, filter)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -207,10 +210,15 @@ func (self Volume) Prune(http *gin.Context) {
 				}
 			}
 			if !has {
+				if item.UsageData != nil {
+					res.SpaceReclaimed += uint64(item.UsageData.Size)
+				}
 				unUseVolume = append(unUseVolume, item.Name)
 			}
 		}
+
 		for _, item := range unUseVolume {
+			res.VolumesDeleted = append(res.VolumesDeleted, item)
 			err = docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, item, false)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
@@ -218,7 +226,7 @@ func (self Volume) Prune(http *gin.Context) {
 			}
 		}
 	}
-
+	_ = notice.Message{}.Info("volumePrune", "count", fmt.Sprintf("%d", len(res.VolumesDeleted)), "size", units.HumanSize(float64(res.SpaceReclaimed)))
 	self.JsonSuccessResponse(http)
 	return
 }

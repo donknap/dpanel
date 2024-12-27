@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -343,7 +344,7 @@ func (self Container) Prune(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_ = notice.Message{}.Info("containerPrune", "count", fmt.Sprintf("%d", len(info.ContainersDeleted)))
+	_ = notice.Message{}.Info("containerPrune", "count", fmt.Sprintf("%d", len(info.ContainersDeleted)), "size", units.HumanSize(float64(info.SpaceReclaimed)))
 	self.JsonSuccessResponse(http)
 	return
 }

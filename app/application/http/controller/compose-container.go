@@ -160,7 +160,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			slog.Debug("compose", "destroy", err)
 		}
 	}
-	_ = notice.Message{}.Success("composeDestroy", "name", composeRow.Name)
+	_ = notice.Message{}.Info("composeDestroy", "name", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
 }
