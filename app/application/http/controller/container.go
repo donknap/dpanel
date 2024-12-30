@@ -249,7 +249,8 @@ func (self Container) Upgrade(http *gin.Context) {
 
 	// 成功的创建一个新的容器后再对旧的进停止或是删除操作
 	_ = notice.Message{}.Info("containerCreate", containerInfo.Name)
-	newContainerName := fmt.Sprintf("%s-%s-new", containerInfo.Name, bakTime)
+	newContainerName := fmt.Sprintf("%s-copy-%s", containerInfo.Name, bakTime)
+
 	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
 		EndpointsConfig: containerInfo.NetworkSettings.Networks,
 	}, &v1.Platform{}, newContainerName)
@@ -260,7 +261,17 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 
-	_ = notice.Message{}.Info("containerBakup", "name", containerInfo.Name)
+	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, containerInfo.Config.Image)
+	// 如果旧的容器使用的镜像和重新拉取的镜像一致，表示无升级，只执行复制操作
+	if containerInfo.Image == imageInfo.ID {
+		_ = notice.Message{}.Info("containerCopy", newContainerName)
+		self.JsonResponseWithoutError(http, gin.H{
+			"containerId": out.ID,
+		})
+		return
+	}
+
+	_ = notice.Message{}.Info("containerBackup", "name", containerInfo.Name)
 
 	if containerInfo.State.Running {
 		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.Name, container.StopOptions{})
@@ -331,6 +342,7 @@ func (self Container) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"containerId": out.ID,
 	})
