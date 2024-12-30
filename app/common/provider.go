@@ -108,10 +108,16 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		}
 		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
 	}
-	docker.Sdk, err = docker.NewDockerClient(docker.NewDockerClientOption{
+	dockerOption := docker.NewDockerClientOption{
 		Host:    defaultDockerEnv.Name,
 		Address: defaultDockerEnv.Address,
-	})
+	}
+	if defaultDockerEnv.EnableTLS {
+		dockerOption.TlsCa = defaultDockerEnv.TlsCa
+		dockerOption.TlsCert = defaultDockerEnv.TlsCert
+		dockerOption.TlsKey = defaultDockerEnv.TlsKey
+	}
+	docker.Sdk, err = docker.NewDockerClient(dockerOption)
 	_, err = docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err == nil {
 		go logic.EventLogic{}.MonitorLoop()

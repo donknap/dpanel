@@ -21,6 +21,10 @@
 
 </div>
 
+<p>
+   <a href="README_EN.md"> English <a/> | 中文
+</p>
+
 ### Pro 版
 
 Pro 版仅是社区版的一个增强和补充，对于通用的、广泛的功能需求不会收录到 Pro 版中。
@@ -49,6 +53,8 @@ Pro 版仅是社区版的一个增强和补充，对于通用的、广泛的功�
 > registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest \
 > registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite
 
+#### 标准版
+
 ```
 docker run -it -d --name dpanel --restart=always \
  -p 80:80 -p 443:443 -p 8807:8080 -e APP_NAME=dpanel \
@@ -56,7 +62,7 @@ docker run -it -d --name dpanel --restart=always \
  dpanel/dpanel:latest 
 ```
 
-##### lite 版
+#### lite 版
 
 lite 版去掉了域名转发相关，需要自行转发域名绑定容器，不需要绑定 80 及 443 端口
 
