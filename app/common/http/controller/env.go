@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -75,6 +76,11 @@ func (self Env) Create(http *gin.Context) {
 		docker.WithAddress(params.Address),
 		docker.WithName(params.Name),
 	}
+	if params.ComposePath == "" {
+		params.ComposePath = fmt.Sprintf("compose-%s", params.Name)
+	}
+	_ = os.MkdirAll(filepath.Join(storage.Local{}.GetStorageLocalPath(), params.ComposePath), 0755)
+
 	client := &docker.Client{
 		Name:              params.Name,
 		Title:             params.Title,
