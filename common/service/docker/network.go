@@ -6,7 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 )
 
-func (self *Builder) NetworkRemove(networkName string) error {
+func (self Builder) NetworkRemove(networkName string) error {
 	if networkRow, err := self.Client.NetworkInspect(self.Ctx, networkName, network.InspectOptions{}); err == nil {
 		for _, item := range networkRow.Containers {
 			err = self.Client.NetworkDisconnect(self.Ctx, networkName, item.Name, true)
@@ -19,7 +19,7 @@ func (self *Builder) NetworkRemove(networkName string) error {
 	return nil
 }
 
-func (self *Builder) NetworkCreate(networkName string, ipV4, ipV6 *NetworkCreateItem) (string, error) {
+func (self Builder) NetworkCreate(networkName string, ipV4, ipV6 *NetworkCreateItem) (string, error) {
 	option := network.CreateOptions{
 		Driver: "bridge",
 		Options: map[string]string{

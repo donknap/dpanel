@@ -179,7 +179,7 @@ func (self Home) Info(http *gin.Context) {
 	dpanelContainerInfo, _ := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
 	info, _ := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if info.ID != "" {
-		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Host, docker.Sdk.Client.DaemonHost())
+		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{

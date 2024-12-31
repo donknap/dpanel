@@ -22,7 +22,7 @@ type Env struct {
 }
 
 func (self Env) GetList(http *gin.Context) {
-	result := make([]*accessor.DockerClientResult, 0)
+	result := make([]*docker.Client, 0)
 
 	setting, err := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDocker)
 	if err == nil {
@@ -49,13 +49,15 @@ func (self Env) GetList(http *gin.Context) {
 
 func (self Env) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Name      string `json:"name" binding:"required"`
-		Title     string `json:"title" binding:"required"`
-		Address   string `json:"address" binding:"required"`
-		TlsCa     string `json:"tlsCa"`
-		TlsCert   string `json:"tlsCert"`
-		TlsKey    string `json:"tlsKey"`
-		EnableTLS bool   `json:"enableTLS"`
+		Name              string `json:"name" binding:"required"`
+		Title             string `json:"title" binding:"required"`
+		Address           string `json:"address" binding:"required"`
+		TlsCa             string `json:"tlsCa"`
+		TlsCert           string `json:"tlsCert"`
+		TlsKey            string `json:"tlsKey"`
+		EnableTLS         bool   `json:"enableTLS"`
+		EnableComposePath bool   `json:"enableComposePath"`
+		ComposePath       string `json:"composePath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -65,15 +67,29 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("开启 TLS 时需要上传证书"), 500)
 		return
 	}
-	options := docker.NewDockerClientOption{
-		Address: params.Address,
-		Host:    params.Name,
+	defaultEnv := false
+	if params.Name == "local" {
+		defaultEnv = true
+	}
+	options := []docker.Option{
+		docker.WithAddress(params.Address),
+		docker.WithName(params.Name),
+	}
+	client := &docker.Client{
+		Name:              params.Name,
+		Title:             params.Title,
+		Address:           params.Address,
+		TlsCa:             params.TlsCa,
+		TlsCert:           params.TlsCert,
+		TlsKey:            params.TlsKey,
+		EnableTLS:         params.EnableTLS,
+		Default:           defaultEnv,
+		EnableComposePath: params.EnableComposePath,
+		ComposePath:       params.ComposePath,
 	}
 	if params.EnableTLS {
 		if strings.HasSuffix(params.TlsCa, ".pem") {
-			options.TlsCa = params.TlsCa
-			options.TlsCert = params.TlsCert
-			options.TlsKey = params.TlsKey
+			options = append(options, docker.WithTLS(params.TlsCa, params.TlsCert, params.TlsKey))
 		} else {
 			certList := []struct {
 				name    string
@@ -106,12 +122,20 @@ func (self Env) Create(http *gin.Context) {
 					return
 				}
 			}
-			options.TlsCa = filepath.Join(certRootPath, "ca.pem")
-			options.TlsCert = filepath.Join(certRootPath, "cert.pem")
-			options.TlsKey = filepath.Join(certRootPath, "key.pem")
+			client.TlsCa = filepath.Join(certRootPath, "ca.pem")
+			client.TlsCert = filepath.Join(certRootPath, "cert.pem")
+			client.TlsKey = filepath.Join(certRootPath, "key.pem")
+
+			options = append(options,
+				docker.WithTLS(
+					client.TlsCa,
+					client.TlsCert,
+					client.TlsKey,
+				),
+			)
 		}
 	}
-	dockerClient, err := docker.NewDockerClient(options)
+	dockerClient, err := docker.NewBuilder(options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -125,20 +149,7 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，错误信息："+err.Error()), 500)
 		return
 	}
-	defaultEnv := false
-	if params.Name == "local" {
-		defaultEnv = true
-	}
-	logic.DockerEnv{}.UpdateEnv(&accessor.DockerClientResult{
-		Name:      params.Name,
-		Title:     params.Title,
-		Address:   params.Address,
-		TlsCa:     options.TlsCa,
-		TlsCert:   options.TlsCert,
-		TlsKey:    options.TlsKey,
-		EnableTLS: params.EnableTLS,
-		Default:   defaultEnv,
-	})
+	logic.DockerEnv{}.UpdateEnv(client)
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -157,29 +168,24 @@ func (self Env) Switch(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	options := docker.NewDockerClientOption{}
-	address := ""
+	options := make([]docker.Option, 0)
 	if row, ok := setting.Value.Docker[params.Name]; !ok {
 		self.JsonResponseWithError(http, errors.New("Docker 客户端不存在，请先添加"), 500)
 		return
 	} else {
-		address = row.Address
+		if docker.Sdk.Client.DaemonHost() == row.Address {
+			self.JsonSuccessResponse(http)
+			return
+		}
+		options = append(options, docker.WithAddress(row.Address))
+		options = append(options, docker.WithName(row.Name))
 		if row.EnableTLS {
-			options.TlsCa = row.TlsCa
-			options.TlsCert = row.TlsCert
-			options.TlsKey = row.TlsKey
+			options = append(options, docker.WithTLS(row.TlsCa, row.TlsCert, row.TlsKey))
 		}
 	}
-	options.Address = address
-	options.Host = params.Name
-
-	if docker.Sdk.Client.DaemonHost() == address {
-		self.JsonSuccessResponse(http)
-		return
-	}
 	oldDockerClient := docker.Sdk
-	dockerClient, err := docker.NewDockerClient(options)
+
+	dockerClient, err := docker.NewBuilder(options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -196,7 +202,7 @@ func (self Env) Switch(http *gin.Context) {
 	go logic.EventLogic{}.MonitorLoop()
 
 	// 清除掉统计数据
-	logic.Setting{}.Save(&entity.Setting{
+	_ = logic.Setting{}.Save(&entity.Setting{
 		GroupName: logic.SettingGroupSetting,
 		Name:      logic.SettingGroupSettingDiskUsage,
 		Value: &accessor.SettingValueOption{

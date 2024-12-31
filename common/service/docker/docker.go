@@ -2,81 +2,132 @@ package docker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/service/storage"
 	"log/slog"
+	"os"
 	"path/filepath"
 )
 
 var (
-	Sdk              = &Builder{}
-	BuilderAuthor    = "DPanel"
-	BuildDesc        = "DPanel is a docker web management panel"
-	BuildWebSite     = "https://dpanel.cc"
-	BuildVersion     = "1.0.0"
-	HostnameTemplate = "%s.pod.dpanel.local"
+	Sdk               = &Builder{}
+	BuilderAuthor     = "DPanel"
+	BuildDesc         = "DPanel is a docker web management panel"
+	BuildWebSite      = "https://dpanel.cc"
+	BuildVersion      = "1.0.0"
+	HostnameTemplate  = "%s.pod.dpanel.local"
+	DefaultClientName = "local"
 )
 
+type Client struct {
+	Name              string `json:"name,omitempty"`
+	Title             string `json:"title,omitempty"`
+	Address           string `json:"address,omitempty"`
+	Default           bool   `json:"default,omitempty"`
+	TlsCa             string `json:"tlsCa,omitempty"`
+	TlsCert           string `json:"tlsCert,omitempty"`
+	TlsKey            string `json:"tlsKey,omitempty"`
+	EnableTLS         bool   `json:"enableTLS,omitempty"`
+	EnableComposePath bool   `json:"enableComposePath,omitempty"`
+	ComposePath       string `json:"composePath,omitempty"`
+}
+
 type Builder struct {
+	Name          string
 	Client        *client.Client
 	Ctx           context.Context
 	CtxCancelFunc context.CancelFunc
-	ExtraParams   []string
-	Env           []string
-	Host          string
+	runParams     []string
+	runEnv        []string
+	clientOption  []client.Opt
 }
 
-type NewDockerClientOption struct {
-	Host    string // docker 客户端名称
-	Address string // docker 客户端地址
-	TlsCa   string
-	TlsCert string
-	TlsKey  string
+func (self Builder) Close() {
+	if self.CtxCancelFunc != nil {
+		self.CtxCancelFunc()
+	}
 }
 
-func NewDockerClient(option NewDockerClientOption) (*Builder, error) {
-	builder := &Builder{
-		ExtraParams: make([]string, 0),
-		Env:         make([]string, 0),
-	}
+type Option func(builder *Builder) error
 
-	dockerOption := []client.Opt{
-		client.FromEnv,
-		client.WithAPIVersionNegotiation(),
+func NewBuilder(opts ...Option) (*Builder, error) {
+	c := &Builder{
+		Name:      "local",
+		runParams: make([]string, 0),
+		runEnv:    make([]string, 0),
+		clientOption: []client.Opt{
+			client.FromEnv,
+			client.WithAPIVersionNegotiation(),
+		},
 	}
-
-	if option.Address != "" {
-		builder.ExtraParams = append(builder.ExtraParams, "-H", option.Address)
-		builder.Env = append(builder.Env, fmt.Sprintf("DOCKER_HOST=%s", option.Address))
-		dockerOption = append(dockerOption, client.WithHost(option.Address))
-	} else {
-		option.Host = "local"
+	for _, opt := range opts {
+		err := opt(c)
+		if err != nil {
+			return nil, err
+		}
 	}
-	if option.TlsCa != "" && option.TlsCert != "" && option.TlsKey != "" {
-		dockerOption = append(dockerOption, client.WithTLSClientConfig(
-			filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCa),
-			filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCert),
-			filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsKey),
-		))
-		builder.ExtraParams = append(builder.ExtraParams, "--tlsverify",
-			"--tlscacert", filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCa),
-			"--tlscert", filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCert),
-			"--tlskey", filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsKey))
-		builder.Env = append(builder.Env,
-			"DOCKER_TLS_VERIFY=1",
-			"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetStorageCertPath(), option.TlsCa)),
-		)
-		slog.Debug("docker connect tls", "extra params", builder.ExtraParams, "env", builder.Env)
-	}
-	obj, err := client.NewClientWithOpts(dockerOption...)
+	obj, err := client.NewClientWithOpts(c.clientOption...)
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	builder.Client = obj
-	builder.Ctx = ctx
-	builder.CtxCancelFunc = cancelFunc
-	builder.Host = option.Host
-	return builder, nil
+	c.Client = obj
+	c.Ctx = ctx
+	c.CtxCancelFunc = cancelFunc
+	return c, nil
+}
+
+func WithName(name string) Option {
+	return func(self *Builder) error {
+		self.Name = name
+		return nil
+	}
+}
+
+func WithAddress(host string) Option {
+	return func(self *Builder) error {
+		self.runParams = append(self.runParams, "-H", host)
+		self.runEnv = append(self.runEnv, fmt.Sprintf("DOCKER_HOST=%s", host))
+		self.clientOption = append(self.clientOption, client.WithHost(host))
+		return nil
+	}
+}
+
+func WithTLS(caPath, certPath, keyPath string) Option {
+	certRealPath := map[string]string{
+		"ca":   filepath.Join(storage.Local{}.GetStorageCertPath(), caPath),
+		"cert": filepath.Join(storage.Local{}.GetStorageCertPath(), certPath),
+		"key":  filepath.Join(storage.Local{}.GetStorageCertPath(), keyPath),
+	}
+	return func(self *Builder) error {
+		if caPath == "" || certPath == "" || keyPath == "" {
+			return errors.New("invalid TLS configuration")
+		}
+		for _, path := range certRealPath {
+			if _, err := os.Stat(path); err != nil {
+				return errors.New("cert file not found: " + path)
+			}
+		}
+
+		self.clientOption = append(self.clientOption, client.WithTLSClientConfig(
+			certRealPath["ca"],
+			certRealPath["cert"],
+			certRealPath["key"],
+		))
+
+		self.runParams = append(self.runParams, "--tlsverify",
+			"--tlscacert", certRealPath["ca"],
+			"--tlscert", certRealPath["cert"],
+			"--tlskey", certRealPath["key"],
+		)
+		self.runEnv = append(self.runEnv,
+			"DOCKER_TLS_VERIFY=1",
+			"DOCKER_CERT_PATH="+filepath.Dir(certRealPath["ca"]),
+		)
+
+		slog.Debug("docker connect tls", "extra params", self.runParams, "env", self.runEnv)
+		return nil
+	}
 }

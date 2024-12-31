@@ -76,10 +76,14 @@ func (self Acme) Issue(option *AcmeIssueOption) (io.ReadCloser, error) {
 	} else {
 		command = append(command, "--issue")
 	}
-	out, err := exec.Command{}.RunInTerminal(&exec.RunCommandOption{
-		CmdName: commandName,
-		CmdArgs: command,
-	})
+	cmd, err := exec.New(
+		exec.WithCommandName(commandName),
+		exec.WithArgs(command...),
+	)
+	if err != nil {
+		return nil, err
+	}
+	out, err := cmd.RunInTerminal(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -87,15 +91,20 @@ func (self Acme) Issue(option *AcmeIssueOption) (io.ReadCloser, error) {
 }
 
 func (self Acme) Info(serverName string) *acmeInfoResult {
-	out := exec.Command{}.RunWithResult(&exec.RunCommandOption{
-		CmdName: commandName,
-		CmdArgs: []string{
-			"--config-home", storage.Local{}.GetStorageLocalPath() + "/acme",
+	cmd, err := exec.New(
+		exec.WithCommandName(commandName),
+		exec.WithArgs(
+			"--config-home", storage.Local{}.GetStorageLocalPath()+"/acme",
 			"--info",
 			"--domain", serverName,
-		},
-	})
+		),
+	)
 	result := &acmeInfoResult{}
+	if err != nil {
+		return result
+	}
+
+	out := cmd.RunWithResult()
 	for _, row := range strings.Split(out, "\n") {
 		if strings.HasPrefix(row, "Le_CertCreateTimeStr=") {
 			value, _ := strings.CutPrefix(row, "Le_CertCreateTimeStr=")

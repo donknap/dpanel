@@ -4,24 +4,25 @@ import (
 	"errors"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/service/docker"
 	"golang.org/x/exp/maps"
 )
 
 type DockerEnv struct {
 }
 
-func (self DockerEnv) UpdateEnv(data *accessor.DockerClientResult) {
+func (self DockerEnv) UpdateEnv(data *docker.Client) {
 	setting, err := Setting{}.GetValue(SettingGroupSetting, SettingGroupSettingDocker)
 	if err != nil || setting.Value == nil || setting.Value.Docker == nil {
 		setting = &entity.Setting{
 			GroupName: SettingGroupSetting,
 			Name:      SettingGroupSettingDocker,
 			Value: &accessor.SettingValueOption{
-				Docker: make(map[string]*accessor.DockerClientResult, 0),
+				Docker: make(map[string]*docker.Client, 0),
 			},
 		}
 	}
-	dockerList := map[string]*accessor.DockerClientResult{
+	dockerList := map[string]*docker.Client{
 		data.Name: data,
 	}
 	maps.Copy(setting.Value.Docker, dockerList)
@@ -29,7 +30,7 @@ func (self DockerEnv) UpdateEnv(data *accessor.DockerClientResult) {
 	return
 }
 
-func (self DockerEnv) GetEnvByName(name string) (*accessor.DockerClientResult, error) {
+func (self DockerEnv) GetEnvByName(name string) (*docker.Client, error) {
 	dockerEnvSetting, err := Setting{}.GetValue(SettingGroupSetting, SettingGroupSettingDocker)
 	if err != nil {
 		return nil, err

@@ -44,14 +44,16 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 	}()
 	slog.Debug("store git download", "path", tempDownloadPath)
 
-	out, err := exec.Command{}.Run(&exec.RunCommandOption{
-		CmdName: "git",
-		CmdArgs: []string{
-			"clone", "--depth", "1",
-			gitUrl, tempDownloadPath,
-		},
-		Timeout: time.Second * 30,
-	})
+	cmd, err := exec.New(
+		exec.WithCommandName("git"),
+		exec.WithArgs("clone", "--depth", "1",
+			gitUrl, tempDownloadPath),
+		exec.WithTimeout(time.Second*5),
+	)
+	if err != nil {
+		return err
+	}
+	out, err := cmd.Run()
 	if err != nil {
 		return err
 	}

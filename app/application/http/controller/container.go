@@ -271,8 +271,6 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 
-	_ = notice.Message{}.Info("containerBackup", "name", containerInfo.Name)
-
 	if containerInfo.State.Running {
 		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.Name, container.StopOptions{})
 		if err != nil {
@@ -286,6 +284,8 @@ func (self Container) Upgrade(http *gin.Context) {
 
 	// 未备份旧容器，需要先删除，否则名称会冲突
 	if params.EnableBak {
+		_ = notice.Message{}.Info("containerBackup", "name", containerInfo.Name)
+
 		// 备份旧容器
 		err = docker.Sdk.Client.ContainerRename(
 			docker.Sdk.Ctx,
@@ -309,12 +309,14 @@ func (self Container) Upgrade(http *gin.Context) {
 		}
 
 	} else {
-		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, bakContainerName, container.RemoveOptions{})
+		_ = notice.Message{}.Info("containerRemove", containerInfo.Name)
+
+		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.Name, container.RemoveOptions{})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, bakImageName, image.RemoveOptions{})
+		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, containerInfo.Image, image.RemoveOptions{})
 		if err != nil {
 			slog.Debug("container upgrade delete image", "error", err.Error())
 		}

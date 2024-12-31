@@ -111,7 +111,7 @@ func (self Setting) GetSetting(http *gin.Context) {
 
 func (self Setting) GetServerIp(http *gin.Context) {
 	serverIp := ""
-	if docker.Sdk.Host == "local" {
+	if docker.Sdk.Name == docker.DefaultClientName {
 		row, _ := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingServer)
 		if row != nil && row.Value != nil {
 			serverIp = row.Value.ServerIp

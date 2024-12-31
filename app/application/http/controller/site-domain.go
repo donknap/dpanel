@@ -420,15 +420,19 @@ func (self SiteDomain) UpdateDomain(http *gin.Context) {
 }
 
 func (self SiteDomain) RestartNginx(http *gin.Context) {
-	exec.Command{}.RunWithResult(&exec.RunCommandOption{
-		CmdName: "nginx",
-		CmdArgs: []string{
-			"-s", "stop",
-		},
-	})
-	exec.Command{}.RunWithResult(&exec.RunCommandOption{
-		CmdName: "nginx",
-	})
+	cmd, _ := exec.New(
+		exec.WithCommandName("nginx"),
+		exec.WithArgs("-s", "stop"),
+	)
+	out := cmd.RunWithResult()
+	slog.Debug("site domain stop nginx", "out", out)
+
+	cmd, _ = exec.New(
+		exec.WithCommandName("nginx"),
+	)
+	out = cmd.RunWithResult()
+	slog.Debug("site domain stop nginx", "out", out)
+
 	self.JsonSuccessResponse(http)
 	return
 }

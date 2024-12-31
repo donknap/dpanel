@@ -35,16 +35,19 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 	}
 
 	result := make([]*statItemResult, 0)
-	response := exec.Command{}.RunWithResult(&exec.RunCommandOption{
-		CmdName: "docker",
-		CmdArgs: append(
-			docker.Sdk.ExtraParams,
-			"stats", "-a",
-			"--format", "json",
-			"--no-stream",
-		),
-		Timeout: time.Second * 60,
-	})
+
+	option := docker.Sdk.GetRunCmd(
+		"stats", "-a",
+		"--format", "json",
+		"--no-stream")
+	option = append(option, exec.WithTimeout(time.Second*60))
+
+	cmd, err := exec.New(option...)
+	if err != nil {
+		return nil, err
+	}
+	response := cmd.RunWithResult()
+
 	statJsonItem := struct {
 		BlockIO   string
 		CPUPerc   string

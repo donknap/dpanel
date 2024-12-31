@@ -2,6 +2,7 @@ package storage
 
 import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -43,5 +44,9 @@ func (self Local) GetScriptTemplatePath() string {
 }
 
 func (self Local) GetStorageLocalPath() string {
+	if facade.GetConfig() == nil {
+		slog.Debug("storage local path empty")
+		return ""
+	}
 	return facade.GetConfig().GetString("storage.local.path")
 }

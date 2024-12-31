@@ -12,7 +12,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	exec2 "os/exec"
 	"strings"
 )
 
@@ -119,25 +118,19 @@ func (self Task) Ps() []*composeContainerResult {
 		return result
 	}
 	// self.runCommand 只负责执行，Ps 命令需要返回结果
-	cmd := self.Composer.GetBaseCommand()
-	cmd = append(cmd, "ps", "--format", "json", "--all")
+	args := self.Composer.GetBaseCommand()
+	args = append(args, "ps", "--format", "json", "--all")
 
-	out := ""
-	if _, err := exec2.LookPath("docker-compose"); err == nil {
-		out = exec.Command{}.RunWithResult(&exec.RunCommandOption{
-			CmdName: "docker-compose",
-			CmdArgs: cmd,
-			Env:     docker.Sdk.Env,
-		})
-	} else {
-		out = exec.Command{}.RunWithResult(&exec.RunCommandOption{
-			CmdName: "docker",
-			CmdArgs: append(append(docker.Sdk.ExtraParams, "compose"), cmd...),
-		})
+	cmd, err := exec.New(docker.Sdk.GetComposeCmd(args...)...)
+	if err != nil {
+		return result
 	}
+
+	out := cmd.RunWithResult()
 	if out == "" {
 		return result
 	}
+
 	if strings.HasPrefix(out, "[{") {
 		// 兼容 docker-compose ps 返回数据
 		temp := make([]*composeContainerResult, 0)
@@ -185,19 +178,9 @@ func (self Task) GetYaml() ([2]string, error) {
 
 func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 	command = append(self.Composer.GetBaseCommand(), command...)
-	if _, err := exec2.LookPath("docker-compose"); err == nil {
-		return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
-			CmdName: "docker-compose",
-			CmdArgs: command,
-			Env:     docker.Sdk.Env,
-		})
-	} else {
-		return exec.Command{}.RunInTerminal(&exec.RunCommandOption{
-			CmdName: "docker",
-			CmdArgs: append(
-				append(docker.Sdk.ExtraParams, "compose", "--progress", "tty"),
-				command...,
-			),
-		})
+	cmd, err := exec.New(docker.Sdk.GetComposeCmd(command...)...)
+	if err != nil {
+		return nil, err
 	}
+	return cmd.RunInTerminal(nil)
 }

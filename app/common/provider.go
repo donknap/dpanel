@@ -4,7 +4,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/service/crontab"
@@ -98,26 +97,27 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	if e := os.Getenv(client.EnvOverrideHost); e != "" {
 		defaultDockerHost = e
 	}
-	defaultDockerEnv, err := logic.DockerEnv{}.GetEnvByName("local")
+
+	defaultDockerEnv, err := logic.DockerEnv{}.GetEnvByName(docker.DefaultClientName)
 	if err != nil {
-		defaultDockerEnv = &accessor.DockerClientResult{
-			Name:    "local",
-			Title:   "默认",
+		defaultDockerEnv = &docker.Client{
+			Name:    docker.DefaultClientName,
+			Title:   docker.DefaultClientName,
 			Address: defaultDockerHost,
 			Default: true,
 		}
 		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
 	}
-	dockerOption := docker.NewDockerClientOption{
-		Host:    defaultDockerEnv.Name,
-		Address: defaultDockerEnv.Address,
+
+	options := []docker.Option{
+		docker.WithName(defaultDockerEnv.Name),
+		docker.WithAddress(defaultDockerEnv.Address),
 	}
 	if defaultDockerEnv.EnableTLS {
-		dockerOption.TlsCa = defaultDockerEnv.TlsCa
-		dockerOption.TlsCert = defaultDockerEnv.TlsCert
-		dockerOption.TlsKey = defaultDockerEnv.TlsKey
+		options = append(options, docker.WithTLS(defaultDockerEnv.TlsCa, defaultDockerEnv.TlsCert, defaultDockerEnv.TlsKey))
 	}
-	docker.Sdk, err = docker.NewDockerClient(dockerOption)
+	docker.Sdk, err = docker.NewBuilder(options...)
+
 	_, err = docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err == nil {
 		go logic.EventLogic{}.MonitorLoop()
