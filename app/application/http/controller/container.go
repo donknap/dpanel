@@ -247,6 +247,18 @@ func (self Container) Upgrade(http *gin.Context) {
 		containerInfo.Image = params.ImageTag
 	}
 
+	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, containerInfo.Config.Image)
+	// 如果旧的容器使用的镜像和重新拉取的镜像一致则不升级
+	// 多平台下的其它平台镜像推送后，也会提示更新
+	// 不一定就是本平台镜像有更新
+	oldContainerImageId := containerInfo.Image
+	if containerInfo.Image == imageInfo.ID {
+		//self.JsonResponseWithoutError(http, gin.H{
+		//	"containerId": containerInfo.ID,
+		//})
+		//return
+	}
+
 	// 成功的创建一个新的容器后再对旧的进停止或是删除操作
 	_ = notice.Message{}.Info("containerCreate", containerInfo.Name)
 	newContainerName := fmt.Sprintf("%s-copy-%s", containerInfo.Name, bakTime)
@@ -258,16 +270,6 @@ func (self Container) Upgrade(http *gin.Context) {
 	if err != nil {
 		errRemove := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, newContainerName, container.RemoveOptions{})
 		self.JsonResponseWithError(http, errors.Join(err, errRemove), 500)
-		return
-	}
-
-	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, containerInfo.Config.Image)
-	// 如果旧的容器使用的镜像和重新拉取的镜像一致，表示无升级，只执行复制操作
-	if containerInfo.Image == imageInfo.ID {
-		_ = notice.Message{}.Info("containerCopy", newContainerName)
-		self.JsonResponseWithoutError(http, gin.H{
-			"containerId": out.ID,
-		})
 		return
 	}
 
@@ -297,17 +299,18 @@ func (self Container) Upgrade(http *gin.Context) {
 			return
 		}
 
-		// 备份旧镜像
-		err = docker.Sdk.Client.ImageTag(
-			docker.Sdk.Ctx,
-			containerInfo.Image,
-			bakImageName,
-		)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
+		if oldContainerImageId != imageInfo.ID {
+			// 备份旧镜像
+			err = docker.Sdk.Client.ImageTag(
+				docker.Sdk.Ctx,
+				containerInfo.Image,
+				bakImageName,
+			)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
-
 	} else {
 		_ = notice.Message{}.Info("containerRemove", containerInfo.Name)
 
