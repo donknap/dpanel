@@ -1,7 +1,7 @@
 <h1 align="center">
 <img src="https://cdn.w7.cc/dpanel/dpanel-logo.png" alt="DPanel" width="500" />
 </h1>
-<h4 align="center"> DPanel dpanel is a lightweight panel for docker. </h4>
+<h4 align="center"> DPanel is a lightweight panel for docker. </h4>
 
 <div align="center">
 
