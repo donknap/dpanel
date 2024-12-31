@@ -21,6 +21,10 @@ var (
 	SettingGroupUserFounder = "founder"
 )
 
+var (
+	SettingGroupCheckContainerUpgrade = "checkContainerUpgrade"
+)
+
 type Setting struct {
 }
 
