@@ -12,7 +12,7 @@ func GetImageTagDetail(tag string) *ImageTagDetail {
 	// 如果没有指定仓库地址，则默认为 docker.io
 	temp := strings.Split(tag, "/")
 	if !strings.Contains(temp[0], ".") || len(temp) == 1 {
-		tag = "docker.io/" + tag
+		tag = "index.docker.io/" + tag
 	}
 
 	temp = strings.Split(tag, "/")
