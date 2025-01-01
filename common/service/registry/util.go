@@ -2,6 +2,11 @@ package registry
 
 import "strings"
 
+const (
+	DefaultRegistryDomain = "docker.io"
+	DefaultRegistryHost   = "index.docker.io"
+)
+
 func GetImageTagDetail(tag string) *ImageTagDetail {
 	tag = strings.TrimPrefix(strings.TrimPrefix(tag, "http://"), "https://")
 	result := &ImageTagDetail{}
@@ -12,7 +17,7 @@ func GetImageTagDetail(tag string) *ImageTagDetail {
 	// 如果没有指定仓库地址，则默认为 docker.io
 	temp := strings.Split(tag, "/")
 	if !strings.Contains(temp[0], ".") || len(temp) == 1 {
-		tag = "index.docker.io/" + tag
+		tag = DefaultRegistryDomain + "/" + tag
 	}
 
 	temp = strings.Split(tag, "/")

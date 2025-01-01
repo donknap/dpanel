@@ -21,9 +21,13 @@ func WithCredentials(username, password string) Option {
 
 func WithRegistryHost(host string) Option {
 	return func(registry *Registry) {
+		host = strings.TrimPrefix(strings.TrimPrefix(host, "http://"), "https://")
+		if host == DefaultRegistryDomain {
+			host = DefaultRegistryHost
+		}
 		registry.url = url.URL{
 			Scheme: "https",
-			Host:   strings.TrimPrefix(strings.TrimPrefix(host, "http://"), "https://"),
+			Host:   host,
 			Path:   "/v2/",
 		}
 	}
