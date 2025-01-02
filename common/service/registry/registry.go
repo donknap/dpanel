@@ -130,7 +130,7 @@ func (self Registry) getBearerUrl(challenge string, scope string) (*url.URL, err
 
 func (self Registry) request(req *http.Request, scope string) (*http.Response, error) {
 	cacheKey := fmt.Sprintf("%s@%s", docker.Sdk.Name, req.URL.String())
-	if item, exists := cache.Load(cacheKey); exists {
+	if item, exists := cache.Load(cacheKey); exists && self.cacheTime > 0 {
 		c := item.(cacheItem)
 		if c.expireTime.After(time.Now()) {
 			return &http.Response{
