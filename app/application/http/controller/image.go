@@ -539,8 +539,9 @@ func (self Image) UpdateTitle(http *gin.Context) {
 
 func (self Image) CheckUpgrade(http *gin.Context) {
 	type ParamsValidate struct {
-		Tag string `json:"tag" binding:"required"`
-		Md5 string `json:"md5" binding:"required"`
+		Tag       string `json:"tag" binding:"required"`
+		Md5       string `json:"md5" binding:"required"`
+		CacheTime int    `json:"cacheTime"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -554,12 +555,13 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 
 	digest := ""
 	upgrade := false
-	option := []registry.Option{
-		registry.WithRequestCacheTime(time.Hour * 2),
-	}
 
 	registryList, exists, username, password := logic.Image{}.GetRegistryList(params.Tag)
 	for _, s := range registryList {
+		option := make([]registry.Option, 0)
+		if params.CacheTime > 0 {
+			option = append(option, registry.WithRequestCacheTime(time.Second*time.Duration(params.CacheTime)))
+		}
 		if exists {
 			option = append(option, registry.WithCredentials(username, password))
 		}
