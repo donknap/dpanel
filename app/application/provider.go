@@ -43,6 +43,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/container/export", controller.Container{}.Export)
 			cors.POST("/app/container/commit", controller.Container{}.Commit)
 			cors.POST("/app/container/copy", controller.Container{}.Copy)
+			cors.POST("/app/container/ignore", controller.Container{}.Ignore)
 
 			cors.POST("/app/container/get-stat-info", controller.Container{}.GetStatInfo)
 			cors.POST("/app/container/get-process-info", controller.Container{}.GetProcessInfo)

@@ -8,21 +8,18 @@ import (
 
 // 全局配置
 var (
-	SettingGroupSetting          = "setting"
-	SettingGroupSettingServer    = "server" // 服务器
-	SettingGroupSettingDocker    = "docker" // docker env
-	SettingGroupSettingTwoFa     = "twoFa"  // 双因素
-	SettingGroupSettingDiskUsage = "diskUsage"
+	SettingGroupSetting                     = "setting"
+	SettingGroupSettingServer               = "server" // 服务器
+	SettingGroupSettingDocker               = "docker" // docker env
+	SettingGroupSettingTwoFa                = "twoFa"  // 双因素
+	SettingGroupSettingDiskUsage            = "diskUsage"
+	SettingGroupSettingCheckContainerIgnore = "checkContainerIgnore"
 )
 
 // 用户相关数据
 var (
 	SettingGroupUser        = "user"
 	SettingGroupUserFounder = "founder"
-)
-
-var (
-	SettingGroupCheckContainerUpgrade = "checkContainerUpgrade"
 )
 
 type Setting struct {
