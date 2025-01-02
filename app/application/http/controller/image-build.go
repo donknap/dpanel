@@ -2,8 +2,8 @@ package controller
 
 import (
 	"errors"
-	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
+	registry2 "github.com/donknap/dpanel/common/service/registry"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,7 +20,7 @@ func (self Image) GetBuildTask(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("构建任务不存在"), 500)
 		return
 	}
-	tagDetail := logic.Image{}.GetImageTagDetail(imageRow.Tag)
+	tagDetail := registry2.GetImageTagDetail(imageRow.Tag)
 	imageRow.Tag = tagDetail.ImageName
 
 	self.JsonResponseWithoutError(http, gin.H{

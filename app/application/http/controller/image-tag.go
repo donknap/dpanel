@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	registry2 "github.com/donknap/dpanel/common/service/registry"
 	"github.com/gin-gonic/gin"
 	"log/slog"
 	"strings"
@@ -25,7 +26,7 @@ func (self Image) TagRemote(http *gin.Context) {
 		return
 	}
 	var authString string
-	tagDetail := logic.Image{}.GetImageTagDetail(params.Tag)
+	tagDetail := registry2.GetImageTagDetail(params.Tag)
 
 	proxyList := make([]string, 0)
 	// 从官方仓库拉取镜像不用权限
@@ -197,7 +198,7 @@ func (self Image) TagSync(http *gin.Context) {
 				return
 			}
 			for _, tag := range imageDetail.RepoTags {
-				imageName := logic.Image{}.GetImageTagDetail(tag)
+				imageName := registry2.GetImageTagDetail(tag)
 				newImageName := logic.Image{}.GetImageName(&logic.ImageNameOption{
 					Registry:  registry.ServerAddress,
 					Name:      imageName.ImageName,

@@ -24,7 +24,7 @@ func (self Image) GetImageName(option *ImageNameOption) (imageName string) {
 	if option.Name == "" {
 		return ""
 	}
-	temp := self.GetImageTagDetail(option.Name)
+	temp := registry2.GetImageTagDetail(option.Name)
 	imageName = temp.ImageName
 
 	if option.Version != "" {
@@ -46,24 +46,22 @@ func (self Image) GetImageName(option *ImageNameOption) (imageName string) {
 	return imageName
 }
 
-func (self Image) GetImageTagDetail(tag string) *registry2.ImageTagDetail {
-	return registry2.GetImageTagDetail(tag)
-}
-
 func (self Image) GetRegistryAuthString(serverAddress string, username string, password string) string {
 	if password == "" || username == "" {
 		return ""
 	}
-	password, _ = function.AseDecode(facade.GetConfig().GetString("app.name"), password)
-	authString, err := registry.EncodeAuthConfig(registry.AuthConfig{
-		Username: username,
-		Password: password,
-	})
-	if err != nil {
-		slog.Debug("get registry auth string", err.Error())
-		return ""
+	if exists, u, p := self.GetRegistryAuth(username, password); exists {
+		authString, err := registry.EncodeAuthConfig(registry.AuthConfig{
+			Username: u,
+			Password: p,
+		})
+		if err != nil {
+			slog.Debug("get registry auth string", err.Error())
+			return ""
+		}
+		return authString
 	}
-	return authString
+	return ""
 }
 
 func (self Image) GetRegistryAuth(username string, password string) (exists bool, u string, p string) {
@@ -80,7 +78,7 @@ func (self Image) GetRegistryList(imageName string) (proxyList []string, existsA
 	password = ""
 	existsAuth = false
 
-	tagDetail := self.GetImageTagDetail(imageName)
+	tagDetail := registry2.GetImageTagDetail(imageName)
 	// 从官方仓库拉取镜像不用权限
 	registryList, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(tagDetail.Registry)).Find()
 	if registryList != nil && len(registryList) > 0 {

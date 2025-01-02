@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -29,11 +30,14 @@ func New(opts ...Option) *Registry {
 type Registry struct {
 	authString string
 	url        url.URL
-
+	cacheTime  time.Duration
 	Repository *repository
 }
 
-const ChallengeHeader = "WWW-Authenticate"
+const (
+	ScopeRepositoryPull = "repository:%s:pull"
+	ChallengeHeader     = "WWW-Authenticate"
+)
 
 func (self Registry) accessToken(scope string) (string, error) {
 	request, err := http.NewRequest("GET", self.url.String(), nil)
@@ -124,9 +128,23 @@ func (self Registry) getBearerUrl(challenge string, scope string) (*url.URL, err
 	return authURL, nil
 }
 
-func (self Registry) request(req *http.Request) (*http.Response, error) {
+func (self Registry) request(req *http.Request, scope string) (*http.Response, error) {
+	cacheKey := req.URL.String()
+	if item, exists := cache.Load(cacheKey); exists {
+		c := item.(cacheItem)
+		if c.expireTime.After(time.Now()) {
+			return &http.Response{
+				Header: c.header,
+				Body:   io.NopCloser(bytes.NewBuffer(c.body)),
+			}, nil
+		}
+	}
+	token, err := self.accessToken(scope)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", token)
 	req.Header.Set("User-Agent", docker.BuilderAuthor)
-
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -152,5 +170,17 @@ func (self Registry) request(req *http.Request) (*http.Response, error) {
 		}
 		return nil, fmt.Errorf("registry responded to head request with %q, auth: %q", res.Status, wwwAuthHeader)
 	}
+	slog.Debug("registry cache result", "cacheKey", req.URL.String())
+
+	buffer := new(bytes.Buffer)
+	_, _ = io.Copy(buffer, res.Body)
+
+	cache.Store(cacheKey, cacheItem{
+		header:     res.Header,
+		body:       buffer.Bytes(),
+		expireTime: time.Now().Add(self.cacheTime).Local(),
+	})
+
+	res.Body = io.NopCloser(buffer)
 	return res, nil
 }

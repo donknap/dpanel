@@ -12,7 +12,6 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/app/application/logic"
-	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -540,44 +539,27 @@ func (self Image) UpdateTitle(http *gin.Context) {
 
 func (self Image) CheckUpgrade(http *gin.Context) {
 	type ParamsValidate struct {
-		Tag      string `json:"tag" binding:"required"`
-		Md5      string `json:"md5" binding:"required"`
-		CacheKey string `json:"cacheKey" binding:"required"`
+		Tag string `json:"tag" binding:"required"`
+		Md5 string `json:"md5" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
-	}
-	if containerCheckUpgrade, err := new(logic2.Setting).GetValue(logic2.SettingGroupCheckContainerUpgrade, params.CacheKey); err == nil {
-		if containerCheckUpgrade.Value.ContainerUpgrade.IgnoreUpgrade {
-			self.JsonResponseWithoutError(http, gin.H{
-				"upgrade": false,
-				"digest":  "",
-				"ignore":  true,
-			})
-			return
-		}
-		if time.Now().Before(containerCheckUpgrade.Value.ContainerUpgrade.ExpireTime) {
-			self.JsonResponseWithoutError(http, gin.H{
-				"upgrade": containerCheckUpgrade.Value.ContainerUpgrade.Upgrade,
-				"digest":  containerCheckUpgrade.Value.ContainerUpgrade.Digest,
-			})
-			return
-		}
 	}
 	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_ = notice.Message{}.Info("imageCheckUpgrade", "tag", params.Tag)
 
 	digest := ""
 	upgrade := false
+	option := []registry.Option{
+		registry.WithRequestCacheTime(time.Hour * 2),
+	}
 
 	registryList, exists, username, password := logic.Image{}.GetRegistryList(params.Tag)
 	for _, s := range registryList {
-		option := make([]registry.Option, 0)
 		if exists {
 			option = append(option, registry.WithCredentials(username, password))
 		}
@@ -600,20 +582,6 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	_ = logic2.Setting{}.Save(&entity.Setting{
-		GroupName: logic2.SettingGroupCheckContainerUpgrade,
-		Name:      params.CacheKey,
-		Value: &accessor.SettingValueOption{
-			ContainerUpgrade: &accessor.CheckContainerUpgrade{
-				ExpireTime:    time.Now().Add(24 * time.Hour),
-				Upgrade:       upgrade,
-				Digest:        digest,
-				IgnoreDigest:  "",
-				IgnoreUpgrade: false,
-			},
-		},
-	})
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"upgrade": upgrade,
