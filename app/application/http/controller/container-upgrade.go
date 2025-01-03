@@ -15,6 +15,7 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"log/slog"
 	"slices"
 	"strings"
@@ -34,6 +35,10 @@ func (self Container) Upgrade(http *gin.Context) {
 	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if containerInfo.Name == "/"+facade.GetConfig().GetString("APP_NAME") || containerInfo.Name == "/dpanel" {
+		self.JsonResponseWithError(http, errors.New("面板无法升级自身，请通过【系统更新】查看 dpanel 面板升级脚本"), 500)
 		return
 	}
 	bakTime := time.Now().Format(function.YmdHis)
