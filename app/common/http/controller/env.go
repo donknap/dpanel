@@ -76,8 +76,10 @@ func (self Env) Create(http *gin.Context) {
 		docker.WithAddress(params.Address),
 		docker.WithName(params.Name),
 	}
-	if params.ComposePath == "" {
-		params.ComposePath = fmt.Sprintf("compose-%s", params.Name)
+	if params.EnableComposePath {
+		if params.ComposePath == "" {
+			params.ComposePath = fmt.Sprintf("compose-%s", params.Name)
+		}
 	}
 	_ = os.MkdirAll(filepath.Join(storage.Local{}.GetStorageLocalPath(), params.ComposePath), 0755)
 
@@ -93,6 +95,7 @@ func (self Env) Create(http *gin.Context) {
 		EnableComposePath: params.EnableComposePath,
 		ComposePath:       params.ComposePath,
 	}
+
 	if params.EnableTLS {
 		if strings.HasSuffix(params.TlsCa, ".pem") {
 			options = append(options, docker.WithTLS(params.TlsCa, params.TlsCert, params.TlsKey))
