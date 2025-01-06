@@ -149,16 +149,19 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		dockerClient.CtxCancelFunc()
-		_ = dockerClient.Client.Close()
-	}()
 	_, err = dockerClient.Client.Info(docker.Sdk.Ctx)
 	if err != nil {
 		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，错误信息："+err.Error()), 500)
 		return
 	}
 	logic.DockerEnv{}.UpdateEnv(client)
+	// 如果修改的是当前客户端的连接地址，则更新 docker sdk
+	if docker.Sdk.Name == params.Name && docker.Sdk.Client.DaemonHost() != params.Address {
+		docker.Sdk.Close()
+		docker.Sdk = dockerClient
+	} else {
+		dockerClient.Close()
+	}
 	self.JsonSuccessResponse(http)
 	return
 }
