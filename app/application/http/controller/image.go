@@ -581,7 +581,7 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		}
 	}
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		self.JsonResponseWithError(http, errors.Join(errors.New("检测容器更新失败 "), err), 500)
 		return
 	}
 
