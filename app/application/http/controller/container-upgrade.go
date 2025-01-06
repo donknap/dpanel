@@ -32,7 +32,7 @@ func (self Container) Upgrade(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	containerInfo, err := docker.Sdk.ContainerCopyInspect(params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -41,6 +41,7 @@ func (self Container) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("面板无法升级自身，请通过【系统更新】查看 dpanel 面板升级脚本"), 500)
 		return
 	}
+
 	bakTime := time.Now().Format(function.YmdHis)
 
 	// 更新容器时可以更改镜像 tag
@@ -81,6 +82,15 @@ func (self Container) Upgrade(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		if containerInfo.HostConfig.AutoRemove {
+			// 如果是自动删除，则等待容器自动被销毁
+			for {
+				time.Sleep(time.Second * 1)
+				if _, err = docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerInfo.Name); err != nil {
+					break
+				}
+			}
+		}
 	}
 
 	bakContainerName := fmt.Sprintf("%s-bak-%s", containerInfo.Name, bakTime)
@@ -90,15 +100,17 @@ func (self Container) Upgrade(http *gin.Context) {
 	if params.EnableBak {
 		_ = notice.Message{}.Info("containerBackup", "name", containerInfo.Name)
 
-		// 备份旧容器
-		err = docker.Sdk.Client.ContainerRename(
-			docker.Sdk.Ctx,
-			containerInfo.Name,
-			bakContainerName,
-		)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
+		if !containerInfo.HostConfig.AutoRemove {
+			// 备份旧容器
+			err = docker.Sdk.Client.ContainerRename(
+				docker.Sdk.Ctx,
+				containerInfo.Name,
+				bakContainerName,
+			)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 
 		if oldContainerImageId != imageInfo.ID {
@@ -116,10 +128,12 @@ func (self Container) Upgrade(http *gin.Context) {
 	} else {
 		_ = notice.Message{}.Info("containerRemove", containerInfo.Name)
 
-		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.Name, container.RemoveOptions{})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
+		if !containerInfo.HostConfig.AutoRemove {
+			err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.Name, container.RemoveOptions{})
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, containerInfo.Image, image.RemoveOptions{})
 		if err != nil {

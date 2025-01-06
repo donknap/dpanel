@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/versions"
 	"io"
 	"os"
 	"path/filepath"
@@ -133,4 +134,25 @@ func (self Builder) ContainerCopyPathIn(containerName, containerDestPath string,
 		return err
 	}
 	return nil
+}
+
+// 获取复制容器信息，兼容低版本的配置情况
+func (self Builder) ContainerCopyInspect(containerName string) (info types.ContainerJSON, err error) {
+	info, err = Sdk.Client.ContainerInspect(Sdk.Ctx, containerName)
+	if err != nil {
+		return info, err
+	}
+	if versions.LessThanOrEqualTo(Sdk.Client.ClientVersion(), "1.44") {
+		macAddress := ""
+		for name, settings := range info.NetworkSettings.Networks {
+			if settings.MacAddress != "" {
+				macAddress = settings.MacAddress
+				info.NetworkSettings.Networks[name].MacAddress = ""
+			}
+		}
+		if macAddress != "" {
+			info.Config.MacAddress = macAddress
+		}
+	}
+	return info, nil
 }
