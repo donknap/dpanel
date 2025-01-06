@@ -48,6 +48,7 @@ func (self Builder) Close() {
 	if self.CtxCancelFunc != nil {
 		self.CtxCancelFunc()
 	}
+	_ = self.Client.Close()
 }
 
 type Option func(builder *Builder) error
