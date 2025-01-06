@@ -198,7 +198,7 @@ func (self Container) Ignore(http *gin.Context) {
 	})
 
 	if params.ImageId == "" {
-		if setting.Value.IgnoreCheckUpgrade != nil {
+		if exists {
 			setting.Value.IgnoreCheckUpgrade = slices.Delete(setting.Value.IgnoreCheckUpgrade, i, i+1)
 		}
 	} else {
