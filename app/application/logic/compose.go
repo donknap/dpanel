@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -14,7 +15,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"io"
 	"io/fs"
 	"net/http"
@@ -200,7 +200,8 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	workingDir := entity.Setting.GetWorkingDir()
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
-	dpanelContainerInfo, _ := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
+
+	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
 	for _, mount := range dpanelContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" {
 			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误

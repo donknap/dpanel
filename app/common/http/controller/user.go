@@ -6,7 +6,6 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -136,7 +135,7 @@ func (self User) LoginInfo(http *gin.Context) {
 		"version":       facade.GetConfig().GetString("app.version"),
 		"family":        facade.GetConfig().GetString("app.env"),
 	}
-	_, err := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
+	_, err := logic.Setting{}.GetDPanelInfo()
 	if err == nil {
 		result["showBuildName"] = false
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"os"
 	"path/filepath"
@@ -153,6 +154,18 @@ func (self Env) Create(http *gin.Context) {
 	if err != nil {
 		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，错误信息："+err.Error()), 500)
 		return
+	}
+	if defaultEnv {
+		// 获取面板信息
+		if info, err := dockerClient.ContainerInfo(facade.GetConfig().GetString("app.name")); err == nil {
+			_ = logic.Setting{}.Save(&entity.Setting{
+				GroupName: logic.SettingGroupSetting,
+				Name:      logic.SettingGroupSettingDPanelInfo,
+				Value: &accessor.SettingValueOption{
+					DPanelInfo: info,
+				},
+			})
+		}
 	}
 	logic.DockerEnv{}.UpdateEnv(client)
 	// 如果修改的是当前客户端的连接地址，则更新 docker sdk

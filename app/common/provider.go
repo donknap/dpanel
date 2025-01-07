@@ -4,12 +4,15 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/entity"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 	"log/slog"
 	"net/http"
@@ -119,7 +122,19 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	docker.Sdk, err = docker.NewBuilder(options...)
 
 	_, err = docker.Sdk.Client.Info(docker.Sdk.Ctx)
+
+	_ = logic.Setting{}.Delete(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo)
 	if err == nil {
+		// 获取面板信息
+		if info, err := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name")); err == nil {
+			_ = logic.Setting{}.Save(&entity.Setting{
+				GroupName: logic.SettingGroupSetting,
+				Name:      logic.SettingGroupSettingDPanelInfo,
+				Value: &accessor.SettingValueOption{
+					DPanelInfo: info,
+				},
+			})
+		}
 		go logic.EventLogic{}.MonitorLoop()
 	}
 

@@ -24,13 +24,13 @@ var (
 type Client struct {
 	Name              string `json:"name,omitempty"`
 	Title             string `json:"title,omitempty"`
-	Address           string `json:"address,omitempty"`
+	Address           string `json:"address,omitempty"` // docker api 地址
 	Default           bool   `json:"default,omitempty"`
 	TlsCa             string `json:"tlsCa,omitempty"`
 	TlsCert           string `json:"tlsCert,omitempty"`
 	TlsKey            string `json:"tlsKey,omitempty"`
 	EnableTLS         bool   `json:"enableTLS,omitempty"`
-	EnableComposePath bool   `json:"enableComposePath,omitempty"`
+	EnableComposePath bool   `json:"enableComposePath,omitempty"` // 启用 compose 独享目录
 	ComposePath       string `json:"composePath,omitempty"`
 }
 

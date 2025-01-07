@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/donknap/dpanel/app/application/logic"
+	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -12,7 +13,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -131,7 +131,7 @@ func (self Volume) Backup(http *gin.Context) {
 		// 因为存储挂载到backup目录，保存时需要再添加一级backup目录
 		// 保存数据到面板存储时，需要将面板的存储挂载上
 		backupTar = "/backup" + backupTar
-		dpanelContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, facade.GetConfig().GetString("app.name"))
+		dpanelContainerInfo, err := logic2.Setting{}.GetDPanelInfo()
 		if err != nil {
 			self.JsonResponseWithError(http, errors.New("您创建的面板容器名称非默认的 dpanel，请重建并通过环境变量 APP_NAME 指定新的名称。"), 500)
 			return

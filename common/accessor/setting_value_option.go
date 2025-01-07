@@ -10,11 +10,11 @@ type SettingValueOption struct {
 	Username           string                    `json:"username,omitempty"`
 	Password           string                    `json:"password,omitempty"`
 	ServerIp           string                    `json:"serverIp,omitempty"`
-	RequestTimeout     int                       `json:"requestTimeout,omitempty"`
 	Docker             map[string]*docker.Client `json:"docker,omitempty"`
 	DiskUsage          *DiskUsage                `json:"diskUsage,omitempty"`
 	TwoFa              *TwoFa                    `json:"twoFa,omitempty"`
 	IgnoreCheckUpgrade []string                  `json:"ignoreCheckUpgrade,omitempty"`
+	DPanelInfo         types.ContainerJSON       `json:"DPanelInfo,omitempty"`
 }
 
 type DiskUsage struct {
