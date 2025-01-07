@@ -23,6 +23,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	"log/slog"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -159,6 +160,10 @@ func (self Container) GetList(http *gin.Context) {
 
 	query := dao.Site.Where(dao.Site.ContainerInfo.In(md5List...))
 	siteList, _ := query.Find()
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Names[0] < result[j].Names[0]
+	})
 
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(nameList...)).Find()
 	self.JsonResponseWithoutError(http, gin.H{

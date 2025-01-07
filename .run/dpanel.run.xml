@@ -2,15 +2,15 @@
   <configuration default="false" name="dpanel" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="dpanel" />
     <working_directory value="$PROJECT_DIR$" />
-    <go_parameters value="-tags pe -ldflags &quot;-X main.DPanelVersion=&quot;" />
+    <go_parameters value="-tags pe -ldflags &quot;-X main.DPanelVersion=1.5.2&quot;" />
     <parameters value="server:start -f config.yaml" />
-<!--    <parameters value="container:upgrade -f config.yaml &#45;&#45;name=dpanel &#45;&#45;docker-env=test" />-->
     <envs>
-      <env name="STORAGE_LOCAL_PATH" value="$PROJECT_DIR$/data" />
       <env name="APP_ENV" value="debug" />
       <env name="APP_FAMILY" value="pe" />
-      <env name="APP_VERSION" value="1.3.0" />
+      <env name="STORAGE_LOCAL_PATH" value="$PROJECT_DIR$/data" />
       <env name="TZ" value="Asia/Shanghai" />
+      <env name="HTTP_PROXY" value="http://127.0.0.1:7890" />
+      <env name="HTTPS_PROXY" value="http://127.0.0.1:7890" />
     </envs>
     <EXTENSION ID="net.ashald.envfile">
       <option name="IS_ENABLED" value="false" />

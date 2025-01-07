@@ -18,9 +18,9 @@ import (
 // docker compose 任务执行，包含 部署，销毁，控制
 
 type Task struct {
-	Name         string
-	Composer     *Wrapper
-	ProgressChan chan []byte
+	Name     string
+	Composer *Wrapper
+	Status   string
 }
 
 func (self Task) Deploy(serviceName ...string) (io.Reader, error) {

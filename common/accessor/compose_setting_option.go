@@ -17,16 +17,25 @@ const (
 )
 
 type ComposeSettingOption struct {
-	Status      string           `json:"status,omitempty"`
-	Type        string           `json:"type"`
-	Uri         []string         `json:"uri,omitempty"`
-	RemoteUrl   string           `json:"remoteUrl,omitempty"`
-	Store       string           `json:"store,omitempty"`
-	Environment []docker.EnvItem `json:"environment,omitempty"`
+	Status        string           `json:"status,omitempty"`
+	Type          string           `json:"type"`
+	Uri           []string         `json:"uri,omitempty"`
+	RemoteUrl     string           `json:"remoteUrl,omitempty"`
+	Store         string           `json:"store,omitempty"`
+	Environment   []docker.EnvItem `json:"environment,omitempty"`
+	DockerEnvName string           `json:"dockerEnvName,omitempty"`
 }
 
 func (self ComposeSettingOption) GetUriFilePath() string {
-	return filepath.Join(storage.Local{}.GetComposePath(), self.Uri[0])
+	return filepath.Join(self.GetWorkingDir(), self.Uri[0])
+}
+
+func (self ComposeSettingOption) GetWorkingDir() string {
+	if self.DockerEnvName == docker.DefaultClientName {
+		return storage.Local{}.GetComposePath()
+	} else {
+		return filepath.Join(filepath.Dir(storage.Local{}.GetComposePath()), "compose-"+self.DockerEnvName)
+	}
 }
 
 func (self ComposeSettingOption) GetYaml() ([2]string, error) {
@@ -40,10 +49,10 @@ func (self ComposeSettingOption) GetYaml() ([2]string, error) {
 			if filepath.IsAbs(uri) {
 				yamlFilePath = uri
 			} else {
-				yamlFilePath = filepath.Join(storage.Local{}.GetComposePath(), uri)
+				yamlFilePath = filepath.Join(self.GetWorkingDir(), uri)
 			}
 		} else {
-			yamlFilePath = filepath.Join(storage.Local{}.GetComposePath(), uri)
+			yamlFilePath = filepath.Join(self.GetWorkingDir(), uri)
 		}
 		content, err := os.ReadFile(yamlFilePath)
 		if err == nil {

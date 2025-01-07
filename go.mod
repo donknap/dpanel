@@ -11,7 +11,6 @@ require (
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/gin-gonic/gin v1.10.0
-	github.com/go-acme/lego/v4 v4.17.4
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gookit/color v1.5.4
 	github.com/gorilla/websocket v1.5.3

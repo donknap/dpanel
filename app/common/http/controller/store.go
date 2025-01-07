@@ -12,6 +12,8 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"gorm.io/datatypes"
+	"gorm.io/gen"
 	"os"
 	"path/filepath"
 	"strings"
@@ -217,7 +219,7 @@ func (self Store) Deploy(http *gin.Context) {
 		return
 	}
 
-	composeRow, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
+	composeRow, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"))...).First()
 	if composeRow != nil {
 		self.JsonResponseWithError(http, errors.New("该标识已经创建过任务，请先删除，"+params.Name), 500)
 		return
@@ -225,23 +227,28 @@ func (self Store) Deploy(http *gin.Context) {
 	composeNew := &entity.Compose{
 		Name:  strings.ToLower(params.Name),
 		Title: params.Title,
-		Yaml:  "",
 		Setting: &accessor.ComposeSettingOption{
-			Status:      "waiting",
 			Type:        accessor.ComposeTypeStore,
 			Store:       fmt.Sprintf("%s@%s", storeRow.Title, storeRow.Setting.Url),
 			Environment: params.Environment,
 			Uri: []string{
 				filepath.Join(params.Name, filepath.Base(params.ComposeFile)),
 			},
+			DockerEnvName: docker.DefaultClientName,
 		},
 	}
+	targetPath := filepath.Join(storage.Local{}.GetComposePath(), params.Name)
+	if dockerClient, err := new(logic.Setting).GetDockerClient(docker.Sdk.Name); err == nil && dockerClient.EnableComposePath {
+		targetPath = filepath.Join(filepath.Dir(storage.Local{}.GetComposePath()), "compose-"+dockerClient.Name, params.Name)
+		composeNew.Setting.DockerEnvName = dockerClient.Name
+	}
+
 	err := dao.Compose.Create(composeNew)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	targetPath := filepath.Join(storage.Local{}.GetComposePath(), params.Name)
+
 	err = os.CopyFS(targetPath, os.DirFS(filepath.Join(storage.Local{}.GetStorePath(), filepath.Dir(params.ComposeFile))))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

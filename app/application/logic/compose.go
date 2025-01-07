@@ -3,7 +3,6 @@ package logic
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
@@ -30,7 +29,7 @@ const (
 	ComposeProjectEnvFileName    = ".dpanel.env"
 )
 
-var composeFileNameSuffix = []string{
+var ComposeFileNameSuffix = []string{
 	"docker-compose.yml", "docker-compose.yaml",
 	"compose.yml", "compose.yaml",
 }
@@ -50,6 +49,7 @@ type composeItem struct {
 	Status         string `json:"status"`
 	ConfigFiles    string `json:"configFiles"`
 	ConfigFileList []string
+	IsDPanel       bool
 }
 
 func (self Compose) Ls() []*composeItem {
@@ -68,6 +68,9 @@ func (self Compose) Ls() []*composeItem {
 		return result
 	}
 	for i, item := range result {
+		if strings.HasPrefix(item.Name, "dpanel-c") {
+			item.IsDPanel = true
+		}
 		if strings.Contains(item.ConfigFiles, ",") {
 			result[i].ConfigFileList = strings.Split(item.ConfigFiles, ",")
 		} else {
@@ -79,147 +82,107 @@ func (self Compose) Ls() []*composeItem {
 	return result
 }
 
-func (self Compose) LsItem(name string) (*composeItem, error) {
-	for _, item := range self.Ls() {
-		if item.Name == name {
-			return item, nil
+func (self Compose) LsItem(name string) *composeItem {
+	ls := self.Ls()
+	for _, item := range ls {
+		if item.Name == name || item.Name == fmt.Sprintf(ComposeProjectName, name) {
+			return item
 		}
 	}
-	return nil, errors.New("task not running")
+	return &composeItem{
+		Name:           name,
+		Status:         accessor.ComposeStatusWaiting,
+		ConfigFiles:    "",
+		ConfigFileList: make([]string, 0),
+		IsDPanel:       true,
+	}
 }
 
 func (self Compose) Kill() error {
 	return exec.Command{}.Kill()
 }
 
-// Sync 同步存储目录中的任务及已运行的外部任务，并同步当前任务的状态
-func (self Compose) Sync() error {
-	rootDir := storage.Local{}.GetComposePath()
-	// 重置所有任务状态为等待
-	composeList, _ := dao.Compose.Find()
-	for i, _ := range composeList {
-		composeList[i].Setting.Status = accessor.ComposeStatusWaiting
-	}
-	// 查找部署过的compose任务，如果是 dpanel-c- 开头表示是系统部署的任务，需要重新定义一下 name
-	// 运行中的任务如果是面板部署的，将数据库中的数据替换到查找到的运行任务
-	// 非面板部署的任务记录下 Yaml 所在位置，在管理页面中确认是否可以找到文件进行管理
+func (self Compose) FindRunTask() map[string]*entity.Compose {
 	findComposeList := make(map[string]*entity.Compose)
 	for _, item := range self.Ls() {
+		if strings.HasPrefix(item.Name, "dpanel-c-") {
+			item.Name = item.Name[9:]
+		}
 		findRow := &entity.Compose{
 			Name:  item.Name,
 			Title: "",
 			Setting: &accessor.ComposeSettingOption{
-				Status: item.Status,
-				Uri:    item.ConfigFileList,
-				Type:   accessor.ComposeTypeOutPath,
+				Status:        item.Status,
+				Uri:           item.ConfigFileList,
+				Type:          accessor.ComposeTypeOutPath,
+				DockerEnvName: docker.Sdk.Name,
 			},
 		}
-
-		has := false
-		if strings.HasPrefix(item.Name, "dpanel-c-") {
-			name := item.Name[9:]
-			exists, pos := function.FindArrayValueIndex(composeList, "Name", name)
-			if exists {
-				has = true
-				dbComposeRow := composeList[pos[0]]
-				dbComposeRow.Setting.Status = item.Status
-				findComposeList[dbComposeRow.Name] = dbComposeRow
-			}
-		}
-
-		if !has {
-			findComposeList[item.Name] = findRow
-		}
+		findComposeList[item.Name] = findRow
 	}
+	return findComposeList
+}
 
-	// 此时 findComposeList 中仅包含的是运行中的任务
-	// 遍历存储目录查找所有的任务文件
-	// 查找到任务文件如果在数据库中标记是文本或是远程地址，则直接跳过，此目录为系统生成的临时部署目录，用户修改无效。
-	// 目录中的任务已经在运行中，仅需要将 uri 重新赋值即可，状态这些不需要再重新赋值
-	// 目录中的任务没有运行，则还需要再去数据库中查找一下，需要将数据库中的数据同步到查找列表中
-	// 目录中的任务数据库中也没有，则添加需要创建
-	err := filepath.Walk(rootDir, func(path string, info fs.FileInfo, err error) error {
-		for _, suffix := range composeFileNameSuffix {
+func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
+	// 查询当前运行中的和目录中的 compose 任务
+	// 查找运行中的任务，如果是 dpanel-c- 开头表示是系统部署的任务，需要重新定义一下 name
+	// 非面板部署的任务记录下 Yaml 所在位置，如果在目录中找到对应的名称则重新定义 uri
+	findComposeList := make(map[string]*entity.Compose)
+	_ = filepath.Walk(rootDir, func(path string, info fs.FileInfo, err error) error {
+		for _, suffix := range ComposeFileNameSuffix {
 			if strings.HasSuffix(path, suffix) {
 				rel, _ := filepath.Rel(rootDir, path)
 				// 只同步二级目录下的 yaml
 				if segments := strings.Split(filepath.Clean(rel), string(filepath.Separator)); len(segments) == 2 {
 					// 强制转为小写
 					name := strings.ToLower(filepath.Dir(rel))
-
-					if _, ok := findComposeList[name]; ok {
-						if function.InArray([]string{
-							accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl, accessor.ComposeTypeStore,
-						}, findComposeList[name].Setting.Type) {
-							break
-						}
-						findComposeList[name].Setting.Uri[0] = rel
-					} else {
-						exists, pos := function.FindArrayValueIndex(composeList, "Name", name)
-						if exists {
-							dbComposeRow := composeList[pos[0]]
-							// 文本和远程地址是主动添加，无论如何都要保留记录
-							if function.InArray([]string{
-								accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl,
-							}, dbComposeRow.Setting.Type) {
-								break
-							}
-							if dbComposeRow.Setting.Type == accessor.ComposeTypeStore {
-
-							} else {
-								dbComposeRow.Setting.Type = accessor.ComposeTypeStoragePath
-								dbComposeRow.Setting.Uri[0] = rel
-							}
-							findComposeList[dbComposeRow.Name] = dbComposeRow
-						} else {
-							findRow := &entity.Compose{
-								Name:  name,
-								Title: "",
-								Setting: &accessor.ComposeSettingOption{
-									Type:   accessor.ComposeTypeStoragePath,
-									Status: accessor.ComposeStatusWaiting,
-									Uri: []string{
-										rel,
-									},
-								},
-							}
-							findComposeList[name] = findRow
-						}
+					findRow := &entity.Compose{
+						Name:  name,
+						Title: "",
+						Setting: &accessor.ComposeSettingOption{
+							Type:   accessor.ComposeTypeStoragePath,
+							Status: "",
+							Uri: []string{
+								rel,
+							},
+						},
 					}
+					findComposeList[name] = findRow
 				}
 				break
 			}
 		}
 		return nil
 	})
-	if err != nil {
-		return err
+	return findComposeList
+}
+
+// 同步当前挂载目录中的 compose
+func (self Compose) Sync(dockerEnvName string) error {
+	var rootDir string
+	if dockerEnvName == docker.DefaultClientName {
+		rootDir = storage.Local{}.GetComposePath()
+	} else {
+		rootDir = filepath.Join(filepath.Dir(storage.Local{}.GetComposePath()), "compose-"+dockerEnvName)
 	}
+	findComposeList := self.FindPathTask(rootDir)
+	for i, _ := range findComposeList {
+		findComposeList[i].Setting.DockerEnvName = dockerEnvName
+	}
+
+	// 重置所有任务状态为等待
+	composeList, _ := dao.Compose.Find()
 
 	// 循环任务，添加，清理任务
 	for _, dbComposeRow := range composeList {
-		has := false
-		if findComposeRow, ok := findComposeList[dbComposeRow.Name]; ok {
-			has = true
-			_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Updates(&entity.Compose{
-				Setting: findComposeRow.Setting,
-			})
+		if find, ok := findComposeList[dbComposeRow.Name]; ok && find.Setting.DockerEnvName == dbComposeRow.Setting.DockerEnvName {
 			delete(findComposeList, dbComposeRow.Name)
-		}
-		//
-		if !has {
+		} else {
+			// 除非任务的类型是属于当前的环境才执行删除
 			if function.InArray([]string{
 				accessor.ComposeTypeOutPath, accessor.ComposeTypeStoragePath, accessor.ComposeTypeStore,
-			}, dbComposeRow.Setting.Type) {
+			}, dbComposeRow.Setting.Type) && dbComposeRow.Setting.DockerEnvName == docker.Sdk.Name {
 				_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Delete()
-			}
-
-			if function.InArray([]string{
-				accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl,
-			}, dbComposeRow.Setting.Type) {
-				_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Updates(&entity.Compose{
-					Setting: dbComposeRow.Setting,
-				})
 			}
 		}
 	}
@@ -229,11 +192,12 @@ func (self Compose) Sync() error {
 			_ = dao.Compose.Create(item)
 		}
 	}
+
 	return nil
 }
 
 func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
-	workingDir := storage.Local{}.GetComposePath()
+	workingDir := entity.Setting.GetWorkingDir()
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
 	dpanelContainerInfo, _ := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
@@ -242,13 +206,19 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
 			if _, err := os.Stat(mount.Source); err != nil {
 				_ = os.MkdirAll(mount.Source, os.ModePerm)
-				err = os.Symlink(storage.Local{}.GetComposePath(), filepath.Join(mount.Source, "compose"))
+				err = os.Symlink(workingDir, filepath.Join(mount.Source, filepath.Base(workingDir)))
 				if err != nil {
 					return nil, err
 				}
 			}
-			workingDir = filepath.Join(mount.Source, "compose")
+			workingDir = filepath.Join(mount.Source, filepath.Base(workingDir))
 		}
+	}
+
+	// 判断当前任务是否是外部任务
+	composeRun := self.LsItem(entity.Name)
+	if !composeRun.IsDPanel {
+		entity.Setting.Type = accessor.ComposeTypeOutPath
 	}
 
 	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
@@ -331,6 +301,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	tasker := &compose.Task{
 		Name:     projectName,
 		Composer: originalComposer,
+		Status:   composeRun.Status,
 	}
 	return tasker, nil
 }

@@ -15,7 +15,6 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
-	"github.com/mcuadros/go-version"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	app "github.com/we7coreteam/w7-rangine-go/v2/src"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http"
@@ -107,11 +106,9 @@ func main() {
 		}
 		migrateTableData := []migrate.Updater{
 			&migrate.Upgrade20240909{},
+			&migrate.Upgrade20250106{},
 		}
 		for _, updater := range migrateTableData {
-			if version.CompareSimple(updater.Version(), myApp.GetConfig().GetString("app.version")) == -1 {
-				continue
-			}
 			slog.Debug("main", "migrate", updater.Version())
 			err = updater.Upgrade()
 			if err != nil {

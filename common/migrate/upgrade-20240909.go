@@ -1,9 +1,7 @@
 package migrate
 
 import (
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/entity"
 )
 
 type Upgrade20240909 struct{}
@@ -15,14 +13,11 @@ func (self Upgrade20240909) Version() string {
 func (self Upgrade20240909) Upgrade() error {
 	composeList, _ := dao.Compose.Find()
 	for _, compose := range composeList {
-		if compose.Setting != nil {
+		if compose.Setting == nil || compose.Setting.Status == "" {
 			continue
 		}
-		_, err := dao.Compose.Where(dao.Compose.ID.Eq(compose.ID)).Updates(&entity.Compose{
-			Setting: &accessor.ComposeSettingOption{
-				Status: "waiting",
-			},
-		})
+		compose.Setting.Status = ""
+		_, err := dao.Compose.Updates(compose)
 		if err != nil {
 			return err
 		}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/service/docker"
 )
 
 // 全局配置
@@ -65,6 +66,15 @@ func (self Setting) GetValueById(id int32) (*entity.Setting, error) {
 		return nil, errors.New("配置不存在")
 	}
 	return setting, nil
+}
+
+func (self Setting) GetDockerClient(name string) (*docker.Client, error) {
+	if setting, err := self.GetValue(SettingGroupSetting, SettingGroupSettingDocker); err == nil {
+		if item, ok := setting.Value.Docker[name]; ok {
+			return item, nil
+		}
+	}
+	return nil, errors.New("docker client not found " + name)
 }
 
 func (self Setting) Delete(groupName string, name string) error {

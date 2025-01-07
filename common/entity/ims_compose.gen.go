@@ -15,7 +15,6 @@ type Compose struct {
 	ID      int32                          `gorm:"column:id;type:INTEGER" json:"id"`
 	Name    string                         `gorm:"column:name" json:"name"`
 	Title   string                         `gorm:"column:title" json:"title"`
-	Yaml    string                         `gorm:"column:yaml" json:"yaml"`
 	Setting *accessor.ComposeSettingOption `gorm:"column:setting;serializer:json" json:"setting"`
 }
 

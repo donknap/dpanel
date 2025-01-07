@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/app/application/logic"
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -84,15 +83,6 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	if err != nil {
 		slog.Error("compose", "deploy copy error", err)
 	}
-	// 部署完成后也上更新状态
-	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
-	if err != nil {
-		composeRow.Setting.Status = accessor.ComposeStatusWaiting
-	} else {
-		composeRow.Setting.Status = composeRun.Status
-	}
-	_, _ = dao.Compose.Updates(composeRow)
-
 	_ = notice.Message{}.Info("composeDeploy", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
@@ -134,13 +124,6 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	if err != nil {
 		slog.Error("compose", "destroy copy error", err)
 	}
-	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
-	if err != nil {
-		composeRow.Setting.Status = accessor.ComposeStatusWaiting
-	} else {
-		composeRow.Setting.Status = composeRun.Status
-	}
-	_, _ = dao.Compose.Updates(composeRow)
 
 	if params.DeleteData {
 		_, err = dao.Compose.Where(dao.Compose.ID.Eq(composeRow.ID)).Delete()
@@ -198,13 +181,6 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		slog.Error("compose", "destroy copy error", err)
 	}
 
-	composeRun, err := logic.Compose{}.LsItem(tasker.Name)
-	if err != nil {
-		composeRow.Setting.Status = accessor.ComposeStatusWaiting
-	} else {
-		composeRow.Setting.Status = composeRun.Status
-	}
-	_, _ = dao.Compose.Updates(composeRow)
 	self.JsonSuccessResponse(http)
 	return
 }

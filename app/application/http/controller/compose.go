@@ -4,20 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
+	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"gorm.io/datatypes"
+	"gorm.io/gen"
 	"io"
 	"log/slog"
 	http2 "net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -40,7 +43,20 @@ func (self Compose) Create(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	dockerClient, err := logic2.Setting{}.GetDockerClient(docker.Sdk.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	var dockerEnvName string
 	var yamlRow *entity.Compose
+
+	if dockerClient.EnableComposePath {
+		dockerEnvName = dockerClient.Name
+	} else {
+		dockerEnvName = docker.DefaultClientName
+	}
+
 	if params.Id > 0 {
 		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
 		if yamlRow == nil {
@@ -65,11 +81,11 @@ func (self Compose) Create(http *gin.Context) {
 			Title: params.Title,
 			Name:  params.Name,
 			Setting: &accessor.ComposeSettingOption{
-				Status:      accessor.ComposeStatusWaiting,
-				Type:        params.Type,
-				Environment: params.Environment,
-				Uri:         make([]string, 0),
-				RemoteUrl:   params.RemoteUrl,
+				Type:          params.Type,
+				Environment:   params.Environment,
+				Uri:           make([]string, 0),
+				RemoteUrl:     params.RemoteUrl,
+				DockerEnvName: dockerEnvName,
 			},
 		}
 		if function.InArray([]string{
@@ -107,7 +123,7 @@ func (self Compose) Create(http *gin.Context) {
 			return
 		}
 
-		rel, _ := filepath.Rel(storage.Local{}.GetComposePath(), overrideYamlFilePath)
+		rel, _ := filepath.Rel(yamlRow.Setting.GetWorkingDir(), overrideYamlFilePath)
 		if !function.InArray(yamlRow.Setting.Uri, rel) {
 			yamlRow.Setting.Uri = append(yamlRow.Setting.Uri, rel)
 		}
@@ -135,23 +151,61 @@ func (self Compose) GetList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	//同步本地目录任务
-	err := logic.Compose{}.Sync()
+	dockerClient, err := logic2.Setting{}.GetDockerClient(docker.Sdk.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	if dockerClient.EnableComposePath {
+		//同步本地目录任务
+		err = logic.Compose{}.Sync(dockerClient.Name)
+	} else {
+		err = logic.Compose{}.Sync(docker.DefaultClientName)
+	}
+
 	if err != nil {
 		slog.Error("compose", "sync", err.Error())
 		return
 	}
 
 	composeList := make([]*entity.Compose, 0)
-	query := dao.Compose.Order(dao.Compose.ID.Desc())
+	query := dao.Compose.Order(dao.Compose.Name.Asc())
 	if params.Name != "" {
 		query = query.Where(dao.Compose.Name.Like("%" + params.Name + "%"))
 	}
 	if params.Title != "" {
 		query = query.Where(dao.Compose.Title.Like("%" + params.Title + "%"))
 	}
+
+	dockerEnvName := dockerClient.Name
+	if !dockerClient.EnableComposePath {
+		dockerEnvName = docker.DefaultClientName
+	}
+	query.Or(gen.Cond(
+		datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
+	)...)
+
 	composeList, _ = query.Find()
 
+	runComposeList := logic.Compose{}.FindRunTask()
+
+	for i, item := range composeList {
+		composeList[i].Setting.Status = accessor.ComposeStatusWaiting
+
+		if find, ok := runComposeList[item.Name]; ok {
+			composeList[i].Setting.Status = find.Setting.Status
+			delete(runComposeList, item.Name)
+		}
+	}
+
+	for _, item := range runComposeList {
+		composeList = append(composeList, item)
+	}
+
+	sort.Slice(composeList, func(i, j int) bool {
+		return composeList[i].Name < composeList[j].Name
+	})
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": composeList,
 	})
@@ -211,6 +265,8 @@ func (self Compose) GetTask(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	yamlRow.Setting.Status = tasker.Status
+
 	yaml, err := tasker.GetYaml()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -259,7 +315,7 @@ func (self Compose) Delete(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		err = os.RemoveAll(filepath.Join(storage.Local{}.GetComposePath(), row.Name))
+		err = os.RemoveAll(filepath.Join(row.Setting.GetWorkingDir(), row.Name))
 		if err != nil {
 			slog.Error("compose", "delete", err.Error())
 		}
