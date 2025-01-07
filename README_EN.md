@@ -1,7 +1,7 @@
 <h1 align="center">
 <img src="https://cdn.w7.cc/dpanel/dpanel-logo.png" alt="DPanel" width="500" />
 </h1>
-<h4 align="center"> DPanel is a lightweight panel for docker. </h4>
+<h4 align="center"> DPanel one of the most lightweight panel for docker. </h4>
 
 <div align="center">
 
@@ -43,14 +43,6 @@ docker run -it -d --name dpanel --restart=always \
  -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
  dpanel/dpanel:lite
 ```
-
-#### Thanks
-
-###### Server & CDN
-
-<a href="https://anycast.ai" target="_blank">
-<img src="https://dpanel.cc/storage/image/sponsor-server.png" width="200" />
-</a>
 
 #### Preview
 
