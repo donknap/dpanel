@@ -34,6 +34,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 	type ParamsValidate struct {
 		ContainerId               string `json:"containerId" binding:"required"`
 		ServerName                string `json:"serverName" binding:"required"`
+		Hostname                  string `json:"hostname"`
 		Port                      int32  `json:"port" binding:"required"`
 		EnableBlockCommonExploits bool   `json:"enableBlockCommonExploits"`
 		EnableAssetCache          bool   `json:"enableAssetCache"`
@@ -65,52 +66,57 @@ func (self SiteDomain) Create(http *gin.Context) {
 	// 将当前容器加入到默认 dpanel-local 网络中，并指定 Hostname 用于 Nginx 反向代理
 	dpanelContainerInfo, err := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
 	if err != nil {
-		self.JsonResponseWithError(http, errors.New("您创建的面板容器名称非默认的 dpanel，请重建并通过环境变量 APP_NAME 指定新的名称。"), 500)
+		self.JsonResponseWithError(http, errors.New("当前环境没有 dpanel 面板，或是创建的面板容器名称非默认的 dpanel，请重建并通过环境变量 APP_NAME 指定新的名称。"), 500)
 		return
 	}
-	if _, ok := dpanelContainerInfo.NetworkSettings.Networks[defaultNetworkName]; !ok {
-		_, err = docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, defaultNetworkName, network.InspectOptions{})
-		if err != nil {
-			_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, defaultNetworkName, network.CreateOptions{
-				Driver: "bridge",
-				Options: map[string]string{
-					"name": defaultNetworkName,
+
+	var hostname string
+	if params.Hostname != "" {
+		hostname = params.Hostname
+	} else {
+		if _, ok := dpanelContainerInfo.NetworkSettings.Networks[defaultNetworkName]; !ok {
+			_, err = docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, defaultNetworkName, network.InspectOptions{})
+			if err != nil {
+				_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, defaultNetworkName, network.CreateOptions{
+					Driver: "bridge",
+					Options: map[string]string{
+						"name": defaultNetworkName,
+					},
+					EnableIPv6: function.PtrBool(false),
+				})
+				if err != nil {
+					self.JsonResponseWithError(http, errors.New("创建 DPanel 默认网络失败，请重新安装并新建&加入 "+defaultNetworkName+" 网络"), 500)
+					return
+				}
+			}
+			// 假如是自身绑定域名，不加入网络，在下面统一处理
+			if dpanelContainerInfo.ID != containerRow.ID {
+				err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, dpanelContainerInfo.ID, &network.EndpointSettings{})
+				if err != nil {
+					self.JsonResponseWithError(http, errors.New("创建 DPanel 默认网络失败，请重新安装并新建&加入 "+defaultNetworkName+" 网络"), 500)
+					return
+				}
+			}
+		}
+		hostname = fmt.Sprintf(docker.HostnameTemplate, strings.Trim(containerRow.Name, "/"))
+		siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
+			ID: params.ContainerId,
+		})).First()
+
+		if siteRow != nil && siteRow.SiteName != "" {
+			hostname = fmt.Sprintf(docker.HostnameTemplate, siteRow.SiteName)
+		}
+
+		if _, ok := containerRow.NetworkSettings.Networks[defaultNetworkName]; !ok {
+			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, params.ContainerId, &network.EndpointSettings{
+				Aliases: []string{
+					hostname,
 				},
-				EnableIPv6: function.PtrBool(false),
 			})
 			if err != nil {
-				self.JsonResponseWithError(http, errors.New("创建 DPanel 默认网络失败，请重新安装并新建&加入 "+defaultNetworkName+" 网络"), 500)
+				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-		}
-		// 假如是自身绑定域名，不加入网络，在下面统一处理
-		if dpanelContainerInfo.ID != containerRow.ID {
-			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, dpanelContainerInfo.ID, &network.EndpointSettings{})
-			if err != nil {
-				self.JsonResponseWithError(http, errors.New("创建 DPanel 默认网络失败，请重新安装并新建&加入 "+defaultNetworkName+" 网络"), 500)
-				return
-			}
-		}
-	}
-
-	hostname := fmt.Sprintf(docker.HostnameTemplate, strings.Trim(containerRow.Name, "/"))
-	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-		ID: params.ContainerId,
-	})).First()
-
-	if siteRow != nil && siteRow.SiteName != "" {
-		hostname = fmt.Sprintf(docker.HostnameTemplate, siteRow.SiteName)
-	}
-
-	if _, ok := containerRow.NetworkSettings.Networks[defaultNetworkName]; !ok {
-		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, params.ContainerId, &network.EndpointSettings{
-			Aliases: []string{
-				hostname,
-			},
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
 		}
 	}
 
@@ -372,6 +378,7 @@ func (self SiteDomain) UpdateDomain(http *gin.Context) {
 		EnableAssetCache          bool   `json:"enableAssetCache"`
 		EnableWs                  bool   `json:"enableWs"`
 		ExtraNginx                string `json:"extraNginx"`
+		Hostname                  string `json:"hostname"`
 	}
 
 	params := ParamsValidate{}
@@ -391,6 +398,7 @@ func (self SiteDomain) UpdateDomain(http *gin.Context) {
 	siteDomainRow.Setting.EnableBlockCommonExploits = params.EnableBlockCommonExploits
 	siteDomainRow.Setting.EnableAssetCache = params.EnableAssetCache
 	siteDomainRow.Setting.EnableWs = params.EnableWs
+	siteDomainRow.Setting.ServerAddress = params.Hostname
 
 	if params.ExtraNginx != "" {
 		siteDomainRow.Setting.ExtraNginx = template.HTML(params.ExtraNginx)
