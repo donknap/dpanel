@@ -154,10 +154,16 @@ func (self Compose) Create(http *gin.Context) {
 	} else if yamlRow.Setting.Type != accessor.ComposeTypeOutPath {
 		_ = dao.Compose.Create(yamlRow)
 	}
+	if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
+		self.JsonResponseWithoutError(http, gin.H{
+			"id": yamlRow.Name,
+		})
+	} else {
+		self.JsonResponseWithoutError(http, gin.H{
+			"id": yamlRow.ID,
+		})
+	}
 
-	self.JsonResponseWithoutError(http, gin.H{
-		"id": yamlRow.ID,
-	})
 	return
 }
 

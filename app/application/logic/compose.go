@@ -253,11 +253,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		}
 	}
 
-	// 判断当前任务是否是外部任务
 	composeRun := self.LsItem(entity.Name)
-	if !composeRun.IsDPanel {
-		entity.Setting.Type = accessor.ComposeTypeOutPath
-	}
 
 	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
 	if entity.Setting.Type == accessor.ComposeTypeRemoteUrl {
@@ -336,6 +332,12 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	if entity.Setting.Type == accessor.ComposeTypeOutPath {
 		// compose 项止名称不允许有大小写，但是compose的目录名可以包含特殊字符，这里统一用id进行区分
 		// 如果是外部任务，则保持原有名称
+		projectName = entity.Name
+	}
+	// 如果该任务已经运行，但是不包含面板dpanel-c前缀，则表示该任务并非是面板创建的
+	// 只不过文件挂载到目录中，当成了挂载任务来对待
+	// 需要特殊的处理一下 -p 参数
+	if !composeRun.IsDPanel {
 		projectName = entity.Name
 	}
 	options = append(options, cli.WithName(projectName))
