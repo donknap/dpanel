@@ -63,6 +63,18 @@ func (self Compose) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 			return
 		}
+	} else if params.Type == accessor.ComposeTypeOutPath {
+		yamlRow, _ = logic.Compose{}.Get(params.Name)
+		if !function.IsEmptyArray(params.Environment) {
+			// 提交写入 .dpanel.env 文件
+			globalEnv := make([]string, 0)
+			for _, item := range params.Environment {
+				globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, compose.ReplacePlaceholder(item.Value)))
+			}
+			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), logic.ComposeProjectEnvFileName)
+			_ = os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
+			err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
+		}
 	} else {
 		if params.Type == accessor.ComposeTypeStoragePath {
 			self.JsonResponseWithError(http, errors.New("存储路径类型不能手动添加，请挂载 /dpanel/compose 目录自动发现。"), 500)
@@ -98,6 +110,7 @@ func (self Compose) Create(http *gin.Context) {
 	}
 
 	if params.Yaml != "" {
+		fmt.Printf("%v \n", yamlRow.Setting.GetUriFilePath())
 		err := os.MkdirAll(filepath.Dir(yamlRow.Setting.GetUriFilePath()), os.ModePerm)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -111,7 +124,12 @@ func (self Compose) Create(http *gin.Context) {
 	}
 
 	if params.YamlOverride != "" {
-		overrideYamlFilePath := filepath.Join(filepath.Dir(yamlRow.Setting.GetUriFilePath()), "dpanel-override.yaml")
+		overrideYamlFileName := "dpanel-override.yaml"
+		if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
+			// 外部 compose 的覆盖文件采用同名
+			overrideYamlFileName = fmt.Sprintf("dpanel-%s-override.yaml", yamlRow.Name)
+		}
+		overrideYamlFilePath := filepath.Join(filepath.Dir(yamlRow.Setting.GetUriFilePath()), overrideYamlFileName)
 		err := os.MkdirAll(filepath.Dir(overrideYamlFilePath), os.ModePerm)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -133,9 +151,10 @@ func (self Compose) Create(http *gin.Context) {
 		yamlRow.Title = params.Title
 		yamlRow.Setting.Environment = params.Environment
 		_, _ = dao.Compose.Updates(yamlRow)
-	} else {
+	} else if yamlRow.Setting.Type != accessor.ComposeTypeOutPath {
 		_ = dao.Compose.Create(yamlRow)
 	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"id": yamlRow.ID,
 	})
@@ -165,7 +184,7 @@ func (self Compose) GetList(http *gin.Context) {
 	}
 
 	if err != nil {
-		slog.Error("compose", "sync", err.Error())
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
@@ -206,6 +225,7 @@ func (self Compose) GetList(http *gin.Context) {
 	sort.Slice(composeList, func(i, j int) bool {
 		return composeList[i].Name < composeList[j].Name
 	})
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": composeList,
 	})
@@ -214,13 +234,13 @@ func (self Compose) GetList(http *gin.Context) {
 
 func (self Compose) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Id int32 `json:"id" binding:"required"`
+		Id string `json:"id"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	yamlRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	yamlRow, _ := logic.Compose{}.Get(params.Id)
 	if yamlRow == nil {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
@@ -240,14 +260,14 @@ func (self Compose) GetDetail(http *gin.Context) {
 
 func (self Compose) GetTask(http *gin.Context) {
 	type ParamsValidate struct {
-		Id int32 `json:"id" binding:"required"`
+		Id string `json:"id"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	yamlRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
-	if yamlRow == nil {
+	yamlRow, err := logic.Compose{}.Get(params.Id)
+	if err != nil {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
 	}
@@ -265,6 +285,7 @@ func (self Compose) GetTask(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	yamlRow.Setting.Status = tasker.Status
 
 	yaml, err := tasker.GetYaml()

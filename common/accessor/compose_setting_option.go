@@ -12,6 +12,7 @@ const (
 	ComposeTypeRemoteUrl   = "remoteUrl"
 	ComposeTypeStoragePath = "storagePath"
 	ComposeTypeOutPath     = "outPath"
+	ComposeTypeDangling    = "dangling"
 	ComposeTypeStore       = "store"
 	ComposeStatusWaiting   = "waiting"
 )
@@ -27,6 +28,9 @@ type ComposeSettingOption struct {
 }
 
 func (self ComposeSettingOption) GetUriFilePath() string {
+	if self.Type == ComposeTypeOutPath {
+		return self.Uri[0]
+	}
 	return filepath.Join(self.GetWorkingDir(), self.Uri[0])
 }
 

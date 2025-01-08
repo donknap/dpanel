@@ -21,7 +21,7 @@ import (
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
 	type ParamsValidate struct {
-		Id                int32            `json:"id" binding:"required"`
+		Id                string           `json:"id" binding:"required"`
 		Environment       []docker.EnvItem `json:"environment"`
 		DeployServiceName []string         `json:"deployServiceName"`
 		CreatePath        bool             `json:"createPath"`
@@ -36,7 +36,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
-	composeRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
@@ -69,7 +69,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, composeRow.ID))
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer wsBuffer.Close()
 	wsBuffer.OnWrite = func(p string) error {
 		wsBuffer.BroadcastMessage(p)
@@ -90,18 +90,18 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 func (self Compose) ContainerDestroy(http *gin.Context) {
 	type ParamsValidate struct {
-		Id           int32 `json:"id" binding:"required"`
-		DeleteImage  bool  `json:"deleteImage"`
-		DeleteVolume bool  `json:"deleteVolume"`
-		DeleteData   bool  `json:"deleteData"`
-		DeletePath   bool  `json:"deletePath"`
+		Id           string `json:"id" binding:"required"`
+		DeleteImage  bool   `json:"deleteImage"`
+		DeleteVolume bool   `json:"deleteVolume"`
+		DeleteData   bool   `json:"deleteData"`
+		DeletePath   bool   `json:"deletePath"`
 	}
 
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	composeRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
@@ -150,14 +150,14 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 
 func (self Compose) ContainerCtrl(http *gin.Context) {
 	type ParamsValidate struct {
-		Id int32  `json:"id" binding:"required"`
+		Id string `json:"id" binding:"required"`
 		Op string `json:"op" binding:"required" oneof:"start restart stop pause unpause ls"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	composeRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
@@ -173,7 +173,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, composeRow.ID))
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer wsBuffer.Close()
 
 	_, err = io.Copy(wsBuffer, response)
@@ -197,13 +197,13 @@ func (self Compose) ContainerProcessKill(http *gin.Context) {
 
 func (self Compose) ContainerLog(http *gin.Context) {
 	type ParamsValidate struct {
-		Id int32 `json:"id" binding:"required"`
+		Id string `json:"id" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	composeRow, _ := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
 		return
@@ -218,7 +218,7 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	wsBuffer, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeComposeLog, composeRow.ID))
+	wsBuffer, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeComposeLog, params.Id))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

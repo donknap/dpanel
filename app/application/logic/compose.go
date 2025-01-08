@@ -3,6 +3,7 @@ package logic
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
@@ -20,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -42,6 +44,18 @@ type StoreItem struct {
 }
 
 type Compose struct {
+}
+
+func (self Compose) Get(key string) (*entity.Compose, error) {
+	if id, err := strconv.Atoi(key); err == nil {
+		return dao.Compose.Where(dao.Compose.ID.Eq(int32(id))).First()
+	} else {
+		if item, ok := self.FindRunTask()[key]; ok {
+			return item, nil
+		} else {
+			return nil, errors.New("compose not found")
+		}
+	}
 }
 
 type composeItem struct {
@@ -108,6 +122,14 @@ func (self Compose) FindRunTask() map[string]*entity.Compose {
 		if strings.HasPrefix(item.Name, "dpanel-c-") {
 			item.Name = item.Name[9:]
 		}
+		// 如果外部任务文件可以访问，则正常管理
+		outComposeFileExists := true
+
+		for _, file := range item.ConfigFileList {
+			if _, err := os.Stat(file); err != nil {
+				outComposeFileExists = false
+			}
+		}
 		findRow := &entity.Compose{
 			Name:  item.Name,
 			Title: "",
@@ -116,7 +138,22 @@ func (self Compose) FindRunTask() map[string]*entity.Compose {
 				Uri:           item.ConfigFileList,
 				Type:          accessor.ComposeTypeOutPath,
 				DockerEnvName: docker.Sdk.Name,
+				Environment:   make([]docker.EnvItem, 0),
 			},
+		}
+		if !outComposeFileExists {
+			findRow.Setting.Type = accessor.ComposeTypeDangling
+		}
+		if content, err := os.ReadFile(filepath.Join(filepath.Dir(item.ConfigFileList[0]), ComposeProjectEnvFileName)); err == nil && content != nil && len(content) > 0 {
+			lines := bytes.Split(content, []byte("\n"))
+			for _, line := range lines {
+				if name, value, exists := strings.Cut(string(line), "="); exists {
+					findRow.Setting.Environment = append(findRow.Setting.Environment, docker.EnvItem{
+						Name:  name,
+						Value: value,
+					})
+				}
+			}
 		}
 		findComposeList[item.Name] = findRow
 	}
@@ -251,12 +288,18 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	yamlFilePath := make([]string, 0)
 
 	if entity.Setting.Type == accessor.ComposeTypeOutPath {
+		taskFileDir = filepath.Join(filepath.Dir(entity.Setting.Uri[0]))
+
 		// 外部路径分两种，一种是原目录挂载，二是将Yaml文件放置到存储目录中
 		for _, item := range entity.Setting.Uri {
-			if filepath.IsAbs(item) {
-				yamlFilePath = append(yamlFilePath, item)
-			} else {
-				yamlFilePath = append(yamlFilePath, filepath.Join(taskFileDir, filepath.Base(item)))
+			yamlFilePath = append(yamlFilePath, item)
+		}
+
+		// 查找当前目录下是否有 dpanel-override 文件
+		overrideFilePath := filepath.Join(taskFileDir, fmt.Sprintf("dpanel-%s-override.yaml", entity.Name))
+		if len(yamlFilePath) > 0 && !function.InArray(yamlFilePath, overrideFilePath) {
+			if _, err := os.Stat(overrideFilePath); err == nil {
+				yamlFilePath = append(yamlFilePath, overrideFilePath)
 			}
 		}
 	} else {
@@ -270,19 +313,23 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		options = append(options, compose.WithYamlPath(path))
 	}
 
+	envFileName := filepath.Join(taskFileDir, ComposeProjectEnvFileName)
+
 	if !function.IsEmptyArray(entity.Setting.Environment) {
 		globalEnv := make([]string, 0)
 		for _, item := range entity.Setting.Environment {
 			globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, compose.ReplacePlaceholder(item.Value)))
 		}
-		envFileName := filepath.Join(taskFileDir, ComposeProjectEnvFileName)
 		err := os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
 		if err != nil {
 			return nil, err
 		}
 		err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
-		options = append(options, cli.WithEnvFiles(envFileName))
 		options = append(options, cli.WithEnv(globalEnv))
+	}
+
+	if _, err := os.Stat(envFileName); err == nil {
+		options = append(options, cli.WithEnvFiles(envFileName))
 	}
 
 	projectName := fmt.Sprintf(ComposeProjectName, entity.Name)
