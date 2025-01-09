@@ -120,7 +120,6 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		options = append(options, docker.WithTLS(defaultDockerEnv.TlsCa, defaultDockerEnv.TlsCert, defaultDockerEnv.TlsKey))
 	}
 	docker.Sdk, err = docker.NewBuilder(options...)
-
 	_, err = docker.Sdk.Client.Info(docker.Sdk.Ctx)
 
 	_ = logic.Setting{}.Delete(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo)
@@ -134,6 +133,8 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 					DPanelInfo: info,
 				},
 			})
+		} else {
+			slog.Debug("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err.Error())
 		}
 		go logic.EventLogic{}.MonitorLoop()
 	}

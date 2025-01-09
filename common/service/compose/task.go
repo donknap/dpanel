@@ -88,7 +88,7 @@ func (self Task) Ctrl(op string) (io.Reader, error) {
 func (self Task) Logs() (io.ReadCloser, error) {
 	cmd := []string{
 		//"--progress", "tty",
-		"logs", "-f",
+		"logs", "-f", "--tail", "500",
 	}
 	return self.runCommand(cmd)
 }

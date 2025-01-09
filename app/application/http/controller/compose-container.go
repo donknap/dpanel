@@ -229,7 +229,7 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		case <-wsBuffer.Done():
 			err = response.Close()
 			if err != nil {
-				slog.Debug("compose", "run log  response close", fmt.Sprintf(ws.MessageTypeComposeLog, composeRow.ID), "error", err)
+				slog.Debug("compose", "run log  response close", fmt.Sprintf(ws.MessageTypeComposeLog, params.Id), "error", err)
 			}
 		}
 	}()

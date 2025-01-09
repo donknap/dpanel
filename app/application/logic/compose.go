@@ -18,6 +18,7 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -117,19 +118,35 @@ func (self Compose) Kill() error {
 }
 
 func (self Compose) FindRunTask() map[string]*entity.Compose {
+	dpanelMountDir := ""
+
+	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
+	for _, mount := range dpanelContainerInfo.Mounts {
+		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" {
+			dpanelMountDir = mount.Source
+		}
+	}
+
 	findComposeList := make(map[string]*entity.Compose)
+
 	for _, item := range self.Ls() {
 		if strings.HasPrefix(item.Name, "dpanel-c-") {
 			item.Name = item.Name[9:]
 		}
 		// 如果外部任务文件可以访问，则正常管理
 		outComposeFileExists := true
-
 		for _, file := range item.ConfigFileList {
 			if _, err := os.Stat(file); err != nil {
-				outComposeFileExists = false
+				// 如果外部任务是 dpanel-c 开头的，还需要将文件路径变更为容器内的实际目录，再尝试查找一次
+				if item.IsDPanel && dpanelMountDir != "" {
+					rel, _ := filepath.Rel(dpanelMountDir, file)
+					if _, err := os.Stat(filepath.Join("/dpanel", rel)); err != nil {
+						outComposeFileExists = false
+					}
+				}
 			}
 		}
+
 		findRow := &entity.Compose{
 			Name:  item.Name,
 			Title: "",
@@ -144,6 +161,7 @@ func (self Compose) FindRunTask() map[string]*entity.Compose {
 		if !outComposeFileExists {
 			findRow.Setting.Type = accessor.ComposeTypeDangling
 		}
+
 		if content, err := os.ReadFile(filepath.Join(filepath.Dir(item.ConfigFileList[0]), ComposeProjectEnvFileName)); err == nil && content != nil && len(content) > 0 {
 			lines := bytes.Split(content, []byte("\n"))
 			for _, line := range lines {
@@ -241,14 +259,12 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
 	for _, mount := range dpanelContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" {
-			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
 			if _, err := os.Stat(mount.Source); err != nil {
 				_ = os.MkdirAll(mount.Source, os.ModePerm)
-				err = os.Symlink(workingDir, filepath.Join(mount.Source, filepath.Base(workingDir)))
-				if err != nil {
-					return nil, err
-				}
 			}
+			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
+			err := os.Symlink(workingDir, filepath.Join(mount.Source, filepath.Base(workingDir)))
+			slog.Debug("make compose symlink", "workdir", workingDir, "target", filepath.Join(mount.Source, filepath.Base(workingDir)), "error", err)
 			workingDir = filepath.Join(mount.Source, filepath.Base(workingDir))
 		}
 	}
@@ -286,7 +302,9 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	if entity.Setting.Type == accessor.ComposeTypeOutPath {
 		taskFileDir = filepath.Join(filepath.Dir(entity.Setting.Uri[0]))
 
-		// 外部路径分两种，一种是原目录挂载，二是将Yaml文件放置到存储目录中
+		// 外部路径分两种，一种是原目录挂载，二是将Yaml文件放置到存储目录中（这种情况还是会当成挂载文件来对待）
+		// 外部任务也可能是 dpanel 面板创建的，面板会将 compose 的文件地址与宿主机中的保持一致
+		// 就会导致无法找到真正的文件，需要把文件中的主机路径，还是需要再添加一个软链接
 		for _, item := range entity.Setting.Uri {
 			yamlFilePath = append(yamlFilePath, item)
 		}
@@ -332,14 +350,16 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	if entity.Setting.Type == accessor.ComposeTypeOutPath {
 		// compose 项止名称不允许有大小写，但是compose的目录名可以包含特殊字符，这里统一用id进行区分
 		// 如果是外部任务，则保持原有名称
-		projectName = entity.Name
+		// 如果该任务已经运行，但是不包含面板dpanel-c前缀，则表示该任务并非是面板创建的
+		// 只不过文件挂载到目录中，当成了挂载任务来对待
+		// 需要特殊的处理一下 -p 参数
+		// 此处还需要兼容包含 dpanel-c 前缀的外部任务
 	}
-	// 如果该任务已经运行，但是不包含面板dpanel-c前缀，则表示该任务并非是面板创建的
-	// 只不过文件挂载到目录中，当成了挂载任务来对待
-	// 需要特殊的处理一下 -p 参数
+
 	if !composeRun.IsDPanel {
 		projectName = entity.Name
 	}
+
 	options = append(options, cli.WithName(projectName))
 
 	// 最终Yaml需要用到原始的compose，创建一个原始的对象
