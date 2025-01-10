@@ -497,25 +497,25 @@ func (self Compose) Download(http *gin.Context) {
 		}
 	}
 
-	if !function.IsEmptyArray(yamlRow.Setting.Environment) {
-		envList := make([]string, 0)
-		for _, item := range yamlRow.Setting.Environment {
-			envList = append(envList, fmt.Sprintf("%s=%s", item.Name, item.Value))
-		}
-		content := strings.Join(envList, "\n")
-		zipHeader := &zip.FileHeader{
-			Name:               ".dpanel.env",
-			Method:             zip.Deflate,
-			UncompressedSize64: uint64(len(content)),
-			Modified:           time.Now(),
-		}
-		writer, _ := zipWriter.CreateHeader(zipHeader)
-		_, err := writer.Write([]byte(content))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
+	//if !function.IsEmptyArray(yamlRow.Setting.Environment) {
+	//	envList := make([]string, 0)
+	//	for _, item := range yamlRow.Setting.Environment {
+	//		envList = append(envList, fmt.Sprintf("%s=%s", item.Name, item.Value))
+	//	}
+	//	content := strings.Join(envList, "\n")
+	//	zipHeader := &zip.FileHeader{
+	//		Name:               ".dpanel.env",
+	//		Method:             zip.Deflate,
+	//		UncompressedSize64: uint64(len(content)),
+	//		Modified:           time.Now(),
+	//	}
+	//	writer, _ := zipWriter.CreateHeader(zipHeader)
+	//	_, err := writer.Write([]byte(content))
+	//	if err != nil {
+	//		self.JsonResponseWithError(http, err, 500)
+	//		return
+	//	}
+	//}
 	_ = zipWriter.Close()
 
 	http.Header("Content-Type", "application/zip")
