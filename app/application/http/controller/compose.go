@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"archive/zip"
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -22,6 +24,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 type Compose struct {
@@ -438,5 +441,85 @@ func (self Compose) Store(http *gin.Context) {
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": storeList,
 	})
+	return
+}
+
+func (self Compose) Download(http *gin.Context) {
+	type ParamsValidate struct {
+		Id string `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	yamlRow, err := logic.Compose{}.Get(params.Id)
+	if err != nil {
+		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		return
+	}
+
+	yaml, err := yamlRow.Setting.GetYaml()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	buffer := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(buffer)
+
+	if yaml[0] != "" {
+		zipHeader := &zip.FileHeader{
+			Name:               "compose.yaml",
+			Method:             zip.Deflate,
+			UncompressedSize64: uint64(len(yaml[0])),
+			Modified:           time.Now(),
+		}
+		writer, _ := zipWriter.CreateHeader(zipHeader)
+		_, err := writer.Write([]byte(yaml[0]))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	if yaml[1] != "" {
+		zipHeader := &zip.FileHeader{
+			Name:               "dpanel-override.yaml",
+			Method:             zip.Deflate,
+			UncompressedSize64: uint64(len(yaml[1])),
+			Modified:           time.Now(),
+		}
+		writer, _ := zipWriter.CreateHeader(zipHeader)
+		_, err := writer.Write([]byte(yaml[1]))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	if !function.IsEmptyArray(yamlRow.Setting.Environment) {
+		envList := make([]string, 0)
+		for _, item := range yamlRow.Setting.Environment {
+			envList = append(envList, fmt.Sprintf("%s=%s", item.Name, item.Value))
+		}
+		content := strings.Join(envList, "\n")
+		zipHeader := &zip.FileHeader{
+			Name:               ".dpanel.env",
+			Method:             zip.Deflate,
+			UncompressedSize64: uint64(len(content)),
+			Modified:           time.Now(),
+		}
+		writer, _ := zipWriter.CreateHeader(zipHeader)
+		_, err := writer.Write([]byte(content))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	_ = zipWriter.Close()
+
+	http.Header("Content-Type", "application/zip")
+	http.Header("Content-Disposition", "attachment; filename=export.zip")
+	_, _ = http.Writer.Write(buffer.Bytes())
 	return
 }
