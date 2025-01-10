@@ -48,13 +48,23 @@ type Compose struct {
 }
 
 func (self Compose) Get(key string) (*entity.Compose, error) {
+	runTaskList := self.FindRunTask()
+
 	if id, err := strconv.Atoi(key); err == nil {
-		return dao.Compose.Where(dao.Compose.ID.Eq(int32(id))).First()
+		if row, err := dao.Compose.Where(dao.Compose.ID.Eq(int32(id))).First(); err == nil {
+			if run, ok := runTaskList[row.Name]; ok {
+				row.Setting.Status = run.Setting.Status
+			} else {
+				row.Setting.Status = accessor.ComposeStatusWaiting
+			}
+			return row, nil
+		}
+		return nil, errors.New("db compose not found")
 	} else {
-		if item, ok := self.FindRunTask()[key]; ok {
+		if item, ok := runTaskList[key]; ok {
 			return item, nil
 		} else {
-			return nil, errors.New("compose not found")
+			return nil, errors.New("run compose not found")
 		}
 	}
 }
@@ -255,7 +265,6 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	workingDir := entity.Setting.GetWorkingDir()
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
-
 	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
 	for _, mount := range dpanelContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" {

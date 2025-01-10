@@ -18,13 +18,16 @@ const (
 )
 
 type ComposeSettingOption struct {
-	Status        string           `json:"status,omitempty"`
-	Type          string           `json:"type"`
-	Uri           []string         `json:"uri,omitempty"`
-	RemoteUrl     string           `json:"remoteUrl,omitempty"`
-	Store         string           `json:"store,omitempty"`
-	Environment   []docker.EnvItem `json:"environment,omitempty"`
-	DockerEnvName string           `json:"dockerEnvName,omitempty"`
+	Status            string           `json:"status,omitempty"`
+	Type              string           `json:"type"`
+	Uri               []string         `json:"uri,omitempty"`
+	RemoteUrl         string           `json:"remoteUrl,omitempty"`
+	Store             string           `json:"store,omitempty"`
+	Environment       []docker.EnvItem `json:"environment,omitempty"`
+	DockerEnvName     string           `json:"dockerEnvName,omitempty"`
+	DeployServiceName []string         `json:"deployServiceName,omitempty"`
+	CreatedAt         string           `json:"createdAt,omitempty"`
+	UpdatedAt         string           `json:"updatedAt,omitempty"`
 }
 
 func (self ComposeSettingOption) GetUriFilePath() string {

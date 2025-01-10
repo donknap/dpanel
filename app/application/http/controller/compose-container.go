@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/app/application/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -17,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
@@ -31,11 +33,6 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
-	if function.IsEmptyArray(params.DeployServiceName) {
-		self.JsonResponseWithError(http, errors.New("至少选择一个服务部署"), 500)
-		return
-	}
-
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
 		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
@@ -43,6 +40,15 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 	if !function.IsEmptyArray(params.Environment) {
 		composeRow.Setting.Environment = params.Environment
+	}
+	if !function.IsEmptyArray(params.DeployServiceName) {
+		composeRow.Setting.DeployServiceName = params.DeployServiceName
+	} else if !function.IsEmptyArray(composeRow.Setting.DeployServiceName) {
+		params.DeployServiceName = composeRow.Setting.DeployServiceName
+	}
+	composeRow.Setting.UpdatedAt = time.Now().Format(function.ShowYmdHis)
+	if composeRow.Setting.Status == accessor.ComposeStatusWaiting {
+		composeRow.Setting.CreatedAt = time.Now().Format(function.ShowYmdHis)
 	}
 
 	tasker, err := logic.Compose{}.GetTasker(composeRow)
@@ -77,11 +83,20 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			_ = notice.Message{}.Error("imagePullInvalidAuth")
 			return errors.New("image pull denied")
 		}
+		if strings.Contains(p, "Mounts denied") {
+			_ = notice.Message{}.Error("containerMountPathDenied")
+			return errors.New("mounts path denied")
+		}
 		return nil
 	}
 	_, err = io.Copy(wsBuffer, response)
 	if err != nil {
 		slog.Error("compose", "deploy copy error", err)
+	}
+
+	if composeRow.ID > 0 {
+		composeRow.Setting.Status = ""
+		_, _ = dao.Compose.Updates(composeRow)
 	}
 	_ = notice.Message{}.Info("composeDeploy", composeRow.Name)
 	self.JsonSuccessResponse(http)
@@ -130,6 +145,12 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		if err != nil {
 			slog.Debug("compose", "destroy", err)
 		}
+	} else {
+		composeRow.Setting.DeployServiceName = make([]string, 0)
+		composeRow.Setting.Status = ""
+		composeRow.Setting.CreatedAt = ""
+		composeRow.Setting.UpdatedAt = ""
+		_, _ = dao.Compose.Updates(composeRow)
 	}
 
 	if params.DeletePath {
