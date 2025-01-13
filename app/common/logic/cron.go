@@ -50,11 +50,17 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 		if containerName == "" {
 			containerName = facade.GetConfig().GetString("app.name")
 		}
-
+		dockerClient, err := Setting{}.GetDockerClient(task.Setting.DockerEnvName)
+		if err != nil {
+			return err
+		}
 		globalEnv := make([]string, 0)
+		globalEnv = append(globalEnv, dockerClient.GetDockerEnv()...)
+
 		for _, item := range task.Setting.Environment {
 			globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, item.Value))
 		}
+
 		response, err := plugin.Command{}.Exec(containerName, container.ExecOptions{
 			Privileged:   true,
 			Tty:          true,
@@ -68,6 +74,7 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 			},
 			Env: globalEnv,
 		})
+
 		if err != nil {
 			_ = dao.CronLog.Create(&entity.CronLog{
 				CronID: task.ID,

@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -55,6 +56,9 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 	}
 	out, err := cmd.Run()
 	if err != nil {
+		if function.ErrorHasKeyword(err, "fatal: early EOF", "致命错误：过早的文件结束符") {
+			_ = notice.Message{}.Info("gitPullEarlyEOF", "url", gitUrl)
+		}
 		return err
 	}
 	_, err = io.Copy(os.Stdout, out)

@@ -49,6 +49,7 @@ func (self Command) Result(containerName string, cmd string) (string, error) {
 }
 
 func (self Command) Exec(containerName string, option container.ExecOptions) (types.HijackedResponse, error) {
+	slog.Debug("docker exec", "command", option)
 	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, option)
 	if err != nil {
 		return types.HijackedResponse{}, err

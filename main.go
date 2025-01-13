@@ -107,6 +107,7 @@ func main() {
 		migrateTableData := []migrate.Updater{
 			&migrate.Upgrade20240909{},
 			&migrate.Upgrade20250106{},
+			&migrate.Upgrade20250113{},
 		}
 		for _, updater := range migrateTableData {
 			slog.Debug("main", "migrate", updater.Version())

@@ -21,19 +21,19 @@ type CronSettingExpression struct {
 func (self CronSettingExpression) ToString() string {
 	switch self.Unit {
 	case "preWeek":
-		return fmt.Sprintf("* %s %s * * %s", self.Minutes, self.Hours, self.DayOfWeek)
+		return fmt.Sprintf("0 %s %s * * %s", self.Minutes, self.Hours, self.DayOfWeek)
 	case "preMonth":
-		return fmt.Sprintf("* %s %s %s * *", self.Minutes, self.Hours, self.DayOfMonth)
+		return fmt.Sprintf("0 %s %s %s * *", self.Minutes, self.Hours, self.DayOfMonth)
 	case "preDay":
-		return fmt.Sprintf("* %s %s * * *", self.Minutes, self.Hours)
+		return fmt.Sprintf("0 %s %s * * *", self.Minutes, self.Hours)
 	case "preHour":
-		return fmt.Sprintf("* %s * * * *", self.Minutes)
+		return fmt.Sprintf("0 %s * * * *", self.Minutes)
 	case "preAtDay":
-		return fmt.Sprintf("* %s %s */%s * *", self.Minutes, self.Hours, self.DayOfMonth)
+		return fmt.Sprintf("0 %s %s */%s * *", self.Minutes, self.Hours, self.DayOfMonth)
 	case "preAtHour":
-		return fmt.Sprintf("* %s 0-23/%s * * *", self.Minutes, self.Hours)
+		return fmt.Sprintf("0 %s 0-23/%s * * *", self.Minutes, self.Hours)
 	case "preAtMinute":
-		return fmt.Sprintf("* */%s * * * *", self.Minutes)
+		return fmt.Sprintf("0 */%s * * * *", self.Minutes)
 	case "preAtSecond":
 		return fmt.Sprintf("*/%s * * * * *", self.Seconds)
 	case "code":
@@ -52,4 +52,5 @@ type CronSettingOption struct {
 	EnableRunBlock bool                    `json:"enableRunBlock,omitempty"`
 	KeepLogTotal   int                     `json:"keepLogTotal,omitempty"`
 	Disable        bool                    `json:"disable,omitempty"`
+	DockerEnvName  string                  `json:"dockerEnvName,omitempty"`
 }

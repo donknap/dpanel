@@ -6,7 +6,7 @@ task:
     Backup the mount directory or volume in the container
   script: |
     BACKUP_FILE_NAME=${CONTAINER_NAME}_$(date +"%Y%m%d%H%M%S").tar
-    BACKUP_CONTAINER_PATH=$(docker inspect test-backup --format '{{range .Mounts}}{{.Destination}} {{end}}')
+    BACKUP_CONTAINER_PATH=$(docker inspect ${CONTAINER_NAME} --format '{{range .Mounts}}{{.Destination}} {{end}}')
     echo "备份目录为 ${BACKUP_PATH}"
     docker run -it --rm --name dpanel-task-backup \
     --volumes-from ${CONTAINER_NAME} \

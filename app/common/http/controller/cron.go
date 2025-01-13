@@ -13,6 +13,8 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"gorm.io/datatypes"
+	"gorm.io/gen"
 	"time"
 )
 
@@ -65,6 +67,7 @@ func (self Cron) Create(http *gin.Context) {
 		taskRow.Setting.Environment = params.Environment
 		taskRow.Setting.KeepLogTotal = params.KeepLogTotal
 		taskRow.Setting.Disable = params.Disable
+		taskRow.Setting.DockerEnvName = docker.Sdk.Name
 	} else {
 		if _, err := dao.Cron.Where(dao.Cron.Title.Like(params.Title)).First(); err == nil {
 			self.JsonResponseWithError(http, errors.New("任务名称已经存在"), 500)
@@ -82,6 +85,7 @@ func (self Cron) Create(http *gin.Context) {
 				Environment:    params.Environment,
 				KeepLogTotal:   params.KeepLogTotal,
 				Disable:        params.Disable,
+				DockerEnvName:  docker.Sdk.Name,
 			},
 		}
 		err = dao.Cron.Create(taskRow)
@@ -104,29 +108,21 @@ func (self Cron) Create(http *gin.Context) {
 
 func (self Cron) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Title    string `json:"title"`
-		Page     int    `form:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize int    `form:"pageSize" binding:"omitempty"`
+		Title string `json:"title"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if params.Page < 1 {
-		params.Page = 1
-	}
-	if params.PageSize < 1 {
-		params.PageSize = 10
-	}
-	query := dao.Cron.Order(dao.Cron.ID.Desc())
+	query := dao.Cron.Order(dao.Cron.Title.Desc()).Where(gen.Cond(
+		datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"),
+	)...)
 	if params.Title != "" {
 		query.Where(dao.Cron.Title.Like("%" + params.Title + "%"))
 	}
-	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
+	list, _ := query.Find()
 	self.JsonResponseWithoutError(http, gin.H{
-		"total": total,
-		"page":  params.Page,
-		"list":  list,
+		"list": list,
 	})
 	return
 }

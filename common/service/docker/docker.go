@@ -34,6 +34,18 @@ type Client struct {
 	ComposePath       string `json:"composePath,omitempty"`
 }
 
+func (self Client) GetDockerEnv() []string {
+	runEnv := make([]string, 0)
+	if self.EnableTLS {
+		runEnv = append(runEnv,
+			"DOCKER_TLS_VERIFY=1",
+			"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetStorageCertPath(), self.TlsCa)),
+		)
+	}
+	runEnv = append(runEnv, fmt.Sprintf("DOCKER_HOST=%s", self.Address))
+	return runEnv
+}
+
 type Builder struct {
 	Name          string
 	Client        *client.Client
