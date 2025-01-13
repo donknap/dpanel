@@ -6,10 +6,12 @@ task:
     Backup the mount directory or volume in the container
   script: |
     BACKUP_FILE_NAME=${CONTAINER_NAME}_$(date +"%Y%m%d%H%M%S").tar
+    BACKUP_CONTAINER_PATH=$(docker inspect test-backup --format '{{range .Mounts}}{{.Destination}} {{end}}')
+    echo "备份目录为 ${BACKUP_PATH}"
     docker run -it --rm --name dpanel-task-backup \
     --volumes-from ${CONTAINER_NAME} \
     -v ${BACKUP_PATH}:/backup busybox \
-    tar czvf /backup/${BACKUP_FILE_NAME} ${CONTAINER_NAME}
+    tar czvf /backup/${BACKUP_FILE_NAME} ${BACKUP_CONTAINER_PATH}
     echo "备份完成，备份文件位于: ${BACKUP_PATH}/${BACKUP_FILE_NAME}"
   tag:
     - dpanel
