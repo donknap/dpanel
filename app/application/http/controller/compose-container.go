@@ -27,6 +27,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		Environment       []docker.EnvItem `json:"environment"`
 		DeployServiceName []string         `json:"deployServiceName"`
 		CreatePath        bool             `json:"createPath"`
+		RemoveOrphans     bool             `json:"removeOrphans"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -69,7 +70,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		}
 	}
 
-	response, err := tasker.Deploy(params.DeployServiceName...)
+	response, err := tasker.Deploy(params.DeployServiceName, params.RemoveOrphans)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

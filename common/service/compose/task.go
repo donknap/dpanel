@@ -23,10 +23,14 @@ type Task struct {
 	Status   string
 }
 
-func (self Task) Deploy(serviceName ...string) (io.Reader, error) {
+func (self Task) Deploy(serviceName []string, removeOrphans bool) (io.Reader, error) {
 	cmd := []string{
 		//"--progress", "tty",
 		"up", "-d",
+	}
+
+	if removeOrphans {
+		cmd = append(cmd, "--remove-orphans")
 	}
 
 	if !function.IsEmptyArray(serviceName) {
@@ -53,7 +57,7 @@ func (self Task) Deploy(serviceName ...string) (io.Reader, error) {
 func (self Task) Destroy(deleteImage bool, deleteVolume bool) (io.Reader, error) {
 	cmd := []string{
 		//"--progress", "tty",
-		"down",
+		"down", "--remove-orphans",
 	}
 	// 删除compose 前需要先把关联的已有容器网络退出
 	for _, item := range self.Composer.Project.Networks {
