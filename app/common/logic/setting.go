@@ -17,6 +17,8 @@ var (
 	SettingGroupSettingDiskUsage            = "diskUsage"
 	SettingGroupSettingCheckContainerIgnore = "checkContainerIgnore"
 	SettingGroupSettingDPanelInfo           = "DPanelInfo"
+	SettingGroupSettingTheme                = "theme"
+	SettingGroupSettingThemeUser            = "themeUser"
 )
 
 // 用户相关数据
@@ -81,7 +83,7 @@ func (self Setting) GetDockerClient(name string) (*docker.Client, error) {
 
 func (self Setting) GetDPanelInfo() (types.ContainerJSON, error) {
 	if setting, err := self.GetValue(SettingGroupSetting, SettingGroupSettingDPanelInfo); err == nil && setting != nil && setting.Value != nil {
-		return setting.Value.DPanelInfo, nil
+		return *setting.Value.DPanelInfo, nil
 	}
 	return types.ContainerJSON{}, errors.New("dpanel container not found")
 }

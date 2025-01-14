@@ -22,5 +22,6 @@ func (self Provider) Feature() []string {
 		"pe",
 		"twoFa",
 		"imageRemoteTag",
+		"userTheme",
 	}
 }

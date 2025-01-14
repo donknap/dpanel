@@ -162,7 +162,7 @@ func (self Env) Create(http *gin.Context) {
 				GroupName: logic.SettingGroupSetting,
 				Name:      logic.SettingGroupSettingDPanelInfo,
 				Value: &accessor.SettingValueOption{
-					DPanelInfo: info,
+					DPanelInfo: &info,
 				},
 			})
 		}

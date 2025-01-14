@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -105,13 +106,15 @@ func (self User) Login(http *gin.Context) {
 }
 
 func (self User) GetUserInfo(http *gin.Context) {
+	result := gin.H{}
+
 	data, exists := http.Get("userInfo")
 	if !exists {
 		self.JsonResponseWithError(http, errors.New("请先登录"), 401)
 		http.AbortWithStatus(401)
 		return
 	}
-	userInfo := data.(logic.UserInfo)
+	result["user"] = data.(logic.UserInfo)
 
 	feature := []string{
 		"composeStore",
@@ -119,12 +122,22 @@ func (self User) GetUserInfo(http *gin.Context) {
 	if facade.GetConfig().GetString("app.env") != "lite" {
 		feature = append(feature, "containerDomain")
 	}
-	feature = append(feature, family.Provider{}.Feature()...)
+	result["feature"] = append(feature, family.Provider{}.Feature()...)
 
-	self.JsonResponseWithoutError(http, gin.H{
-		"user":    userInfo,
-		"feature": feature,
-	})
+	if setting, err := new(logic.Setting).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingTheme); err == nil && setting.Value != nil && setting.Value.Theme != nil {
+		result["theme"] = setting.Value.Theme
+	}
+
+	if function.InArray(family.Provider{}.Feature(), "userTheme") {
+		if setting, err := new(logic.Setting).GetValue(
+			logic.SettingGroupSetting,
+			logic.SettingGroupSettingThemeUser,
+		); err == nil && setting.Value != nil && setting.Value.ThemeUser != nil {
+			result["themeUser"] = setting.Value.ThemeUser
+		}
+	}
+
+	self.JsonResponseWithoutError(http, result)
 	return
 }
 
@@ -148,5 +161,59 @@ func (self User) LoginInfo(http *gin.Context) {
 		result["showTwoFa"] = true
 	}
 	self.JsonResponseWithoutError(http, result)
+	return
+}
+
+func (self User) Theme(http *gin.Context) {
+	type ParamsValidate struct {
+		MainMenu        string `json:"mainMenu"`
+		Algorithm       string `json:"algorithm"`
+		Compact         string `json:"compact"`
+		FontSize        int    `json:"fontSize"`
+		FontSizeConsole int    `json:"fontSizeConsole"`
+		SideMenu        string `json:"sideMenu"`
+		TablePageSize   string `json:"tablePageSize"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	setting, err := new(logic.Setting).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingTheme)
+	if err != nil || setting == nil || setting.Value == nil || setting.Value.Theme == nil {
+		setting = &entity.Setting{
+			GroupName: logic.SettingGroupSetting,
+			Name:      logic.SettingGroupSettingTheme,
+			Value: &accessor.SettingValueOption{
+				Theme: &accessor.Theme{},
+			},
+		}
+	}
+	if params.MainMenu != "" {
+		setting.Value.Theme.MainMenu = params.MainMenu
+	}
+	if params.Algorithm != "" {
+		setting.Value.Theme.Algorithm = params.Algorithm
+	}
+	if params.Compact != "" {
+		setting.Value.Theme.Compact = params.Compact
+	}
+	if params.FontSizeConsole > 0 {
+		setting.Value.Theme.FontSizeConsole = params.FontSizeConsole
+	}
+	if params.FontSize > 0 {
+		setting.Value.Theme.FontSize = params.FontSize
+	}
+	if params.SideMenu != "" {
+		setting.Value.Theme.SideMenu = params.SideMenu
+	}
+	if params.TablePageSize != "" {
+		setting.Value.Theme.TablePageSize = params.TablePageSize
+	}
+	err = logic.Setting{}.Save(setting)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
 	return
 }
