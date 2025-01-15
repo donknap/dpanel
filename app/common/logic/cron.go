@@ -8,9 +8,9 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/crontab"
+	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/robfig/cron/v3"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"io"
 	"log/slog"
 	"sync"
@@ -47,9 +47,7 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 		}
 		startTime := time.Now()
 		containerName := task.Setting.ContainerName
-		if containerName == "" {
-			containerName = facade.GetConfig().GetString("app.name")
-		}
+
 		dockerClient, err := Setting{}.GetDockerClient(task.Setting.DockerEnvName)
 		if err != nil {
 			return err
@@ -60,48 +58,59 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 		for _, item := range task.Setting.Environment {
 			globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, item.Value))
 		}
-
-		response, err := plugin.Command{}.Exec(containerName, container.ExecOptions{
-			Privileged:   true,
-			Tty:          true,
-			AttachStdin:  false,
-			AttachStdout: true,
-			AttachStderr: false,
-			Cmd: []string{
-				"/bin/sh",
-				"-c",
-				task.Setting.Script,
-			},
-			Env: globalEnv,
-		})
-
-		if err != nil {
-			_ = dao.CronLog.Create(&entity.CronLog{
-				CronID: task.ID,
-				Value: &accessor.CronLogValueOption{
-					Error:   err.Error(),
-					RunTime: startTime,
+		var out string
+		if containerName == "" {
+			// 如果没有指定容器，则直接在面板 shell 中执行
+			cmd, _ := exec.New(
+				exec.WithCommandName("/bin/sh"),
+				exec.WithArgs("-c", task.Setting.Script),
+				exec.WithEnv(globalEnv),
+			)
+			out = cmd.RunWithResult()
+		} else {
+			response, err := plugin.Command{}.Exec(containerName, container.ExecOptions{
+				Privileged:   true,
+				Tty:          true,
+				AttachStdin:  false,
+				AttachStdout: true,
+				AttachStderr: false,
+				Cmd: []string{
+					"/bin/sh",
+					"-c",
+					task.Setting.Script,
 				},
+				Env: globalEnv,
 			})
-			return err
+			if err != nil {
+				_ = dao.CronLog.Create(&entity.CronLog{
+					CronID: task.ID,
+					Value: &accessor.CronLogValueOption{
+						Error:   err.Error(),
+						RunTime: startTime,
+					},
+				})
+				return err
+			}
+			defer response.Close()
+			buffer := new(bytes.Buffer)
+			_, err = io.Copy(buffer, response.Reader)
+			if err != nil {
+				_ = dao.CronLog.Create(&entity.CronLog{
+					CronID: task.ID,
+					Value: &accessor.CronLogValueOption{
+						Error:   err.Error(),
+						RunTime: startTime,
+					},
+				})
+				return err
+			}
+			out = buffer.String()
 		}
-		defer response.Close()
-		buffer := new(bytes.Buffer)
-		_, err = io.Copy(buffer, response.Reader)
-		if err != nil {
-			_ = dao.CronLog.Create(&entity.CronLog{
-				CronID: task.ID,
-				Value: &accessor.CronLogValueOption{
-					Error:   err.Error(),
-					RunTime: startTime,
-				},
-			})
-			return err
-		}
+
 		_ = dao.CronLog.Create(&entity.CronLog{
 			CronID: task.ID,
 			Value: &accessor.CronLogValueOption{
-				Message: buffer.String(),
+				Message: out,
 				RunTime: startTime,
 				UseTime: time.Now().Sub(startTime).Seconds(),
 			},
