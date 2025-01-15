@@ -51,11 +51,11 @@ type ThemeUser struct {
 		Left   string `json:"left,omitempty"`
 		Right  string `json:"right,omitempty"`
 		Bottom string `json:"bottom,omitempty"`
-	} `json:"bgImage"`
+	} `json:"bgImage,omitempty"`
 	SiteLink []struct {
 		Href  string `json:"href,omitempty"`
 		Title string `json:"title,omitempty"`
-	} `json:"siteLink"`
+	} `json:"siteLink,omitempty"`
 	SiteCopyright string `json:"siteCopyright,omitempty"`
 	SiteTitle     string `json:"siteTitle,omitempty"`
 	SiteLogo      string `json:"siteLogo,omitempty"`
