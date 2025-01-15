@@ -20,7 +20,10 @@ func (self repository) GetImageDigest(imageName string) (string, error) {
 	imageDetail := GetImageTagDetail(imageName)
 
 	u := self.registry.url.JoinPath(imageDetail.GetBaseName(), "manifests", imageDetail.GetTag())
-	req, _ := http.NewRequest("HEAD", u.String(), nil)
+	req, err := http.NewRequest("HEAD", u.String(), nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v2+json")
 	req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.list.v2+json")
 	req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v1+json")

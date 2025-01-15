@@ -34,7 +34,7 @@ func WithRequestCacheTime(cacheTime time.Duration) Option {
 
 func WithRegistryHost(host string) Option {
 	return func(registry *Registry) {
-		host = strings.TrimPrefix(strings.TrimPrefix(host, "http://"), "https://")
+		host = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(host, "http://"), "https://"), "/")
 		if host == DefaultRegistryDomain {
 			host = DefaultRegistryHost
 		}
