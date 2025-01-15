@@ -1,0 +1,23 @@
+task:
+  name: clear-upload
+  descriptionZh: |
+    清理上传临时附件
+  descriptionEn: |
+    prune upload temp file
+  script: |
+    #!/bin/sh
+    DIR="/dpanel/storage"
+    EXPIRE_DAYS=3
+    find "$DIR" -type f -name "dpanel-*" | while read -r file; do
+        file_mtime=$(stat -c %Y "$file")
+        current_time=$(date +%s)
+        time_diff=$((current_time - file_mtime))
+        timeout_seconds=$((EXPIRE_DAYS * 24 * 60 * 60))
+        if [ "$time_diff" -gt "$timeout_seconds" ]; then
+            echo "Deleting $file (older than $EXPIRE_DAYS days)"
+            rm -f "$file"
+        fi
+    done
+  tag:
+    - dpanel
+    - run-in-dpanel
