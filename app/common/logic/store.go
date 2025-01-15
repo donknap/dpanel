@@ -281,6 +281,11 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 
 		return nil
 	})
+
+	if storeItem.Name != "" && storeItem.Version != nil && len(storeItem.Version) > 0 {
+		result = append(result, storeItem)
+	}
+
 	if err != nil {
 		return nil, err
 	}
