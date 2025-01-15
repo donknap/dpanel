@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"bytes"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -32,7 +31,7 @@ func (self Command) Result(containerName string, cmd string) (string, error) {
 		"-c",
 		cmd,
 	})
-	response, err := self.Exec(containerName, execConfig)
+	response, err := docker.Sdk.ContainerExec(containerName, execConfig)
 	if err != nil {
 		return "", err
 	}
@@ -46,20 +45,6 @@ func (self Command) Result(containerName string, cmd string) (string, error) {
 	cleanOut := self.Clean(buffer.Bytes())
 	slog.Debug("command", "clear result", cleanOut)
 	return cleanOut, nil
-}
-
-func (self Command) Exec(containerName string, option container.ExecOptions) (types.HijackedResponse, error) {
-	slog.Debug("docker exec", "command", option)
-	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, option)
-	if err != nil {
-		return types.HijackedResponse{}, err
-	}
-	execAttachOption := container.ExecStartOptions{
-		Tty:         option.Tty,
-		ConsoleSize: option.ConsoleSize,
-		Detach:      option.Detach,
-	}
-	return docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, execAttachOption)
 }
 
 func (self Command) Clean(str []byte) string {

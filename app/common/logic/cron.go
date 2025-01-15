@@ -8,8 +8,8 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/crontab"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/robfig/cron/v3"
 	"io"
 	"log/slog"
@@ -48,27 +48,63 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 		startTime := time.Now()
 		containerName := task.Setting.ContainerName
 
-		dockerClient, err := Setting{}.GetDockerClient(task.Setting.DockerEnvName)
+		defaultDockerEnv, err := Setting{}.GetDockerClient(task.Setting.DockerEnvName)
 		if err != nil {
 			return err
 		}
 		globalEnv := make([]string, 0)
-		globalEnv = append(globalEnv, dockerClient.GetDockerEnv()...)
+		globalEnv = append(globalEnv, defaultDockerEnv.GetDockerEnv()...)
 
 		for _, item := range task.Setting.Environment {
 			globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, item.Value))
 		}
+
 		var out string
 		if containerName == "" {
 			// 如果没有指定容器，则直接在面板 shell 中执行
+			// 生成 script.sh 文件
 			cmd, _ := exec.New(
 				exec.WithCommandName("/bin/sh"),
 				exec.WithArgs("-c", task.Setting.Script),
 				exec.WithEnv(globalEnv),
 			)
-			out = cmd.RunWithResult()
+			response, err := cmd.RunInTerminal(nil)
+			if err != nil {
+				_ = dao.CronLog.Create(&entity.CronLog{
+					CronID: task.ID,
+					Value: &accessor.CronLogValueOption{
+						Error:   err.Error(),
+						RunTime: startTime,
+					},
+				})
+				return err
+			}
+			buffer := new(bytes.Buffer)
+			_, err = io.Copy(buffer, response)
+			if err != nil {
+				_ = dao.CronLog.Create(&entity.CronLog{
+					CronID: task.ID,
+					Value: &accessor.CronLogValueOption{
+						Error:   err.Error(),
+						RunTime: startTime,
+					},
+				})
+				return err
+			}
+			out = buffer.String()
 		} else {
-			response, err := plugin.Command{}.Exec(containerName, container.ExecOptions{
+			options := []docker.Option{
+				docker.WithName(defaultDockerEnv.Name),
+				docker.WithAddress(defaultDockerEnv.Address),
+			}
+			if defaultDockerEnv.EnableTLS {
+				options = append(options, docker.WithTLS(defaultDockerEnv.TlsCa, defaultDockerEnv.TlsCert, defaultDockerEnv.TlsKey))
+			}
+			dockerClient, err := docker.NewBuilder(options...)
+			defer func() {
+				dockerClient.Close()
+			}()
+			response, err := dockerClient.ContainerExec(containerName, container.ExecOptions{
 				Privileged:   true,
 				Tty:          true,
 				AttachStdin:  false,

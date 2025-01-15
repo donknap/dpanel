@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/versions"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -155,4 +156,18 @@ func (self Builder) ContainerCopyInspect(containerName string) (info types.Conta
 		}
 	}
 	return info, nil
+}
+
+func (self Builder) ContainerExec(containerName string, option container.ExecOptions) (types.HijackedResponse, error) {
+	slog.Debug("docker exec", "command", option)
+	exec, err := self.Client.ContainerExecCreate(self.Ctx, containerName, option)
+	if err != nil {
+		return types.HijackedResponse{}, err
+	}
+	execAttachOption := container.ExecStartOptions{
+		Tty:         option.Tty,
+		ConsoleSize: option.ConsoleSize,
+		Detach:      option.Detach,
+	}
+	return self.Client.ContainerExecAttach(self.Ctx, exec.ID, execAttachOption)
 }
