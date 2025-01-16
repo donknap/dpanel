@@ -68,7 +68,7 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 				exec.WithArgs("-c", task.Setting.Script),
 				exec.WithEnv(globalEnv),
 			)
-			response, err := cmd.RunInTerminal(nil)
+			response, err := cmd.Run()
 			if err != nil {
 				_ = dao.CronLog.Create(&entity.CronLog{
 					CronID: task.ID,

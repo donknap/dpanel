@@ -47,16 +47,16 @@ type ThemeUser struct {
 		Src    string `json:"src,omitempty"`
 		Width  string `json:"width,omitempty"`
 		Height string `json:"height,omitempty"`
-		Top    string `json:"top,omitempty"`
-		Left   string `json:"left,omitempty"`
-		Right  string `json:"right,omitempty"`
-		Bottom string `json:"bottom,omitempty"`
+		Top    int    `json:"top,omitempty"`
+		Left   int    `json:"left,omitempty"`
+		Right  int    `json:"right,omitempty"`
+		Bottom int    `json:"bottom,omitempty"`
 	} `json:"bgImage,omitempty"`
 	SiteLink []struct {
 		Href  string `json:"href,omitempty"`
 		Title string `json:"title,omitempty"`
 	} `json:"siteLink,omitempty"`
 	SiteCopyright string `json:"siteCopyright,omitempty"`
-	SiteTitle     string `json:"siteTitle,omitempty"`
+	SiteTitle     string `json:"siteTitle"`
 	SiteLogo      string `json:"siteLogo,omitempty"`
 }

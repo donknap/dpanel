@@ -57,7 +57,7 @@ func (self Cron) Create(http *gin.Context) {
 			return
 		}
 		crontab.Wrapper.RemoveJob(taskRow.Setting.JobIds...)
-
+		taskRow.Title = params.Title
 		taskRow.Setting.NextRunTime = make([]time.Time, 0)
 		taskRow.Setting.JobIds = make([]cron.EntryID, 0)
 		taskRow.Setting.Expression = params.Expression
