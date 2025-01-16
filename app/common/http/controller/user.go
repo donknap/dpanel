@@ -6,7 +6,6 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -128,15 +127,6 @@ func (self User) GetUserInfo(http *gin.Context) {
 		result["theme"] = setting.Value.Theme
 	}
 
-	if function.InArray(family.Provider{}.Feature(), "userTheme") {
-		if setting, err := new(logic.Setting).GetValue(
-			logic.SettingGroupSetting,
-			logic.SettingGroupSettingThemeUser,
-		); err == nil && setting.Value != nil && setting.Value.ThemeUser != nil {
-			result["themeUser"] = setting.Value.ThemeUser
-		}
-	}
-
 	self.JsonResponseWithoutError(http, result)
 	return
 }
@@ -159,6 +149,9 @@ func (self User) LoginInfo(http *gin.Context) {
 	setting, err := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa)
 	if err == nil && setting != nil && setting.Value.TwoFa.Enable {
 		result["showTwoFa"] = true
+	}
+	if setting, err = new(logic.Setting).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingTheme); err == nil && setting.Value != nil && setting.Value.Theme != nil {
+		result["theme"] = setting.Value.Theme
 	}
 	self.JsonResponseWithoutError(http, result)
 	return

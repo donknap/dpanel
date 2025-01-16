@@ -23,13 +23,11 @@ func (self Attach) Upload(http *gin.Context) {
 	}
 	defer fileUploader.Close()
 	file, err := os.CreateTemp(storage.Local{}.GetSaveRootPath(), "dpanel-upload")
-	if file != nil {
-		slog.Debug("upload file", "path", file.Name())
-	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	slog.Debug("upload file", "path", file.Name())
 	err = http.SaveUploadedFile(fileHeader, file.Name())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

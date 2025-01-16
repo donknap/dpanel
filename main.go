@@ -75,6 +75,7 @@ func main() {
 				http.Data(http2.StatusOK, "text/html; charset=UTF-8", indexHtml)
 				return
 			})
+			engine.Static("/dpanel/static/image", filepath.Join(storage.Local{}.GetSaveRootPath(), "image"))
 		},
 	)
 
