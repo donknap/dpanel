@@ -15,3 +15,4 @@ runtime/
 bin/
 data
 tests
+app/pro/**/.DS_Store
