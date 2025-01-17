@@ -89,6 +89,10 @@ QQ: 837583876
 
 #### 界面预览
 
+###### pro 自定义皮肤
+
+![pro-1](https://cdn.w7.cc/dpanel/pro-1.png)
+
 ###### 概览
 ![home.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/home.png)
 ###### 容器管理
