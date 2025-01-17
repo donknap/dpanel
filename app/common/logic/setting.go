@@ -3,6 +3,7 @@ package logic
 import (
 	"errors"
 	"github.com/docker/docker/api/types"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -17,8 +18,8 @@ var (
 	SettingGroupSettingDiskUsage            = "diskUsage"
 	SettingGroupSettingCheckContainerIgnore = "checkContainerIgnore"
 	SettingGroupSettingDPanelInfo           = "DPanelInfo"
-	SettingGroupSettingTheme                = "theme"
-	SettingGroupSettingThemeUser            = "themeUser"
+	SettingGroupSettingThemeConfig          = "themeConfig"
+	SettingGroupSettingThemeUserConfig      = "themeUserConfig"
 )
 
 // 用户相关数据
@@ -57,8 +58,8 @@ func (self Setting) GetValue(groupName string, name string) (*entity.Setting, er
 		dao.Setting.GroupName.Eq(groupName),
 		dao.Setting.Name.Eq(name),
 	).First()
-	if setting == nil {
-		return nil, errors.New("配置不存在")
+	if setting == nil || setting.Value == nil {
+		return nil, errors.New("setting not found")
 	}
 	return setting, nil
 
@@ -82,10 +83,11 @@ func (self Setting) GetDockerClient(name string) (*docker.Client, error) {
 }
 
 func (self Setting) GetDPanelInfo() (types.ContainerJSON, error) {
-	if setting, err := self.GetValue(SettingGroupSetting, SettingGroupSettingDPanelInfo); err == nil && setting != nil && setting.Value != nil {
-		return *setting.Value.DPanelInfo, nil
+	result := types.ContainerJSON{}
+	if exists := self.GetByKey(SettingGroupSetting, SettingGroupSettingDPanelInfo, &result); exists {
+		return result, nil
 	}
-	return types.ContainerJSON{}, errors.New("dpanel container not found")
+	return result, errors.New("dpanel container not found")
 }
 
 func (self Setting) Delete(groupName string, name string) error {
@@ -94,4 +96,51 @@ func (self Setting) Delete(groupName string, name string) error {
 		dao.Setting.Name.Eq(name),
 	).Delete()
 	return nil
+}
+
+func (self Setting) GetByKey(group, name string, value interface{}) (exists bool) {
+	setting, err := self.GetValue(group, name)
+	if err != nil {
+		return false
+	}
+	if value != nil {
+		switch v := value.(type) {
+		case *map[string]*docker.Client:
+			if setting.Value.Docker != nil {
+				exists = true
+				*v = setting.Value.Docker
+			}
+		case *accessor.DiskUsage:
+			if setting.Value.DiskUsage != nil {
+				exists = true
+				*v = *setting.Value.DiskUsage
+			}
+		case *accessor.TwoFa:
+			if setting.Value.TwoFa != nil {
+				exists = true
+				*v = *setting.Value.TwoFa
+			}
+		case *[]accessor.IgnoreCheckUpgradeItem:
+			if setting.Value.IgnoreCheckUpgrade != nil {
+				exists = true
+				*v = setting.Value.IgnoreCheckUpgrade
+			}
+		case *types.ContainerJSON:
+			if setting.Value.DPanelInfo != nil {
+				exists = true
+				*v = *setting.Value.DPanelInfo
+			}
+		case *accessor.ThemeUserConfig:
+			if setting.Value.ThemeUserConfig != nil {
+				exists = true
+				*v = *setting.Value.ThemeUserConfig
+			}
+		case *accessor.ThemeConfig:
+			if setting.Value.ThemeConfig != nil {
+				exists = true
+				*v = *setting.Value.ThemeConfig
+			}
+		}
+	}
+	return exists
 }

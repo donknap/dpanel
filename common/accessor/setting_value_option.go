@@ -13,11 +13,13 @@ type SettingValueOption struct {
 	Docker             map[string]*docker.Client `json:"docker,omitempty"`
 	DiskUsage          *DiskUsage                `json:"diskUsage,omitempty"`
 	TwoFa              *TwoFa                    `json:"twoFa,omitempty"`
-	IgnoreCheckUpgrade []string                  `json:"ignoreCheckUpgrade,omitempty"`
+	IgnoreCheckUpgrade []IgnoreCheckUpgradeItem  `json:"ignoreCheckUpgrade,omitempty"`
 	DPanelInfo         *types.ContainerJSON      `json:"DPanelInfo,omitempty"`
-	Theme              *Theme                    `json:"theme,omitempty"`
-	ThemeUser          *ThemeUser                `json:"themeUser,omitempty"`
+	ThemeConfig        *ThemeConfig              `json:"theme,omitempty"`
+	ThemeUserConfig    *ThemeUserConfig          `json:"themeUser,omitempty"`
 }
+
+type IgnoreCheckUpgradeItem string
 
 type DiskUsage struct {
 	Usage     *types.DiskUsage `json:"usage,omitempty"`
@@ -31,7 +33,7 @@ type TwoFa struct {
 	QrCode string `json:"qrCode,omitempty"`
 }
 
-type Theme struct {
+type ThemeConfig struct {
 	MainMenu        string `json:"mainMenu,omitempty"`
 	Algorithm       string `json:"algorithm,omitempty"`
 	Compact         string `json:"compact,omitempty"`
@@ -41,7 +43,7 @@ type Theme struct {
 	TablePageSize   string `json:"tablePageSize,omitempty"`
 }
 
-type ThemeUser struct {
+type ThemeUserConfig struct {
 	Token   map[string]interface{} `json:"token"`
 	BgImage struct {
 		Src    string `json:"src,omitempty"`
@@ -59,4 +61,8 @@ type ThemeUser struct {
 	SiteCopyright string `json:"siteCopyright,omitempty"`
 	SiteTitle     string `json:"siteTitle"`
 	SiteLogo      string `json:"siteLogo,omitempty"`
+	LoginPageType string `json:"loginPageType,omitempty"`
+	LoginLogo     string `json:"loginLogo,omitempty"`
+	LoginBgImage  string `json:"loginBgImage,omitempty"`
+	LoginBgVideo  string `json:"loginBgVideo,omitempty"`
 }

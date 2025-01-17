@@ -187,14 +187,14 @@ func (self Container) Ignore(http *gin.Context) {
 			GroupName: logic2.SettingGroupSetting,
 			Name:      logic2.SettingGroupSettingCheckContainerIgnore,
 			Value: &accessor.SettingValueOption{
-				IgnoreCheckUpgrade: make([]string, 0),
+				IgnoreCheckUpgrade: make([]accessor.IgnoreCheckUpgradeItem, 0),
 			},
 		}
 	}
 
 	ignore := fmt.Sprintf("%s@%s", params.Md5, params.ImageId)
-	exists, i := function.IndexArrayWalk(setting.Value.IgnoreCheckUpgrade, func(i string) bool {
-		return strings.HasPrefix(i, params.Md5+"@")
+	exists, i := function.IndexArrayWalk(setting.Value.IgnoreCheckUpgrade, func(i accessor.IgnoreCheckUpgradeItem) bool {
+		return strings.HasPrefix(string(i), params.Md5+"@")
 	})
 
 	if params.ImageId == "" {
@@ -203,9 +203,9 @@ func (self Container) Ignore(http *gin.Context) {
 		}
 	} else {
 		if exists {
-			setting.Value.IgnoreCheckUpgrade[i] = ignore
+			setting.Value.IgnoreCheckUpgrade[i] = accessor.IgnoreCheckUpgradeItem(ignore)
 		} else {
-			setting.Value.IgnoreCheckUpgrade = append(setting.Value.IgnoreCheckUpgrade, ignore)
+			setting.Value.IgnoreCheckUpgrade = append(setting.Value.IgnoreCheckUpgrade, accessor.IgnoreCheckUpgradeItem(ignore))
 		}
 	}
 

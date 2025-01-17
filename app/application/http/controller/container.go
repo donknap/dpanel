@@ -189,7 +189,7 @@ func (self Container) GetDetail(http *gin.Context) {
 		return
 	}
 
-	ignore := make([]string, 0)
+	ignore := make([]accessor.IgnoreCheckUpgradeItem, 0)
 	if setting, err := new(logic2.Setting).GetValue(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore); err == nil {
 		ignore = setting.Value.IgnoreCheckUpgrade
 	}

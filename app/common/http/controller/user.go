@@ -31,15 +31,19 @@ func (self User) Login(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	setting, err := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa)
-	if err == nil && setting != nil && setting.Value.TwoFa.Enable {
-		if params.Code == "" {
-			self.JsonResponseWithError(http, errors.New("请输入双因素验证码"), 500)
-			return
-		}
-		if !totp.Validate(params.Code, setting.Value.TwoFa.Secret) {
-			self.JsonResponseWithError(http, errors.New("验证码错误"), 500)
-			return
+
+	if new(family.Provider).Check(family.FeatureTwoFa) {
+		twoFa := accessor.TwoFa{}
+		exists := logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa, &twoFa)
+		if exists && twoFa.Enable {
+			if params.Code == "" {
+				self.JsonResponseWithError(http, errors.New("请输入双因素验证码"), 500)
+				return
+			}
+			if !totp.Validate(params.Code, twoFa.Secret) {
+				self.JsonResponseWithError(http, errors.New("验证码错误"), 500)
+				return
+			}
 		}
 	}
 
@@ -116,15 +120,15 @@ func (self User) GetUserInfo(http *gin.Context) {
 	result["user"] = data.(logic.UserInfo)
 
 	feature := []string{
-		"composeStore",
+		family.FeatureComposeStore,
 	}
 	if facade.GetConfig().GetString("app.env") != "lite" {
-		feature = append(feature, "containerDomain")
+		feature = append(feature, family.FeatureContainerDomain)
 	}
 	result["feature"] = append(feature, family.Provider{}.Feature()...)
 
-	if setting, err := new(logic.Setting).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingTheme); err == nil && setting.Value != nil && setting.Value.Theme != nil {
-		result["theme"] = setting.Value.Theme
+	if setting, err := new(logic.Setting).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingThemeConfig); err == nil && setting.Value != nil && setting.Value.ThemeConfig != nil {
+		result["theme"] = setting.Value.ThemeConfig
 	}
 
 	self.JsonResponseWithoutError(http, result)
@@ -135,74 +139,33 @@ func (self User) LoginInfo(http *gin.Context) {
 	result := gin.H{
 		"showRegister":  false,
 		"showBuildName": true,
-		"version":       facade.GetConfig().GetString("app.version"),
 		"family":        facade.GetConfig().GetString("app.env"),
+		"feature":       family.Provider{}.Feature(),
 	}
 	_, err := logic.Setting{}.GetDPanelInfo()
 	if err == nil {
 		result["showBuildName"] = false
 	}
-	founder, err := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
-	if err != nil || founder == nil {
+	_, err = logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
+	if err != nil {
 		result["showRegister"] = true
-	}
-	setting, err := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa)
-	if err == nil && setting != nil && setting.Value.TwoFa.Enable {
-		result["showTwoFa"] = true
-	}
-	if setting, err = new(logic.Setting).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingTheme); err == nil && setting.Value != nil && setting.Value.Theme != nil {
-		result["theme"] = setting.Value.Theme
 	}
 	self.JsonResponseWithoutError(http, result)
 	return
 }
 
 func (self User) Theme(http *gin.Context) {
-	type ParamsValidate struct {
-		MainMenu        string `json:"mainMenu"`
-		Algorithm       string `json:"algorithm"`
-		Compact         string `json:"compact"`
-		FontSize        int    `json:"fontSize"`
-		FontSizeConsole int    `json:"fontSizeConsole"`
-		SideMenu        string `json:"sideMenu"`
-		TablePageSize   string `json:"tablePageSize"`
-	}
-	params := ParamsValidate{}
+	params := accessor.ThemeConfig{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	setting, err := new(logic.Setting).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingTheme)
-	if err != nil || setting == nil || setting.Value == nil || setting.Value.Theme == nil {
-		setting = &entity.Setting{
-			GroupName: logic.SettingGroupSetting,
-			Name:      logic.SettingGroupSettingTheme,
-			Value: &accessor.SettingValueOption{
-				Theme: &accessor.Theme{},
-			},
-		}
-	}
-	if params.MainMenu != "" {
-		setting.Value.Theme.MainMenu = params.MainMenu
-	}
-	if params.Algorithm != "" {
-		setting.Value.Theme.Algorithm = params.Algorithm
-	}
-	if params.Compact != "" {
-		setting.Value.Theme.Compact = params.Compact
-	}
-	if params.FontSizeConsole > 0 {
-		setting.Value.Theme.FontSizeConsole = params.FontSizeConsole
-	}
-	if params.FontSize > 0 {
-		setting.Value.Theme.FontSize = params.FontSize
-	}
-	if params.SideMenu != "" {
-		setting.Value.Theme.SideMenu = params.SideMenu
-	}
-	if params.TablePageSize != "" {
-		setting.Value.Theme.TablePageSize = params.TablePageSize
-	}
-	err = logic.Setting{}.Save(setting)
+	err := logic.Setting{}.Save(&entity.Setting{
+		GroupName: logic.SettingGroupSetting,
+		Name:      logic.SettingGroupSettingThemeConfig,
+		Value: &accessor.SettingValueOption{
+			ThemeConfig: &params,
+		},
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

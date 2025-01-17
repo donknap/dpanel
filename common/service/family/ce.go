@@ -18,3 +18,7 @@ func (providder *Provider) Register(httpServer *server.Server, consoleServer con
 func (self Provider) Feature() []string {
 	return []string{}
 }
+
+func (self Provider) Check(name string) bool {
+	return function.InArray(self.Feature(), name)
+}
