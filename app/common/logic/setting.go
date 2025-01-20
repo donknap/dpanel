@@ -120,7 +120,7 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 				exists = true
 				*v = *setting.Value.TwoFa
 			}
-		case *[]accessor.IgnoreCheckUpgradeItem:
+		case *accessor.IgnoreCheckUpgrade:
 			if setting.Value.IgnoreCheckUpgrade != nil {
 				exists = true
 				*v = setting.Value.IgnoreCheckUpgrade

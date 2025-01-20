@@ -50,7 +50,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/user/login", controller.User{}.Login)
 		cors.POST("/common/user/login-info", controller.User{}.LoginInfo)
 		cors.POST("/common/user/get-user-info", controller.User{}.GetUserInfo)
-		cors.POST("/common/user/theme", controller.User{}.Theme)
+		cors.POST("/common/user/save-theme-config", controller.User{}.SaveThemeConfig)
 
 		// 配置
 		cors.POST("/common/setting/save", controller.Setting{}.Save)

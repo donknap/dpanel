@@ -154,7 +154,7 @@ func (self User) LoginInfo(http *gin.Context) {
 	return
 }
 
-func (self User) Theme(http *gin.Context) {
+func (self User) SaveThemeConfig(http *gin.Context) {
 	params := accessor.ThemeConfig{}
 	if !self.Validate(http, &params) {
 		return

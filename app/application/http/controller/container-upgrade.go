@@ -179,37 +179,34 @@ func (self Container) Ignore(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	var setting *entity.Setting
-	var err error
 
-	if setting, err = new(logic2.Setting).GetValue(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore); err != nil {
-		setting = &entity.Setting{
-			GroupName: logic2.SettingGroupSetting,
-			Name:      logic2.SettingGroupSettingCheckContainerIgnore,
-			Value: &accessor.SettingValueOption{
-				IgnoreCheckUpgrade: make([]accessor.IgnoreCheckUpgradeItem, 0),
-			},
-		}
-	}
+	checkIgnore := accessor.IgnoreCheckUpgrade{}
+	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore, &checkIgnore)
 
 	ignore := fmt.Sprintf("%s@%s", params.Md5, params.ImageId)
-	exists, i := function.IndexArrayWalk(setting.Value.IgnoreCheckUpgrade, func(i accessor.IgnoreCheckUpgradeItem) bool {
+	exists, i := function.IndexArrayWalk(checkIgnore, func(i string) bool {
 		return strings.HasPrefix(string(i), params.Md5+"@")
 	})
 
 	if params.ImageId == "" {
 		if exists {
-			setting.Value.IgnoreCheckUpgrade = slices.Delete(setting.Value.IgnoreCheckUpgrade, i, i+1)
+			checkIgnore = slices.Delete(checkIgnore, i, i+1)
 		}
 	} else {
 		if exists {
-			setting.Value.IgnoreCheckUpgrade[i] = accessor.IgnoreCheckUpgradeItem(ignore)
+			checkIgnore[i] = ignore
 		} else {
-			setting.Value.IgnoreCheckUpgrade = append(setting.Value.IgnoreCheckUpgrade, accessor.IgnoreCheckUpgradeItem(ignore))
+			checkIgnore = append(checkIgnore, ignore)
 		}
 	}
 
-	_ = logic2.Setting{}.Save(setting)
+	_ = logic2.Setting{}.Save(&entity.Setting{
+		GroupName: logic2.SettingGroupSetting,
+		Name:      logic2.SettingGroupSettingCheckContainerIgnore,
+		Value: &accessor.SettingValueOption{
+			IgnoreCheckUpgrade: checkIgnore,
+		},
+	})
 
 	self.JsonSuccessResponse(http)
 	return

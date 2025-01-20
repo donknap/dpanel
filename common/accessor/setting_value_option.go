@@ -13,13 +13,13 @@ type SettingValueOption struct {
 	Docker             map[string]*docker.Client `json:"docker,omitempty"`
 	DiskUsage          *DiskUsage                `json:"diskUsage,omitempty"`
 	TwoFa              *TwoFa                    `json:"twoFa,omitempty"`
-	IgnoreCheckUpgrade []IgnoreCheckUpgradeItem  `json:"ignoreCheckUpgrade,omitempty"`
+	IgnoreCheckUpgrade IgnoreCheckUpgrade        `json:"ignoreCheckUpgrade,omitempty"`
 	DPanelInfo         *types.ContainerJSON      `json:"DPanelInfo,omitempty"`
 	ThemeConfig        *ThemeConfig              `json:"theme,omitempty"`
 	ThemeUserConfig    *ThemeUserConfig          `json:"themeUser,omitempty"`
 }
 
-type IgnoreCheckUpgradeItem string
+type IgnoreCheckUpgrade []string
 
 type DiskUsage struct {
 	Usage     *types.DiskUsage `json:"usage,omitempty"`
@@ -54,15 +54,14 @@ type ThemeUserConfig struct {
 		Right  int    `json:"right,omitempty"`
 		Bottom int    `json:"bottom,omitempty"`
 	} `json:"bgImage,omitempty"`
-	SiteLink []struct {
-		Href  string `json:"href,omitempty"`
-		Title string `json:"title,omitempty"`
-	} `json:"siteLink,omitempty"`
-	SiteCopyright string `json:"siteCopyright,omitempty"`
-	SiteTitle     string `json:"siteTitle"`
-	SiteLogo      string `json:"siteLogo,omitempty"`
-	LoginPageType string `json:"loginPageType,omitempty"`
-	LoginLogo     string `json:"loginLogo,omitempty"`
-	LoginBgImage  string `json:"loginBgImage,omitempty"`
-	LoginBgVideo  string `json:"loginBgVideo,omitempty"`
+	SiteLink      []ThemeUserConfigSiteLink `json:"siteLink,omitempty"`
+	SiteCopyright string                    `json:"siteCopyright,omitempty"`
+	SiteTitle     string                    `json:"siteTitle"`
+	SiteLogo      string                    `json:"siteLogo,omitempty"`
+	LoginLogo     string                    `json:"loginLogo,omitempty"`
+}
+
+type ThemeUserConfigSiteLink struct {
+	Href  string `json:"href,omitempty"`
+	Title string `json:"title,omitempty"`
 }
