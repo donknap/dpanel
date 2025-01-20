@@ -127,9 +127,9 @@ func (self User) GetUserInfo(http *gin.Context) {
 	}
 	result["feature"] = append(feature, family.Provider{}.Feature()...)
 
-	if setting, err := new(logic.Setting).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingThemeConfig); err == nil && setting.Value != nil && setting.Value.ThemeConfig != nil {
-		result["theme"] = setting.Value.ThemeConfig
-	}
+	themeConfig := accessor.ThemeConfig{}
+	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingThemeConfig, &themeConfig)
+	result["theme"] = themeConfig
 
 	self.JsonResponseWithoutError(http, result)
 	return
