@@ -66,7 +66,7 @@ func (self AcmeIssueOption) to() ([]string, error) {
 	return command, nil
 }
 
-func (self Acme) Issue(option *AcmeIssueOption) (io.ReadCloser, error) {
+func (self Acme) Issue(option *AcmeIssueOption) (io.Reader, error) {
 	command, err := option.to()
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (self Acme) Issue(option *AcmeIssueOption) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	out, err := cmd.RunInTerminal(nil)
+	out, err := cmd.Run()
 	if err != nil {
 		return nil, err
 	}

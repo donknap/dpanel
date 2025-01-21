@@ -19,7 +19,7 @@ type repository struct {
 func (self repository) GetImageDigest(imageName string) (string, error) {
 	imageDetail := GetImageTagDetail(imageName)
 
-	u := self.registry.url.JoinPath(imageDetail.GetBaseName(), "manifests", imageDetail.GetTag())
+	u := self.registry.url.JoinPath(imageDetail.BaseName, "manifests", imageDetail.Version)
 	req, err := http.NewRequest("HEAD", u.String(), nil)
 	if err != nil {
 		return "", err
@@ -29,7 +29,7 @@ func (self repository) GetImageDigest(imageName string) (string, error) {
 	req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v1+json")
 	req.Header.Add("Accept", "application/vnd.oci.image.index.v1+json")
 
-	res, err := self.registry.request(req, fmt.Sprintf(ScopeRepositoryPull, imageDetail.GetBaseName()))
+	res, err := self.registry.request(req, fmt.Sprintf(ScopeRepositoryPull, imageDetail.BaseName))
 	if err != nil {
 		return "", err
 	}
@@ -38,13 +38,11 @@ func (self repository) GetImageDigest(imageName string) (string, error) {
 	return res.Header.Get(ContentDigestHeader), nil
 }
 
-func (self repository) GetImageTagList(imageName string) ([]string, error) {
-	imageDetail := GetImageTagDetail(imageName)
-
-	u := self.registry.url.JoinPath(imageDetail.GetBaseName(), "tags", "list")
+func (self repository) GetImageTagList(basename string) ([]string, error) {
+	u := self.registry.url.JoinPath(basename, "tags", "list")
 	req, _ := http.NewRequest("GET", u.String(), nil)
 
-	res, err := self.registry.request(req, fmt.Sprintf(ScopeRepositoryPull, imageDetail.GetBaseName()))
+	res, err := self.registry.request(req, fmt.Sprintf(ScopeRepositoryPull, basename))
 	if err != nil {
 		return nil, err
 	}

@@ -49,11 +49,11 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	imageName := logic.Image{}.GetImageName(&logic.ImageNameOption{
-		Registry: params.Registry,
-		Name:     params.Tag,
-	})
-	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
+	imageNameDetail := registry.GetImageTagDetail(params.Tag)
+	if params.Registry != "" {
+		imageNameDetail.Registry = params.Registry
+	}
+	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageNameDetail.Uri())
 	if err == nil && imageInfo.ID != "" {
 		self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
 		return
@@ -81,7 +81,7 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 	out, err := docker.Sdk.Client.ImageImport(docker.Sdk.Ctx, image.ImportSource{
 		Source:     containerTar,
 		SourceName: "-",
-	}, imageName, image.ImportOptions{
+	}, imageNameDetail.Uri(), image.ImportOptions{
 		Changes: change,
 	})
 	if err != nil {
@@ -102,23 +102,21 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 
 func (self Image) ImportByImageTar(http *gin.Context) {
 	type ParamsValidate struct {
-		Tar      string `json:"tar" binding:"required"`
-		Tag      string `json:"tag"`
-		Registry string `json:"registry"`
+		Tar string `json:"tar" binding:"required"`
+		Tag string `json:"tag"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	imageName := logic.Image{}.GetImageName(&logic.ImageNameOption{
-		Registry: params.Registry,
-		Name:     params.Tag,
-	})
-	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
-	if err == nil && imageInfo.ID != "" {
-		self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
-		return
+	if params.Tag != "" {
+		imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Tag)
+		if err == nil && imageInfo.ID != "" {
+			self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
+			return
+		}
 	}
+
 	imageTar, err := os.Open(storage.Local{}.GetRealPath(params.Tar))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -178,7 +176,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 		return
 	}
 	if imageTag != nil && len(imageTag) == 1 && params.Tag != "" {
-		err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, strings.TrimSpace(imageTag[0]), imageName)
+		err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, strings.TrimSpace(imageTag[0]), params.Tag)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -216,14 +214,12 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("zip 包和 git 地址只需要只定一项"), 500)
 		return
 	}
-
-	imageName := logic.Image{}.GetImageName(&logic.ImageNameOption{
-		Registry: params.Registry,
-		Name:     params.Tag,
-	})
-
+	imageNameDetail := registry.GetImageTagDetail(params.Tag)
+	if params.Registry != "" {
+		imageNameDetail.Registry = params.Registry
+	}
 	buildImageTask := &logic.BuildImageOption{
-		Tag: imageName,
+		Tag: imageNameDetail.Uri(),
 	}
 
 	if params.BuildRoot != "" {
@@ -246,7 +242,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		buildImageTask.GitUrl = params.BuildGit
 	}
 	imageNew := &entity.Image{
-		Tag:   imageName,
+		Tag:   imageNameDetail.Uri(),
 		Title: params.Title,
 		Setting: &accessor.ImageSettingOption{
 			Registry:        params.Registry,
@@ -265,9 +261,9 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 
 	} else {
 		// 如果已经构建过，先查找一下旧镜像，新加一个标签，避免变成 none 标签
-		_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
+		_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageNameDetail.Uri())
 		if err == nil {
-			_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, imageName, imageName+"-deprecated-"+function.GetRandomString(6))
+			_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, imageNameDetail.Uri(), imageNameDetail.Uri()+"-deprecated-"+function.GetRandomString(6))
 		}
 		dao.Image.Select(
 			dao.Image.Status,
@@ -294,7 +290,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	imageRow.Status = logic.StatusSuccess
 	imageRow.Message = log
 	imageRow.ImageInfo = &accessor.ImageInfoOption{
-		Id: imageName,
+		Id: imageNameDetail.Uri(),
 	}
 	if imageRow.ID == 0 {
 		_ = dao.Image.Create(imageNew)
@@ -556,15 +552,15 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 	digest := ""
 	upgrade := false
 
-	registryList, exists, username, password := logic.Image{}.GetRegistryList(params.Tag)
-	for _, s := range registryList {
+	imageNameDetail := registry.GetImageTagDetail(params.Tag)
+	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Uri())
+
+	for _, s := range registryConfig.Proxy {
 		option := make([]registry.Option, 0)
 		if params.CacheTime > 0 {
 			option = append(option, registry.WithRequestCacheTime(time.Second*time.Duration(params.CacheTime)))
 		}
-		if exists {
-			option = append(option, registry.WithCredentials(username, password))
-		}
+		option = append(option, registry.WithCredentialsString(registryConfig.GetRegistryAuthString()))
 		option = append(option, registry.WithRegistryHost(s))
 		reg := registry.New(option...)
 		if digest, err = reg.Repository.GetImageDigest(params.Tag); err == nil {
@@ -580,6 +576,7 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 			slog.Debug("image check upgrade", "err", err.Error())
 		}
 	}
+
 	if err != nil {
 		self.JsonResponseWithError(http, errors.Join(errors.New("检测容器更新失败，请确保仓库或加速地址可以正常访问"), err), 500)
 		return

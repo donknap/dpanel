@@ -20,6 +20,14 @@ func WithCredentials(username, password string) Option {
 	}
 }
 
+func WithCredentialsString(auth string) Option {
+	return func(registry *Registry) {
+		if auth != "" {
+			registry.authString = auth
+		}
+	}
+}
+
 func WithRequestCacheTime(cacheTime time.Duration) Option {
 	cache.Range(func(key, value any) bool {
 		if value.(cacheItem).expireTime.Before(time.Now()) {

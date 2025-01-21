@@ -1,104 +1,51 @@
 package logic
 
 import (
-	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	registry2 "github.com/donknap/dpanel/common/service/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"log/slog"
-	"strings"
 )
 
 type Image struct {
 }
 
-type ImageNameOption struct {
-	Registry  string
-	Name      string
-	Version   string
-	Namespace string
-}
-
-func (self Image) GetImageName(option *ImageNameOption) (imageName string) {
-	if option.Name == "" {
-		return ""
+func (self Image) GetRegistryConfig(imageName string) registry2.Config {
+	result := registry2.Config{
+		Proxy: make([]string, 0),
 	}
-	temp := registry2.GetImageTagDetail(option.Name)
-	imageName = temp.ImageName
+	imageNameDetail := registry2.GetImageTagDetail(imageName)
 
-	if option.Version != "" {
-		imageName = strings.Replace(imageName, temp.Version, option.Version, 1)
-	}
-
-	if option.Namespace != "" {
-		if strings.Contains(imageName, "/") {
-			imageName = strings.Replace(imageName, temp.Namespace, option.Namespace, 1)
-		} else {
-			imageName = option.Namespace + "/" + imageName
+	if docker.Sdk.Client != nil && imageNameDetail.Registry == registry2.DefaultRegistryDomain {
+		// 获取docker 配置中的加速地址
+		if dockerInfo, err := docker.Sdk.Client.Info(docker.Sdk.Ctx); err == nil && dockerInfo.RegistryConfig != nil && !function.IsEmptyArray(dockerInfo.RegistryConfig.Mirrors) {
+			result.Proxy = dockerInfo.RegistryConfig.Mirrors
 		}
 	}
 
-	if option.Registry != "" {
-		imageName = option.Registry + "/" + imageName
-	}
-
-	return imageName
-}
-
-func (self Image) GetRegistryAuthString(serverAddress string, username string, password string) string {
-	if password == "" || username == "" {
-		return ""
-	}
-	if exists, u, p := self.GetRegistryAuth(username, password); exists {
-		authString, err := registry.EncodeAuthConfig(registry.AuthConfig{
-			Username: u,
-			Password: p,
-		})
-		if err != nil {
-			slog.Debug("get registry auth string", err.Error())
-			return ""
+	registryList, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(imageNameDetail.Registry)).Find()
+	for _, item := range registryList {
+		if item.Setting == nil {
+			continue
 		}
-		return authString
-	}
-	return ""
-}
-
-func (self Image) GetRegistryAuth(username string, password string) (exists bool, u string, p string) {
-	if password == "" || username == "" {
-		return false, "", ""
-	}
-	password, _ = function.AseDecode(facade.GetConfig().GetString("app.name"), password)
-	return true, username, password
-}
-
-func (self Image) GetRegistryList(imageName string) (proxyList []string, existsAuth bool, username string, password string) {
-	proxyList = make([]string, 0)
-	username = ""
-	password = ""
-	existsAuth = false
-
-	tagDetail := registry2.GetImageTagDetail(imageName)
-	// 从官方仓库拉取镜像不用权限
-	registryList, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(tagDetail.Registry)).Find()
-	if registryList != nil && len(registryList) > 0 {
-		if registryList[0] != nil && registryList[0].Setting.Password != "" {
-			existsAuth, username, password = self.GetRegistryAuth(registryList[0].Setting.Username, registryList[0].Setting.Password)
+		if !function.IsEmptyArray(item.Setting.Proxy) {
+			result.Proxy = append(result.Proxy, item.Setting.Proxy...)
+		}
+		if item.Setting.Username != "" && item.Setting.Password != "" {
+			result.Username = item.Setting.Username
+			password, err := function.AseDecode(facade.GetConfig().GetString("app.name"), item.Setting.Password)
+			if err != nil {
+				slog.Debug("image registry decode password", "error", err)
+			}
+			result.Password = password
+			result.ExistsAuth = true
 		}
 	}
 
-	for _, registryRow := range registryList {
-		if registryRow.Setting.Username == tagDetail.Namespace {
-			existsAuth, username, password = self.GetRegistryAuth(registryRow.Setting.Username, registryRow.Setting.Password)
-		}
-		proxyList = append(proxyList, registryRow.Setting.Proxy...)
+	if !function.InArray(result.Proxy, imageNameDetail.Registry) {
+		result.Proxy = append(result.Proxy, imageNameDetail.Registry)
 	}
-
-	if len(proxyList) == 0 {
-		proxyList = []string{
-			tagDetail.Registry,
-		}
-	}
-
-	return proxyList, existsAuth, username, password
+	return result
 }

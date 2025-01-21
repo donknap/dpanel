@@ -1,30 +1,75 @@
 package registry
 
-import "strings"
+import (
+	"encoding/base64"
+	"fmt"
+	"github.com/docker/docker/api/types/registry"
+	"log/slog"
+	"strings"
+)
+
+const (
+	DefaultRegistryDomain = "docker.io"
+	DefaultRegistryHost   = "index.docker.io"
+)
 
 type TokenResponse struct {
 	Token       string `json:"token"`
 	AccessToken string `json:"access_token"`
 }
 
+// {registryUrl}/{namespace-可能有多个路径}/{imageName}:{version}
 type ImageTagDetail struct {
 	Registry  string
 	Namespace string
 	ImageName string
 	Version   string
-	Tag       string
-	Path      string
+	BaseName  string
 }
 
-func (self ImageTagDetail) GetTag() string {
-	return self.ImageName[strings.Index(self.ImageName, ":")+1:]
-}
-
-func (self ImageTagDetail) GetBaseName() string {
-	return self.ImageName[0:strings.Index(self.ImageName, ":")]
+func (self ImageTagDetail) Uri() string {
+	if self.Registry == "" {
+		self.Registry = DefaultRegistryDomain
+	}
+	self.Registry = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(self.Registry, "http://"), "https://"), "/")
+	return fmt.Sprintf("%s/%s/%s:%s", self.Registry, self.Namespace, self.ImageName, self.Version)
 }
 
 type ImageTagListResult struct {
 	Name string   `json:"name"`
 	Tags []string `json:"tags"`
+}
+
+type Config struct {
+	Username   string   `json:"username"`
+	Password   string   `json:"password"`
+	Host       string   `json:"host"`
+	Proxy      []string `json:"proxy"`
+	ExistsAuth bool     `json:"existsAuth"`
+}
+
+func (self Config) GetAuthString() string {
+	if self.Username == "" || self.Password == "" {
+		return ""
+	}
+	authString, err := registry.EncodeAuthConfig(registry.AuthConfig{
+		Username: self.Username,
+		Password: self.Password,
+	})
+	if err != nil {
+		slog.Debug("get registry auth string", err.Error())
+		return ""
+	}
+	return authString
+}
+
+func (self Config) GetRegistryAuthString() string {
+	if self.Username == "" || self.Password == "" {
+		return ""
+	}
+	return base64.StdEncoding.EncodeToString([]byte(
+		fmt.Sprintf("%s:%s",
+			self.Username, self.Password,
+		)),
+	)
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/image"
 	"github.com/donknap/dpanel/common/service/notice"
@@ -89,37 +88,17 @@ func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
 	return log.String(), nil
 }
 
-func (self DockerTask) ImageRemote(task *ImageRemoteOption) error {
-	var err error
-	var out io.ReadCloser
-	if task.Type == "pull" {
-		pullOption := image.PullOptions{
-			RegistryAuth: task.Auth,
-		}
-		if task.Platform != "" {
-			pullOption.Platform = task.Platform
-		}
-		tag := task.Tag
-		if task.Proxy != "" {
-			tag = task.Proxy + "/" + task.Tag
-		}
-		out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, tag, pullOption)
-	} else {
-		out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, task.Tag, image.PushOptions{
-			RegistryAuth: task.Auth,
-		})
-	}
-	if err != nil {
-		return err
+func (self DockerTask) ImageRemote(tag string, response io.ReadCloser) error {
+	if response == nil {
+		return errors.New("invalid image pull / push response")
 	}
 	defer func() {
-		err = out.Close()
-		if err != nil {
-			slog.Error("image", "pull", err.Error())
+		if err := response.Close(); err != nil {
+			slog.Error("image pull / push close", "error", err.Error())
 		}
 	}()
 
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, task.Tag))
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, tag))
 	defer wsBuffer.Close()
 
 	lastSendTime := time.Now()
@@ -167,7 +146,7 @@ func (self DockerTask) ImageRemote(task *ImageRemoteOption) error {
 		wsBuffer.BroadcastMessage(pg)
 		return nil
 	}
-	_, err = io.Copy(wsBuffer, out)
+	_, err := io.Copy(wsBuffer, response)
 	if err != nil {
 		return err
 	}
