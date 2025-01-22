@@ -11,6 +11,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
@@ -218,6 +219,26 @@ func (self Home) Usage(http *gin.Context) {
 			for i, _ := range diskUsage.Volumes {
 				diskUsage.Volumes[i].Labels = make(map[string]string)
 			}
+			if !function.IsEmptyArray(diskUsage.Images) {
+				sort.Slice(diskUsage.Images, func(i, j int) bool {
+					return diskUsage.Images[i].Size > diskUsage.Images[j].Size
+				})
+			}
+			if !function.IsEmptyArray(diskUsage.Containers) {
+				sort.Slice(diskUsage.Containers, func(i, j int) bool {
+					return diskUsage.Containers[i].SizeRw+diskUsage.Containers[i].SizeRootFs > diskUsage.Containers[j].SizeRw+diskUsage.Containers[j].SizeRootFs
+				})
+			}
+
+			if !function.IsEmptyArray(diskUsage.Volumes) {
+				sort.Slice(diskUsage.Volumes, func(i, j int) bool {
+					if diskUsage.Volumes[i].UsageData != nil && diskUsage.Volumes[j].UsageData != nil {
+						return diskUsage.Volumes[i].UsageData.Size > diskUsage.Volumes[j].UsageData.Size
+					}
+					return false
+				})
+			}
+
 			logic.Setting{}.Save(&entity.Setting{
 				GroupName: logic.SettingGroupSetting,
 				Name:      logic.SettingGroupSettingDiskUsage,
@@ -232,14 +253,10 @@ func (self Home) Usage(http *gin.Context) {
 		return
 	}()
 
-	diskUsage := &accessor.DiskUsage{
+	diskUsage := accessor.DiskUsage{
 		Usage: &types.DiskUsage{},
 	}
-	setting, err := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDiskUsage)
-	if err == nil && setting != nil {
-		diskUsage = setting.Value.DiskUsage
-	}
-
+	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDiskUsage, &diskUsage)
 	type portItem struct {
 		Port docker.PortItem `json:"port"`
 		Name string          `json:"name"`
