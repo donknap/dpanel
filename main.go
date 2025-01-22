@@ -151,9 +151,12 @@ func main() {
 			)
 		}
 		for _, path := range initPath {
-			err = os.MkdirAll(storage.Local{}.GetStorageLocalPath()+"/"+path, os.ModePerm)
-			if err != nil {
-				panic(err.Error())
+			realPath := storage.Local{}.GetStorageLocalPath() + "/" + path
+			if _, err := os.Lstat(realPath); err != nil {
+				err = os.MkdirAll(realPath, os.ModePerm)
+				if err != nil {
+					panic(err.Error())
+				}
 			}
 		}
 	}
