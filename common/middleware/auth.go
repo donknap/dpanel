@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
+	"log/slog"
 	"strings"
 )
 
@@ -57,6 +58,7 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 	if token.Valid {
 		_, err := logic.Setting{}.GetValueById(myUserInfo.UserId)
 		if err != nil {
+			slog.Debug("auth get user", "error", err.Error())
 			self.JsonResponseWithError(http, ErrLogin, 401)
 			http.AbortWithStatus(401)
 			return

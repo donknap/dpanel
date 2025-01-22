@@ -24,21 +24,21 @@ func New(opts ...Option) (*Command, error) {
 			return nil, err
 		}
 	}
-	cmd = c.cmd
+
 	slog.Debug("run command", "args", c.cmd.Args)
 
 	if c.cmd.Cancel == nil {
-		slog.Debug("run command kill global cmd")
 		// 没有配置超时时间，则先杀掉上一个进程
 		if cmd != nil && cmd.Process != nil && cmd.Process.Pid > 0 {
-			if err := cmd.Process.Kill(); err == nil {
-				_, err = cmd.Process.Wait()
-				if err != nil {
-					slog.Debug("run command kill global cmd", "error", err.Error())
-				}
+			err = cmd.Process.Kill()
+			if err == nil {
+				_, _ = cmd.Process.Wait()
 			}
+			slog.Debug("run command kill global cmd", "pid", cmd.Process.Pid, "name", cmd.String(), "error", err)
 		}
 	}
+
+	cmd = c.cmd
 
 	return c, nil
 }
@@ -78,6 +78,12 @@ func (self Command) RunWithResult() string {
 		slog.Debug("run command with result", "arg", self.cmd.Args, "error", err.Error())
 		return ""
 	}
+	defer func() {
+		//err := self.cmd.Process.Release()
+		//if err != nil {
+		//	fmt.Printf("%v \n", err)
+		//}
+	}()
 	return string(out)
 }
 
