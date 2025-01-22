@@ -157,6 +157,9 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 						imageTag = append(imageTag, after)
 					}
 				}
+				if msg.ErrorDetail.Message != "" {
+					return errors.New(msg.ErrorDetail.Message)
+				}
 				buffer.WriteString(fmt.Sprintf("\r%s: %s", msg.Id, msg.Progress))
 			} else {
 				slog.Error("docker", "image build task", err, "data", p)
