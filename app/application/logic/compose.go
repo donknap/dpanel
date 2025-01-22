@@ -192,6 +192,18 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 	// 查询当前运行中的和目录中的 compose 任务
 	// 查找运行中的任务，如果是 dpanel-c- 开头表示是系统部署的任务，需要重新定义一下 name
 	// 非面板部署的任务记录下 Yaml 所在位置，如果在目录中找到对应的名称则重新定义 uri
+	if _, err := os.Stat(rootDir); err != nil {
+		slog.Error("compose sync path not found", "error", err)
+		return make(map[string]*entity.Compose)
+	}
+
+	// 如果是软链接，获取到实际指向的目录
+	if fileInfo, err := os.Lstat(rootDir); err == nil && fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
+		if linkRealPath, err := os.Readlink(rootDir); err == nil {
+			rootDir = linkRealPath
+		}
+	}
+
 	findComposeList := make(map[string]*entity.Compose)
 	_ = filepath.Walk(rootDir, func(path string, info fs.FileInfo, err error) error {
 		for _, suffix := range ComposeFileNameSuffix {
