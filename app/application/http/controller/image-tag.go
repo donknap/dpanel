@@ -59,6 +59,8 @@ func (self Image) TagRemote(http *gin.Context) {
 			self.JsonResponseWithError(http, errors.New(".imagePullNotFound"), 500)
 			return
 		}
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 
 	err = logic.DockerTask{}.ImageRemote(params.Tag, out)
