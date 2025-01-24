@@ -13,7 +13,7 @@
 <a href="https://hellogithub.com/repository/c69089b776704985b989f98626de977a" target="_blank"><img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=c69089b776704985b989f98626de977a&claim_uid=ekhLfDOxR5U0mVw&theme=small" alt="Featured｜HelloGitHub" /></a>
 
 [**官网**](https://dpanel.cc/) &nbsp; |
-&nbsp; [**演示**](https://demo.dpanel.cc/) &nbsp; |
+&nbsp; [**演示**](https://dpanel.park1991.com) &nbsp; |
 &nbsp; [**文档**](https://doc.dpanel.cc/#/zh-cn/install/docker) &nbsp; |
 &nbsp; [**Pro版**](https://dpanel.cc/#/zh-cn/manual/pro) &nbsp; |
 &nbsp; [**交流群**](https://qm.qq.com/q/2v4x9x8q4k) &nbsp; |
