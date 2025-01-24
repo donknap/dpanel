@@ -21,19 +21,23 @@ LANG_FILE="$LANG_DIR/$LANG_SELECTED.sh"
 PUBLIC_IP=
 LOCAL_IP="127.0.0.1"
 
-VERSION_CODES=("se" "le")
+VERSION_CODES=("se" "le", "be")
+
+IMAGE_CODES=("hub" "aliyun")
 
 INSTALL_DIR="/home/dpanel"
 INSTALL_PORT=8807
 INSTALL_CONTAINER_NAME="dpanel"
 INSTALL_IMAGE="dpanel/dpanel:lite"
 
+BACKUP_CONTAINER_NAME=""
+
 source "$LANG_FILE"
 
 function log() {
     message="[DPanel Install Log]: $1 "
     case "$1" in
-        *"$TXT_RUN_AS_ROOT"*)
+        *"$TXT_RUN_AS_ROOT"*|*"$TXT_RESULT_FAILED"*)
             echo -e "${RED}${message}${NC}" 2>&1 | tee -a "${CURRENT_DIR}"/install.log
             ;;
         *"$TXT_SUCCESS_MESSAGE"* )
@@ -48,12 +52,20 @@ function log() {
     esac
 }
 
+function check_command() {
+    local cmd_name=$1
+    if ! command -v "$cmd_name" &> /dev/null; then
+      log "$cmd_name $TXT_COMMAND_NOT_FOUND"
+      exit 1
+    fi
+}
+
 function select_lang() {
-  log "Select a language:"
+  log "$TXT_SELECT_LANGUAGE"
   for i in "${!LANG_CODES[@]}"; do
     echo "$((i + 1)). ${LANG_NAMES[$i]}"
   done
-  read -p "Enter the number [default: $LANG_CHOICE]: " LANG_CHOICE
+  read -p "$TXT_SELECT_LANGUAGE_CHOICE $LANG_CHOICE]: " LANG_CHOICE
   if [[ $LANG_CHOICE -ge 1 && $LANG_CHOICE -le ${#LANG_CODES[@]} ]]; then
     LANG_SELECTED=${LANG_CODES[$((LANG_CHOICE-1))]}
     LANG_FILE="$LANG_DIR/$LANG_SELECTED.sh"
@@ -67,6 +79,47 @@ function check_root() {
         log "$TXT_RUN_AS_ROOT"
         exit 1
     fi
+}
+
+function upgrade_panel() {
+  log "$TXT_UPGRADE_START"
+
+  PORTS=$(docker inspect --format='{{range $p, $conf := .HostConfig.PortBindings}}{{range $conf}}{{printf "-p %s:%s " (index . "HostPort") $p}}{{end}}{{end}}' $INSTALL_CONTAINER_NAME)
+  if [ -z "$PORTS" ]; then
+    log $TXT_UPGRADE_EMPTY_PORT
+    PORTS=""
+  fi
+
+  HOST_PORT=$(docker inspect --format='{{range $p, $conf := .HostConfig.PortBindings}}{{if eq $p "8080/tcp"}}{{range $conf}}{{.HostPort}}{{end}}{{end}}{{end}}' "$INSTALL_CONTAINER_NAME")
+  if [ -n "$HOST_PORT" ]; then
+    INSTALL_PORT=$HOST_PORT
+  fi
+
+  MOUNTS=$(docker inspect --format='{{range .Mounts}}{{if .Source}}{{printf "-v %s:%s " .Source .Destination}}{{end}}{{end}}' $INSTALL_CONTAINER_NAME)
+  if [ -z "$MOUNTS" ]; then
+    log $TXT_UPGRADE_EMPTY_MOUNT
+    MOUNTS=""
+  fi
+
+  RUN_COMMAND=""
+
+  if [ -n "$PORTS" ]; then
+    RUN_COMMAND="$RUN_COMMAND $PORTS"
+  fi
+  if [ -n "$MOUNTS" ]; then
+    RUN_COMMAND="$RUN_COMMAND $MOUNTS"
+  fi
+
+  CONTAINER_ID=$(docker inspect --format '{{.Id}}' "$INSTALL_CONTAINER_NAME")
+
+  log "$TXT_UPGRADE_BACKUP $INSTALL_CONTAINER_NAME"
+  BACKUP_CONTAINER_NAME="$INSTALL_CONTAINER_NAME-${CONTAINER_ID:0:12}"
+
+  docker stop $INSTALL_CONTAINER_NAME && docker rename "$INSTALL_CONTAINER_NAME" "$BACKUP_CONTAINER_NAME"
+  docker run -d --pull always --name $INSTALL_CONTAINER_NAME $RUN_COMMAND $INSTALL_IMAGE
+
+  result
+  exit 1
 }
 
 function install_version() {
@@ -83,13 +136,22 @@ function install_version() {
     INSTALL_VERSION="le"
   fi
 
-  if [ "$INSTALL_VERSION" == "le" ]; then
+  INSTALL_IMAGE="dpanel/dpanel:latest"
+  if [ "$INSTALL_VERSION" = "le" ]; then
     INSTALL_IMAGE="dpanel/dpanel:lite"
-  else
-    INSTALL_IMAGE="dpanel/dpanel:latest"
   fi
 
-  if [[ $(curl -s ipinfo.io/country) == "CN" ]]; then
+  if [ "$INSTALL_VERSION" = "be" ]; then
+    INSTALL_IMAGE="dpanel/dpanel:beta"
+  fi
+
+  for i in "${!IMAGE_CODES[@]}"; do
+    echo "$((i + 1)). ${TXT_INSTALL_VERSION_REGISTRY_NAME[$i]}"
+  done
+
+  read -p "$TXT_INSTALL_VERSION_REGISTRY_CHOICE" IMAGE_REGISTRY
+
+  if [ "$IMAGE_REGISTRY" == "2" ]; then
     INSTALL_IMAGE="registry.cn-hangzhou.aliyuncs.com/${INSTALL_IMAGE}"
   fi
 
@@ -164,170 +226,132 @@ function install_port(){
 }
 
 function install_docker(){
-    if which docker >/dev/null 2>&1; then
-        docker_version=$(docker --version | grep -oE '[0-9]+\.[0-9]+' | head -n 1)
-        major_version=${docker_version%%.*}
-        minor_version=${docker_version##*.}
-        if [[ $major_version -lt 20 ]]; then
-            log "$TXT_INSTALL_LOW_DOCKER_VERSION"
+  if which docker >/dev/null 2>&1; then
+    docker_version=$(docker --version | grep -oE '[0-9]+\.[0-9]+' | head -n 1)
+    major_version=${docker_version%%.*}
+    minor_version=${docker_version##*.}
+    if [[ $major_version -lt 20 ]]; then
+      log "$TXT_INSTALL_LOW_DOCKER_VERSION"
+    fi
+  else
+    read -p "$TXT_INSTALL_DOCKER_MESSAGE" DO_INSTALL_DOCKER
+    if [ "$DO_INSTALL_DOCKER" == "n" ]; then
+     exit 1
+    fi
+
+    check_command systemctl
+
+    log "$TXT_INSTALL_DOCKER_INSTALL_ONLINE"
+
+    if [[ $(curl -s ipinfo.io/country) == "CN" ]]; then
+      sources=(
+        "https://mirrors.aliyun.com/docker-ce"
+        "https://mirrors.tencent.com/docker-ce"
+        "https://mirrors.163.com/docker-ce"
+        "https://mirrors.cernet.edu.cn/docker-ce"
+      )
+
+      docker_install_scripts=(
+        "https://get.docker.com"
+        "https://testingcf.jsdelivr.net/gh/docker/docker-install@master/install.sh"
+        "https://cdn.jsdelivr.net/gh/docker/docker-install@master/install.sh"
+        "https://fastly.jsdelivr.net/gh/docker/docker-install@master/install.sh"
+        "https://gcore.jsdelivr.net/gh/docker/docker-install@master/install.sh"
+        "https://raw.githubusercontent.com/docker/docker-install/master/install.sh"
+      )
+
+      get_average_delay() {
+          local source=$1
+          local total_delay=0
+          local iterations=2
+          local timeout=2
+
+          for ((i = 0; i < iterations; i++)); do
+              delay=$(curl -o /dev/null -s -m $timeout -w "%{time_total}\n" "$source")
+              if [ $? -ne 0 ]; then
+                  delay=$timeout
+              fi
+              total_delay=$(awk "BEGIN {print $total_delay + $delay}")
+          done
+
+          average_delay=$(awk "BEGIN {print $total_delay / $iterations}")
+          echo "$average_delay"
+      }
+
+      min_delay=99999999
+      selected_source=""
+
+      for source in "${sources[@]}"; do
+          average_delay=$(get_average_delay "$source" &)
+
+          if (( $(awk 'BEGIN { print '"$average_delay"' < '"$min_delay"' }') )); then
+              min_delay=$average_delay
+              selected_source=$source
+          fi
+      done
+      wait
+
+      if [ -n "$selected_source" ]; then
+          log "$TXT_INSTALL_DOCKER_CHOOSE_LOWEST_LATENCY_SOURCE $selected_source，$TXT_INSTALL_DOCKER_CHOOSE_LOWEST_LATENCY_DELAY $min_delay"
+          export DOWNLOAD_URL="$selected_source"
+
+          for alt_source in "${docker_install_scripts[@]}"; do
+              log "$TXT_INSTALL_DOCKER_TRY_NEXT_LINK $alt_source $TXT_DOWNLOAD_DOCKER_SCRIPT_FAIL"
+              if curl -fsSL --retry 2 --retry-delay 3 --connect-timeout 5 --max-time 10 "$alt_source" -o get-docker.sh; then
+                  log "$TXT_DOWNLOAD_DOCKER_SCRIPT_SUCCESS $alt_source $TXT_SUCCESSFULLY_MESSAGE"
+                  break
+              else
+                  log "$TXT_DOWNLOAD_DOCKER_FAILED $alt_source $TXT_DOWNLOAD_DOCKER_TRY_NEXT_LINK"
+              fi
+          done
+
+          if [ ! -f "get-docker.sh" ]; then
+            log "$TXT_DOWNLOAD_ALL_ATTEMPTS_FAILED"
+            log "bash <(curl -sSL https://linuxmirrors.cn/docker.sh)"
+            exit 1
+          fi
+
+          sh get-docker.sh 2>&1 | tee -a ${CURRENT_DIR}/install.log
+
+          docker_config_folder="/etc/docker"
+          if [[ ! -d "$docker_config_folder" ]];then
+              mkdir -p "$docker_config_folder"
+          fi
+
+          docker version >/dev/null 2>&1
+          if [[ $? -ne 0 ]]; then
+            log "$TXT_INSTALL_DOCKER_INSTALL_FAILED"
+            exit 1
+          else
+            log "$TXT_INSTALL_DOCKER_INSTALL_SUCCESS"
+            systemctl enable docker 2>&1 | tee -a "${CURRENT_DIR}"/install.log
+          fi
+        else
+          log "$TXT_INSTALL_DOCKER_CANNOT_SELECT_SOURCE"
+          exit 1
         fi
     else
-        log "$TXT_INSTALL_DOCKER_INSTALL_ONLINE"
+      log "$TXT_DOWNLOAD_REGIONS_OTHER_THAN_CHINA"
+      export DOWNLOAD_URL="https://download.docker.com"
+      curl -fsSL "https://get.docker.com" -o get-docker.sh
+      sh get-docker.sh 2>&1 | tee -a "${CURRENT_DIR}"/install.log
 
-        if [[ $(curl -s ipinfo.io/country) == "CN" ]]; then
-            sources=(
-                "https://mirrors.aliyun.com/docker-ce"
-                "https://mirrors.tencent.com/docker-ce"
-                "https://mirrors.163.com/docker-ce"
-                "https://mirrors.cernet.edu.cn/docker-ce"
-            )
+      log "$TXT_INSTALL_DOCKER_START_NOTICE"
+      systemctl enable docker; systemctl daemon-reload; systemctl start docker 2>&1 | tee -a "${CURRENT_DIR}"/install.log
 
-            docker_install_scripts=(
-                "https://get.docker.com"
-                "https://testingcf.jsdelivr.net/gh/docker/docker-install@master/install.sh"
-                "https://cdn.jsdelivr.net/gh/docker/docker-install@master/install.sh"
-                "https://fastly.jsdelivr.net/gh/docker/docker-install@master/install.sh"
-                "https://gcore.jsdelivr.net/gh/docker/docker-install@master/install.sh"
-                "https://raw.githubusercontent.com/docker/docker-install/master/install.sh"
-            )
-
-            get_average_delay() {
-                local source=$1
-                local total_delay=0
-                local iterations=2
-                local timeout=2
-
-                for ((i = 0; i < iterations; i++)); do
-                    delay=$(curl -o /dev/null -s -m $timeout -w "%{time_total}\n" "$source")
-                    if [ $? -ne 0 ]; then
-                        delay=$timeout
-                    fi
-                    total_delay=$(awk "BEGIN {print $total_delay + $delay}")
-                done
-
-                average_delay=$(awk "BEGIN {print $total_delay / $iterations}")
-                echo "$average_delay"
-            }
-
-            min_delay=99999999
-            selected_source=""
-
-            for source in "${sources[@]}"; do
-                average_delay=$(get_average_delay "$source" &)
-
-                if (( $(awk 'BEGIN { print '"$average_delay"' < '"$min_delay"' }') )); then
-                    min_delay=$average_delay
-                    selected_source=$source
-                fi
-            done
-            wait
-
-            if [ -n "$selected_source" ]; then
-                log "$TXT_INSTALL_DOCKER_CHOOSE_LOWEST_LATENCY_SOURCE $selected_source，$TXT_INSTALL_DOCKER_CHOOSE_LOWEST_LATENCY_DELAY $min_delay"
-                export DOWNLOAD_URL="$selected_source"
-
-                for alt_source in "${docker_install_scripts[@]}"; do
-                    log "$TXT_INSTALL_DOCKER_TRY_NEXT_LINK $alt_source $TXT_DOWNLOAD_DOCKER_SCRIPT_FAIL"
-                    if curl -fsSL --retry 2 --retry-delay 3 --connect-timeout 5 --max-time 10 "$alt_source" -o get-docker.sh; then
-                        log "$TXT_DOWNLOAD_DOCKER_SCRIPT_SUCCESS $alt_source $TXT_SUCCESSFULLY_MESSAGE"
-                        break
-                    else
-                        log "$TXT_DOWNLOAD_DOCKER_FAILED $alt_source $TXT_DOWNLOAD_DOCKER_TRY_NEXT_LINK"
-                    fi
-                done
-
-                if [ ! -f "get-docker.sh" ]; then
-                    log "$TXT_DOWNLOAD_ALL_ATTEMPTS_FAILED"
-                    log "bash <(curl -sSL https://linuxmirrors.cn/docker.sh)"
-                    exit 1
-                fi
-
-                sh get-docker.sh 2>&1 | tee -a ${CURRENT_DIR}/install.log
-
-                docker_config_folder="/etc/docker"
-                if [[ ! -d "$docker_config_folder" ]];then
-                    mkdir -p "$docker_config_folder"
-                fi
-
-                docker version >/dev/null 2>&1
-                if [[ $? -ne 0 ]]; then
-                    log "$TXT_INSTALL_DOCKER_INSTALL_FAILED"
-                    exit 1
-                else
-                    log "$TXT_INSTALL_DOCKER_INSTALL_SUCCESS"
-                    systemctl enable docker 2>&1 | tee -a "${CURRENT_DIR}"/install.log
-                    configure_accelerator
-                fi
-            else
-                log "$TXT_INSTALL_DOCKER_CANNOT_SELECT_SOURCE"
-                exit 1
-            fi
-        else
-            log "$TXT_DOWNLOAD_REGIONS_OTHER_THAN_CHINA"
-            export DOWNLOAD_URL="https://download.docker.com"
-            curl -fsSL "https://get.docker.com" -o get-docker.sh
-            sh get-docker.sh 2>&1 | tee -a "${CURRENT_DIR}"/install.log
-
-            log "$TXT_INSTALL_DOCKER_START_NOTICE"
-            systemctl enable docker; systemctl daemon-reload; systemctl start docker 2>&1 | tee -a "${CURRENT_DIR}"/install.log
-
-            docker_config_folder="/etc/docker"
-            if [[ ! -d "$docker_config_folder" ]];then
-                mkdir -p "$docker_config_folder"
-            fi
-
-            docker version >/dev/null 2>&1
-            if [[ $? -ne 0 ]]; then
-                log "$TXT_INSTALL_DOCKER_INSTALL_FAIL"
-                exit 1
-            else
-                log "$TXT_INSTALL_DOCKER_INSTALL_SUCCESS"
-            fi
-        fi
+      docker_config_folder="/etc/docker"
+      if [[ ! -d "$docker_config_folder" ]];then
+        mkdir -p "$docker_config_folder"
+      fi
+      docker version >/dev/null 2>&1
+      if [[ $? -ne 0 ]]; then
+        log "$TXT_INSTALL_DOCKER_INSTALL_FAIL"
+        exit 1
+      else
+        log "$TXT_INSTALL_DOCKER_INSTALL_SUCCESS"
+      fi
     fi
-}
-
-function upgrade_panel() {
-  log "$TXT_UPGRADE_START"
-
-  PORTS=$(docker inspect --format='{{range $p, $conf := .NetworkSettings.Ports}}{{range $conf}}{{- if $p }}{{- printf "-p %s:%s " (index .HostPort) $p }}{{- end }}{{end}}{{end}}' $INSTALL_CONTAINER_NAME)
-  if [ -z "$PORTS" ]; then
-    log $TXT_UPGRADE_EMPTY_PORT
-    PORTS=""
   fi
-
-  HOST_PORT=$(docker inspect --format='{{range $p, $conf := .NetworkSettings.Ports}}{{if eq $p "8080/tcp"}}{{range $conf}}{{.HostPort}}{{end}}{{end}}{{end}}' "$INSTALL_CONTAINER_NAME")
-  if [ -n "$HOST_PORT" ]; then
-    INSTALL_PORT=$HOST_PORT
-  fi
-
-  MOUNTS=$(docker inspect --format='{{range .Mounts}}{{if .Source}}{{printf "-v %s:%s " .Source .Destination}}{{end}}{{end}}' $INSTALL_CONTAINER_NAME)
-  if [ -z "$MOUNTS" ]; then
-    log $TXT_UPGRADE_EMPTY_MOUNT
-    MOUNTS=""
-  fi
-
-  IMAGE=$(docker inspect --format='{{.Config.Image}}' $INSTALL_CONTAINER_NAME)
-
-  RUN_COMMAND=""
-
-  if [ -n "$PORTS" ]; then
-    RUN_COMMAND="$RUN_COMMAND $PORTS"
-  fi
-  if [ -n "$MOUNTS" ]; then
-    RUN_COMMAND="$RUN_COMMAND $MOUNTS"
-  fi
-
-  CONTAINER_ID=$(docker inspect --format '{{.Id}}' "$INSTALL_CONTAINER_NAME")
-
-  log "$TXT_UPGRADE_BACKUP $INSTALL_CONTAINER_NAME-${CONTAINER_ID:0:12}"
-
-  docker rename $INSTALL_CONTAINER_NAME $INSTALL_CONTAINER_NAME-${CONTAINER_ID:0:12}
-  docker stop $INSTALL_CONTAINER_NAME-${CONTAINER_ID:0:12}
-  docker run -d --pull always --name $INSTALL_CONTAINER_NAME $RUN_COMMAND $IMAGE
-
-  result
-  exit 1
 }
 
 function get_ip(){
@@ -344,30 +368,40 @@ function get_ip(){
     fi
     if echo "$PUBLIC_IP" | grep -q ":"; then
         PUBLIC_IP=[${PUBLIC_IP}]
-        1pctl listen-ip ipv6
     fi
 }
 
 function result(){
-    log ""
-    log "$TXT_RESULT_THANK_YOU_WAITING"
-    log ""
-    log "$TXT_RESULT_BROWSER_ACCESS_PANEL"
-    log "$TXT_RESULT_EXTERNAL_ADDRESS http://$PUBLIC_IP:$INSTALL_PORT"
-    log "$TXT_RESULT_INTERNAL_ADDRESS http://$LOCAL_IP:$INSTALL_PORT"
-    log "$TXT_RESULT_OPEN_PORT_SECURITY_GROUP $INSTALL_PORT"
-    log ""
-    log "$TXT_RESULT_PROJECT_WEBSITE"
-    log "$TXT_RESULT_PROJECT_REPOSITORY"
-    log ""
-    log "================================================================"
+  if [ $? -ne 0 ]; then
+    log "$TXT_RESULT_FAILED"
+    if [ -n "$BACKUP_CONTAINER_NAME" ]; then
+      log "$TXT_UPGRADE_BACKUP_RESUME $BACKUP_CONTAINER_NAME"
+      docker rename "$BACKUP_CONTAINER_NAME" "$INSTALL_CONTAINER_NAME"
+      docker start $INSTALL_CONTAINER_NAME
+    fi
+    exit 1
+  fi
+  log ""
+  log "$TXT_RESULT_THANK_YOU_WAITING"
+  log ""
+  log "$TXT_RESULT_BROWSER_ACCESS_PANEL"
+  log "$TXT_RESULT_EXTERNAL_ADDRESS http://$PUBLIC_IP:$INSTALL_PORT"
+  log "$TXT_RESULT_INTERNAL_ADDRESS http://$LOCAL_IP:$INSTALL_PORT"
+  log "$TXT_RESULT_OPEN_PORT_SECURITY_GROUP $INSTALL_PORT"
+  log ""
+  log "$TXT_RESULT_PROJECT_WEBSITE"
+  log "$TXT_RESULT_PROJECT_REPOSITORY"
+  log ""
+  log "================================================================"
 }
 
 log "$TXT_START_INSTALLATION"
 
-ACCELERATOR_URL="https://docker.1panelproxy.com"
-
 function main(){
+  check_command bash
+  check_command curl
+  check_command ip
+
   get_ip
   select_lang
   check_root
@@ -391,4 +425,5 @@ function main(){
   fi
   result
 }
+
 main
