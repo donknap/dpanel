@@ -56,7 +56,7 @@ Pro 版仅是社区版的一个增强和补充，对于通用的、广泛的功�
 #### 标准版
 
 ```
-docker run -it -d --name dpanel --restart=always \
+docker run -d --name dpanel --restart=always \
  -p 80:80 -p 443:443 -p 8807:8080 -e APP_NAME=dpanel \
  -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
  dpanel/dpanel:latest 
@@ -67,10 +67,18 @@ docker run -it -d --name dpanel --restart=always \
 lite 版去掉了域名转发相关，需要自行转发域名绑定容器，不需要绑定 80 及 443 端口
 
 ```
-docker run -it -d --name dpanel --restart=always \
+docker run -d --name dpanel --restart=always \
  -p 8807:8080 -e APP_NAME=dpanel \
  -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
  dpanel/dpanel:lite
+```
+
+#### 集成脚本
+
+> 支持 Debian Ubuntu Alpine，其它发行版未进行测试，请提交 Issue
+
+```
+curl -sSL https://dpanel.cc/quick.sh -o quick.sh && sudo bash quick.sh
 ```
 
 #### 为爱发电

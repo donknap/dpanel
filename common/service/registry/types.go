@@ -32,7 +32,11 @@ func (self ImageTagDetail) Uri() string {
 		self.Registry = DefaultRegistryDomain
 	}
 	self.Registry = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(self.Registry, "http://"), "https://"), "/")
-	return fmt.Sprintf("%s/%s/%s:%s", self.Registry, self.Namespace, self.ImageName, self.Version)
+	if self.Namespace == "" {
+		return fmt.Sprintf("%s/%s:%s", self.Registry, self.ImageName, self.Version)
+	} else {
+		return fmt.Sprintf("%s/%s/%s:%s", self.Registry, self.Namespace, self.ImageName, self.Version)
+	}
 }
 
 type ImageTagListResult struct {
@@ -50,7 +54,11 @@ type Config struct {
 
 func (self Config) GetAuthString() string {
 	if self.Username == "" || self.Password == "" {
-		return ""
+		authString, _ := registry.EncodeAuthConfig(registry.AuthConfig{
+			Username: "",
+			Password: "",
+		})
+		return authString
 	}
 	authString, err := registry.EncodeAuthConfig(registry.AuthConfig{
 		Username: self.Username,

@@ -3,7 +3,6 @@ package registry
 import (
 	"encoding/base64"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -46,10 +45,6 @@ func WithRegistryHost(host string) Option {
 		if host == DefaultRegistryDomain {
 			host = DefaultRegistryHost
 		}
-		registry.url = url.URL{
-			Scheme: "https",
-			Host:   host,
-			Path:   "/v2/",
-		}
+		registry.url = GetRegistryUrl(host)
 	}
 }
