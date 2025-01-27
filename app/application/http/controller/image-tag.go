@@ -61,6 +61,9 @@ func (self Image) TagRemote(http *gin.Context) {
 					}
 					slog.Debug("image remote pull", "tag", imageNameDetail.Uri())
 					out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, imageNameDetail.Uri(), pullOption)
+					if err != nil {
+						slog.Debug("image remote pull", "error", err)
+					}
 				} else {
 					if response != nil {
 						slog.Debug("image remote select registry url", "header", response.Header.Get(registry2.ChallengeHeader))
