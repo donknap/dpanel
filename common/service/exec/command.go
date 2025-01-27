@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"runtime"
 )
 
 var cmd *exec.Cmd
@@ -51,6 +52,14 @@ func (self Command) RunInTerminal(size *pty.Winsize) (io.ReadCloser, error) {
 	var out *os.File
 	var err error
 
+	if runtime.GOOS == "windows" {
+		// 不支持 Pty
+		out, err := self.Run()
+		if err != nil {
+			return nil, err
+		}
+		return io.NopCloser(out), nil
+	}
 	out, err = pty.StartWithSize(self.cmd, size)
 	if err != nil {
 		return nil, err

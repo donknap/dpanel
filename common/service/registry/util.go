@@ -17,16 +17,21 @@ func GetImageTagDetail(tag string) *ImageTagDetail {
 		noRegistryUrl = true
 		tag = DefaultRegistryDomain + "/" + tag
 	}
+	temp = strings.Split(tag, "/")
 	// 先补齐 registry 地址后再判断是否有标签，仓库地址中可能包含端口号
 	if !strings.Contains(strings.Join(temp[1:], "/"), ":") {
 		tag += ":latest"
 	}
-
 	temp = strings.Split(tag, "/")
 	result.Registry = temp[0]
 
 	name := strings.Split(temp[len(temp)-1], ":")
 	result.ImageName, result.Version = name[0], strings.Join(name[1:], ":")
+
+	// 兼容使用 digest 标识版本号的情况
+	if strings.Contains(result.Version, "@") {
+		//result.Version = strings.Split(result.Version, "@")[1]
+	}
 
 	if len(temp) <= 2 {
 		if noRegistryUrl {

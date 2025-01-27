@@ -32,10 +32,11 @@ func (self ImageTagDetail) Uri() string {
 		self.Registry = DefaultRegistryDomain
 	}
 	self.Registry = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(self.Registry, "http://"), "https://"), "/")
+	split := ":"
 	if self.Namespace == "" {
-		return fmt.Sprintf("%s/%s:%s", self.Registry, self.ImageName, self.Version)
+		return fmt.Sprintf("%s/%s%s%s", self.Registry, self.ImageName, split, self.Version)
 	} else {
-		return fmt.Sprintf("%s/%s/%s:%s", self.Registry, self.Namespace, self.ImageName, self.Version)
+		return fmt.Sprintf("%s/%s/%s%s%s", self.Registry, self.Namespace, self.ImageName, split, self.Version)
 	}
 }
 

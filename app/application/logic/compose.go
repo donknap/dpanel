@@ -30,6 +30,7 @@ const (
 	ComposeProjectName           = "dpanel-c-%s"
 	ComposeProjectDeployFileName = "dpanel-deploy.yaml"
 	ComposeProjectEnvFileName    = ".dpanel.env"
+	ComposeDefaultEnvFileName    = ".env"
 )
 
 var ComposeFileNameSuffix = []string{
@@ -348,8 +349,18 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		options = append(options, compose.WithYamlPath(path))
 	}
 
-	envFileName := filepath.Join(taskFileDir, ComposeProjectEnvFileName)
+	if _, err := os.Stat(filepath.Join(taskFileDir, ComposeDefaultEnvFileName)); err == nil {
+		options = append(options, cli.WithEnvFiles(filepath.Join(taskFileDir, ComposeDefaultEnvFileName)))
+		options = append(options, cli.WithDotEnv)
+	}
 
+	entity.Setting.Environment = []docker.EnvItem{
+		{
+			Name:  "abc",
+			Value: "123",
+		},
+	}
+	envFileName := filepath.Join(taskFileDir, ComposeProjectEnvFileName)
 	if !function.IsEmptyArray(entity.Setting.Environment) {
 		globalEnv := make([]string, 0)
 		for _, item := range entity.Setting.Environment {
