@@ -56,7 +56,7 @@ func GetRegistryUrl(address string) url.URL {
 		host = parseUrl.Host
 	}
 	return url.URL{
-		Scheme: "http",
+		Scheme: "https",
 		Host:   host,
 		Path:   "/v2/",
 	}
