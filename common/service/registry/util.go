@@ -26,7 +26,7 @@ func GetImageTagDetail(tag string) *ImageTagDetail {
 	result.Registry = temp[0]
 
 	name := strings.Split(temp[len(temp)-1], ":")
-	result.ImageName, result.Version = name[0], name[1]
+	result.ImageName, result.Version = name[0], strings.Join(name[1:], ":")
 
 	if len(temp) <= 2 {
 		if noRegistryUrl {
