@@ -566,7 +566,7 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		option = append(option, registry.WithCredentialsString(registryConfig.GetRegistryAuthString()))
 		option = append(option, registry.WithRegistryHost(s))
 		reg := registry.New(option...)
-		if digest, err = reg.Repository.GetImageDigest(params.Tag); err == nil {
+		if digest, err = reg.Repository.GetImageDigest(params.Tag); err == nil && !function.IsEmptyArray(imageInfo.RepoDigests) {
 			slog.Debug("image check upgrade", "remote digest", fmt.Sprintf("%s@%s", params.Tag, digest), "local digest", imageInfo.RepoDigests)
 			if !function.InArrayWalk(imageInfo.RepoDigests, func(i string) bool {
 				return strings.HasSuffix(i, digest)
@@ -586,8 +586,9 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"upgrade": upgrade,
-		"digest":  digest,
+		"upgrade":     upgrade,
+		"digest":      digest,
+		"digestLocal": imageInfo.RepoDigests,
 	})
 	return
 }

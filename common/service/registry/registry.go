@@ -139,11 +139,9 @@ func (self Registry) request(req *http.Request, scope string) (*http.Response, e
 			}, nil
 		}
 	}
-	token, err := self.accessToken(scope)
-	if err != nil {
-		return nil, err
+	if token, err := self.accessToken(scope); err == nil {
+		req.Header.Set("Authorization", token)
 	}
-	req.Header.Set("Authorization", token)
 	req.Header.Set("User-Agent", docker.BuilderAuthor)
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
