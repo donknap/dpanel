@@ -109,28 +109,30 @@ func (self Image) TagRemote(http *gin.Context) {
 	if params.Type == "pull" {
 		// 如果使用了加速，需要给镜像 tag 一个原来的名称
 		_ = notice.Message{}.Info("imagePullUseProxy", "name", imageNameDetail.Registry)
+
+		// 当 tag 中包含 @ digest 值时，不能直接 tag 成新名称，需要获取到其实中的版本号
+		if tag, _, ok := strings.Cut(params.Tag, "@"); ok {
+			params.Tag = tag
+		}
+		err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, imageNameDetail.Uri(), params.Tag)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 		// 取消掉加速的标签名
 		oldImageNameDetail := registry2.GetImageTagDetail(params.Tag)
-		// 当 tag 中包含 @ digest 值时，不能直接 tag 成新名称，需要获取到其实中的版本号
-		if tag, _, ok := strings.Cut(oldImageNameDetail.Uri(), "@"); ok {
-			err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, imageNameDetail.Uri(), tag)
+
+		if oldImageNameDetail.Registry != imageNameDetail.Registry {
+			_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, imageNameDetail.Uri(), image.RemoveOptions{})
 			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			if oldImageNameDetail.Registry != imageNameDetail.Registry {
-				_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, imageNameDetail.Uri(), image.RemoveOptions{})
-				if err != nil {
-					slog.Debug("image remote tag", "error", err)
-				}
+				slog.Debug("image remote tag", "error", err)
 			}
 		}
-
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"proxyUrl": imageNameDetail.Registry,
-		"tag":      imageNameDetail.ImageName,
+		"tag":      params.Tag,
 	})
 	return
 }
