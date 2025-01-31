@@ -366,8 +366,9 @@ func WithDevice(item ...docker.DeviceItem) Option {
 
 		for _, deviceItem := range item {
 			self.hostConfig.Devices = append(self.hostConfig.Devices, container.DeviceMapping{
-				PathOnHost:      deviceItem.Host,
-				PathInContainer: deviceItem.Dest,
+				PathOnHost:        deviceItem.Host,
+				PathInContainer:   deviceItem.Dest,
+				CgroupPermissions: "rwm",
 			})
 		}
 		return nil
