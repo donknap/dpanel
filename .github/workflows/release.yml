@@ -166,13 +166,7 @@ jobs:
           --build-arg APP_VERSION=${VERSION_TAG} \
           --build-arg APP_FAMILY=pe \
           . --push
-          
-          docker buildx build \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:demo \
-          --platform linux/amd64 \
-          --build-arg APP_VERSION=${VERSION_TAG} \
-          -f Dockerfile-demo \
-          . --push
+
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
