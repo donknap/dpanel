@@ -44,6 +44,14 @@ docker run -it -d --name dpanel --restart=always \
  dpanel/dpanel:lite
 ```
 
+#### Install Script 
+
+> Tested on Debian and Alpine.
+
+```
+curl -sSL https://dpanel.cc/quick.sh -o quick.sh && sudo bash quick.sh
+```
+
 #### Preview
 
 ###### overview
