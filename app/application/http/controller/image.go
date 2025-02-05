@@ -286,7 +286,11 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	if err != nil {
 		imageRow.Status = logic.StatusError
 		imageRow.Message = log + "\n" + err.Error()
-		_, _ = dao.Image.Updates(imageRow)
+		if imageRow.ID > 0 {
+			_, _ = dao.Image.Updates(imageRow)
+		} else {
+			_ = dao.Image.Create(imageRow)
+		}
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
