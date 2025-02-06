@@ -49,7 +49,7 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 		exec.WithCommandName("git"),
 		exec.WithArgs("clone", "--depth", "1",
 			gitUrl, tempDownloadPath),
-		exec.WithTimeout(time.Second*5),
+		exec.WithTimeout(time.Second*60),
 	)
 	if err != nil {
 		return err

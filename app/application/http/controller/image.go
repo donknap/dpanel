@@ -555,6 +555,15 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	// 如果本地 digest 为空，则不检测
+	if function.IsEmptyArray(imageInfo.RepoDigests) {
+		self.JsonResponseWithoutError(http, gin.H{
+			"upgrade":     false,
+			"digest":      "",
+			"digestLocal": imageInfo.RepoDigests,
+		})
+		return
+	}
 
 	digest := ""
 	upgrade := false
@@ -570,16 +579,15 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		option = append(option, registry.WithCredentialsString(registryConfig.GetRegistryAuthString()))
 		option = append(option, registry.WithRegistryHost(s))
 		reg := registry.New(option...)
-		if digest, err = reg.Repository.GetImageDigest(params.Tag); err == nil && !function.IsEmptyArray(imageInfo.RepoDigests) {
+		if digest, err = reg.Repository.GetImageDigest(params.Tag); err == nil {
 			slog.Debug("image check upgrade", "remote digest", fmt.Sprintf("%s@%s", params.Tag, digest), "local digest", imageInfo.RepoDigests)
 			if !function.InArrayWalk(imageInfo.RepoDigests, func(i string) bool {
 				return strings.HasSuffix(i, digest)
 			}) {
 				upgrade = true
-				break
 			}
-		}
-		if err != nil {
+			break
+		} else {
 			slog.Debug("image check upgrade", "err", err.Error())
 		}
 	}
