@@ -52,7 +52,7 @@ func (self Image) TagRemote(http *gin.Context) {
 				out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, imageNameDetail.Uri(), pullOption)
 			} else {
 				url := registry2.GetRegistryUrl(s)
-				if response, err = http2.Get(strings.Replace(url.String(), "https://", "http://", 0)); err == nil && strings.Contains(response.Header.Get(registry2.ChallengeHeader), "docker.io") {
+				if response, err = http2.Get(strings.Replace(url.String(), "https://", "http://", 0)); err == nil && strings.Contains(response.Header.Get(registry2.ChallengeHeader), "realm=") {
 					pullOption := image.PullOptions{
 						RegistryAuth: registryConfig.GetAuthString(),
 					}
