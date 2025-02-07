@@ -20,9 +20,10 @@ func (self Image) GetRegistryConfig(imageName string) registry2.Config {
 
 	if docker.Sdk.Client != nil && imageNameDetail.Registry == registry2.DefaultRegistryDomain {
 		// 获取docker 配置中的加速地址
-		if dockerInfo, err := docker.Sdk.Client.Info(docker.Sdk.Ctx); err == nil && dockerInfo.RegistryConfig != nil && !function.IsEmptyArray(dockerInfo.RegistryConfig.Mirrors) {
-			result.Proxy = dockerInfo.RegistryConfig.Mirrors
-		}
+		// 暂时注释掉，直接取 daemon.json 的镜像地址问题太多
+		//if dockerInfo, err := docker.Sdk.Client.Info(docker.Sdk.Ctx); err == nil && dockerInfo.RegistryConfig != nil && !function.IsEmptyArray(dockerInfo.RegistryConfig.Mirrors) {
+		//	result.Proxy = dockerInfo.RegistryConfig.Mirrors
+		//}
 	}
 
 	registryList, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(imageNameDetail.Registry)).Find()
