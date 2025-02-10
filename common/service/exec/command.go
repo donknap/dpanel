@@ -1,10 +1,8 @@
 package exec
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"github.com/creack/pty"
 	"io"
 	"log/slog"
@@ -55,13 +53,17 @@ func (self Command) RunInTerminal(size *pty.Winsize) (io.ReadCloser, error) {
 	var err error
 
 	if runtime.GOOS == "windows" {
-		// 不支持 Pty
-		out, err := self.RunWithPip()
+		// 不支持 Pty，利用管道模拟读取
+		stdout, err := self.cmd.StdoutPipe()
 		if err != nil {
 			return nil, err
 		}
-		return io.NopCloser(out), nil
+		if err := cmd.Start(); err != nil {
+			return nil, err
+		}
+		return stdout, nil
 	}
+
 	out, err = pty.StartWithSize(self.cmd, size)
 	if err != nil {
 		return nil, err
@@ -70,42 +72,6 @@ func (self Command) RunInTerminal(size *pty.Winsize) (io.ReadCloser, error) {
 		Conn: out,
 		cmd:  self.cmd,
 	}, err
-}
-
-func (self Command) RunWithPip() (io.Reader, error) {
-	output := new(bytes.Buffer)
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			fmt.Printf("%v \n", scanner.Text())
-			output.WriteString(scanner.Text() + "\n")
-		}
-		return
-	}()
-
-	go func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			output.WriteString(scanner.Text() + "\n")
-		}
-		return
-	}()
-
-	return stdout, nil
 }
 
 func (self Command) Run() (io.Reader, error) {

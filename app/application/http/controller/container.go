@@ -183,7 +183,7 @@ func (self Container) GetDetail(http *gin.Context) {
 		return
 	}
 
-	detail, err := docker.Sdk.ContainerInfo(params.Md5)
+	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -191,9 +191,12 @@ func (self Container) GetDetail(http *gin.Context) {
 
 	ignore := accessor.IgnoreCheckUpgrade{}
 	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore, &ignore)
+
+	domain, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(detail.Name)).Find()
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":   detail,
 		"ignore": ignore,
+		"domain": domain,
 	})
 	return
 }
