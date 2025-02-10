@@ -278,9 +278,10 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	workingDir := entity.Setting.GetWorkingDir()
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
+	// windows 下无法使用 link 目录对齐到宿主机目录
 	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
 	for _, mount := range dpanelContainerInfo.Mounts {
-		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" {
+		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
 			if _, err := os.Stat(mount.Source); err != nil {
 				_ = os.MkdirAll(mount.Source, os.ModePerm)
 			}
