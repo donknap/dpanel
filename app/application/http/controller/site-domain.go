@@ -161,32 +161,26 @@ func (self SiteDomain) Create(http *gin.Context) {
 
 func (self SiteDomain) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		ContainerId string `json:"containerId" binding:"required"`
+		ContainerId string `json:"containerId"`
 		ServerName  string `json:"serverName"`
-		Port        int32  `json:"port"`
-		Page        int    `json:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize    int    `json:"pageSize" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if params.Page < 1 {
-		params.Page = 1
+	query := dao.SiteDomain.Order(dao.SiteDomain.ID.Desc())
+	if params.ContainerId != "" {
+		containerRow, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		query = query.Where(dao.SiteDomain.ContainerID.Eq(containerRow.Name))
 	}
-	if params.PageSize < 1 {
-		params.PageSize = 10
-	}
-	containerRow, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	query := dao.SiteDomain.Order(dao.SiteDomain.ID.Desc()).Where(dao.SiteDomain.ContainerID.Eq(containerRow.Name))
 	if params.ServerName != "" {
 		query = query.Where(dao.SiteDomain.ServerName.Like("%" + params.ServerName + "%"))
 	}
-	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
+	list, _ := query.Find()
 
 	for key, domain := range list {
 		if domain.Setting != nil && domain.Setting.EnableSSL && domain.Setting.SslCrtKey != "" {
@@ -196,9 +190,7 @@ func (self SiteDomain) GetList(http *gin.Context) {
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"total": total,
-		"page":  params.Page,
-		"list":  list,
+		"list": list,
 	})
 	return
 }
