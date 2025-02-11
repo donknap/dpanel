@@ -23,6 +23,7 @@ func (self RunLog) Run(http *gin.Context) {
 		Md5       string `json:"md5" binding:"required"`
 		LineTotal int    `json:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000 5000 -1"`
 		Download  bool   `json:"download"`
+		ShowTime  bool   `json:"showTime"`
 	}
 
 	params := ParamsValidate{}
@@ -33,6 +34,7 @@ func (self RunLog) Run(http *gin.Context) {
 		ShowStderr: true,
 		ShowStdout: true,
 		Follow:     !params.Download,
+		Timestamps: params.ShowTime,
 	}
 	if params.LineTotal > 0 {
 		option.Tail = strconv.Itoa(params.LineTotal)

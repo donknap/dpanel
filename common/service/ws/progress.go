@@ -17,9 +17,10 @@ func NewProgressPip(messageType string) ProgressPip {
 		ctx:         ctx,
 		cancel:      cancelFunc,
 	}
-	if p, exists := collect.progressPip.LoadOrStore(messageType, process); exists {
+	if p, exists := collect.progressPip.LoadAndDelete(messageType); exists {
 		p.(ProgressPip).Close()
 	}
+	collect.progressPip.Store(messageType, process)
 	return process
 }
 
@@ -66,9 +67,7 @@ func (self ProgressPip) BroadcastMessage(data interface{}) {
 }
 
 func (self ProgressPip) Close() {
-	if p, exists := collect.progressPip.LoadAndDelete(self.messageType); exists {
-		p.(ProgressPip).cancel()
-	}
+	self.cancel()
 }
 
 func (self ProgressPip) Done() <-chan struct{} {
