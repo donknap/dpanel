@@ -22,7 +22,7 @@ COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/ser
 COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
 
-WORKDIR /app
+WORKDIR /app/server
 VOLUME [ "/dpanel" ]
 
 EXPOSE 8080

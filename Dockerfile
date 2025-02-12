@@ -30,7 +30,7 @@ COPY ./runtime/config.yaml /app/server/config.yaml
 
 COPY ./docker/entrypoint.sh /docker/entrypoint.sh
 
-WORKDIR /app
+WORKDIR /app/server
 VOLUME [ "/dpanel" ]
 
 EXPOSE 443

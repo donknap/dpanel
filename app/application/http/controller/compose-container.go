@@ -133,7 +133,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		return
 	}
 
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, composeRow.ID))
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer wsBuffer.Close()
 
 	_, err = io.Copy(wsBuffer, response)

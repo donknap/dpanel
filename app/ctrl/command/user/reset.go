@@ -3,6 +3,7 @@ package user
 import (
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
@@ -41,9 +42,10 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 		return
 	}
 	if username == "" && password == "" {
-		color.Errorln("请指定要重置的用户名或是密码")
-		return
+		username = "dpanel"
+		password = function.GetRandomString(10)
 	}
+
 	if username != "" && password == "" {
 		color.Errorln("重置用户名时必须指定密码")
 		return
@@ -60,5 +62,7 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 		color.Errorln("重置失败，", err.Error())
 		return
 	}
+	color.Println("用户名: ", username)
+	color.Println("密  码: ", password)
 	color.Successln("用户名或是密码重置成功")
 }
