@@ -354,12 +354,6 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		options = append(options, cli.WithDotEnv)
 	}
 
-	entity.Setting.Environment = []docker.EnvItem{
-		{
-			Name:  "abc",
-			Value: "123",
-		},
-	}
 	envFileName := filepath.Join(taskFileDir, ComposeProjectEnvFileName)
 	if !function.IsEmptyArray(entity.Setting.Environment) {
 		globalEnv := make([]string, 0)
