@@ -20,6 +20,7 @@ var (
 	SettingGroupSettingDPanelInfo           = "DPanelInfo"
 	SettingGroupSettingThemeConfig          = "themeConfig"
 	SettingGroupSettingThemeUserConfig      = "themeUserConfig"
+	SettingGroupSettingDnsApi               = "dnsApi"
 )
 
 // 用户相关数据
@@ -139,6 +140,11 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 			if setting.Value.ThemeConfig != nil {
 				exists = true
 				*v = *setting.Value.ThemeConfig
+			}
+		case *[]accessor.DnsApi:
+			if setting.Value.DnsApi != nil {
+				exists = true
+				*v = setting.Value.DnsApi
 			}
 		}
 	}

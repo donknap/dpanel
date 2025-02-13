@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/application/logic"
+	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/acme"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/ws"
@@ -262,98 +264,74 @@ func (self SiteDomain) Delete(http *gin.Context) {
 
 func (self SiteDomain) ApplyDomainCert(http *gin.Context) {
 	type ParamsValidate struct {
-		Id          []int32 `json:"id" binding:"required"`
-		Email       string  `json:"email" binding:"required"`
-		CertServer  string  `json:"certServer" binding:"required" oneof:"zerossl letsencrypt"`
-		AuthUpgrade bool    `json:"authUpgrade"`
-		Renew       bool    `json:"renew"`
-		Debug       bool    `json:"debug"`
+		Domain      []string `json:"domain" binding:"required"`
+		Email       string   `json:"email" binding:"required"`
+		CertServer  string   `json:"certServer" binding:"required" oneof:"zerossl letsencrypt"`
+		AuthUpgrade bool     `json:"authUpgrade"`
+		Renew       bool     `json:"renew"`
+		Debug       bool     `json:"debug"`
+		DnsApi      string   `json:"dnsApi"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	var serverNameList []string
 
-	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
-	if function.IsEmptyArray(domainList) || len(domainList) != len(params.Id) {
-		self.JsonResponseWithError(http, errors.New("请先在域名列表勾选待申请的域名，多个域名可以共用同一张证书"), 500)
+	options := []acme.Option{
+		acme.WithDomainList(params.Domain...),
+		acme.WithEmail(params.Email),
+		acme.WithCertServer(params.CertServer),
+	}
+
+	if params.AuthUpgrade {
+		options = append(options, acme.WithAutoUpgrade())
+	}
+
+	if params.Renew {
+		options = append(options, acme.WithRenew(), acme.WithForce())
+	} else {
+		options = append(options, acme.WithIssue())
+	}
+
+	if params.Debug {
+		options = append(options, acme.WithDebug())
+	}
+
+	if params.DnsApi != "" {
+		if params.DnsApi == "nginx" {
+			options = append(options, acme.WithDnsNginx())
+		} else {
+			dnsApiList := make([]accessor.DnsApi, 0)
+			logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingDnsApi, &dnsApiList)
+			if exists, i := function.IndexArrayWalk(dnsApiList, func(i accessor.DnsApi) bool {
+				return i.ServerName == params.DnsApi
+			}); exists {
+				options = append(options, acme.WithDnsApi(dnsApiList[i]))
+			}
+		}
+	}
+
+	if facade.GetConfig().GetString("app.env") == "debug" {
+		_ = os.Setenv(acme.EnvOverrideCommandName, "/Users/renchao/.acme.sh/acme.sh")
+	} else {
+		options = append(options, acme.WithConfigHomePath("/dpanel/acme"))
+	}
+
+	builder, err := acme.New(options...)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	for _, domain := range domainList {
-		serverNameList = append(serverNameList, domain.ServerName)
-	}
-
-	response, err := logic.Acme{}.Issue(&logic.AcmeIssueOption{
-		ServerName:  serverNameList,
-		Email:       params.Email,
-		CertServer:  params.CertServer,
-		AutoUpgrade: params.AuthUpgrade,
-		Renew:       params.Renew,
-		Debug:       params.Debug,
-	})
+	response, err := builder.Run()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	wsBuffer := ws.NewProgressPip(ws.MessageTypeDomainApply)
 	defer wsBuffer.Close()
-
 	_, err = io.Copy(wsBuffer, response)
 	if err != nil {
 		slog.Error("compose", "deploy copy error", err)
-	}
-	siteNginxSetting := logic.Site{}.GetSiteNginxSetting(serverNameList[0])
-	certContent, err := siteNginxSetting.GetCertContent()
-	if os.IsNotExist(err) {
-		self.JsonResponseWithError(http, errors.New("证书申请失败，请查看控制台日志"), 500)
-		return
-	}
-	keyContent, err := siteNginxSetting.GetKeyContent()
-	if os.IsNotExist(err) {
-		self.JsonResponseWithError(http, errors.New("证书申请失败，请查看控制台日志"), 500)
-		return
-	}
-
-	certInfo := logic.Acme{}.Info(serverNameList[0])
-	if certInfo.CreateTimeStr == "" || certInfo.RenewTimeStr == "" {
-		self.JsonResponseWithError(http, errors.New("证书申请失败，请查看控制台日志"), 500)
-		return
-	}
-
-	for _, domain := range domainList {
-		domainSetting := &accessor.SiteDomainSettingOption{
-			ServerName:                domain.ServerName,
-			Port:                      domain.Setting.Port,
-			ServerAddress:             domain.Setting.ServerAddress,
-			EnableBlockCommonExploits: domain.Setting.EnableBlockCommonExploits,
-			EnableWs:                  domain.Setting.EnableWs,
-			EnableAssetCache:          domain.Setting.EnableAssetCache,
-			ExtraNginx:                domain.Setting.ExtraNginx,
-			EnableSSL:                 true,
-			TargetName:                function.GetMd5(domain.Setting.ServerName),
-			SslCrt:                    string(certContent),
-			SslKey:                    string(keyContent),
-			SslCrtKey:                 serverNameList[0],
-			SslCrtCreaeTime:           certInfo.CreateTimeStr,
-			SslCrtRenewTime:           certInfo.RenewTimeStr,
-			AutoSsl:                   true,
-		}
-		err = logic.Site{}.MakeNginxConf(domainSetting)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-
-		_, err = dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(domain.ID)).Updates(&entity.SiteDomain{
-			Setting: domainSetting,
-		})
-
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
 	}
 	self.JsonSuccessResponse(http)
 	return
@@ -434,5 +412,62 @@ func (self SiteDomain) RestartNginx(http *gin.Context) {
 	slog.Debug("site domain stop nginx", "out", out)
 
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self SiteDomain) DnsApi(http *gin.Context) {
+	type ParamsValidate struct {
+		Account []accessor.DnsApi `json:"account"`
+		User    []accessor.DnsApi `json:"user"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	dnsApi := make([]accessor.DnsApi, 0)
+	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingDnsApi, &dnsApi)
+
+	if !function.IsEmptyArray(params.Account) || !function.IsEmptyArray(params.User) {
+		dnsApi = make([]accessor.DnsApi, 0)
+		for _, item := range params.Account {
+			if exists, index := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
+				return i.ServerName == item.ServerName
+			}); exists {
+				dnsApi[index] = item
+			} else {
+				dnsApi = append(dnsApi, item)
+			}
+		}
+		for _, item := range params.User {
+			if exists, index := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
+				return i.ServerName == item.ServerName
+			}); exists {
+				dnsApi[index] = item
+			} else {
+				dnsApi = append(dnsApi, item)
+			}
+		}
+		err := logic2.Setting{}.Save(&entity.Setting{
+			GroupName: logic2.SettingGroupSetting,
+			Name:      logic2.SettingGroupSettingDnsApi,
+			Value: &accessor.SettingValueOption{
+				DnsApi: dnsApi,
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	dnsApi = append([]accessor.DnsApi{
+		{
+			ServerName: "nginx",
+			Title:      "Nginx",
+			Env:        make([]docker.EnvItem, 0),
+		},
+	}, dnsApi...)
+	self.JsonResponseWithoutError(http, gin.H{
+		"setting": dnsApi,
+	})
 	return
 }

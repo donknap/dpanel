@@ -17,6 +17,7 @@ type SettingValueOption struct {
 	DPanelInfo         *types.ContainerJSON      `json:"DPanelInfo,omitempty"`
 	ThemeConfig        *ThemeConfig              `json:"theme,omitempty"`
 	ThemeUserConfig    *ThemeUserConfig          `json:"themeUser,omitempty"`
+	DnsApi             []DnsApi                  `json:"dnsApi,omitempty"`
 }
 
 type IgnoreCheckUpgrade []string
@@ -64,4 +65,10 @@ type ThemeUserConfig struct {
 type ThemeUserConfigSiteLink struct {
 	Href  string `json:"href,omitempty"`
 	Title string `json:"title,omitempty"`
+}
+
+type DnsApi struct {
+	Title      string           `json:"title,omitempty"`
+	ServerName string           `json:"serverName,omitempty"`
+	Env        []docker.EnvItem `json:"env,omitempty"`
 }

@@ -17,7 +17,7 @@ const (
 )
 
 type AcmeIssueOption struct {
-	ServerName  []string
+	Domain      []string
 	CertServer  string
 	Email       string
 	AutoUpgrade bool
@@ -34,14 +34,14 @@ type acmeInfoResult struct {
 
 func (self AcmeIssueOption) to() ([]string, error) {
 	var command []string
-	if function.IsEmptyArray(self.ServerName) || self.Email == "" {
+	if function.IsEmptyArray(self.Domain) || self.Email == "" {
 		return nil, errors.New("缺少生成参数")
 	}
-	if !function.IsEmptyArray(self.ServerName) {
-		for _, serverName := range self.ServerName {
+	if !function.IsEmptyArray(self.Domain) {
+		for _, serverName := range self.Domain {
 			command = append(command, "--domain", serverName)
 		}
-		settingPath := Site{}.GetSiteNginxSetting(self.ServerName[0])
+		settingPath := Site{}.GetSiteNginxSetting(self.Domain[0])
 
 		command = append(command, "--nginx")
 		command = append(command, "--key-file", settingPath.KeyPath)

@@ -54,14 +54,7 @@ func (self Command) RunInTerminal(size *pty.Winsize) (io.ReadCloser, error) {
 
 	if runtime.GOOS == "windows" {
 		// 不支持 Pty，利用管道模拟读取
-		stdout, err := self.cmd.StdoutPipe()
-		if err != nil {
-			return nil, err
-		}
-		if err := cmd.Start(); err != nil {
-			return nil, err
-		}
-		return stdout, nil
+		return self.RunInPip()
 	}
 
 	out, err = pty.StartWithSize(self.cmd, size)
@@ -72,6 +65,18 @@ func (self Command) RunInTerminal(size *pty.Winsize) (io.ReadCloser, error) {
 		Conn: out,
 		cmd:  self.cmd,
 	}, err
+}
+
+func (self Command) RunInPip() (stdout io.ReadCloser, err error) {
+	stdout, err = self.cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	cmd.Stderr = cmd.Stdout
+	if err = cmd.Start(); err != nil {
+		return nil, err
+	}
+	return stdout, nil
 }
 
 func (self Command) Run() (io.Reader, error) {

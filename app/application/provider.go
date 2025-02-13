@@ -29,6 +29,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/site/get-domain-list", controller.SiteDomain{}.GetList)
 			cors.POST("/app/site/get-domain-detail", controller.SiteDomain{}.GetDetail)
 			cors.POST("/app/site/apply-domain-cert", controller.SiteDomain{}.ApplyDomainCert)
+			cors.POST("/app/site/dns-api", controller.SiteDomain{}.DnsApi)
 
 			cors.POST("/app/site/restart-nginx", controller.SiteDomain{}.RestartNginx)
 
