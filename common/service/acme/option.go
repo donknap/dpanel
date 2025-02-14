@@ -1,28 +1,20 @@
 package acme
 
 import (
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 )
 
-type Option func() []string
+type Option func(self *Acme) error
 
-func WithDomainList(list ...string) Option {
+func WithDomain(list ...string) Option {
 	if function.IsEmptyArray(list) {
 		return nil
 	}
-	return func() []string {
-		domainList := make([]string, 0)
+	return func(self *Acme) error {
 		for _, d := range list {
-			domainList = append(domainList, "--domain", d)
+			self.argv = append(self.argv, "--domain", d)
 		}
-		return domainList
-	}
-}
-
-func WithDomain(domain string) Option {
-	return func() []string {
-		return []string{"--domain", domain}
+		return nil
 	}
 }
 
@@ -30,67 +22,79 @@ func WithCertServer(server string) Option {
 	if server == "" {
 		server = "letsencrypt"
 	}
-	return func() []string {
-		return []string{"--server", server}
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--server", server)
+		return nil
 	}
 }
 
 func WithEmail(email string) Option {
-	return func() []string {
-		return []string{"--email", email}
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--email", email)
+		return nil
 	}
 }
 
 func WithAutoUpgrade() Option {
-	return func() []string {
-		return []string{"--auto-upgrade", "1"}
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--auto-upgrade", "1")
+		return nil
 	}
 }
 
 func WithForce() Option {
-	return func() []string {
-		return []string{"--force"}
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--force")
+		return nil
 	}
 }
 
 func WithDnsNginx() Option {
-	return func() []string {
-		return []string{"--nginx"}
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--nginx")
+		return nil
 	}
 }
 
 func WithRenew() Option {
-	return func() []string {
-		return []string{"--renew"}
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--renew")
+		return nil
 	}
 }
 
 func WithIssue() Option {
-	return func() []string {
-		return []string{"--issue"}
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--issue")
+		return nil
 	}
 }
 
 func WithCertRootPath(path string) Option {
-	return func() []string {
-		return []string{"--key-file", path, "--fullchain-file", path}
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--key-file", path, "--fullchain-file", path)
+		return nil
 	}
 }
 
-func WithDnsApi(api accessor.DnsApi) Option {
-	return func() []string {
-		return []string{"--dns", api.ServerName}
+func WithDnsApi(apiType string, env []string) Option {
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--dns", apiType)
+		self.env = append(self.env, env...)
+		return nil
 	}
 }
 
 func WithConfigHomePath(path string) Option {
-	return func() []string {
-		return []string{"--config-home", path}
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--config-home", path)
+		return nil
 	}
 }
 
 func WithDebug() Option {
-	return func() []string {
-		return []string{"--debug"}
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--debug")
+		return nil
 	}
 }

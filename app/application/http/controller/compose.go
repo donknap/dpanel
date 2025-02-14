@@ -70,10 +70,9 @@ func (self Compose) Create(http *gin.Context) {
 		yamlRow, _ = logic.Compose{}.Get(params.Name)
 		if !function.IsEmptyArray(params.Environment) {
 			// 提交写入 .dpanel.env 文件
-			globalEnv := make([]string, 0)
-			for _, item := range params.Environment {
-				globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, compose.ReplacePlaceholder(item.Value)))
-			}
+			globalEnv := function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
+				return fmt.Sprintf("%s=%s", i.Name, compose.ReplacePlaceholder(i.Value)), true
+			})
 			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), logic.ComposeProjectEnvFileName)
 			_ = os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
 			err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)

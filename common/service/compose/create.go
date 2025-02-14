@@ -98,10 +98,9 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 		}
 
 		if !function.IsEmptyArray(siteOption.Environment) {
-			envList := make([]string, 0)
-			for _, item := range siteOption.Environment {
-				envList = append(envList, fmt.Sprintf("%s=%s", item.Name, item.Value))
-			}
+			envList := function.PluckArrayWalk(siteOption.Environment, func(i docker.EnvItem) (string, bool) {
+				return fmt.Sprintf("%s=%s", i.Name, i.Value), true
+			})
 			service.Environment = types.NewMappingWithEquals(envList)
 		}
 
@@ -193,10 +192,13 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 			service.Labels[item.Name] = item.Value
 		}
 
-		hostList := make([]string, 0)
-		for _, item := range siteOption.ExtraHosts {
-			hostList = append(hostList, fmt.Sprintf("%s=%s", item.Name, item.Value))
-		}
+		hostList := function.PluckArrayWalk(siteOption.ExtraHosts, func(i docker.ValueItem) (string, bool) {
+			if i.Name == "" || i.Value == "" {
+				return "", false
+			}
+			return fmt.Sprintf("%s=%s", i.Name, i.Value), true
+		})
+
 		if !function.IsEmptyArray(hostList) {
 			hostLists, err := types.NewHostsList(hostList)
 			if err != nil {

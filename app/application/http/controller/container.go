@@ -18,11 +18,14 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -328,7 +331,10 @@ func (self Container) Delete(http *gin.Context) {
 	// 删除域名、配置、证书
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.Name)).Find()
 	for _, domain := range domainList {
-		logic.Site{}.GetSiteNginxSetting(domain.ServerName).RemoveAll()
+		err = os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(logic.VhostFileName, domain.ServerName)))
+		if err != nil {
+			slog.Debug("container delete domain", "error", err)
+		}
 	}
 	dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.ID)).Delete()
 

@@ -357,10 +357,9 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 
 	envFileName := filepath.Join(taskFileDir, ComposeProjectEnvFileName)
 	if !function.IsEmptyArray(entity.Setting.Environment) {
-		globalEnv := make([]string, 0)
-		for _, item := range entity.Setting.Environment {
-			globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, compose.ReplacePlaceholder(item.Value)))
-		}
+		globalEnv := function.PluckArrayWalk(entity.Setting.Environment, func(i docker.EnvItem) (string, bool) {
+			return fmt.Sprintf("%s=%s", i.Name, compose.ReplacePlaceholder(i.Value)), true
+		})
 		err := os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
 		if err != nil {
 			return nil, err

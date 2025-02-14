@@ -15,6 +15,7 @@ ENV DOCKER_HOST=unix:///var/run/docker.sock
 ENV STORAGE_LOCAL_PATH=/dpanel
 ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
 ENV TZ=Asia/Shanghai
+ENV ACME_OVERRIDE_CONFIG_HOME=/dpanel/acme
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update nginx musl inotify-tools docker-compose curl openssl tzdata git && \

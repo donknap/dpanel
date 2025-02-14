@@ -3,13 +3,16 @@ package logic
 import (
 	"embed"
 	"errors"
+	"fmt"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"html/template"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,9 +26,10 @@ const (
 )
 
 var (
-	CertFileName  = "%s.crt"
+	CertFileName  = "fullchain.cer"
 	KeyFileName   = "%s.key"
 	VhostFileName = "%s.conf"
+	CertName      = "%s_ecc"
 )
 
 type Site struct {
@@ -184,25 +188,14 @@ func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error 
 	if err != nil {
 		return err
 	}
-	siteSettingPath := Site{}.GetSiteNginxSetting(setting.ServerName)
-
-	vhostFile, err := os.OpenFile(siteSettingPath.ConfPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+	nginxConfPath := filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(VhostFileName, setting.ServerName))
+	vhostFile, err := os.OpenFile(nginxConfPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
 		return errors.New("nginx 配置目录不存在")
 	}
-	defer vhostFile.Close()
-
-	if setting.SslCrt != "" && setting.SslKey != "" {
-		err = os.WriteFile(siteSettingPath.CertPath, []byte(setting.SslCrt), 0666)
-		if err != nil {
-			return err
-		}
-		err = os.WriteFile(siteSettingPath.KeyPath, []byte(setting.SslKey), 0666)
-		if err != nil {
-			return err
-		}
-	}
-
+	defer func() {
+		_ = vhostFile.Close()
+	}()
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
 	if err != nil {
 		return err
@@ -211,6 +204,5 @@ func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error 
 	if err != nil {
 		return err
 	}
-
 	return nil
 }

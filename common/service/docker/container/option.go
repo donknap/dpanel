@@ -42,14 +42,12 @@ func WithContainerName(name string) Option {
 
 func WithEnv(item ...docker.EnvItem) Option {
 	return func(self *Builder) error {
-		self.containerConfig.Env = make([]string, 0)
-
-		for _, envItem := range item {
-			if envItem.Name == "" {
-				continue
+		self.containerConfig.Env = function.PluckArrayWalk(item, func(i docker.EnvItem) (string, bool) {
+			if i.Name == "" {
+				return "", false
 			}
-			self.containerConfig.Env = append(self.containerConfig.Env, fmt.Sprintf("%s=%s", envItem.Name, envItem.Value))
-		}
+			return fmt.Sprintf("%s=%s", i.Name, i.Value), true
+		})
 		return nil
 	}
 }

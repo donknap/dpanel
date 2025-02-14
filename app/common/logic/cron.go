@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
@@ -54,10 +55,9 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 		}
 		globalEnv := make([]string, 0)
 		globalEnv = append(globalEnv, defaultDockerEnv.GetDockerEnv()...)
-
-		for _, item := range task.Setting.Environment {
-			globalEnv = append(globalEnv, fmt.Sprintf("%s=%s", item.Name, item.Value))
-		}
+		globalEnv = append(globalEnv, function.PluckArrayWalk(task.Setting.Environment, func(i docker.EnvItem) (string, bool) {
+			return fmt.Sprintf("%s=%s", i.Name, i.Value), true
+		})...)
 
 		var out string
 		if containerName == "" {

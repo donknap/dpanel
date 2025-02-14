@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"fmt"
+	"github.com/donknap/dpanel/common/service/acme"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"log/slog"
 	"os"
@@ -49,4 +51,15 @@ func (self Local) GetStorageLocalPath() string {
 		return ""
 	}
 	return facade.GetConfig().GetString("storage.local.path")
+}
+
+func (self Local) GetNginxSettingPath() string {
+	return fmt.Sprintf("%s/nginx/proxy_host/", self.GetStorageLocalPath())
+}
+
+func (self Local) GetNginxCertPath() string {
+	if override := os.Getenv(acme.EnvOverrideConfigHome); override != "" {
+		return override
+	}
+	return fmt.Sprintf("%s/cert/", self.GetStorageLocalPath())
 }

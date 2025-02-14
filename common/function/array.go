@@ -44,14 +44,15 @@ func IndexArrayWalk[T interface{}](v []T, walk func(i T) bool) (exists bool, ind
 	return false, 0
 }
 
-func ConvertArray[T any](interfaces []interface{}) []T {
-	slice := make([]T, len(interfaces))
-	for i, v := range interfaces {
-		if val, ok := v.(T); ok {
-			slice[i] = val
+func PluckArrayWalk[T interface{}, R interface{}](v []T, walk func(i T) (R, bool)) []R {
+	result := make([]R, 0)
+	for _, item := range v {
+		newItem, ok := walk(item)
+		if ok {
+			result = append(result, newItem)
 		}
 	}
-	return slice
+	return result
 }
 
 func FindArrayValueIndex(items interface{}, value ...interface{}) (exists bool, pos []int) {

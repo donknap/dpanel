@@ -23,15 +23,15 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/site/delete", controller.Site{}.Delete)
 			cors.POST("/app/site/update-title", controller.Site{}.UpdateTitle)
 
-			cors.POST("/app/site/create-domain", controller.SiteDomain{}.Create)
-			cors.POST("/app/site/update-domain", controller.SiteDomain{}.UpdateDomain)
-			cors.POST("/app/site/delete-domain", controller.SiteDomain{}.Delete)
-			cors.POST("/app/site/get-domain-list", controller.SiteDomain{}.GetList)
-			cors.POST("/app/site/get-domain-detail", controller.SiteDomain{}.GetDetail)
-			cors.POST("/app/site/apply-domain-cert", controller.SiteDomain{}.ApplyDomainCert)
-			cors.POST("/app/site/dns-api", controller.SiteDomain{}.DnsApi)
+			cors.POST("/app/site-domain/create", controller.SiteDomain{}.Create)
+			cors.POST("/app/site-domain/delete", controller.SiteDomain{}.Delete)
+			cors.POST("/app/site-domain/get-list", controller.SiteDomain{}.GetList)
+			cors.POST("/app/site-domain/get-detail", controller.SiteDomain{}.GetDetail)
+			cors.POST("/app/site-domain/restart-nginx", controller.SiteDomain{}.RestartNginx)
 
-			cors.POST("/app/site/restart-nginx", controller.SiteDomain{}.RestartNginx)
+			cors.POST("/app/site-cert/apply", controller.SiteCert{}.Apply)
+			cors.POST("/app/site-cert/get-list", controller.SiteCert{}.GetList)
+			cors.POST("/app/site-cert/dns-api", controller.SiteCert{}.DnsApi)
 
 			// 容器相关
 			cors.POST("/app/container/status", controller.Container{}.Status)

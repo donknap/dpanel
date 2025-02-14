@@ -9,7 +9,7 @@ upstream {{.TargetName}} {
 {{if .EnableSSL}}
 server {
     listen 80;
-    server_name {{.ServerName}};
+    server_name {{.ServerName}} {{range $index, $value := .ServerNameAlias}}{{$value}} {{end}};
 
     location / {
         return 301 https://$host$request_uri;
@@ -25,11 +25,11 @@ server {
   listen 80;
   {{end}}
 
-  server_name {{.ServerName}};
+  server_name {{.ServerName}} {{range $index, $value := .ServerNameAlias}}{{$value}} {{end}};
 
   {{if .EnableSSL}}
-  ssl_certificate /dpanel/cert/{{.ServerName}}.crt;
-  ssl_certificate_key /dpanel/cert/{{.ServerName}}.key;
+  ssl_certificate {{.SslCrt}};
+  ssl_certificate_key {{.SslKey}};
   ssl_session_cache shared:SSL:1m;
   ssl_session_timeout 5m;
   ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE:ECDH:AES:HIGH:!NULL:!aNULL:!MD5:!ADH:!RC4;

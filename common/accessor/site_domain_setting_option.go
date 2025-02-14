@@ -6,6 +6,7 @@ import (
 
 type SiteDomainSettingOption struct {
 	ServerName                string        `json:"serverName"`
+	ServerNameAlias           []string      `json:"serverNameAlias,omitempty"`
 	ServerAddress             string        `json:"serverAddress"`
 	TargetName                string        `json:"targetName"`
 	Port                      int32         `json:"port"`
@@ -17,8 +18,5 @@ type SiteDomainSettingOption struct {
 	Email                     string        `json:"email"`
 	SslCrt                    string        `json:"sslCrt"`
 	SslKey                    string        `json:"sslKey"`
-	SslCrtRenewTime           string        `json:"sslCrtRenewTime"`
-	SslCrtCreaeTime           string        `json:"sslCrtCreaeTime"`
-	SslCrtKey                 string        `json:"sslCrtKey"` // 标记当前域名获取证书信息的名称 acme.sh --info -d SslCrtKey
-	AutoSsl                   bool          `json:"autoSsl"`
+	CertName                  string        `json:"certName"`
 }
