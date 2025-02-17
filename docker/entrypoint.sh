@@ -16,10 +16,10 @@ reload_nginx() {
     fi
 }
 
-while true; do
-    inotifywait -r -e modify,create,delete,move "$NGINX_CONFIG_DIR"
-    reload_nginx
-done &
+#while true; do
+#    inotifywait -r -e modify,create,delete,move "$NGINX_CONFIG_DIR"
+#    reload_nginx
+#done &
 
 crond
 nginx

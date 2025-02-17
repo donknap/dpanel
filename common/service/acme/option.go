@@ -35,9 +35,13 @@ func WithEmail(email string) Option {
 	}
 }
 
-func WithAutoUpgrade() Option {
+func WithAutoUpgrade(b bool) Option {
 	return func(self *Acme) error {
-		self.argv = append(self.argv, "--auto-upgrade", "1")
+		if b {
+			self.argv = append(self.argv, "--auto-upgrade", "1")
+		} else {
+			self.argv = append(self.argv, "--auto-upgrade", "0")
+		}
 		return nil
 	}
 }

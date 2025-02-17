@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/service/exec"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -26,6 +27,8 @@ func New(opts ...Option) (*Acme, error) {
 	if override := os.Getenv(EnvOverrideConfigHome); override != "" {
 		b.configHome = override
 		b.argv = append(b.argv, "--config-home", override)
+	} else {
+		b.configHome = filepath.Dir(b.commandName)
 	}
 	b.argv = append(b.argv, "--ecc")
 	for _, opt := range opts {
@@ -60,14 +63,44 @@ func (self Acme) Run() (io.ReadCloser, error) {
 }
 
 type Cert struct {
-	Domain    []string `json:"domain"`
-	CA        string   `json:"CA"`
-	CreatedAt string   `json:"createdAt"`
-	RenewAt   string   `json:"renewAt"`
-	Success   bool     `json:"success"`
+	RootPath      string   `json:"-"`
+	MainDomain    string   `json:"mainDomain"`
+	Domain        []string `json:"domain"`
+	CA            string   `json:"CA"`
+	CreatedAt     string   `json:"createdAt"`
+	RenewAt       string   `json:"renewAt"`
+	Success       bool     `json:"success"`
+	DnsApi        string   `json:"dnsApi"`
+	SslCrtContent string   `json:"sslCrtContent"`
+	SslKeyContent string   `json:"sslKeyContent"`
 }
 
-func (self Acme) List() ([]Cert, error) {
+func (self *Cert) IsImport() bool {
+	return self.CA == "import"
+}
+
+func (self *Cert) FillCertContent() {
+	if content, err := os.ReadFile(filepath.Join(self.GetRootPath(), "fullchain.cer")); err == nil {
+		self.SslCrtContent = string(content)
+	}
+	if content, err := os.ReadFile(filepath.Join(self.GetRootPath(), self.Domain[0]+".key")); err == nil {
+		self.SslKeyContent = string(content)
+	}
+}
+
+func (self *Cert) GetRootPath() string {
+	if self.IsImport() {
+		return self.RootPath
+	} else {
+		return self.RootPath + "_ecc"
+	}
+}
+
+func (self *Cert) GetConfigPath() string {
+	return filepath.Join(self.GetRootPath(), self.Domain[0]+".conf")
+}
+
+func (self Acme) List() ([]*Cert, error) {
 	cmd, err := exec.New(
 		exec.WithCommandName(self.commandName),
 		exec.WithArgs("--list", "--listraw"),
@@ -79,7 +112,7 @@ func (self Acme) List() ([]Cert, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := make([]Cert, 0)
+	result := make([]*Cert, 0)
 	scanner := bufio.NewScanner(out)
 	for scanner.Scan() {
 		if strings.Contains(scanner.Text(), "Main_Domain") {
@@ -96,13 +129,27 @@ func (self Acme) List() ([]Cert, error) {
 			if split[4] != "" && split[3] != "" {
 				success = true
 			}
-			result = append(result, Cert{
-				Domain:    domain,
-				CA:        split[3],
-				CreatedAt: split[4],
-				RenewAt:   split[5],
-				Success:   success,
-			})
+			cert := &Cert{
+				MainDomain: split[0],
+				RootPath:   filepath.Join(self.configHome, split[0]),
+				Domain:     domain,
+				CA:         split[3],
+				CreatedAt:  split[4],
+				RenewAt:    split[5],
+				Success:    success,
+			}
+			if !cert.IsImport() {
+				if conf, err := os.ReadFile(cert.GetConfigPath()); err == nil {
+					item := function.PluckArrayWalk(strings.Split(string(conf), "\n"), func(i string) (string, bool) {
+						if k, v, exists := strings.Cut(i, "="); exists && k == "Le_Webroot" {
+							return strings.Trim(v, "'"), true
+						}
+						return "", false
+					})
+					cert.DnsApi = strings.Join(item, "")
+				}
+			}
+			result = append(result, cert)
 		}
 	}
 	return result, nil

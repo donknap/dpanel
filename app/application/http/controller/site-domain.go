@@ -143,9 +143,9 @@ func (self SiteDomain) Create(http *gin.Context) {
 	}
 
 	if params.CertName != "" && params.EnableSSL {
-		siteDomainRow.Setting.CertName = fmt.Sprintf(logic.CertName, params.CertName)
-		siteDomainRow.Setting.SslCrt = filepath.Join(storage.Local{}.GetNginxCertPath(), siteDomainRow.Setting.CertName, logic.CertFileName)
-		siteDomainRow.Setting.SslKey = filepath.Join(storage.Local{}.GetNginxCertPath(), siteDomainRow.Setting.CertName, fmt.Sprintf(logic.KeyFileName, params.CertName))
+		siteDomainRow.Setting.CertName = params.CertName
+		siteDomainRow.Setting.SslCrt = filepath.Join(storage.Local{}.GetNginxCertPath(), fmt.Sprintf(logic.CertName, params.CertName), logic.CertFileName)
+		siteDomainRow.Setting.SslKey = filepath.Join(storage.Local{}.GetNginxCertPath(), fmt.Sprintf(logic.CertName, params.CertName), fmt.Sprintf(logic.KeyFileName, params.CertName))
 	}
 
 	err = logic.Site{}.MakeNginxConf(siteDomainRow.Setting)
@@ -234,18 +234,17 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	}
 	list, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
 	for _, item := range list {
-		go func() {
-			err := os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(logic.VhostFileName, item.ServerName)))
-			if err != nil {
-				slog.Debug("container delete domain", "error", err)
-			}
-		}()
+		err := os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(logic.VhostFileName, item.ServerName)))
+		if err != nil {
+			slog.Debug("container delete domain", "error", err)
+		}
 	}
 	_, err := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Delete()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	// 如果没有域名，则退出默认网络
 	if list != nil && len(list) > 0 {
 		count, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(list[0].ContainerID)).Count()

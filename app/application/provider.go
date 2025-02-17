@@ -32,6 +32,8 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/site-cert/apply", controller.SiteCert{}.Apply)
 			cors.POST("/app/site-cert/get-list", controller.SiteCert{}.GetList)
 			cors.POST("/app/site-cert/dns-api", controller.SiteCert{}.DnsApi)
+			cors.POST("/app/site-cert/delete", controller.SiteCert{}.Delete)
+			cors.POST("/app/site-cert/import", controller.SiteCert{}.Import)
 
 			// 容器相关
 			cors.POST("/app/container/status", controller.Container{}.Status)
