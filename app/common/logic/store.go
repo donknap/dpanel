@@ -57,7 +57,7 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 	out, err := cmd.Run()
 	if err != nil {
 		if function.ErrorHasKeyword(err, "fatal: early EOF", "致命错误：过早的文件结束符") {
-			_ = notice.Message{}.Info("gitPullEarlyEOF", "url", gitUrl)
+			_ = notice.Message{}.Info(".gitPullEarlyEOF", "url", gitUrl)
 		}
 		return err
 	}

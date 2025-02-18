@@ -2,6 +2,7 @@ package acme
 
 import (
 	"bufio"
+	"errors"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
 	"io"
@@ -101,9 +102,10 @@ func (self *Cert) GetConfigPath() string {
 }
 
 func (self Acme) List() ([]*Cert, error) {
+	self.argv = append(self.argv, "--list", "--listraw")
 	cmd, err := exec.New(
 		exec.WithCommandName(self.commandName),
-		exec.WithArgs("--list", "--listraw"),
+		exec.WithArgs(self.argv...),
 	)
 	if err != nil {
 		return nil, err
@@ -153,4 +155,21 @@ func (self Acme) List() ([]*Cert, error) {
 		}
 	}
 	return result, nil
+}
+
+func (self Acme) Remove(name string) error {
+	self.argv = append(self.argv, "--remove", "-d", name)
+	cmd, err := exec.New(
+		exec.WithCommandName(self.commandName),
+		exec.WithArgs(self.argv...),
+	)
+	if err != nil {
+		return err
+	}
+	out := cmd.RunWithResult()
+	if strings.Contains(out, "has been removed") {
+		return nil
+	} else {
+		return errors.New(out)
+	}
 }

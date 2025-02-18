@@ -16,7 +16,7 @@ var cmd *exec.Cmd
 func New(opts ...Option) (*Command, error) {
 	var err error
 	c := &Command{
-		cmd: exec.Command("", ""),
+		cmd: &exec.Cmd{},
 	}
 
 	for _, opt := range opts {
@@ -94,7 +94,7 @@ func (self Command) RunWithResult() string {
 	out, err := self.cmd.CombinedOutput()
 	if err != nil {
 		slog.Debug("run command with result", "arg", self.cmd.Args, "error", err.Error())
-		return ""
+		return string(out)
 	}
 	defer func() {
 		//err := self.cmd.Process.Release()

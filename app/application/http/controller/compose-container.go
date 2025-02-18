@@ -81,11 +81,11 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	wsBuffer.OnWrite = func(p string) error {
 		wsBuffer.BroadcastMessage(p)
 		if strings.Contains(p, "denied: You may not login") {
-			_ = notice.Message{}.Error("imagePullInvalidAuth")
+			_ = notice.Message{}.Error(".imagePullInvalidAuth")
 			return errors.New("image pull denied")
 		}
 		if strings.Contains(p, "Mounts denied") {
-			_ = notice.Message{}.Error("containerMountPathDenied")
+			_ = notice.Message{}.Error(".containerMountPathDenied")
 			return errors.New("mounts path denied")
 		}
 		return nil
@@ -99,7 +99,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		composeRow.Setting.Status = ""
 		_, _ = dao.Compose.Updates(composeRow)
 	}
-	_ = notice.Message{}.Info("composeDeploy", composeRow.Name)
+	_ = notice.Message{}.Info(".composeDeploy", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -165,7 +165,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			slog.Debug("compose", "destroy", err)
 		}
 	}
-	_ = notice.Message{}.Info("composeDestroy", "name", composeRow.Name)
+	_ = notice.Message{}.Info(".composeDestroy", "name", composeRow.Name)
 	self.JsonSuccessResponse(http)
 	return
 }

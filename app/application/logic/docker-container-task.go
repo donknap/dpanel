@@ -34,7 +34,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	options := make([]builder.Option, 0)
 
 	if oldContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, task.SiteName); err == nil {
-		_ = notice.Message{}.Info("containerRemove", task.SiteName)
+		_ = notice.Message{}.Info(".containerRemove", task.SiteName)
 		if oldContainerInfo.State.Running {
 			err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, oldContainerInfo.ID, container.StopOptions{})
 			if err != nil {
@@ -88,7 +88,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		return "", err
 	}
 
-	_ = notice.Message{}.Info("containerCreate", task.SiteName)
+	_ = notice.Message{}.Info(".containerCreate", task.SiteName)
 	response, err := b.Execute()
 	if err != nil {
 		return "", err

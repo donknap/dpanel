@@ -2,6 +2,7 @@ package exec
 
 import (
 	"context"
+	"github.com/donknap/dpanel/common/function"
 	"os/exec"
 	"time"
 )
@@ -24,7 +25,11 @@ func WithCommandName(commandName string) Option {
 		if commandName == "" {
 			return nil
 		}
-		self.cmd = exec.Command(commandName, self.cmd.Args...)
+		if function.IsEmptyArray(self.cmd.Args) {
+			self.cmd = exec.Command(commandName)
+		} else {
+			self.cmd = exec.Command(commandName, self.cmd.Args...)
+		}
 		return nil
 	}
 }

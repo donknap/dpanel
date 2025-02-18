@@ -18,7 +18,7 @@ import (
 )
 
 func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
-	_ = notice.Message{}.Info("imageBuild", "tag", task.Tag)
+	_ = notice.Message{}.Info(".imageBuild", "tag", task.Tag)
 
 	b, err := builder.New(
 		builder.WithZipFilePath(task.ZipPath),

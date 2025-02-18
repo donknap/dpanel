@@ -63,7 +63,7 @@ func (self Container) Upgrade(http *gin.Context) {
 	}
 
 	// 成功的创建一个新的容器后再对旧的进停止或是删除操作
-	_ = notice.Message{}.Info("containerCreate", containerInfo.Name)
+	_ = notice.Message{}.Info(".containerCreate", containerInfo.Name)
 	newContainerName := fmt.Sprintf("%s-copy-%s", containerInfo.Name, bakTime)
 
 	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
@@ -98,7 +98,7 @@ func (self Container) Upgrade(http *gin.Context) {
 
 	// 未备份旧容器，需要先删除，否则名称会冲突
 	if params.EnableBak {
-		_ = notice.Message{}.Info("containerBackup", "name", containerInfo.Name)
+		_ = notice.Message{}.Info(".containerBackup", "name", containerInfo.Name)
 
 		if !containerInfo.HostConfig.AutoRemove {
 			// 备份旧容器
@@ -126,7 +126,7 @@ func (self Container) Upgrade(http *gin.Context) {
 			}
 		}
 	} else {
-		_ = notice.Message{}.Info("containerRemove", containerInfo.Name)
+		_ = notice.Message{}.Info(".containerRemove", containerInfo.Name)
 
 		if !containerInfo.HostConfig.AutoRemove {
 			err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.Name, container.RemoveOptions{})

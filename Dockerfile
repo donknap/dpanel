@@ -18,7 +18,7 @@ ENV TZ=Asia/Shanghai
 ENV ACME_OVERRIDE_CONFIG_HOME=/dpanel/acme
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-  apk add --no-cache --update nginx musl inotify-tools docker-compose curl openssl tzdata git && \
+  apk add --no-cache --update nginx musl docker-compose curl openssl tzdata git && \
   mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
   export ${PROXY} && curl https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh | sh -s -- --install-online --config-home /dpanel/acme
 
@@ -38,4 +38,4 @@ EXPOSE 443
 EXPOSE 80
 EXPOSE 8080
 
-ENTRYPOINT [ "sh", "/docker/entrypoint.sh" ]
+ENTRYPOINT [ "/docker/entrypoint.sh" ]

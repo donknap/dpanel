@@ -141,6 +141,7 @@ func (self User) LoginInfo(http *gin.Context) {
 		"showBuildName": true,
 		"family":        facade.GetConfig().GetString("app.env"),
 		"feature":       family.Provider{}.Feature(),
+		"appName":       facade.GetConfig().GetString("app.name"),
 	}
 	_, err := logic.Setting{}.GetDPanelInfo()
 	if err == nil {

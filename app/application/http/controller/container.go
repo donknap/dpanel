@@ -281,7 +281,7 @@ func (self Container) Prune(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_ = notice.Message{}.Info("containerPrune", "count", fmt.Sprintf("%d", len(info.ContainersDeleted)), "size", units.HumanSize(float64(info.SpaceReclaimed)))
+	_ = notice.Message{}.Info(".containerPrune", "count", fmt.Sprintf("%d", len(info.ContainersDeleted)), "size", units.HumanSize(float64(info.SpaceReclaimed)))
 	self.JsonSuccessResponse(http)
 	return
 }

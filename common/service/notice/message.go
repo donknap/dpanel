@@ -2,6 +2,7 @@ package notice
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -46,4 +47,16 @@ func (self Message) push(level string, title string, message []string) error {
 	fmt.Printf("协程数，%v \n", runtime.NumGoroutine())
 	QueueNoticePushMessage <- row
 	return err
+}
+
+func (self Message) New(title string, message ...string) error {
+	jsonMessage, _ := json.Marshal(message)
+	row := &entity.Notice{
+		Title:     title,
+		Message:   string(jsonMessage),
+		Type:      TypeError,
+		CreatedAt: time.Now().Local(),
+	}
+	result, _ := json.Marshal(row)
+	return errors.New(string(result))
 }

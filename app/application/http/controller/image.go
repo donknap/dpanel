@@ -125,7 +125,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 	defer func() {
 		_ = os.Remove(imageTar.Name())
 	}()
-	_ = notice.Message{}.Info("imageBuild", params.Tag)
+	_ = notice.Message{}.Info(".imageBuild", params.Tag)
 
 	response, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageTar, false)
 	if err != nil {
@@ -463,7 +463,7 @@ func (self Image) ImagePrune(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_ = notice.Message{}.Info("imagePrune", "size", units.HumanSize(float64(res.SpaceReclaimed)), "count", fmt.Sprintf("%d", len(res.ImagesDeleted)))
+	_ = notice.Message{}.Info(".imagePrune", "size", units.HumanSize(float64(res.SpaceReclaimed)), "count", fmt.Sprintf("%d", len(res.ImagesDeleted)))
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -476,7 +476,7 @@ func (self Image) BuildPrune(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_ = notice.Message{}.Info("imageBuildPrune", "size", units.HumanSize(float64(res.SpaceReclaimed)))
+	_ = notice.Message{}.Info(".imageBuildPrune", "size", units.HumanSize(float64(res.SpaceReclaimed)))
 	self.JsonSuccessResponse(http)
 	return
 }

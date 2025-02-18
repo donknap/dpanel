@@ -1,12 +1,15 @@
 package controller
 
 import (
+	"archive/zip"
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -14,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/acme"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
@@ -21,6 +25,7 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gen"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -169,7 +174,7 @@ func (self SiteCert) Apply(http *gin.Context) {
 	if success {
 		self.JsonSuccessResponse(http)
 	} else {
-		self.JsonResponseWithError(http, errors.New(".domainCertIssueFailed"), 500)
+		self.JsonResponseWithError(http, notice.Message{}.New(".domainCertIssueFailed"), 500)
 	}
 	return
 }
@@ -287,13 +292,108 @@ func (self SiteCert) Delete(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	var err error
+
 	for _, d := range params.Name {
 		if list, _ := dao.SiteDomain.Where(gen.Cond(
 			datatypes.JSONQuery("setting").Equals(d, "certName"),
 		)...).First(); list != nil {
-			self.JsonResponseWithError(http, errors.New(".siteDomainCertHasBindDomain"), 500)
+			self.JsonResponseWithError(http, notice.Message{}.New(".siteDomainCertHasBindDomain"), 500)
 			return
 		}
 	}
-	fmt.Printf("%v \n", params.Name)
+	builder, err := acme.New()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	list, err := builder.List()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	deleteList := function.PluckArrayWalk(list, func(i *acme.Cert) (*acme.Cert, bool) {
+		if function.InArray(params.Name, i.MainDomain) {
+			return i, true
+		} else {
+			return nil, false
+		}
+	})
+
+	for _, cert := range deleteList {
+		if !cert.IsImport() {
+			if err = builder.Remove(cert.MainDomain); err != nil {
+				slog.Debug("site cert acme remove", "error", err)
+			}
+		}
+		if err = os.RemoveAll(cert.GetRootPath()); err != nil {
+			slog.Debug("site cert delete path", "error", err)
+		}
+
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self SiteCert) Download(http *gin.Context) {
+	type ParamsValidate struct {
+		Name string `json:"name" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	builder, err := acme.New()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	list, err := builder.List()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	buffer := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(buffer)
+
+	for _, cert := range function.PluckArrayWalk(list, func(i *acme.Cert) (*acme.Cert, bool) {
+		if params.Name == i.MainDomain {
+			return i, true
+		} else {
+			return nil, false
+		}
+	}) {
+		cert.FillCertContent()
+
+		zipHeader := &zip.FileHeader{
+			Name:               logic.CertFileName,
+			Method:             zip.Deflate,
+			UncompressedSize64: uint64(len(cert.SslCrtContent)),
+			Modified:           time.Now(),
+		}
+		writer, _ := zipWriter.CreateHeader(zipHeader)
+		_, err := writer.Write([]byte(cert.SslCrtContent))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		zipHeader = &zip.FileHeader{
+			Name:               fmt.Sprintf(logic.KeyFileName, cert.MainDomain),
+			Method:             zip.Deflate,
+			UncompressedSize64: uint64(len(cert.SslKeyContent)),
+			Modified:           time.Now(),
+		}
+		writer, _ = zipWriter.CreateHeader(zipHeader)
+		_, err = writer.Write([]byte(cert.SslKeyContent))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	_ = zipWriter.Close()
+	http.Header("Content-Type", "application/zip")
+	http.Header("Content-Disposition", "attachment; filename=export.zip")
+	_, _ = http.Writer.Write(buffer.Bytes())
+	self.JsonSuccessResponse(http)
 }

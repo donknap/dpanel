@@ -103,7 +103,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		WorkingDir: params.WorkDir,
 	})
 	if err != nil {
-		_ = notice.Message{}.Error("consoleError", err.Error())
+		_ = notice.Message{}.Error(".consoleError", err.Error())
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -123,7 +123,7 @@ func (self Home) WsConsole(http *gin.Context) {
 	client, err := ws.NewClient(http, ws.ClientOption{
 		CloseHandler: func() {
 			if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
-				_ = notice.Message{}.Info("consoleDestroyPlugin", pluginName)
+				_ = notice.Message{}.Info(".consoleDestroyPlugin", pluginName)
 
 				if webShellPlugin, err := plugin.NewPlugin(plugin.PluginWebShell, map[string]*plugin.TemplateParser{
 					"webshell": &plugin.TemplateParser{

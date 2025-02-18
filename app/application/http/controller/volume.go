@@ -226,7 +226,7 @@ func (self Volume) Prune(http *gin.Context) {
 			}
 		}
 	}
-	_ = notice.Message{}.Info("volumePrune", "count", fmt.Sprintf("%d", len(res.VolumesDeleted)), "size", units.HumanSize(float64(res.SpaceReclaimed)))
+	_ = notice.Message{}.Info(".volumePrune", "count", fmt.Sprintf("%d", len(res.VolumesDeleted)), "size", units.HumanSize(float64(res.SpaceReclaimed)))
 	self.JsonSuccessResponse(http)
 	return
 }
