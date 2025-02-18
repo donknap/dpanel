@@ -130,6 +130,7 @@ func (self Registry) getBearerUrl(challenge string, scope string) (*url.URL, err
 
 func (self Registry) request(req *http.Request, scope string) (*http.Response, error) {
 	cacheKey := fmt.Sprintf("%s@%s", docker.Sdk.Name, req.URL.String())
+	slog.Debug("registry request", "cacheKey", cacheKey, "scope", scope)
 	if item, exists := cache.Load(cacheKey); exists && self.cacheTime > 0 {
 		c := item.(cacheItem)
 		if c.expireTime.After(time.Now()) {
@@ -170,16 +171,14 @@ func (self Registry) request(req *http.Request, scope string) (*http.Response, e
 	}
 	slog.Debug("registry cache result", "cacheKey", req.URL.String())
 
-	if self.cacheTime > 0 {
-		buffer := new(bytes.Buffer)
-		_, _ = io.Copy(buffer, res.Body)
-		cache.Store(cacheKey, cacheItem{
-			header:     res.Header,
-			body:       buffer.Bytes(),
-			expireTime: time.Now().Add(self.cacheTime).Local(),
-		})
-		res.Body = io.NopCloser(buffer)
-	}
+	buffer := new(bytes.Buffer)
+	_, _ = io.Copy(buffer, res.Body)
+	cache.Store(cacheKey, cacheItem{
+		header:     res.Header,
+		body:       buffer.Bytes(),
+		expireTime: time.Now().Add(self.cacheTime).Local(),
+	})
+	res.Body = io.NopCloser(buffer)
 
 	return res, nil
 }
