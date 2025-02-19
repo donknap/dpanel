@@ -72,6 +72,12 @@ func (self Image) TagRemote(http *gin.Context) {
 					continue
 				}
 			}
+			if err != nil {
+				if function.ErrorHasKeyword(err, "not found:", "repository does not exist") {
+					self.JsonResponseWithError(http, notice.Message{}.New(".imagePullTagNotFound", "tag", params.Tag), 500)
+					return
+				}
+			}
 		} else {
 			// 推荐送镜像时保持原样
 			// 自建仓库不需要添加 library
@@ -88,8 +94,8 @@ func (self Image) TagRemote(http *gin.Context) {
 
 	// 可能最后循环后还包含错误
 	if err != nil {
-		if function.ErrorHasKeyword(err, "not found:") {
-			self.JsonResponseWithError(http, notice.Message{}.New(".imagePullNotFound"), 500)
+		if function.ErrorHasKeyword(err, "not found:", "repository does not exist") {
+			self.JsonResponseWithError(http, notice.Message{}.New(".imagePullTagNotFound", "tag", params.Tag), 500)
 			return
 		}
 		if function.ErrorHasKeyword(err, "server gave HTTP response to HTTPS client") {
