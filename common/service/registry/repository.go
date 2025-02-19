@@ -40,6 +40,9 @@ func (self repository) GetImageDigest(imageName string) (string, error) {
 
 func (self repository) GetImageTagList(basename string) ([]string, error) {
 	u := self.registry.url.JoinPath(basename, "tags", "list")
+	//if limit > 0 {
+	//	u.RawQuery = fmt.Sprintf("n=%d", limit)
+	//}
 	req, _ := http.NewRequest("GET", u.String(), nil)
 
 	res, err := self.registry.request(req, fmt.Sprintf(ScopeRepositoryPull, basename))

@@ -14,9 +14,9 @@ type SiteDomainSettingOption struct {
 	EnableAssetCache          bool          `json:"enableAssetCache"`
 	EnableWs                  bool          `json:"enableWs"`
 	EnableSSL                 bool          `json:"enableSSL"`
-	ExtraNginx                template.HTML `json:"extraNginx"`
-	Email                     string        `json:"email"`
-	SslCrt                    string        `json:"sslCrt"`
-	SslKey                    string        `json:"sslKey"`
-	CertName                  string        `json:"certName"`
+	ExtraNginx                template.HTML `json:"extraNginx,omitempty"`
+	Email                     string        `json:"email,omitempty"`
+	SslCrt                    string        `json:"sslCrt,omitempty"`
+	SslKey                    string        `json:"sslKey,omitempty"`
+	CertName                  string        `json:"certName,omitempty"`
 }

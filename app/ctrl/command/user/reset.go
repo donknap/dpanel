@@ -42,7 +42,7 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 		return
 	}
 	if username == "" && password == "" {
-		username = "dpanel"
+		username = "admin"
 		password = function.GetRandomString(10)
 	}
 

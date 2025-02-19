@@ -146,7 +146,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 				return
 			}
 		}
-		siteDomainRow.ContainerID = containerRow.ID
+		siteDomainRow.ContainerID = containerRow.Name
 	}
 
 	siteDomainRow.Setting = &accessor.SiteDomainSettingOption{
