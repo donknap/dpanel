@@ -15,9 +15,11 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
+	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/mcuadros/go-version"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"log/slog"
@@ -177,17 +179,45 @@ func (self Home) WsConsole(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
-	dpanelContainerInfo, _ := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
+	dpanelContainerInfo := types.ContainerJSON{}
+	new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo)
+
 	info, _ := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if info.ID != "" {
 		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
+	}
+
+	var tags []string
+	var err error
+	currentVersion := facade.GetConfig().GetString("app.version")
+	newVersion := ""
+
+	for _, s := range []string{
+		"registry.cn-hangzhou.aliyuncs.com",
+	} {
+		option := make([]registry.Option, 0)
+		option = append(option, registry.WithRequestCacheTime(time.Hour*24))
+		option = append(option, registry.WithRegistryHost(s))
+		reg := registry.New(option...)
+		tags, err = reg.Repository.GetImageTagList("dpanel/dpanel")
+		if err == nil {
+			break
+		}
+	}
+
+	for _, ver := range tags {
+		if !strings.Contains(ver, "-") && version.Compare(ver, currentVersion, ">") {
+			newVersion = ver
+			break
+		}
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,
 		"sdkVersion": docker.Sdk.Client.ClientVersion(),
 		"dpanel": map[string]interface{}{
-			"version":       facade.GetConfig().GetString("app.version"),
+			"version":       currentVersion,
+			"newVersion":    newVersion,
 			"family":        facade.GetConfig().GetString("app.family"),
 			"env":           facade.GetConfig().GetString("app.env"),
 			"containerInfo": dpanelContainerInfo,
@@ -354,13 +384,13 @@ func (self Home) GetStatList(http *gin.Context) {
 }
 
 func (self Home) UpgradeScript(http *gin.Context) {
-	containerRow, err := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name"))
-	if err != nil {
-		self.JsonResponseWithError(http, errors.New("您创建的面板容器名称非默认的 dpanel 无法获取更新脚本，请通过环境变量 APP_NAME 指定名称。"), 500)
+	dpanelContainerInfo := types.ContainerJSON{}
+	if exists := new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo); !exists {
+		self.JsonResponseWithError(http, notice.Message{}.New(".systemUpgradeDPanelNotFound"), 500)
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"info": containerRow,
+		"info": dpanelContainerInfo,
 	})
 	return
 }
