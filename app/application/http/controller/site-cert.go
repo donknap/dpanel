@@ -50,7 +50,17 @@ func (self SiteCert) DnsApi(http *gin.Context) {
 
 	if !function.IsEmptyArray(params.Account) || !function.IsEmptyArray(params.User) {
 		dnsApi = make([]accessor.DnsApi, 0)
-		for _, item := range params.Account {
+		for _, item := range function.PluckArrayWalk(params.Account, func(i accessor.DnsApi) (accessor.DnsApi, bool) {
+			if i.ServerName != "nginx" && len(i.Env) == 1 {
+				return accessor.DnsApi{}, false
+			}
+			for _, item := range i.Env {
+				if item.Value == "" {
+					return accessor.DnsApi{}, false
+				}
+			}
+			return i, true
+		}) {
 			if exists, index := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
 				return i.ServerName == item.ServerName
 			}); exists {
@@ -80,13 +90,6 @@ func (self SiteCert) DnsApi(http *gin.Context) {
 			return
 		}
 	}
-	dnsApi = append([]accessor.DnsApi{
-		{
-			ServerName: "nginx",
-			Title:      "Nginx",
-			Env:        make([]docker.EnvItem, 0),
-		},
-	}, dnsApi...)
 	self.JsonResponseWithoutError(http, gin.H{
 		"setting": dnsApi,
 	})

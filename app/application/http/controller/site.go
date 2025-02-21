@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -13,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/gorm"
-	"net"
 	"strings"
 )
 
@@ -70,42 +68,6 @@ func (self Site) CreateByImage(http *gin.Context) {
 		for _, item := range oldContainerInfo.HostConfig.PortBindings {
 			for _, value := range item {
 				oldBindPort = append(oldBindPort, value.HostPort)
-			}
-		}
-	}
-
-	if buildParams.Ports != nil {
-		var checkPorts []string
-		for i, port := range buildParams.Ports {
-			if strings.Contains(port.Host, ":") {
-				temp := strings.Split(port.Host, ":")
-				port.Host = temp[1]
-				port.HostIp = temp[0]
-				buildParams.Ports[i].HostIp = temp[0]
-				buildParams.Ports[i].Host = temp[1]
-			}
-			// 如果容器绑定过该端口，则不需要再次检测
-			if function.InArray(oldBindPort, port.Host) {
-				continue
-			}
-			listener, err := net.Listen("tcp", "0.0.0.0:"+port.Host)
-			if err != nil {
-				self.JsonResponseWithError(http, errors.New(port.Host+"绑定的外部端口已经被其它容器占用，请更换。"), 500)
-				return
-			}
-			_ = listener.Close()
-			checkPorts = append(checkPorts, port.Host)
-		}
-		// 没有绑定宿主机的端口，有可能被未启动的容器绑定，这里再次检查一下
-		if checkPorts != nil {
-			hasPortContainer, _ := docker.Sdk.ContainerByField("publish", checkPorts...)
-			if len(hasPortContainer) > 0 {
-				names := make([]string, 0)
-				for _, item := range hasPortContainer {
-					names = append(names, item.Names[0])
-				}
-				self.JsonResponseWithError(http, errors.New("绑定的外部端口已经被 "+strings.Join(names, "/")+" 容器占用，请更换其它端口"), 500)
-				return
 			}
 		}
 	}
