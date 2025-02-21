@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -122,7 +123,7 @@ func (self User) GetUserInfo(http *gin.Context) {
 	feature := []string{
 		family.FeatureComposeStore,
 	}
-	if facade.GetConfig().GetString("app.env") != "lite" {
+	if facade.GetConfig().GetString("app.env") != "lite" && docker.Sdk.Name == docker.DefaultClientName {
 		feature = append(feature, family.FeatureContainerDomain)
 	}
 	result["feature"] = append(feature, family.Provider{}.Feature()...)

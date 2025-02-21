@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,6 +57,7 @@ func (self Acme) Run() (io.ReadCloser, error) {
 	if !function.IsEmptyArray(self.env) {
 		options = append(options, exec.WithEnv(self.env))
 	}
+	slog.Debug("acme apply run", "env", self.env, "argv", self.argv)
 	cmd, err := exec.New(options...)
 	if err != nil {
 		return nil, err

@@ -6,7 +6,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/application/logic"
-	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -16,6 +15,7 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
@@ -94,9 +94,10 @@ func (self SiteDomain) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		// 转发时必须保证当前环境有 dpanel 面板
 		// 将当前容器加入到默认 dpanel-local 网络中，并指定 Hostname 用于 Nginx 反向代理
 		dpanelContainerInfo := types.ContainerJSON{}
-		if exists := new(logic2.Setting).GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingDPanelInfo, &dpanelContainerInfo); !exists {
+		if dpanelContainerInfo, err = docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, facade.GetConfig().GetString("app.name")); err != nil {
 			self.JsonResponseWithError(http, notice.Message{}.New(".siteDomainNotFoundDPanel"), 500)
 			return
 		}

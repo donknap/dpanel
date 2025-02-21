@@ -160,11 +160,15 @@ func (self SiteCert) Apply(http *gin.Context) {
 	wsBuffer := ws.NewProgressPip(ws.MessageTypeDomainApply)
 	defer wsBuffer.Close()
 
+	errMessage := notice.Message{}.New(".domainCertIssueFailed")
 	success := false
 	wsBuffer.OnWrite = func(p string) error {
 		wsBuffer.BroadcastMessage(p)
 		if strings.Contains(p, "-----END CERTIFICATE-----") {
 			success = true
+		}
+		if strings.Contains(p, "Error adding TXT record to domain") {
+			errMessage = notice.Message{}.Error(".domainCertAddTxtFailed")
 		}
 		return nil
 	}
@@ -177,7 +181,7 @@ func (self SiteCert) Apply(http *gin.Context) {
 	if success {
 		self.JsonSuccessResponse(http)
 	} else {
-		self.JsonResponseWithError(http, notice.Message{}.New(".domainCertIssueFailed"), 500)
+		self.JsonResponseWithError(http, errMessage, 500)
 	}
 	return
 }
