@@ -17,3 +17,4 @@ data
 tests
 app/pro/**/.DS_Store
 docker/**/*.log
+.run/**.*
