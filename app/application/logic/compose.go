@@ -350,26 +350,51 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		options = append(options, compose.WithYamlPath(path))
 	}
 
-	if _, err := os.Stat(filepath.Join(taskFileDir, ComposeDefaultEnvFileName)); err == nil {
-		options = append(options, cli.WithEnvFiles(filepath.Join(taskFileDir, ComposeDefaultEnvFileName)))
-		options = append(options, cli.WithDotEnv)
+	defaultEnvFileName := filepath.Join(taskFileDir, ComposeDefaultEnvFileName)
+	var defaultEnvFileExists error
+
+	// 如果任务中的环境变量值为空，则使用默认 .env 中的值填充
+	// 默认情况下，不管 compose 中有没有指定 env_files 都会加载 .env 文件
+	// 组合后最终的值，再写入回 .env 文件，写入时不要破坏 .env 原始文件内容，只替换变量
+
+	if _, defaultEnvFileExists = os.Stat(defaultEnvFileName); defaultEnvFileExists == nil {
+		if defaultEnvContent, err := os.ReadFile(defaultEnvFileName); err == nil {
+			for _, s := range strings.Split(string(defaultEnvContent), "\n") {
+				if name, value, exists := strings.Cut(s, "="); exists {
+					if exists, i := function.IndexArrayWalk(entity.Setting.Environment, func(i docker.EnvItem) bool {
+						// 如果数据库中环境变量有值时，则不使用 .env 中的覆盖
+						if i.Name == name {
+							return true
+						}
+						return false
+					}); exists {
+						if entity.Setting.Environment[i].Value == "" {
+							entity.Setting.Environment[i].Value = value
+						}
+					} else {
+						entity.Setting.Environment = append(entity.Setting.Environment, docker.EnvItem{
+							Name:  name,
+							Value: value,
+						})
+					}
+				}
+			}
+		}
 	}
 
-	envFileName := filepath.Join(taskFileDir, ComposeProjectEnvFileName)
 	if !function.IsEmptyArray(entity.Setting.Environment) {
 		globalEnv := function.PluckArrayWalk(entity.Setting.Environment, func(i docker.EnvItem) (string, bool) {
 			return fmt.Sprintf("%s=%s", i.Name, compose.ReplacePlaceholder(i.Value)), true
 		})
-		err := os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
+		err := os.MkdirAll(filepath.Dir(defaultEnvFileName), os.ModePerm)
 		if err != nil {
 			return nil, err
 		}
-		err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
-		options = append(options, cli.WithEnv(globalEnv))
-	}
+		err = os.WriteFile(defaultEnvFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
 
-	if _, err := os.Stat(envFileName); err == nil {
-		options = append(options, cli.WithEnvFiles(envFileName))
+		options = append(options, cli.WithEnv(globalEnv))
+		options = append(options, cli.WithEnvFiles(defaultEnvFileName))
+		options = append(options, cli.WithDotEnv)
 	}
 
 	projectName := fmt.Sprintf(ComposeProjectName, entity.Name)
