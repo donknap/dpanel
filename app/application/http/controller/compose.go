@@ -209,7 +209,7 @@ func (self Compose) GetList(http *gin.Context) {
 	if !dockerClient.EnableComposePath {
 		dockerEnvName = docker.DefaultClientName
 	}
-	query.Or(gen.Cond(
+	query.Where(gen.Cond(
 		datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
 	)...)
 
@@ -419,13 +419,15 @@ func (self Compose) Parse(http *gin.Context) {
 	}
 	if err == nil {
 		self.JsonResponseWithoutError(http, gin.H{
-			"project": composer.Project,
-			"error":   "",
+			"project":     composer.Project,
+			"environment": composer.Project.Environment,
+			"error":       "",
 		})
 	} else {
 		self.JsonResponseWithoutError(http, gin.H{
-			"project": nil,
-			"error":   err.Error(),
+			"project":     nil,
+			"environment": make(map[string]string),
+			"error":       err.Error(),
 		})
 	}
 	return
