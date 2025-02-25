@@ -39,19 +39,24 @@ func (self *Collection) Join(c *Client) {
 
 func (self *Collection) Leave(c *Client) {
 	self.clients.Delete(c.Fd)
+
 	self.progressPip.Range(func(key, value any) bool {
-		p := value.(ProgressPip)
-		if p.fd == c.Fd {
-			p.Close()
+		if v, ok := value.(*ProgressPip); ok {
+			v.CloseFd(c.Fd)
 		}
 		return true
 	})
+
+	// 所有客户端都退出时，销毁所有通道
 	if self.Total() == 0 {
 		self.progressPip.Range(func(key, value any) bool {
-			p := value.(ProgressPip)
-			p.Close()
+			if p, success := value.(*ProgressPip); success {
+				p.Close()
+			}
 			return true
 		})
+		self.progressPip.Clear()
+
 		// 没有任何用户时，中断 docker 的所有请求
 		slog.Debug("docker client cancel")
 		//docker.Sdk.CtxCancelFunc()
@@ -70,6 +75,9 @@ func (self *Collection) sendMessage(message *RespMessage) {
 	lock.Unlock()
 	self.clients.Range(func(key, value any) bool {
 		c := value.(*Client)
+		if message.Fd != "" && c.Fd != message.Fd {
+			return true
+		}
 		err := c.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
 		if err != nil {
 			slog.Error("ws broadcast error", "fd", c.Fd, "error", err.Error())

@@ -27,15 +27,19 @@ func NewClient(ctx *gin.Context, options ClientOption) (*Client, error) {
 	if options.RecvMessageHandler == nil {
 		options.RecvMessageHandler = map[string]RecvMessageHandlerFn{}
 	}
+	fd := fmt.Sprintf("fd:%s", ctx.Request.Header.Get("Sec-WebSocket-Key"))
+	// ws 主动关掉管道
 	options.RecvMessageHandler[MessageTypeProgressClose] = func(message *RecvMessage) {
 		closeMessage := struct {
 			Type string `json:"type"`
 			Data string `json:"data"`
 		}{}
+
 		if err := json.Unmarshal(message.Message, &closeMessage); err == nil {
-			if p, exists := collect.progressPip.Load(closeMessage.Data); exists {
-				// 在 pip 的 close 方法中统一删除
-				p.(ProgressPip).Close()
+			if p, ok := collect.progressPip.Load(closeMessage.Data); ok {
+				if v, ok := p.(*ProgressPip); ok {
+					v.CloseFd(fd)
+				}
 			}
 		}
 	}
@@ -51,7 +55,7 @@ func NewClient(ctx *gin.Context, options ClientOption) (*Client, error) {
 	}
 	ctxWs, ctxWsCancel := context.WithCancel(context.Background())
 	client := &Client{
-		Fd:                 fmt.Sprintf("fd:%s", ctx.Request.Header.Get("Sec-WebSocket-Key")),
+		Fd:                 fd,
 		Conn:               wsConn,
 		CtxContext:         ctxWs,
 		CtxCancelFunc:      ctxWsCancel,
@@ -106,6 +110,7 @@ func (self *Client) ReadMessage() {
 			if err != nil {
 				slog.Error("websocket", "unmarshal content", err)
 			}
+			slog.Debug("ws event", "event", content.Type, "fd", self.Fd)
 			if handler, ok := self.recvMessageHandler[content.Type]; ok {
 				handler(recv)
 			}

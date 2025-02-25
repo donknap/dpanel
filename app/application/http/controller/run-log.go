@@ -39,6 +39,16 @@ func (self RunLog) Run(http *gin.Context) {
 	if params.LineTotal > 0 {
 		option.Tail = strconv.Itoa(params.LineTotal)
 	}
+	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerLog, params.Md5))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	if progress.IsShadow() {
+		option.Follow = false
+	}
+
 	response, err := docker.Sdk.Client.ContainerLogs(docker.Sdk.Ctx, params.Md5, option)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -56,11 +66,7 @@ func (self RunLog) Run(http *gin.Context) {
 		http.Data(200, "text/plain", buffer.Bytes())
 		return
 	}
-	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerLog, params.Md5))
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+
 	progress.OnWrite = func(p string) error {
 		newReader := bytes.NewReader([]byte(p))
 		stdout := new(bytes.Buffer)
@@ -72,13 +78,18 @@ func (self RunLog) Run(http *gin.Context) {
 		}
 		return nil
 	}
+
 	go func() {
+		if progress.IsShadow() {
+			return
+		}
 		select {
 		case <-progress.Done():
 			slog.Debug("container", "run log response close", fmt.Sprintf(ws.MessageTypeContainerLog, params.Md5))
 			_ = response.Close()
 		}
 	}()
+
 	_, err = io.Copy(progress, response)
 	//if err != nil {
 	//	self.JsonResponseWithError(http, errors.New("读取日志失败"), 500)

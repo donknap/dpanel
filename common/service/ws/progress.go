@@ -4,41 +4,56 @@ import (
 	"context"
 	"errors"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/gin-gonic/gin"
 	"time"
 )
 
 type ProgressWrite func(p []byte) ([]byte, error)
 
-func NewProgressPip(messageType string) ProgressPip {
+func NewProgressPip(messageType string) *ProgressPip {
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	process := ProgressPip{
+	process := &ProgressPip{
 		messageType: messageType,
 		ctx:         ctx,
 		cancel:      cancelFunc,
+		fd:          make([]string, 0),
 	}
 	if p, exists := collect.progressPip.LoadAndDelete(messageType); exists {
-		p.(ProgressPip).Close()
+		if v, ok := p.(*ProgressPip); ok {
+			v.Close()
+		}
 	}
 	collect.progressPip.Store(messageType, process)
 	return process
 }
 
-func NewFdProgressPip(http *gin.Context, messageType string) (ProgressPip, error) {
+// 利用 fd 新建一个公共推送管道，多个 fd 共用一个，直到所有 fd 都退出
+func NewFdProgressPip(http *gin.Context, messageType string) (*ProgressPip, error) {
 	fd := ""
 	if data, exists := http.Get("userInfo"); exists {
 		userInfo := data.(logic.UserInfo)
 		fd = userInfo.Fd
 	} else {
-		return ProgressPip{}, errors.New("fd not found")
+		return nil, errors.New("fd not found")
 	}
-	process := NewProgressPip(messageType)
-	process.fd = fd
+	var process *ProgressPip
+	if p, ok := collect.progressPip.Load(messageType); ok {
+		if v, ok := p.(*ProgressPip); ok {
+			if !function.InArray(v.fd, fd) {
+				v.fd = append(v.fd, fd)
+			}
+			process = v
+		}
+	} else {
+		process = NewProgressPip(messageType)
+		process.fd = append(process.fd, fd)
+	}
 	return process, nil
 }
 
 type ProgressPip struct {
-	fd          string
+	fd          []string
 	messageType string
 	ctx         context.Context
 	cancel      context.CancelFunc
@@ -68,6 +83,22 @@ func (self ProgressPip) BroadcastMessage(data interface{}) {
 
 func (self ProgressPip) Close() {
 	self.cancel()
+}
+
+func (self *ProgressPip) CloseFd(fd string) {
+	self.fd = function.PluckArrayWalk(self.fd, func(i string) (string, bool) {
+		if i != fd {
+			return i, true
+		}
+		return "", false
+	})
+	if len(self.fd) == 0 {
+		self.Close()
+	}
+}
+
+func (self ProgressPip) IsShadow() bool {
+	return len(self.fd) > 1
 }
 
 func (self ProgressPip) Done() <-chan struct{} {

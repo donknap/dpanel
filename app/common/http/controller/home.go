@@ -55,7 +55,7 @@ func (self Home) WsNotice(http *gin.Context) {
 	// 将自己的fd推回给客户端
 	err = client.SendMessage(&ws.RespMessage{
 		Type: ws.MessageTypeEventFd,
-		Data: []byte(client.Fd),
+		Data: client.Fd,
 	})
 	if err != nil {
 		slog.Error("websocket", "connect", err.Error())

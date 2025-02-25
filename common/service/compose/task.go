@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
@@ -89,10 +90,16 @@ func (self Task) Ctrl(op string) (io.Reader, error) {
 	return self.runCommand(cmd)
 }
 
-func (self Task) Logs() (io.ReadCloser, error) {
+func (self Task) Logs(tail int, follow bool) (io.ReadCloser, error) {
 	cmd := []string{
 		//"--progress", "tty",
-		"logs", "-f", "--tail", "500",
+		"logs",
+	}
+	if tail > 0 {
+		cmd = append(cmd, "--tail", fmt.Sprintf("%d", tail))
+	}
+	if follow {
+		cmd = append(cmd, "-f")
 	}
 	return self.runCommand(cmd)
 }

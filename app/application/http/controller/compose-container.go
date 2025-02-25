@@ -235,17 +235,12 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	response, err := tasker.Logs()
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeComposeLog, params.Id))
+	response, err := tasker.Logs(500, true)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	wsBuffer, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeComposeLog, params.Id))
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer wsBuffer.Close()
 	go func() {
 		select {
 		case <-wsBuffer.Done():
