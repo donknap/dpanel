@@ -2,6 +2,7 @@ package logic
 
 import (
 	"encoding/json"
+	"github.com/docker/docker/api/types/system"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
@@ -28,26 +29,19 @@ type ioItemResult struct {
 	Out int64 `json:"out"`
 }
 
-func (self Stat) GetStat() ([]*statItemResult, error) {
-	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]*statItemResult, 0)
-
+func (self Stat) GetCommandResult() string {
 	option := docker.Sdk.GetRunCmd(
 		"stats", "-a",
-		"--format", "json",
-		"--no-stream")
-	option = append(option, exec.WithTimeout(time.Second*60))
-
-	cmd, err := exec.New(option...)
-	if err != nil {
-		return nil, err
+		"--format", "json", "--no-stream")
+	option = append(option, exec.WithTimeout(time.Minute*10))
+	if cmd, err := exec.New(option...); err == nil {
+		return cmd.RunWithResult()
 	}
-	response := cmd.RunWithResult()
+	return ""
+}
 
+func (self Stat) GetStat(dockerInfo system.Info, response string) ([]*statItemResult, error) {
+	result := make([]*statItemResult, 0)
 	statJsonItem := struct {
 		BlockIO   string
 		CPUPerc   string
@@ -57,11 +51,14 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 		Name      string
 		Container string
 	}{}
-	for _, item := range strings.Split(response, "\n") {
-		if item == "" || !strings.Contains(item, "\"Name\":") {
+	if response == "" {
+		return result, nil
+	}
+	for _, line := range strings.Split(response, "\n") {
+		if line == "" || !strings.Contains(line, "\"Name\":") {
 			continue
 		}
-		err := json.Unmarshal([]byte(item), &statJsonItem)
+		err := json.Unmarshal([]byte(line), &statJsonItem)
 		if err != nil {
 			return nil, err
 		}
@@ -70,13 +67,11 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 			Container: statJsonItem.Container,
 		}
 		cpu, _ := strconv.ParseFloat(strings.TrimSuffix(statJsonItem.CPUPerc, "%"), 64)
-
 		// 使用率超过100%时，代表该容器使用超过1核。需要将占用转换成100%之内的占用
 		if cpu > 100 {
-			cpu = math.Round(cpu/float64(info.NCPU)*100) / 100
+			cpu = math.Round(cpu/float64(dockerInfo.NCPU)*100) / 100
 		}
 		r.Cpu += cpu
-
 		if strings.Contains(statJsonItem.MemUsage, "/") {
 			memory := strings.Split(statJsonItem.MemUsage, "/")
 			use, _ := units.RAMInBytes(strings.TrimSpace(memory[0]))
@@ -85,7 +80,6 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 			r.Memory.In = use
 			r.Memory.Out = limit
 		}
-
 		if strings.Contains(statJsonItem.NetIO, "/") {
 			networkIo := strings.Split(statJsonItem.NetIO, "/")
 			in, _ := units.RAMInBytes(strings.TrimSpace(networkIo[0]))
@@ -94,7 +88,6 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 			r.NetworkIO.In = in
 			r.NetworkIO.Out = out
 		}
-
 		if strings.Contains(statJsonItem.BlockIO, "/") {
 			blockIo := strings.Split(statJsonItem.BlockIO, "/")
 			in, _ := units.RAMInBytes(strings.TrimSpace(blockIo[0]))
@@ -103,10 +96,7 @@ func (self Stat) GetStat() ([]*statItemResult, error) {
 			r.BlockIO.In = in
 			r.BlockIO.Out = out
 		}
-
 		result = append(result, r)
 	}
-
 	return result, nil
-
 }

@@ -39,13 +39,15 @@ func NewFdProgressPip(http *gin.Context, messageType string) (*ProgressPip, erro
 	}
 	var process *ProgressPip
 	if p, ok := collect.progressPip.Load(messageType); ok {
-		if v, ok := p.(*ProgressPip); ok {
+		// 当管道的上下文已经关闭过了，就不能再次使用，需要重新创建
+		if v, ok := p.(*ProgressPip); ok && v.ctx.Err() == nil {
 			if !function.InArray(v.fd, fd) {
 				v.fd = append(v.fd, fd)
 			}
 			process = v
 		}
-	} else {
+	}
+	if process == nil {
 		process = NewProgressPip(messageType)
 		process.fd = append(process.fd, fd)
 	}
@@ -53,11 +55,12 @@ func NewFdProgressPip(http *gin.Context, messageType string) (*ProgressPip, erro
 }
 
 type ProgressPip struct {
-	fd          []string
-	messageType string
-	ctx         context.Context
-	cancel      context.CancelFunc
-	OnWrite     func(p string) error
+	fd           []string
+	messageType  string
+	ctx          context.Context
+	cancel       context.CancelFunc
+	OnWrite      func(p string) error
+	OnWriteBytes func(p []byte) error
 }
 
 func (self ProgressPip) Write(p []byte) (n int, err error) {

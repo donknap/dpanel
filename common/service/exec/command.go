@@ -30,6 +30,7 @@ func New(opts ...Option) (*Command, error) {
 
 	if c.cmd.Cancel == nil {
 		// 没有配置超时时间，则先杀掉上一个进程
+		// 如果配置了超时时间，自行处理命令的终止问题，不会在下次执行命令时被清理掉
 		if cmd != nil && cmd.Process != nil && cmd.Process.Pid > 0 {
 			err = cmd.Process.Kill()
 			if err == nil {
@@ -37,9 +38,8 @@ func New(opts ...Option) (*Command, error) {
 			}
 			slog.Debug("run command kill global cmd", "pid", cmd.Process.Pid, "name", cmd.String(), "error", err)
 		}
+		cmd = c.cmd
 	}
-
-	cmd = c.cmd
 
 	return c, nil
 }
@@ -72,8 +72,8 @@ func (self Command) RunInPip() (stdout io.ReadCloser, err error) {
 	if err != nil {
 		return nil, err
 	}
-	cmd.Stderr = cmd.Stdout
-	if err = cmd.Start(); err != nil {
+	self.cmd.Stderr = self.cmd.Stdout
+	if err = self.cmd.Start(); err != nil {
 		return nil, err
 	}
 	return stdout, nil
@@ -106,12 +106,15 @@ func (self Command) RunWithResult() string {
 }
 
 func (self Command) Kill() error {
-	if cmd != nil {
-		err := cmd.Process.Kill()
+	if self.cmd != nil {
+		if self.cmd.Cancel != nil {
+			return self.cmd.Cancel()
+		}
+		err := self.cmd.Process.Kill()
 		if err != nil {
 			return err
 		}
-		return cmd.Wait()
+		return self.cmd.Wait()
 	}
 	return nil
 }

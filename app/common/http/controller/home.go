@@ -372,15 +372,60 @@ func (self Home) Usage(http *gin.Context) {
 }
 
 func (self Home) GetStatList(http *gin.Context) {
-	statList, err := logic.Stat{}.GetStat()
+	type ParamsValidate struct {
+		Follow bool `json:"follow"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	var err error
+
+	dockerInfo, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"list": statList,
-	})
-	return
+
+	if !params.Follow {
+		list, err := logic.Stat{}.GetStat(dockerInfo, logic.Stat{}.GetCommandResult())
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		self.JsonResponseWithoutError(http, gin.H{
+			"list": list,
+		})
+		return
+	}
+
+	progress, err := ws.NewFdProgressPip(http, ws.MessageTypeContainerStat)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	if progress.IsShadow() {
+		self.JsonResponseWithoutError(http, gin.H{
+			"list": "",
+		})
+		return
+	}
+
+	for {
+		select {
+		case <-progress.Done():
+			slog.Debug("container", "container stat response close", ws.MessageTypeContainerStat)
+			http.Abort()
+			return
+		default:
+			list, err := logic.Stat{}.GetStat(dockerInfo, logic.Stat{}.GetCommandResult())
+			if err != nil {
+				break
+			}
+			progress.BroadcastMessage(list)
+		}
+	}
 }
 
 func (self Home) UpgradeScript(http *gin.Context) {
