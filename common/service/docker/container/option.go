@@ -187,8 +187,33 @@ func WithLink(item ...docker.LinkItem) Option {
 
 // WithNetwork 不在构建时加入网络，会导致 bridge 网络无法加入
 func WithNetwork(item ...docker.NetworkItem) Option {
-	return func(builder *Builder) error {
-		return errors.New("not implemented")
+	return func(self *Builder) error {
+		if self.networkingConfig == nil {
+			self.networkingConfig = &network.NetworkingConfig{
+				EndpointsConfig: make(map[string]*network.EndpointSettings),
+			}
+		}
+		for _, networkRow := range item {
+			if networkRow.Alise == nil {
+				networkRow.Alise = make([]string, 0)
+			}
+			dpanelHostName := fmt.Sprintf("%s.pod.dpanel.local", self.containerName)
+			if !function.InArray(networkRow.Alise, dpanelHostName) {
+				networkRow.Alise = append(networkRow.Alise, dpanelHostName)
+			}
+			endpointSetting := &network.EndpointSettings{
+				Aliases:    networkRow.Alise,
+				IPAMConfig: &network.EndpointIPAMConfig{},
+			}
+			if networkRow.IpV4 != "" {
+				endpointSetting.IPAMConfig.IPv4Address = networkRow.IpV4
+			}
+			if networkRow.IpV6 != "" {
+				endpointSetting.IPAMConfig.IPv6Address = networkRow.IpV6
+			}
+			self.networkingConfig.EndpointsConfig[networkRow.Name] = endpointSetting
+		}
+		return nil
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
+	"strings"
 )
 
 func (self Builder) NetworkRemove(networkName string) error {
@@ -32,13 +33,13 @@ func (self Builder) NetworkCreate(networkName string, ipV4, ipV6 *NetworkCreateI
 			Config:  []network.IPAMConfig{},
 		},
 	}
-	if ipV4 != nil {
+	if ipV4 != nil && ipV4.Gateway != "" && ipV4.Subnet != "" {
 		option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
 			Subnet:  ipV4.Subnet,
 			Gateway: ipV4.Gateway,
 		})
 	}
-	if ipV6 != nil {
+	if ipV6 != nil && ipV6.Gateway != "" && ipV6.Subnet != "" {
 		option.EnableIPv6 = function.PtrBool(true)
 		option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
 			Subnet:  ipV6.Subnet,
@@ -59,7 +60,7 @@ func (self Builder) NetworkConnect(networkRow NetworkItem, containerName string)
 	if networkRow.Alise == nil {
 		networkRow.Alise = make([]string, 0)
 	}
-	dpanelHostName := fmt.Sprintf("%s.pod.dpanel.local", containerName)
+	dpanelHostName := fmt.Sprintf("%s.pod.dpanel.local", strings.TrimLeft(containerName, "/"))
 	if !function.InArray(networkRow.Alise, dpanelHostName) {
 		networkRow.Alise = append(networkRow.Alise, dpanelHostName)
 	}

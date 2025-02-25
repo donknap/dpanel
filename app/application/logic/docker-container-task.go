@@ -2,6 +2,7 @@ package logic
 
 import (
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
@@ -83,6 +84,17 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		options = append(options, builder.WithHostNetwork())
 	}
 
+	useBridgeNetwork := function.InArrayWalk(task.BuildParams.Network, func(i docker.NetworkItem) bool {
+		if i.Name == network.NetworkBridge {
+			return true
+		}
+		return false
+	})
+	// 如果没有开启加入 bridge 网络，在创建时添加网络参数
+	if !useBridgeNetwork && !function.IsEmptyArray(task.BuildParams.Network) {
+		options = append(options, builder.WithNetwork(task.BuildParams.Network...))
+	}
+
 	b, err := builder.New(options...)
 	if err != nil {
 		return "", err
@@ -139,12 +151,18 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 
 	// 网络需要在创建好容器后统一 connect 否则 bridge 网络会消失。当网络变更后了，可能绑定的端口无法使用。
 	// 如果同时绑定多个网络，会以自定义的网络优先，默认的 bridge 网络将不会绑定
-	if !function.IsEmptyArray(task.BuildParams.Network) {
+	if useBridgeNetwork && !function.IsEmptyArray(task.BuildParams.Network) {
 		for _, value := range task.BuildParams.Network {
 			if value.Name == task.SiteName {
 				continue
 			}
-			if value.Name == "host" {
+			if function.InArray([]string{
+				network.NetworkDefault,
+				network.NetworkHost,
+				network.NetworkNone,
+				network.NetworkBridge,
+				network.NetworkNat,
+			}, value.Name) {
 				continue
 			}
 			err = docker.Sdk.NetworkConnect(value, task.SiteName)
