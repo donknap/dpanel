@@ -56,13 +56,13 @@ test: amd64 arm64
 	--build-arg APP_VERSION=${VERSION} \
 	-f Dockerfile-lite \
 	. --push
-#	docker buildx build \
-#	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-nginx \
-#	--platform linux/amd64 \
-#	--build-arg APP_VERSION=${VERSION} \
-#	--build-arg PROXY="https_proxy=http://172.16.1.198:7890 http_proxy=http://172.16.1.198:7890" \
-#	-f Dockerfile \
-#	. --push
+	docker buildx build \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite \
+	--platform linux/amd64,linux/arm64 \
+	--build-arg APP_VERSION=${VERSION} \
+	--build-arg PROXY="https_proxy=http://172.16.1.198:7890 http_proxy=http://172.16.1.198:7890" \
+	-f Dockerfile \
+	. --push
 demo: amd64
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:demo \
