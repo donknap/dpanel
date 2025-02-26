@@ -122,7 +122,6 @@ func WithZipFilePath(path string) Option {
 				return err
 			}
 		}
-		os.WriteFile("/Users/renchao/Workspace/data/test1.tar", buf.Bytes(), 0644)
 		self.buildContext = buf
 		return nil
 	}
