@@ -13,6 +13,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
@@ -71,7 +72,7 @@ func (self Compose) Create(http *gin.Context) {
 		if !function.IsEmptyArray(params.Environment) {
 			// 提交写入 .dpanel.env 文件
 			globalEnv := function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
-				return fmt.Sprintf("%s=%s", i.Name, compose.ReplacePlaceholder(i.Value)), true
+				return fmt.Sprintf("%s=%s", i.Name, compose.NewReplaceTable().Replace(&i.Value)), true
 			})
 			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), logic.ComposeProjectEnvFileName)
 			_ = os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
@@ -237,32 +238,6 @@ func (self Compose) GetList(http *gin.Context) {
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": composeList,
 	})
-	return
-}
-
-func (self Compose) GetDetail(http *gin.Context) {
-	type ParamsValidate struct {
-		Id string `json:"id"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	yamlRow, _ := logic.Compose{}.Get(params.Id)
-	if yamlRow == nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
-		return
-	}
-	yaml, err := yamlRow.Setting.GetYaml()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	data := gin.H{
-		"detail": yamlRow,
-		"yaml":   yaml,
-	}
-	self.JsonResponseWithoutError(http, data)
 	return
 }
 
@@ -460,8 +435,8 @@ func (self Compose) Download(http *gin.Context) {
 	}
 
 	yaml, err := yamlRow.Setting.GetYaml()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	if err != nil || yaml[0] == "" {
+		self.JsonResponseWithError(http, notice.Message{}.New(".composeNotFoundYaml"), 500)
 		return
 	}
 

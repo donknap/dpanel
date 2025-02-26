@@ -115,7 +115,6 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			// Compose 相关
 			cors.POST("/app/compose/create", controller.Compose{}.Create)
 			cors.POST("/app/compose/get-list", controller.Compose{}.GetList)
-			cors.POST("/app/compose/get-detail", controller.Compose{}.GetDetail)
 			cors.POST("/app/compose/get-task", controller.Compose{}.GetTask)
 			cors.POST("/app/compose/delete", controller.Compose{}.Delete)
 			cors.POST("/app/compose/get-from-uri", controller.Compose{}.GetFromUri)
