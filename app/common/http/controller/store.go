@@ -8,12 +8,14 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -149,11 +151,13 @@ func (self Store) Sync(http *gin.Context) {
 	storeRootPath := filepath.Join(storage.Local{}.GetStorePath(), params.Name)
 	var err error
 	appList := make([]accessor.StoreAppItem, 0)
-	if params.Type == accessor.StoreTypeOnePanel {
-		err = logic.Store{}.SyncByGit(storeRootPath, params.Url)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
+	if params.Type == accessor.StoreTypeOnePanel || params.Type == accessor.StoreTypeOnePanelLocal {
+		if params.Type == accessor.StoreTypeOnePanel {
+			err = logic.Store{}.SyncByGit(storeRootPath, params.Url)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 		_, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, "1panel-network", network.InspectOptions{})
 		if err != nil {
@@ -223,6 +227,24 @@ func (self Store) Deploy(http *gin.Context) {
 	if composeRow != nil {
 		self.JsonResponseWithError(http, errors.New("该标识已经创建过任务，请先删除，"+params.Name), 500)
 		return
+	}
+	envReplaceTable := compose.NewReplaceTable(map[string]compose.ReplaceFunc{
+		compose.CurrentUsername: func(placeholder string) (string, error) {
+			if data, ok := http.Get("userInfo"); ok {
+				if userInfo, ok := data.(logic.UserInfo); ok {
+					return userInfo.Username, nil
+				}
+			}
+			return "", errors.New("not found userinfo")
+		},
+	})
+	for i, item := range params.Environment {
+		v := item.Value
+		if err := envReplaceTable.Replace(&v); err == nil {
+			params.Environment[i].Value = v
+		} else {
+			slog.Debug("store replace env", "error", err)
+		}
 	}
 	composeNew := &entity.Compose{
 		Name:  strings.ToLower(params.Name),

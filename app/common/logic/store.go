@@ -179,7 +179,9 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 		}
 		relPath, _ := filepath.Rel(storePath, path)
 		segments := strings.Split(filepath.Clean(relPath), string(filepath.Separator))
-
+		if len(segments) == 1 {
+			return nil
+		}
 		if storeItem.Name == "" {
 			storeItem.Name = segments[0]
 		}
