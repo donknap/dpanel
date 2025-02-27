@@ -187,6 +187,21 @@ func (self Home) Info(http *gin.Context) {
 		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
 	}
 
+	self.JsonResponseWithoutError(http, gin.H{
+		"info":       info,
+		"sdkVersion": docker.Sdk.Client.ClientVersion(),
+		"dpanel": map[string]interface{}{
+			"version":       facade.GetConfig().GetString("app.version"),
+			"family":        facade.GetConfig().GetString("app.family"),
+			"env":           facade.GetConfig().GetString("app.env"),
+			"containerInfo": dpanelContainerInfo,
+		},
+		"plugin": plugin.Wrapper{}.GetPluginList(),
+	})
+	return
+}
+
+func (self Home) CheckNewVersion(http *gin.Context) {
 	var tags []string
 	var err error
 	currentVersion := facade.GetConfig().GetString("app.version")
@@ -213,16 +228,8 @@ func (self Home) Info(http *gin.Context) {
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"info":       info,
-		"sdkVersion": docker.Sdk.Client.ClientVersion(),
-		"dpanel": map[string]interface{}{
-			"version":       currentVersion,
-			"newVersion":    newVersion,
-			"family":        facade.GetConfig().GetString("app.family"),
-			"env":           facade.GetConfig().GetString("app.env"),
-			"containerInfo": dpanelContainerInfo,
-		},
-		"plugin": plugin.Wrapper{}.GetPluginList(),
+		"version":    currentVersion,
+		"newVersion": newVersion,
 	})
 	return
 }

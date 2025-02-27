@@ -48,6 +48,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 		// 用户
 		cors.POST("/common/user/login", controller.User{}.Login)
+		cors.POST("/common/user/create-founder", controller.User{}.CreateFounder)
 		cors.POST("/common/user/login-info", controller.User{}.LoginInfo)
 		cors.POST("/common/user/get-user-info", controller.User{}.GetUserInfo)
 		cors.POST("/common/user/save-theme-config", controller.User{}.SaveThemeConfig)
@@ -59,6 +60,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/setting/get-server-ip", controller.Setting{}.GetServerIp)
 
 		cors.POST("/common/home/info", controller.Home{}.Info)
+		cors.POST("/common/home/check-new-version", controller.Home{}.CheckNewVersion)
 		cors.POST("/common/home/usage", controller.Home{}.Usage)
 		cors.POST("/common/home/upgrade-script", controller.Home{}.UpgradeScript)
 		cors.POST("/common/home/get-stat-list", controller.Home{}.GetStatList)
