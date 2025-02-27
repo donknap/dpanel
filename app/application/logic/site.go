@@ -30,6 +30,13 @@ var (
 	KeyFileName   = "%s.key"
 	VhostFileName = "%s.conf"
 	CertName      = "%s_ecc"
+	DefaultDnsApi = []accessor.DnsApi{
+		{
+			Title:      "Nginx",
+			ServerName: "nginx",
+			Env:        make([]docker.EnvItem, 0),
+		},
+	}
 )
 
 type Site struct {
