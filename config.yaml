@@ -36,3 +36,5 @@ database:
 storage:
   local:
     path: ${STORAGE_LOCAL_PATH}
+jwt:
+  reset_user_info_ttl_seconds: 3600

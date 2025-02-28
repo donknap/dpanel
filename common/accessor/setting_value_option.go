@@ -9,6 +9,8 @@ import (
 type SettingValueOption struct {
 	Username           string                    `json:"username,omitempty"`
 	Password           string                    `json:"password,omitempty"`
+	Email              string                    `json:"email,omitempty"`
+	UserStatus         uint8                     `json:"userStatus,omitempty"`
 	ServerIp           string                    `json:"serverIp,omitempty"`
 	Docker             map[string]*docker.Client `json:"docker,omitempty"`
 	DiskUsage          *DiskUsage                `json:"diskUsage,omitempty"`

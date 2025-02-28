@@ -14,8 +14,7 @@ import (
 	"github.com/pquerna/otp/totp"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"gorm.io/datatypes"
-	"gorm.io/gen"
+	"log/slog"
 	"time"
 )
 
@@ -26,7 +25,7 @@ type User struct {
 func (self User) Login(http *gin.Context) {
 	type ParamsValidate struct {
 		Username  string `json:"username" binding:"required"`
-		Password  string `json:"password" binding:"required"`
+		Password  string `json:"password" binding:"password"`
 		AutoLogin bool   `json:"autoLogin"`
 		Code      string `json:"code"`
 	}
@@ -68,10 +67,17 @@ func (self User) Login(http *gin.Context) {
 		expireAddTime = time.Hour * 24
 	}
 
-	currentUser, err := dao.Setting.Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
-		Where(gen.Cond(datatypes.JSONQuery("value").Equals(params.Username, "username"))...).First()
+	currentUser, err := logic.User{}.GetUserByUsername(params.Username)
 	if err != nil {
 		self.JsonResponseWithError(http, notice.Message{}.New(".usernameOrPasswordError"), 500)
+		return
+	}
+	if currentUser.Value.Password == "" {
+		self.JsonResponseWithError(http, notice.Message{}.New(".usernameOrPasswordError"), 500)
+		return
+	}
+	if currentUser.Value.UserStatus == logic.SettingGroupUserStatusDisable {
+		self.JsonResponseWithError(http, notice.Message{}.New(".userDisable"), 500)
 		return
 	}
 
@@ -171,8 +177,8 @@ func (self User) SaveThemeConfig(http *gin.Context) {
 func (self User) CreateFounder(http *gin.Context) {
 	type ParamsValidate struct {
 		Username        string `json:"username" binding:"required"`
-		Password        string `json:"password" binding:"required"`
-		ConfirmPassword string `json:"confirmPassword" binding:"required"`
+		Password        string `json:"password" binding:"password"`
+		ConfirmPassword string `json:"confirmPassword" binding:"password"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -191,8 +197,9 @@ func (self User) CreateFounder(http *gin.Context) {
 		GroupName: logic.SettingGroupUser,
 		Name:      logic.SettingGroupUserFounder,
 		Value: &accessor.SettingValueOption{
-			Password: logic.User{}.GetMd5Password(params.Password, params.Username),
-			Username: params.Username,
+			Password:   logic.User{}.GetMd5Password(params.Password, params.Username),
+			Username:   params.Username,
+			UserStatus: logic.SettingGroupUserStatusEnable,
 		},
 	})
 	if err != nil {
@@ -201,4 +208,91 @@ func (self User) CreateFounder(http *gin.Context) {
 	}
 	self.JsonSuccessResponse(http)
 	return
+}
+
+func (self User) ChaneUserStatus(http *gin.Context) {
+	type ParamsValidate struct {
+		Username string `json:"username" binding:"required"`
+		Status   uint8  `json:"status" binding:"required,oneof=1 2"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	user, err := logic.User{}.GetUserByUsername(params.Username)
+	if err != nil {
+		self.JsonResponseWithError(http, errors.New("用户不存在"), 500)
+		return
+	}
+	user.Value.UserStatus = params.Status
+	err = dao.Setting.Save(user)
+	if err != nil {
+		slog.Error("保存用户状态失败", "err", err, "params", params)
+		self.JsonResponseWithError(http, errors.New("保存失败"), 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
+}
+
+func (self User) GetResetUserInfoToken(http *gin.Context) {
+	type ParamsValidate struct {
+		Username string `json:"username" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	user, err := logic.User{}.GetUserByUsername(params.Username)
+	if err != nil {
+		self.JsonResponseWithError(http, errors.New("用户不存在"), 500)
+		return
+	}
+	token, err := logic.User{}.GetResetUserInfoToken(user)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"token": token,
+	})
+}
+
+func (self User) ResetUserInfo(http *gin.Context) {
+	type ParamsValidate struct {
+		Token           string `json:"token" binding:"required"`
+		Password        string `json:"password" binding:"password"`
+		ConfirmPassword string `json:"confirmPassword" binding:"password"`
+		Email           string `json:"email" binding:"required,email"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if params.Password != params.ConfirmPassword {
+		self.JsonResponseWithError(http, errors.New(".userPasswordConfirmFailed"), 500)
+		return
+	}
+
+	userInfo, err := logic.User{}.ValidateResetUserInfoToken(params.Token)
+	if err != nil {
+		self.JsonResponseWithError(http, errors.New("token错误或已过期"), 500)
+		return
+	}
+	user, err := logic.User{}.GetUserByUsername(userInfo.Username)
+	if err != nil {
+		self.JsonResponseWithError(http, errors.New("用户不存在"), 500)
+		return
+	}
+
+	user.Value.Email = params.Email
+	user.Value.Password = logic.User{}.GetMd5Password(params.Password, userInfo.Username)
+	err = dao.Setting.Save(user)
+	if err != nil {
+		slog.Error("保存用户信息失败", "err", err, "params", params)
+		self.JsonResponseWithError(http, errors.New("保存失败"), 500)
+		return
+	}
+
+	self.JsonSuccessResponse(http)
 }

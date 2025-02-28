@@ -11,6 +11,8 @@ import (
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
+	ut "github.com/go-playground/universal-translator"
+	"github.com/go-playground/validator/v10"
 	"github.com/robfig/cron/v3"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
@@ -18,9 +20,57 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"unicode"
 )
 
 type Provider struct {
+}
+
+func (p Provider) RegisterValidateRule() {
+	if v, ok := facade.GetValidator().Engine().(*validator.Validate); ok {
+		err := v.RegisterValidation("password", func(fl validator.FieldLevel) bool {
+			if password, ok := fl.Field().Interface().(string); ok {
+				if len(password) < 8 {
+					return false
+				}
+				var hasUpper, hasLower, hasNumber bool
+
+				for _, char := range password {
+					switch {
+					case unicode.IsUpper(char):
+						hasUpper = true
+					case unicode.IsLower(char):
+						hasLower = true
+					case unicode.IsNumber(char):
+						hasNumber = true
+					}
+
+					// 提前终止循环优化效率
+					if hasUpper && hasLower && hasNumber {
+						break
+					}
+				}
+
+				return hasUpper && hasLower && hasNumber
+			}
+
+			return false
+		})
+		if err != nil {
+			slog.Error("register validate rule password error", err)
+			panic(err)
+		}
+		err = v.RegisterTranslation("password", facade.GetTranslator(), func(ut ut.Translator) error {
+			return ut.Add("password", "{0} 格式错误", true) // see universal-translator for details
+		}, func(ut ut.Translator, fe validator.FieldError) string {
+			t, _ := ut.T("password", fe.Field())
+			return t
+		})
+		if err != nil {
+			slog.Error("register validate rule password translate error", err)
+			panic(err)
+		}
+	}
 }
 
 func (provider *Provider) Register(httpServer *http_server.Server) {

@@ -27,6 +27,10 @@ var (
 var (
 	SettingGroupUser        = "user"
 	SettingGroupUserFounder = "founder"
+	SettingGroupUserMember  = "member"
+
+	SettingGroupUserStatusEnable  = uint8(2)
+	SettingGroupUserStatusDisable = uint8(1)
 )
 
 type Setting struct {
