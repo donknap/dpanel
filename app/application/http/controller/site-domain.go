@@ -62,6 +62,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		siteDomainRow.ContainerID = ""
 	} else {
 		siteDomainRow = &entity.SiteDomain{
 			ServerName:  params.ServerName,
@@ -178,7 +179,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		return
 	}
 	if siteDomainRow.ID > 0 {
-		_, err = dao.SiteDomain.Updates(siteDomainRow)
+		err = dao.SiteDomain.Save(siteDomainRow)
 	} else {
 		err = dao.SiteDomain.Create(siteDomainRow)
 	}

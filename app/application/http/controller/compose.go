@@ -11,8 +11,8 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
@@ -71,9 +71,9 @@ func (self Compose) Create(http *gin.Context) {
 		if !function.IsEmptyArray(params.Environment) {
 			// 提交写入 .dpanel.env 文件
 			globalEnv := function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
-				return fmt.Sprintf("%s=%s", i.Name, compose.ReplacePlaceholder(i.Value)), true
+				return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 			})
-			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), logic.ComposeProjectEnvFileName)
+			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), logic.ComposeDefaultEnvFileName)
 			_ = os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
 			err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
 		}
@@ -240,32 +240,6 @@ func (self Compose) GetList(http *gin.Context) {
 	return
 }
 
-func (self Compose) GetDetail(http *gin.Context) {
-	type ParamsValidate struct {
-		Id string `json:"id"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	yamlRow, _ := logic.Compose{}.Get(params.Id)
-	if yamlRow == nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
-		return
-	}
-	yaml, err := yamlRow.Setting.GetYaml()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	data := gin.H{
-		"detail": yamlRow,
-		"yaml":   yaml,
-	}
-	self.JsonResponseWithoutError(http, data)
-	return
-}
-
 func (self Compose) GetTask(http *gin.Context) {
 	type ParamsValidate struct {
 		Id string `json:"id"`
@@ -281,15 +255,6 @@ func (self Compose) GetTask(http *gin.Context) {
 	}
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
-		// 如果是外部任务并且获取不到yaml，则直接返回基本状态
-		if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
-			data := gin.H{
-				"detail": yamlRow,
-				"yaml":   [2]string{},
-			}
-			self.JsonResponseWithoutError(http, data)
-			return
-		}
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -393,54 +358,27 @@ func (self Compose) GetFromUri(http *gin.Context) {
 func (self Compose) Parse(http *gin.Context) {
 	type ParamsValidate struct {
 		Yaml string `json:"yaml" binding:"required"`
-		Id   int32  `json:"id"`
+		Id   string `json:"id"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	var composer *compose.Wrapper
 	var err error
-
-	if params.Id > 0 {
-		composeRow, err := dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		tasker, err := logic.Compose{}.GetTasker(composeRow)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		composer = tasker.Composer
-	} else {
-		composer, err = compose.NewComposeWithYaml([]byte(params.Yaml))
+	composeRow, err := logic.Compose{}.Get(params.Id)
+	if err != nil {
+		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		return
 	}
-	if err == nil {
-		self.JsonResponseWithoutError(http, gin.H{
-			"project":     composer.Project,
-			"environment": composer.Project.Environment,
-			"error":       "",
-		})
-	} else {
-		self.JsonResponseWithoutError(http, gin.H{
-			"project":     nil,
-			"environment": make(map[string]string),
-			"error":       err.Error(),
-		})
-	}
-	return
-}
-
-func (self Compose) Store(http *gin.Context) {
-	storeList, err := dao.Store.Find()
+	tasker, err := logic.Compose{}.GetTasker(composeRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": storeList,
+		"project":     tasker.Composer.Project,
+		"environment": tasker.Composer.Project.Environment,
+		"error":       "",
 	})
 	return
 }
@@ -460,8 +398,8 @@ func (self Compose) Download(http *gin.Context) {
 	}
 
 	yaml, err := yamlRow.Setting.GetYaml()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	if err != nil || yaml[0] == "" {
+		self.JsonResponseWithError(http, notice.Message{}.New(".composeNotFoundYaml"), 500)
 		return
 	}
 

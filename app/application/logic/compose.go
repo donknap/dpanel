@@ -173,17 +173,6 @@ func (self Compose) FindRunTask() map[string]*entity.Compose {
 			findRow.Setting.Type = accessor.ComposeTypeDangling
 		}
 
-		if content, err := os.ReadFile(filepath.Join(filepath.Dir(item.ConfigFileList[0]), ComposeProjectEnvFileName)); err == nil && content != nil && len(content) > 0 {
-			lines := bytes.Split(content, []byte("\n"))
-			for _, line := range lines {
-				if name, value, exists := strings.Cut(string(line), "="); exists {
-					findRow.Setting.Environment = append(findRow.Setting.Environment, docker.EnvItem{
-						Name:  name,
-						Value: value,
-					})
-				}
-			}
-		}
 		findComposeList[item.Name] = findRow
 	}
 	return findComposeList
@@ -362,15 +351,13 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 			for _, s := range strings.Split(string(defaultEnvContent), "\n") {
 				if name, value, exists := strings.Cut(s, "="); exists {
 					if exists, i := function.IndexArrayWalk(entity.Setting.Environment, func(i docker.EnvItem) bool {
-						// 如果数据库中环境变量有值时，则不使用 .env 中的覆盖
 						if i.Name == name {
 							return true
 						}
 						return false
 					}); exists {
-						if entity.Setting.Environment[i].Value == "" {
-							entity.Setting.Environment[i].Value = value
-						}
+						// 以 .env 中的数据为优先，因为最后保存的时候会同步一份给 .env
+						entity.Setting.Environment[i].Value = value
 					} else {
 						entity.Setting.Environment = append(entity.Setting.Environment, docker.EnvItem{
 							Name:  name,
@@ -382,9 +369,31 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		}
 	}
 
+	if dpanelEnvContent, err := os.ReadFile(filepath.Join(taskFileDir, ComposeProjectEnvFileName)); err == nil {
+		for _, s := range strings.Split(string(dpanelEnvContent), "\n") {
+			if name, value, exists := strings.Cut(s, "="); exists {
+				if exists, i := function.IndexArrayWalk(entity.Setting.Environment, func(i docker.EnvItem) bool {
+					// 如果数据库中环境变量有值时，则不使用 .env 中的覆盖
+					if i.Name == name {
+						return true
+					}
+					return false
+				}); exists {
+					// .dpanel.env 中的数据强制覆盖到 .env 中
+					entity.Setting.Environment[i].Value = value
+				} else {
+					entity.Setting.Environment = append(entity.Setting.Environment, docker.EnvItem{
+						Name:  name,
+						Value: value,
+					})
+				}
+			}
+		}
+	}
+
 	if !function.IsEmptyArray(entity.Setting.Environment) {
 		globalEnv := function.PluckArrayWalk(entity.Setting.Environment, func(i docker.EnvItem) (string, bool) {
-			return fmt.Sprintf("%s=%s", i.Name, compose.ReplacePlaceholder(i.Value)), true
+			return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 		})
 		err := os.MkdirAll(filepath.Dir(defaultEnvFileName), os.ModePerm)
 		if err != nil {

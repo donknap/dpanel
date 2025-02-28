@@ -3,9 +3,10 @@ package accessor
 import "github.com/donknap/dpanel/common/service/docker"
 
 var (
-	StoreTypeOnePanel  = "1panel"
-	StoreTypePortainer = "portainer"
-	StoreTypeCasaOs    = "casaos"
+	StoreTypeOnePanel      = "1panel"
+	StoreTypeOnePanelLocal = "1panel-local"
+	StoreTypePortainer     = "portainer"
+	StoreTypeCasaOs        = "casaos"
 )
 
 type StoreAppItem struct {

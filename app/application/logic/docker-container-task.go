@@ -153,9 +153,6 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	// 如果同时绑定多个网络，会以自定义的网络优先，默认的 bridge 网络将不会绑定
 	if useBridgeNetwork && !function.IsEmptyArray(task.BuildParams.Network) {
 		for _, value := range task.BuildParams.Network {
-			if value.Name == task.SiteName {
-				continue
-			}
 			if function.InArray([]string{
 				network.NetworkDefault,
 				network.NetworkHost,

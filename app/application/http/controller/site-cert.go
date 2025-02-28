@@ -28,6 +28,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -48,12 +49,23 @@ func (self SiteCert) DnsApi(http *gin.Context) {
 	dnsApi := make([]accessor.DnsApi, 0)
 	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingDnsApi, &dnsApi)
 
+	upgrade := false
 	if !function.IsEmptyArray(params.Account) || !function.IsEmptyArray(params.User) {
+		// 有数据提交时，就清空数据，重新构建
 		dnsApi = make([]accessor.DnsApi, 0)
+		upgrade = true
+	}
+
+	for _, item := range logic.DefaultDnsApi {
+		if exists, _ := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
+			return i.ServerName == item.ServerName
+		}); !exists {
+			dnsApi = append(dnsApi, item)
+		}
+	}
+
+	if !function.IsEmptyArray(params.Account) {
 		for _, item := range function.PluckArrayWalk(params.Account, func(i accessor.DnsApi) (accessor.DnsApi, bool) {
-			if i.ServerName != "nginx" && len(i.Env) == 1 {
-				return accessor.DnsApi{}, false
-			}
 			for _, item := range i.Env {
 				if item.Value == "" {
 					return accessor.DnsApi{}, false
@@ -69,6 +81,9 @@ func (self SiteCert) DnsApi(http *gin.Context) {
 				dnsApi = append(dnsApi, item)
 			}
 		}
+	}
+
+	if !function.IsEmptyArray(params.User) {
 		for _, item := range params.User {
 			if exists, index := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
 				return i.ServerName == item.ServerName
@@ -78,6 +93,13 @@ func (self SiteCert) DnsApi(http *gin.Context) {
 				dnsApi = append(dnsApi, item)
 			}
 		}
+	}
+
+	sort.Slice(dnsApi, func(i, j int) bool {
+		return dnsApi[i].ServerName < dnsApi[j].ServerName
+	})
+
+	if upgrade {
 		err := logic2.Setting{}.Save(&entity.Setting{
 			GroupName: logic2.SettingGroupSetting,
 			Name:      logic2.SettingGroupSettingDnsApi,
@@ -90,6 +112,7 @@ func (self SiteCert) DnsApi(http *gin.Context) {
 			return
 		}
 	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"setting": dnsApi,
 	})
