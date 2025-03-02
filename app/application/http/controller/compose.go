@@ -11,6 +11,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
@@ -364,22 +365,39 @@ func (self Compose) Parse(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+
+	var composer *compose.Wrapper
 	var err error
-	composeRow, err := logic.Compose{}.Get(params.Id)
-	if err != nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
-		return
+
+	if params.Id != "" {
+		composeRow, err := logic.Compose{}.Get(params.Id)
+		if err != nil {
+			self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+			return
+		}
+		tasker, err := logic.Compose{}.GetTasker(composeRow)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		composer = tasker.Composer
+	} else {
+		composer, err = compose.NewComposeWithYaml([]byte(params.Yaml))
 	}
-	tasker, err := logic.Compose{}.GetTasker(composeRow)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+
+	if err == nil {
+		self.JsonResponseWithoutError(http, gin.H{
+			"project":     composer.Project,
+			"environment": composer.Project.Environment,
+			"error":       "",
+		})
+	} else {
+		self.JsonResponseWithoutError(http, gin.H{
+			"project":     nil,
+			"environment": make(map[string]string),
+			"error":       err.Error(),
+		})
 	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"project":     tasker.Composer.Project,
-		"environment": tasker.Composer.Project.Environment,
-		"error":       "",
-	})
 	return
 }
 
