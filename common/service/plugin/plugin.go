@@ -51,7 +51,7 @@ func NewPlugin(name string, composeData map[string]*TemplateParser) (*plugin, er
 	if err != nil {
 		return nil, err
 	}
-	composer, err := compose.NewComposeWithYaml(buffer.Bytes())
+	composer, err := compose.NewCompose(compose.WithYamlContent(buffer.Bytes()))
 	if err != nil {
 		return nil, err
 	}

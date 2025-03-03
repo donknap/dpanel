@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -358,8 +359,9 @@ func (self Compose) GetFromUri(http *gin.Context) {
 
 func (self Compose) Parse(http *gin.Context) {
 	type ParamsValidate struct {
-		Yaml string `json:"yaml" binding:"required"`
-		Id   string `json:"id"`
+		Yaml        string           `json:"yaml" binding:"required"`
+		Id          string           `json:"id"`
+		Environment []docker.EnvItem `json:"environment"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -382,22 +384,24 @@ func (self Compose) Parse(http *gin.Context) {
 		}
 		composer = tasker.Composer
 	} else {
-		composer, err = compose.NewComposeWithYaml([]byte(params.Yaml))
+		options := make([]cli.ProjectOptionsFn, 0)
+		if !function.IsEmptyArray(params.Environment) {
+			options = append(options, compose.WithDockerEnvItem(params.Environment...))
+		}
+		options = append(options, compose.WithYamlContent([]byte(params.Yaml)))
+		composer, err = compose.NewCompose(options...)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_ = os.RemoveAll(composer.Project.WorkingDir)
 	}
 
-	if err == nil {
-		self.JsonResponseWithoutError(http, gin.H{
-			"project":     composer.Project,
-			"environment": composer.Project.Environment,
-			"error":       "",
-		})
-	} else {
-		self.JsonResponseWithoutError(http, gin.H{
-			"project":     nil,
-			"environment": make(map[string]string),
-			"error":       err.Error(),
-		})
-	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"project":     composer.Project,
+		"environment": composer.Project.Environment,
+		"error":       "",
+	})
 	return
 }
 
