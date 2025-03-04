@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
@@ -33,6 +34,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	var err error
 
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
@@ -69,6 +71,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			}
 		}
 	}
+	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
 
 	response, err := tasker.Deploy(params.DeployServiceName, params.RemoveOrphans)
 	if err != nil {
@@ -78,28 +81,35 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer wsBuffer.Close()
+
 	wsBuffer.OnWrite = func(p string) error {
 		wsBuffer.BroadcastMessage(p)
-		if strings.Contains(p, "denied: You may not login") {
-			_ = notice.Message{}.Error(".imagePullInvalidAuth")
-			return errors.New("image pull denied")
-		}
-		if strings.Contains(p, "Mounts denied") {
-			_ = notice.Message{}.Error(".containerMountPathDenied")
-			return errors.New("mounts path denied")
+		if strings.Contains(p, "Error") {
+			return errors.New(p)
 		}
 		return nil
 	}
+
 	_, err = io.Copy(wsBuffer, response)
 	if err != nil {
-		slog.Error("compose", "deploy copy error", err)
-	}
-
-	if composeRow.ID > 0 {
+		if function.ErrorHasKeyword(err, "denied: You may not login") {
+			_ = notice.Message{}.Error(".imagePullInvalidAuth")
+		} else if function.ErrorHasKeyword(err, "Mounts denied") {
+			_ = notice.Message{}.Error(".containerMountPathDenied")
+		}
+		composeRow.Setting.Message = err.Error()
+		composeRow.Setting.Status = accessor.ComposeStatusError
+	} else {
+		composeRow.Setting.Message = ""
 		composeRow.Setting.Status = ""
+	}
+	if composeRow.ID > 0 {
 		_, _ = dao.Compose.Updates(composeRow)
 	}
-	_ = notice.Message{}.Info(".composeDeploy", composeRow.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -208,7 +218,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 }
 
 func (self Compose) ContainerProcessKill(http *gin.Context) {
-	err := logic.Compose{}.Kill()
+	err := exec.Kill()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

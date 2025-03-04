@@ -193,5 +193,5 @@ func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cmd.RunInTerminal(nil)
+	return cmd.RunInPip()
 }

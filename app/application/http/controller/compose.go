@@ -35,14 +35,15 @@ type Compose struct {
 
 func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id           int32            `json:"id"`
-		Title        string           `json:"title"`
-		Name         string           `json:"name" binding:"required,lowercase"`
-		Type         string           `json:"type" binding:"required"`
-		Yaml         string           `json:"yaml"`
-		YamlOverride string           `json:"yamlOverride"`
-		RemoteUrl    string           `json:"remoteUrl"`
-		Environment  []docker.EnvItem `json:"environment"`
+		Id               int32            `json:"id"`
+		Title            string           `json:"title"`
+		Name             string           `json:"name" binding:"required,lowercase"`
+		Type             string           `json:"type" binding:"required"`
+		Yaml             string           `json:"yaml"`
+		YamlOverride     string           `json:"yamlOverride"`
+		RemoteUrl        string           `json:"remoteUrl"`
+		Environment      []docker.EnvItem `json:"environment"`
+		DeployBackground bool             `json:"deployBackground"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -151,6 +152,10 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
+	if params.DeployBackground {
+		yamlRow.Setting.Status = accessor.ComposeStatusDeploying
+	}
+
 	if params.Id > 0 {
 		yamlRow.Title = params.Title
 		yamlRow.Setting.Environment = params.Environment
@@ -158,6 +163,7 @@ func (self Compose) Create(http *gin.Context) {
 	} else if yamlRow.Setting.Type != accessor.ComposeTypeOutPath {
 		_ = dao.Compose.Create(yamlRow)
 	}
+
 	if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
 		self.JsonResponseWithoutError(http, gin.H{
 			"id": yamlRow.Name,
@@ -220,7 +226,12 @@ func (self Compose) GetList(http *gin.Context) {
 	runComposeList := logic.Compose{}.FindRunTask()
 
 	for i, item := range composeList {
-		composeList[i].Setting.Status = accessor.ComposeStatusWaiting
+		if !function.InArray([]string{
+			accessor.ComposeStatusDeploying,
+			accessor.ComposeStatusError,
+		}, item.Setting.Status) {
+			composeList[i].Setting.Status = accessor.ComposeStatusWaiting
+		}
 
 		if find, ok := runComposeList[item.Name]; ok {
 			composeList[i].Setting.Status = find.Setting.Status

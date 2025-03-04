@@ -36,6 +36,9 @@ func (self Image) TagRemote(http *gin.Context) {
 	var err error
 	var response *http2.Response
 
+	if params.Type == "pull" {
+		_ = notice.Message{}.Info(".imagePull", "name", params.Tag)
+	}
 	for i, s := range registryConfig.Proxy {
 		imageNameDetail.Registry = s
 		if params.Type == "pull" {

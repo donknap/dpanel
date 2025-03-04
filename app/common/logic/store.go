@@ -2,6 +2,7 @@ package logic
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/common/accessor"
@@ -45,11 +46,12 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 	}()
 	slog.Debug("store git download", "path", tempDownloadPath)
 
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*60*5)
 	cmd, err := exec.New(
 		exec.WithCommandName("git"),
 		exec.WithArgs("clone", "--depth", "1",
 			gitUrl, tempDownloadPath),
-		exec.WithTimeout(time.Second*60*5),
+		exec.WithCtx(ctx),
 	)
 	if err != nil {
 		return err

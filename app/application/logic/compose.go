@@ -2,6 +2,7 @@ package logic
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -84,8 +85,15 @@ func (self Compose) Ls() []*composeItem {
 		"--format", "json",
 		"--all",
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+	}()
+
 	result := make([]*composeItem, 0)
-	cmd, err := exec.New(docker.Sdk.GetComposeCmd(command...)...)
+	options := docker.Sdk.GetComposeCmd(command...)
+	options = append(options, exec.WithCtx(ctx))
+	cmd, err := exec.New(options...)
 	if err != nil {
 		return result
 	}
@@ -122,10 +130,6 @@ func (self Compose) LsItem(name string) *composeItem {
 		ConfigFileList: make([]string, 0),
 		IsDPanel:       true,
 	}
-}
-
-func (self Compose) Kill() error {
-	return exec.Command{}.Kill()
 }
 
 func (self Compose) FindRunTask() map[string]*entity.Compose {
@@ -357,7 +361,9 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 						return false
 					}); exists {
 						// 以 .env 中的数据为优先，因为最后保存的时候会同步一份给 .env
-						entity.Setting.Environment[i].Value = value
+						if entity.Setting.Environment[i].Value == "" {
+							entity.Setting.Environment[i].Value = value
+						}
 					} else {
 						entity.Setting.Environment = append(entity.Setting.Environment, docker.EnvItem{
 							Name:  name,
@@ -380,7 +386,9 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 					return false
 				}); exists {
 					// .dpanel.env 中的数据强制覆盖到 .env 中
-					entity.Setting.Environment[i].Value = value
+					if entity.Setting.Environment[i].Value == "" {
+						entity.Setting.Environment[i].Value = value
+					}
 				} else {
 					entity.Setting.Environment = append(entity.Setting.Environment, docker.EnvItem{
 						Name:  name,

@@ -15,6 +15,8 @@ const (
 	ComposeTypeDangling    = "dangling"
 	ComposeTypeStore       = "store"
 	ComposeStatusWaiting   = "waiting"
+	ComposeStatusDeploying = "deploying"
+	ComposeStatusError     = "error"
 )
 
 type ComposeSettingOption struct {
@@ -28,6 +30,7 @@ type ComposeSettingOption struct {
 	DeployServiceName []string         `json:"deployServiceName,omitempty"`
 	CreatedAt         string           `json:"createdAt,omitempty"`
 	UpdatedAt         string           `json:"updatedAt,omitempty"`
+	Message           string           `json:"message,omitempty"`
 }
 
 func (self ComposeSettingOption) GetUriFilePath() string {
