@@ -90,13 +90,16 @@ func (self Task) Ctrl(op string) (io.Reader, error) {
 	return self.runCommand(cmd)
 }
 
-func (self Task) Logs(tail int, follow bool) (io.ReadCloser, error) {
+func (self Task) Logs(tail int, showTime, follow bool) (io.ReadCloser, error) {
 	cmd := []string{
 		//"--progress", "tty",
 		"logs",
 	}
 	if tail > 0 {
 		cmd = append(cmd, "--tail", fmt.Sprintf("%d", tail))
+	}
+	if showTime {
+		cmd = append(cmd, "-t")
 	}
 	if follow {
 		cmd = append(cmd, "-f")

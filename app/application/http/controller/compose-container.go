@@ -229,15 +229,19 @@ func (self Compose) ContainerProcessKill(http *gin.Context) {
 
 func (self Compose) ContainerLog(http *gin.Context) {
 	type ParamsValidate struct {
-		Id string `json:"id" binding:"required"`
+		Id        string `json:"id" binding:"required"`
+		LineTotal int    `json:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000 5000 -1"`
+		Download  bool   `json:"download"`
+		ShowTime  bool   `json:"showTime"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		self.JsonResponseWithError(http, notice.Message{}.New(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	tasker, err := logic.Compose{}.GetTasker(composeRow)
@@ -245,10 +249,27 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	follow := true
+	if params.Download {
+		follow = false
+	}
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeComposeLog, params.Id))
-	response, err := tasker.Logs(500, true)
+
+	response, err := tasker.Logs(params.LineTotal, params.ShowTime, follow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.Download {
+		buffer, err := io.ReadAll(response)
+		_ = response.Close()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		http.Header("Content-Type", "text/plain")
+		http.Header("Content-Disposition", "attachment; filename="+params.Id+".log")
+		http.Data(200, "text/plain", buffer)
 		return
 	}
 	go func() {
