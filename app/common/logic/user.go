@@ -36,7 +36,7 @@ type User struct {
 }
 
 func (self User) GetJwtSecret() []byte {
-	return []byte(docker.BuilderAuthor + facade.GetConfig().GetString("app.name"))
+	return []byte(docker.BuilderAuthor + facade.GetConfig().GetString("app.name") + facade.GetConfig().GetString("jwt.secret"))
 }
 
 func (self User) GetMd5Password(password string, key string) string {

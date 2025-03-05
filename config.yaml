@@ -36,3 +36,5 @@ database:
 storage:
   local:
     path: ${STORAGE_LOCAL_PATH}
+jwt:
+  secret: ${DP_JWT_SECRET}

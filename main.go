@@ -43,6 +43,10 @@ func main() {
 		_ = os.Setenv("STORAGE_LOCAL_PATH", filepath.Dir(exePath))
 	}
 
+	if os.Getenv("DP_JWT_SECRET") == "" {
+		_ = os.Setenv("DP_JWT_SECRET", function.GetRandomString(20))
+	}
+
 	myApp := app.NewApp(
 		app.Option{
 			Name:    "w7-rangine-go-skeleton",
