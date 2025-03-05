@@ -357,7 +357,9 @@ func (self Compose) GetFromUri(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		defer response.Body.Close()
+		defer func() {
+			_ = response.Body.Close()
+		}()
 		content, err = io.ReadAll(response.Body)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)

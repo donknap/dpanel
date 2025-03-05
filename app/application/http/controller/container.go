@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -82,7 +81,7 @@ func (self Container) GetList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	list := make([]types.Container, 0)
+	list := make([]container.Summary, 0)
 	filter := filters.NewArgs()
 	if params.Md5 != "" {
 		filter.Add("id", params.Md5)
@@ -99,7 +98,7 @@ func (self Container) GetList(http *gin.Context) {
 
 	if function.IsEmptyArray(list) {
 		self.JsonResponseWithoutError(http, gin.H{
-			"list": make([]types.Container, 0),
+			"list": make([]container.Port, 0),
 		})
 		return
 	}
@@ -114,10 +113,8 @@ func (self Container) GetList(http *gin.Context) {
 		}
 	}
 
-	var result []types.Container
-
+	result := make([]container.Summary, 0)
 	if params.SiteTitle != "" {
-		result = make([]types.Container, 0)
 		for _, item := range list {
 			if function.InArray(searchContainerIds, item.ID) {
 				result = append(result, item)
@@ -146,10 +143,10 @@ func (self Container) GetList(http *gin.Context) {
 		if item.HostConfig.NetworkMode == "host" {
 			imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
 			if err == nil {
-				ports := []types.Port{}
+				ports := make([]container.Port, 0)
 				for port, _ := range imageInfo.Config.ExposedPorts {
 					portInt, _ := strconv.Atoi(port.Port())
-					ports = append(ports, types.Port{
+					ports = append(ports, container.Port{
 						IP:          "0.0.0.0",
 						PublicPort:  uint16(portInt),
 						PrivatePort: uint16(portInt),

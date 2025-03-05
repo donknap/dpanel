@@ -179,7 +179,7 @@ func (self Home) WsConsole(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
-	dpanelContainerInfo := types.ContainerJSON{}
+	dpanelContainerInfo := container.InspectResponse{}
 	new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo)
 
 	info, _ := docker.Sdk.Client.Info(docker.Sdk.Ctx)
@@ -276,7 +276,7 @@ func (self Home) Usage(http *gin.Context) {
 				})
 			}
 
-			logic.Setting{}.Save(&entity.Setting{
+			_ = logic.Setting{}.Save(&entity.Setting{
 				GroupName: logic.SettingGroupSetting,
 				Name:      logic.SettingGroupSettingDiskUsage,
 				Value: &accessor.SettingValueOption{
@@ -436,7 +436,7 @@ func (self Home) GetStatList(http *gin.Context) {
 }
 
 func (self Home) UpgradeScript(http *gin.Context) {
-	dpanelContainerInfo := types.ContainerJSON{}
+	dpanelContainerInfo := container.InspectResponse{}
 	if exists := new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo); !exists {
 		self.JsonResponseWithError(http, notice.Message{}.New(".systemUpgradeDPanelNotFound"), 500)
 		return

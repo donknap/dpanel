@@ -17,7 +17,7 @@ import (
 )
 
 // 获取单条容器 field 支持 id,name
-func (self Builder) ContainerByField(field string, name ...string) (result map[string]*types.Container, err error) {
+func (self Builder) ContainerByField(field string, name ...string) (result map[string]*container.Summary, err error) {
 	if len(name) == 0 {
 		return nil, errors.New("please specify a container name")
 	}
@@ -44,7 +44,7 @@ func (self Builder) ContainerByField(field string, name ...string) (result map[s
 	if len(containerList) == 0 {
 		return nil, errors.New("container not found")
 	}
-	result = make(map[string]*types.Container)
+	result = make(map[string]*container.Summary)
 
 	var key string
 	for _, value := range containerList {
@@ -61,8 +61,8 @@ func (self Builder) ContainerByField(field string, name ...string) (result map[s
 	return result, nil
 }
 
-func (self Builder) ContainerInfo(md5 string) (info types.ContainerJSON, err error) {
-	info, _, err = Sdk.Client.ContainerInspectWithRaw(Sdk.Ctx, md5, true)
+func (self Builder) ContainerInfo(md5 string) (info container.InspectResponse, err error) {
+	info, err = Sdk.Client.ContainerInspect(Sdk.Ctx, md5)
 	if err != nil {
 		return info, err
 	}
@@ -138,7 +138,7 @@ func (self Builder) ContainerCopyPathIn(containerName, containerDestPath string,
 }
 
 // 获取复制容器信息，兼容低版本的配置情况
-func (self Builder) ContainerCopyInspect(containerName string) (info types.ContainerJSON, err error) {
+func (self Builder) ContainerCopyInspect(containerName string) (info container.InspectResponse, err error) {
 	info, err = Sdk.Client.ContainerInspect(Sdk.Ctx, containerName)
 	if err != nil {
 		return info, err

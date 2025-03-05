@@ -2,22 +2,23 @@ package accessor
 
 import (
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/service/docker"
 	"time"
 )
 
 type SettingValueOption struct {
-	Username           string                    `json:"username,omitempty"`
-	Password           string                    `json:"password,omitempty"`
-	ServerIp           string                    `json:"serverIp,omitempty"`
-	Docker             map[string]*docker.Client `json:"docker,omitempty"`
-	DiskUsage          *DiskUsage                `json:"diskUsage,omitempty"`
-	TwoFa              *TwoFa                    `json:"twoFa,omitempty"`
-	IgnoreCheckUpgrade IgnoreCheckUpgrade        `json:"ignoreCheckUpgrade,omitempty"`
-	DPanelInfo         *types.ContainerJSON      `json:"DPanelInfo,omitempty"`
-	ThemeConfig        *ThemeConfig              `json:"theme,omitempty"`
-	ThemeUserConfig    *ThemeUserConfig          `json:"themeUser,omitempty"`
-	DnsApi             []DnsApi                  `json:"dnsApi,omitempty"`
+	Username           string                     `json:"username,omitempty"`
+	Password           string                     `json:"password,omitempty"`
+	ServerIp           string                     `json:"serverIp,omitempty"`
+	Docker             map[string]*docker.Client  `json:"docker,omitempty"`
+	DiskUsage          *DiskUsage                 `json:"diskUsage,omitempty"`
+	TwoFa              *TwoFa                     `json:"twoFa,omitempty"`
+	IgnoreCheckUpgrade IgnoreCheckUpgrade         `json:"ignoreCheckUpgrade,omitempty"`
+	DPanelInfo         *container.InspectResponse `json:"DPanelInfo,omitempty"`
+	ThemeConfig        *ThemeConfig               `json:"theme,omitempty"`
+	ThemeUserConfig    *ThemeUserConfig           `json:"themeUser,omitempty"`
+	DnsApi             []DnsApi                   `json:"dnsApi,omitempty"`
 }
 
 type IgnoreCheckUpgrade []string
