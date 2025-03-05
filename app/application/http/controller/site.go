@@ -78,7 +78,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		_, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
 	}
 
-	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.ImageName)
+	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.ImageName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

@@ -144,7 +144,7 @@ func (self Container) GetList(http *gin.Context) {
 		// 如果是直接绑定到宿主机网络，端口号不会显示到容器详情中
 		// 需要通过镜像允许再次获取下
 		if item.HostConfig.NetworkMode == "host" {
-			imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, item.ImageID)
+			imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
 			if err == nil {
 				ports := []types.Port{}
 				for port, _ := range imageInfo.Config.ExposedPorts {

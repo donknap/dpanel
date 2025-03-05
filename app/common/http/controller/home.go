@@ -324,7 +324,7 @@ func (self Home) Usage(http *gin.Context) {
 			}
 			usePort := make([]*portItem, 0)
 			if item.HostConfig.NetworkMode == "host" {
-				imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, item.ImageID)
+				imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
 				if err == nil {
 					for port, _ := range imageInfo.Config.ExposedPorts {
 						usePort = append(usePort, &portItem{

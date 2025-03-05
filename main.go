@@ -16,6 +16,7 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	app "github.com/we7coreteam/w7-rangine-go/v2/src"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http"
@@ -44,7 +45,7 @@ func main() {
 	}
 
 	if os.Getenv("DP_JWT_SECRET") == "" {
-		_ = os.Setenv("DP_JWT_SECRET", function.GetRandomString(20))
+		_ = os.Setenv("DP_JWT_SECRET", uuid.New().String())
 	}
 
 	myApp := app.NewApp(

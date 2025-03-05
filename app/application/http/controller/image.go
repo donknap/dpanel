@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -53,7 +54,7 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 	if params.Registry != "" {
 		imageNameDetail.Registry = params.Registry
 	}
-	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageNameDetail.Uri())
+	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, imageNameDetail.Uri())
 	if err == nil && imageInfo.ID != "" {
 		self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
 		return
@@ -110,7 +111,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 		return
 	}
 	if params.Tag != "" {
-		imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Tag)
+		imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.Tag)
 		if err == nil && imageInfo.ID != "" {
 			self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
 			return
@@ -127,7 +128,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 	}()
 	_ = notice.Message{}.Info(".imageBuild", params.Tag)
 
-	response, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageTar, false)
+	response, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageTar, client.ImageLoadWithQuiet(false))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -264,7 +265,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 
 	} else {
 		// 如果已经构建过，先查找一下旧镜像，新加一个标签，避免变成 none 标签
-		_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageNameDetail.Uri())
+		_, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, imageNameDetail.Uri())
 		if err == nil {
 			_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, imageNameDetail.Uri(), imageNameDetail.Uri()+"-deprecated-"+function.GetRandomString(6))
 		}
@@ -360,7 +361,7 @@ func (self Image) GetList(http *gin.Context) {
 			}
 		}
 
-		imageDetail, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, summary.ID)
+		imageDetail, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, summary.ID)
 		if err == nil {
 			if summary.Labels == nil {
 				imageList[key].Labels = make(map[string]string)
@@ -417,7 +418,7 @@ func (self Image) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	imageDetail, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Md5)
+	imageDetail, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -550,7 +551,7 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Md5)
+	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

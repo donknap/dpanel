@@ -172,7 +172,7 @@ func (self Image) TagAdd(http *gin.Context) {
 		return
 	}
 
-	imageDetail, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, params.Md5)
+	imageDetail, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -227,7 +227,7 @@ func (self Image) TagSync(http *gin.Context) {
 		}
 
 		for _, md5 := range params.Md5 {
-			imageDetail, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, md5)
+			imageDetail, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, md5)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return

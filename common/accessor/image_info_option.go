@@ -3,14 +3,14 @@ package accessor
 import (
 	"database/sql/driver"
 	"fmt"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/common/service/docker"
 	"log/slog"
 )
 
 type ImageInfoOption struct {
-	Id   string             `json:"id"`
-	Info types.ImageInspect `json:"info"`
+	Id   string                `json:"id"`
+	Info image.InspectResponse `json:"info"`
 }
 
 func (c ImageInfoOption) Value() (driver.Value, error) {
@@ -30,7 +30,7 @@ func (c *ImageInfoOption) Scan(value interface{}) error {
 		return nil
 	}
 	c.Id = id
-	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, id)
+	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, id)
 	if err != nil {
 		slog.Debug(err.Error())
 		return nil
