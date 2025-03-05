@@ -152,6 +152,7 @@ func (self Builder) ContainerCopyInspect(containerName string) (info container.I
 			}
 		}
 		if macAddress != "" {
+			// 底版本的 docker 需要兼容这一项
 			info.Config.MacAddress = macAddress
 		}
 	}

@@ -144,7 +144,7 @@ func (self Container) GetList(http *gin.Context) {
 			imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
 			if err == nil {
 				ports := make([]container.Port, 0)
-				for port, _ := range imageInfo.Config.ExposedPorts {
+				for port := range imageInfo.Config.ExposedPorts {
 					portInt, _ := strconv.Atoi(port.Port())
 					ports = append(ports, container.Port{
 						IP:          "0.0.0.0",
@@ -309,7 +309,7 @@ func (self Container) Delete(http *gin.Context) {
 		// 获取该容器的网络，退出里面的容器
 		networkInfo, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, siteRow.SiteName, network.InspectOptions{})
 		if err == nil {
-			for md5, _ := range networkInfo.Containers {
+			for md5 := range networkInfo.Containers {
 				err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, siteRow.SiteName, md5, true)
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
@@ -333,8 +333,11 @@ func (self Container) Delete(http *gin.Context) {
 			slog.Debug("container delete domain", "error", err)
 		}
 	}
-	dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.ID)).Delete()
-
+	_, err = dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.ID)).Delete()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.ID, container.StopOptions{})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -367,7 +370,7 @@ func (self Container) Delete(http *gin.Context) {
 	}
 
 	if siteRow != nil {
-		dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
+		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
 		self.JsonResponseWithoutError(http, gin.H{
 			"siteId": siteRow.ID,
 			"md5":    params.Md5,
@@ -394,7 +397,9 @@ func (self Container) Export(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer out.Close()
+	defer func() {
+		_ = out.Close()
+	}()
 
 	data, err := io.ReadAll(out)
 	if err != nil {

@@ -128,7 +128,7 @@ func (self Home) WsConsole(http *gin.Context) {
 				_ = notice.Message{}.Info(".consoleDestroyPlugin", pluginName)
 
 				if webShellPlugin, err := plugin.NewPlugin(plugin.PluginWebShell, map[string]*plugin.TemplateParser{
-					"webshell": &plugin.TemplateParser{
+					"webshell": {
 						ContainerName: pluginName,
 					},
 				}); err == nil {
@@ -247,13 +247,13 @@ func (self Home) Usage(http *gin.Context) {
 		})
 		if err == nil {
 			// 去掉无用的信息
-			for i, _ := range diskUsage.Containers {
+			for i := range diskUsage.Containers {
 				diskUsage.Containers[i].Labels = make(map[string]string)
 			}
-			for i, _ := range diskUsage.Images {
+			for i := range diskUsage.Images {
 				diskUsage.Images[i].Labels = make(map[string]string)
 			}
-			for i, _ := range diskUsage.Volumes {
+			for i := range diskUsage.Volumes {
 				diskUsage.Volumes[i].Labels = make(map[string]string)
 			}
 			if !function.IsEmptyArray(diskUsage.Images) {
@@ -326,7 +326,7 @@ func (self Home) Usage(http *gin.Context) {
 			if item.HostConfig.NetworkMode == "host" {
 				imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
 				if err == nil {
-					for port, _ := range imageInfo.Config.ExposedPorts {
+					for port := range imageInfo.Config.ExposedPorts {
 						usePort = append(usePort, &portItem{
 							Name: item.Names[0],
 							Port: docker.PortItem{

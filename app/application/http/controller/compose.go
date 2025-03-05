@@ -63,10 +63,6 @@ func (self Compose) Create(http *gin.Context) {
 		dockerEnvName = docker.DefaultClientName
 	}
 
-	if params.Id == "0" || params.Id == "" {
-		params.Id = params.Name
-	}
-
 	if params.Id != "" {
 		yamlRow, _ = logic.Compose{}.Get(params.Id)
 		if yamlRow == nil {
@@ -380,7 +376,7 @@ func (self Compose) GetFromUri(http *gin.Context) {
 
 func (self Compose) Parse(http *gin.Context) {
 	type ParamsValidate struct {
-		Yaml        string           `json:"yaml" binding:"required"`
+		Yaml        []string         `json:"yaml" binding:"required"`
 		Id          string           `json:"id"`
 		Environment []docker.EnvItem `json:"environment"`
 	}
@@ -409,7 +405,8 @@ func (self Compose) Parse(http *gin.Context) {
 		if !function.IsEmptyArray(params.Environment) {
 			options = append(options, compose.WithDockerEnvItem(params.Environment...))
 		}
-		options = append(options, compose.WithYamlContent([]byte(params.Yaml)))
+		options = append(options, compose.WithYamlContent(params.Yaml...))
+
 		composer, err = compose.NewCompose(options...)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
