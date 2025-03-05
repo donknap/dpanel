@@ -35,7 +35,7 @@ type Compose struct {
 
 func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id               int32            `json:"id"`
+		Id               string           `json:"id"`
 		Title            string           `json:"title"`
 		Name             string           `json:"name" binding:"required,lowercase"`
 		Type             string           `json:"type" binding:"required"`
@@ -63,22 +63,18 @@ func (self Compose) Create(http *gin.Context) {
 		dockerEnvName = docker.DefaultClientName
 	}
 
-	if params.Id > 0 {
-		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	if params.Id == "0" || params.Id == "" {
+		params.Id = params.Name
+	}
+
+	if params.Id != "" {
+		yamlRow, _ = logic.Compose{}.Get(params.Id)
 		if yamlRow == nil {
 			self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 			return
 		}
-	} else if params.Type == accessor.ComposeTypeOutPath {
-		yamlRow, _ = logic.Compose{}.Get(params.Name)
-		if !function.IsEmptyArray(params.Environment) {
-			// 提交写入 .dpanel.env 文件
-			globalEnv := function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
-				return fmt.Sprintf("%s=%s", i.Name, i.Value), true
-			})
-			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), logic.ComposeDefaultEnvFileName)
-			_ = os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
-			err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
+		if params.Title != "" {
+			yamlRow.Title = params.Title
 		}
 	} else {
 		if params.Type == accessor.ComposeTypeStoragePath {
@@ -115,7 +111,6 @@ func (self Compose) Create(http *gin.Context) {
 	}
 
 	if params.Yaml != "" {
-		fmt.Printf("%v \n", yamlRow.Setting.GetUriFilePath())
 		err := os.MkdirAll(filepath.Dir(yamlRow.Setting.GetUriFilePath()), os.ModePerm)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -152,13 +147,26 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
+	if !function.IsEmptyArray(params.Environment) {
+		if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
+			// 如果是外部任务，不插件数据库，有变动后直接修改原文件
+			// 提交写入 .dpanel.env 文件
+			globalEnv := function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
+				return fmt.Sprintf("%s=%s", i.Name, i.Value), true
+			})
+			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), logic.ComposeDefaultEnvFileName)
+			_ = os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
+			err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
+		} else {
+			yamlRow.Setting.Environment = params.Environment
+		}
+	}
+
 	if params.DeployBackground {
 		yamlRow.Setting.Status = accessor.ComposeStatusDeploying
 	}
 
-	if params.Id > 0 {
-		yamlRow.Title = params.Title
-		yamlRow.Setting.Environment = params.Environment
+	if yamlRow.ID > 0 {
 		_, _ = dao.Compose.Updates(yamlRow)
 	} else if yamlRow.Setting.Type != accessor.ComposeTypeOutPath {
 		_ = dao.Compose.Create(yamlRow)
