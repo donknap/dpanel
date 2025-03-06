@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -159,14 +160,6 @@ func (self Store) Sync(http *gin.Context) {
 				return
 			}
 		}
-		_, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, "1panel-network", network.InspectOptions{})
-		if err != nil {
-			_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, "1panel-network", network.CreateOptions{})
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
 		appList, err = logic.Store{}.GetAppByOnePanel(params.Name)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -219,13 +212,22 @@ func (self Store) Deploy(http *gin.Context) {
 	}
 	storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(params.StoreId)).First()
 	if storeRow == nil {
-		self.JsonResponseWithError(http, errors.New("商店不存在"), 500)
+		self.JsonResponseWithError(http, notice.Message{}.New(".commonDataNotFoundOrDeleted"), 500)
 		return
+	}
+
+	if storeRow.Setting.Type == accessor.StoreTypeOnePanel {
+		if _, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, "1panel-network", network.InspectOptions{}); err != nil {
+			if _, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, "1panel-network", network.CreateOptions{}); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
 	}
 
 	composeRow, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"))...).First()
 	if composeRow != nil {
-		self.JsonResponseWithError(http, errors.New("该标识已经创建过任务，请先删除，"+params.Name), 500)
+		self.JsonResponseWithError(http, notice.Message{}.New(".storeCreateNameExists", "name", params.Name), 500)
 		return
 	}
 	envReplaceTable := compose.NewReplaceTable(map[string]compose.ReplaceFunc{

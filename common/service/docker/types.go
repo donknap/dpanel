@@ -50,11 +50,33 @@ type NetworkItem struct {
 	IpV6  string   `json:"ipV6"`
 }
 
+const (
+	EnvValueRuleRequired = 1 << iota
+	EnvValueRuleDisabled
+	_
+	_
+	_
+	_
+	_
+	_
+	_
+	_
+	EnvValueTypeNumber
+	EnvValueTypeText
+	EnvValueTypeSelect
+)
+
+type ValueRuleItem struct {
+	Kind   int         `json:"kind,omitempty"`
+	Option []ValueItem `json:"option,omitempty"`
+}
+
 type EnvItem struct {
-	Label   string `json:"label,omitempty" yaml:"label,omitempty"`
-	Default string `json:"default,omitempty" yaml:"default,omitempty"`
-	Name    string `json:"name"`
-	Value   string `json:"value"`
+	Label   string         `json:"label,omitempty" yaml:"label,omitempty"`
+	Default string         `json:"default,omitempty" yaml:"default,omitempty"`
+	Name    string         `json:"name"`
+	Value   string         `json:"value"`
+	Rule    *ValueRuleItem `json:"rule,omitempty"`
 }
 
 type ValueItem struct {

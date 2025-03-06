@@ -246,11 +246,34 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 					Value: compose.ContainerDefaultName,
 				})
 				for _, field := range fields {
-					env = append(env, docker.EnvItem{
+					envItem := docker.EnvItem{
+						Label: field["labelZh"],
 						Name:  field["envKey"],
 						Value: field["default"],
-						Label: field["labelZh"],
-					})
+						Rule: &docker.ValueRuleItem{
+							Kind:   0,
+							Option: make([]docker.ValueItem, 0),
+						},
+					}
+
+					if field["required"] == "true" {
+						envItem.Rule.Kind |= docker.EnvValueRuleRequired
+					}
+					if field["disabled"] == "true" {
+						envItem.Rule.Kind |= docker.EnvValueRuleDisabled
+					}
+
+					switch field["type"] {
+					case "text":
+						envItem.Rule.Kind |= docker.EnvValueTypeText
+						break
+					case "number":
+						envItem.Rule.Kind |= docker.EnvValueTypeNumber
+						break
+					case "select":
+						envItem.Rule.Kind |= docker.EnvValueTypeSelect
+					}
+					env = append(env, envItem)
 				}
 				storeVersionItem.Environment = env
 			}

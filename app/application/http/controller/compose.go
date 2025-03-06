@@ -160,6 +160,8 @@ func (self Compose) Create(http *gin.Context) {
 
 	if params.DeployBackground {
 		yamlRow.Setting.Status = accessor.ComposeStatusDeploying
+	} else {
+		yamlRow.Setting.Status = ""
 	}
 
 	if yamlRow.ID > 0 {

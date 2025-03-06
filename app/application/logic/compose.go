@@ -158,6 +158,8 @@ func (self Compose) FindRunTask() map[string]*entity.Compose {
 					if _, err := os.Stat(filepath.Join("/dpanel", rel)); err != nil {
 						outComposeFileExists = false
 					}
+				} else {
+					outComposeFileExists = false
 				}
 			}
 		}
