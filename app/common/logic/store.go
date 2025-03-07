@@ -245,7 +245,7 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 					Label: "容器名称",
 					Value: compose.ContainerDefaultName,
 				})
-				for _, field := range fields {
+				for index, field := range fields {
 					envItem := docker.EnvItem{
 						Label: field["labelZh"],
 						Name:  field["envKey"],
@@ -272,6 +272,14 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 						break
 					case "select":
 						envItem.Rule.Kind |= docker.EnvValueTypeSelect
+						envItem.Rule.Option = function.PluckArrayWalk(
+							yamlData.GetSliceStringMapString(fmt.Sprintf("additionalProperties.formFields.%d.values", index)),
+							func(i map[string]string) (docker.ValueItem, bool) {
+								return docker.ValueItem{
+									Name:  i["label"],
+									Value: i["value"],
+								}, true
+							})
 					}
 					env = append(env, envItem)
 				}

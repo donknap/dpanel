@@ -13,28 +13,29 @@ func (self YamlGetter) GetString(path string) string {
 }
 
 // GetStringSlice
-// 获取一个数组类型的 yaml 字段
+// 获取一个数组类型的 yaml 字段 tag
 // tag:
 //   - a
 //   - b
 func (self YamlGetter) GetStringSlice(path string) []string {
-	return cast.ToStringSlice(self.getValueInterface(path))
+	return cast.ToStringSlice(self.toSlice(self.getValueInterface(path)))
 }
 
 // GetSliceStringMapString
-// 获取一个键值对数组
+// 获取一个键值对数组 tag or tag.2.values
 // tag:
 //   - name: a
 //     age: 1
 //   - name: b
 //     age: 2
+//   - name: c
+//     age: 3
+//     values:
+//   - a
+//   - b
 func (self YamlGetter) GetSliceStringMapString(path string) []map[string]string {
 	result := make([]map[string]string, 0)
-	temp := make([]interface{}, 0)
-	for _, value := range self.getValueInterface(path).(YamlGetter) {
-		temp = append(temp, value)
-	}
-	slice := cast.ToSlice(temp)
+	slice := cast.ToSlice(self.toSlice(self.getValueInterface(path)))
 	for _, item := range slice {
 		temp := make(map[string]string)
 		for key, value := range item.(YamlGetter) {
@@ -71,17 +72,31 @@ func (self YamlGetter) getValueInterface(path string) interface{} {
 	for i := 0; i < pathLen; i++ {
 		switch t := current[pathList[i]].(type) {
 		case []interface{}:
+			// 断言是数组类型时，需要转换成 map 再继续下一步
 			temp := make(YamlGetter)
 			for j, v := range t {
-				temp[fmt.Sprintf("%d", j)] = v.(YamlGetter)
+				temp[fmt.Sprintf("%d", j)] = v
 			}
 			current = temp
 		case YamlGetter:
-			current = current[pathList[i]].(YamlGetter)
+			current = t
+		default:
+			// 类型非 map 或是 数组，直接返回数据上层再进行转换
+			return t
 		}
 		if i == pathLen-1 {
 			return current
 		}
 	}
 	return interface{}(nil)
+}
+
+func (self YamlGetter) toSlice(data interface{}) []interface{} {
+	temp := data.(YamlGetter)
+	result := make([]interface{}, len(temp))
+	for key, value := range temp {
+		k := cast.ToInt(key)
+		result[k] = value
+	}
+	return result
 }

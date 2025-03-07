@@ -28,7 +28,7 @@ type StoreAppVersionScriptItem struct {
 
 type StoreAppVersionItem struct {
 	Name        string                     `json:"name"`
-	ComposeFile string                     `json:"composeFile"`
+	ComposeFile string                     `json:"composeFile" yaml:"composeFile"`
 	Environment []docker.EnvItem           `json:"environment,omitempty"`
 	Script      *StoreAppVersionScriptItem `json:"script,omitempty"`
 }
