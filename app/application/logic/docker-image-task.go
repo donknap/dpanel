@@ -88,23 +88,11 @@ func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
 	return log.String(), nil
 }
 
-func (self DockerTask) ImageRemote(tag string, response io.ReadCloser) error {
-	if response == nil {
-		return errors.New("invalid image pull / push response")
-	}
-	defer func() {
-		if err := response.Close(); err != nil {
-			slog.Error("image pull / push close", "error", err.Error())
-		}
-	}()
-
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, tag))
-	defer wsBuffer.Close()
-
+func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 	lastSendTime := time.Now()
 	pg := make(map[string]*docker.PullProgress)
 
-	wsBuffer.OnWrite = func(p string) error {
+	w.OnWrite = func(p string) error {
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
 		pd := docker.BuildMessage{}
 		for {
@@ -143,10 +131,10 @@ func (self DockerTask) ImageRemote(tag string, response io.ReadCloser) error {
 			return nil
 		}
 		lastSendTime = time.Now()
-		wsBuffer.BroadcastMessage(pg)
+		w.BroadcastMessage(pg)
 		return nil
 	}
-	_, err := io.Copy(wsBuffer, response)
+	_, err := io.Copy(w, r)
 	if err != nil {
 		return err
 	}

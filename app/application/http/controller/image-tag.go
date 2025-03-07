@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	registry2 "github.com/donknap/dpanel/common/service/registry"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"io"
@@ -30,15 +31,20 @@ func (self Image) TagRemote(http *gin.Context) {
 	}
 	imageNameDetail := registry2.GetImageTagDetail(params.Tag)
 	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Uri())
-	slog.Debug("image remote pull", "tag", imageNameDetail.Uri())
 
 	var out io.ReadCloser
 	var err error
 	var response *http2.Response
 
+	slog.Debug("image remote", "type", params.Type, "tag", imageNameDetail.Uri())
+
 	if params.Type == "pull" {
 		_ = notice.Message{}.Info(".imagePull", "name", params.Tag)
 	}
+
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, params.Tag))
+	defer wsBuffer.Close()
+
 	for i, s := range registryConfig.Proxy {
 		imageNameDetail.Registry = s
 		if params.Type == "pull" {
@@ -52,27 +58,27 @@ func (self Image) TagRemote(http *gin.Context) {
 				if params.Platform != "" {
 					pullOption.Platform = params.Platform
 				}
-				out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, imageNameDetail.Uri(), pullOption)
+				out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption)
 			} else {
 				url := registry2.GetRegistryUrl(s)
 				if response, err = http2.Get(strings.Replace(url.String(), "https://", "http://", 0)); err == nil {
-					pullOption := image.PullOptions{
-						RegistryAuth: registryConfig.GetAuthString(),
-					}
-					if params.Platform != "" {
-						pullOption.Platform = params.Platform
-					}
-					slog.Debug("image remote pull", "tag", imageNameDetail.Uri())
-					out, err = docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, imageNameDetail.Uri(), pullOption)
-					if err != nil {
-						slog.Debug("image remote pull", "error", err)
-					}
-				} else {
 					if response != nil {
 						slog.Debug("image remote select registry url", "header", response.Header.Get(registry2.ChallengeHeader))
 					}
 					slog.Debug("image remote select registry url", "error", err)
 					continue
+				}
+				pullOption := image.PullOptions{
+					RegistryAuth: registryConfig.GetAuthString(),
+				}
+				if params.Platform != "" {
+					pullOption.Platform = params.Platform
+				}
+				slog.Debug("image remote proxy", "tag", imageNameDetail.Uri())
+
+				out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption)
+				if err != nil {
+					slog.Debug("image remote pull", "error", err)
 				}
 			}
 		} else {
@@ -103,7 +109,7 @@ func (self Image) TagRemote(http *gin.Context) {
 		return
 	}
 
-	err = logic.DockerTask{}.ImageRemote(params.Tag, out)
+	err = logic.DockerTask{}.ImageRemote(wsBuffer, out)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -252,7 +258,7 @@ func (self Image) TagSync(http *gin.Context) {
 					self.JsonResponseWithError(http, err, 500)
 					return
 				}
-				err = logic.DockerTask{}.ImageRemote(tag, out)
+				_, err = io.Copy(io.Discard, out)
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return

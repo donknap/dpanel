@@ -115,7 +115,7 @@ func (self Registry) getBearerUrl(challenge string, scope string) (*url.URL, err
 		}
 	}
 	if values["realm"] == "" || values["service"] == "" {
-		return nil, fmt.Errorf("challenge header did not include all values needed to construct an auth url")
+		return nil, errors.New("challenge header did not include all values needed to construct an auth url")
 	}
 	authURL, _ := url.Parse(values["realm"])
 	q := authURL.Query()
@@ -125,6 +125,7 @@ func (self Registry) getBearerUrl(challenge string, scope string) (*url.URL, err
 	//scope := fmt.Sprintf("registry:catalog:pull")
 	q.Add("scope", scope)
 	authURL.RawQuery = q.Encode()
+	slog.Debug("registry auth url", "url", authURL.String())
 	return authURL, nil
 }
 
@@ -142,6 +143,8 @@ func (self Registry) request(req *http.Request, scope string) (*http.Response, e
 	}
 	if token, err := self.accessToken(scope); err == nil {
 		req.Header.Set("Authorization", token)
+	} else {
+		return nil, err
 	}
 	req.Header.Set("User-Agent", docker.BuilderAuthor)
 	tr := &http.Transport{

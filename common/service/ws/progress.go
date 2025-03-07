@@ -107,3 +107,7 @@ func (self ProgressPip) IsShadow() bool {
 func (self ProgressPip) Done() <-chan struct{} {
 	return self.ctx.Done()
 }
+
+func (self ProgressPip) Context() context.Context {
+	return self.ctx
+}
