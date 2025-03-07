@@ -24,6 +24,7 @@ func (self Provider) Feature() []string {
 		FeatureTwoFa,
 		FeatureImageRemoteTag,
 		FeatureThemeUser,
+		FeatureUserManager,
 	}
 }
 

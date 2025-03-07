@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"errors"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -31,10 +30,11 @@ func (self UserFailedItem) Max() bool {
 }
 
 type UserInfo struct {
-	Fd           string `json:"fd"`
-	UserId       int32  `json:"userId"`
-	Username     string `json:"username"`
-	RoleIdentity string `json:"roleIdentity"`
+	Fd           string                          `json:"fd"`
+	UserId       int32                           `json:"userId"`
+	Username     string                          `json:"username"`
+	RoleIdentity string                          `json:"roleIdentity"`
+	Permission   *accessor.PermissionValueOption `json:"permission"`
 	jwt.RegisteredClaims
 }
 
@@ -43,6 +43,10 @@ type User struct {
 
 func (self User) GetJwtSecret() []byte {
 	return []byte(docker.BuilderAuthor + facade.GetConfig().GetString("app.name"))
+}
+
+func (self User) GetBuiltInPublicUsername() string {
+	return facade.GetConfig().GetString("common.public_user_name")
 }
 
 func (self User) GetMd5Password(password string, key string) string {
@@ -83,61 +87,4 @@ func (self User) Lock(username string, failed bool) {
 func (self User) GetUserByUsername(username string) (*entity.Setting, error) {
 	return dao.Setting.Where(dao.Setting.GroupName.Eq(SettingGroupUser)).
 		Where(gen.Cond(datatypes.JSONQuery("value").Equals(username, "username"))...).First()
-}
-
-func (self User) CreateUser(username string, userRole string) (*entity.Setting, error) {
-	user, err := self.GetUserByUsername(username)
-	if err == nil && user != nil {
-		return nil, errors.New("用户已存在")
-	}
-
-	user = &entity.Setting{
-		GroupName: SettingGroupUser,
-		Name:      userRole,
-		Value: &accessor.SettingValueOption{
-			Password:   "",
-			Username:   username,
-			Email:      "",
-			UserStatus: SettingGroupUserStatusEnable,
-		},
-	}
-
-	err = dao.Setting.Create(user)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
-}
-
-func (self User) GetResetUserInfoToken(user *entity.Setting) (string, error) {
-	jwtSecret := self.GetJwtSecret()
-	ttlSeconds := facade.GetConfig().GetInt("jwt.reset_user_info_ttl_seconds")
-	if ttlSeconds <= 0 {
-		ttlSeconds = 3600
-	}
-	jwtClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, UserInfo{
-		UserId:       0,
-		Username:     user.Value.Username,
-		RoleIdentity: user.Name,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Second * time.Duration(ttlSeconds))),
-		},
-	})
-
-	return jwtClaims.SignedString(jwtSecret)
-}
-
-func (self User) ValidateResetUserInfoToken(token string) (*UserInfo, error) {
-	myUserInfo := &UserInfo{}
-	jwtToken, err := jwt.ParseWithClaims(token, myUserInfo, func(t *jwt.Token) (interface{}, error) {
-		return self.GetJwtSecret(), nil
-	}, jwt.WithValidMethods([]string{"HS256"}))
-	if err != nil {
-		return nil, err
-	}
-	if jwtToken.Valid {
-		return myUserInfo, nil
-	}
-	return nil, errors.New("token验证失败")
 }

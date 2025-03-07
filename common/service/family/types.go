@@ -6,4 +6,5 @@ const (
 	FeatureImageRemoteTag  = "imageRemoteTag"
 	FeatureComposeStore    = "composeStore"
 	FeatureContainerDomain = "containerDomain"
+	FeatureUserManager     = "userManager"
 )

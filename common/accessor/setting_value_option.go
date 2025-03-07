@@ -11,6 +11,8 @@ type SettingValueOption struct {
 	Password           string                    `json:"password,omitempty"`
 	Email              string                    `json:"email,omitempty"`
 	UserStatus         uint8                     `json:"userStatus,omitempty"`
+	UserRemark         string                    `json:"userRemark,omitempty"`
+	RegisterAt         time.Time                 `json:"registerAt,omitempty"`
 	ServerIp           string                    `json:"serverIp,omitempty"`
 	Docker             map[string]*docker.Client `json:"docker,omitempty"`
 	DiskUsage          *DiskUsage                `json:"diskUsage,omitempty"`
