@@ -61,7 +61,7 @@ func (self Image) TagRemote(http *gin.Context) {
 				out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption)
 			} else {
 				url := registry2.GetRegistryUrl(s)
-				if response, err = http2.Get(strings.Replace(url.String(), "https://", "http://", 0)); err == nil {
+				if response, err = http2.Get(strings.Replace(url.String(), "https://", "http://", 1)); err != nil {
 					if response != nil {
 						slog.Debug("image remote select registry url", "header", response.Header.Get(registry2.ChallengeHeader))
 					}
