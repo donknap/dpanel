@@ -95,6 +95,7 @@ func (self Compose) Ls() []*composeItem {
 	options = append(options, exec.WithCtx(ctx))
 	cmd, err := exec.New(options...)
 	if err != nil {
+		slog.Debug("compose ls", "error", err)
 		return result
 	}
 	err = json.Unmarshal([]byte(cmd.RunWithResult()), &result)

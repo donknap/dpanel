@@ -26,7 +26,7 @@ func New(opts ...Option) (*Command, error) {
 		}
 	}
 
-	slog.Debug("run command", "args", c.cmd.Args)
+	slog.Debug("run command", "args", c.cmd.Args, "env", c.cmd.Env)
 
 	if c.cmd.Cancel == nil {
 		// 没有配置超时时间，则先杀掉上一个进程

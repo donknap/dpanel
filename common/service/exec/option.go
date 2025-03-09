@@ -56,7 +56,10 @@ func WithCtx(ctx context.Context) Option {
 		if function.IsEmptyArray(self.cmd.Args) {
 			return errors.New("invalid arguments")
 		}
-		self.cmd = exec.CommandContext(ctx, self.cmd.Args[0], self.cmd.Args[1:]...)
+		newCmd := exec.CommandContext(ctx, self.cmd.Args[0], self.cmd.Args[1:]...)
+		newCmd.Env = self.cmd.Env
+		newCmd.Dir = self.cmd.Dir
+		self.cmd = newCmd
 		return nil
 	}
 }
