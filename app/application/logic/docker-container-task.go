@@ -8,7 +8,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"log/slog"
 )
 
@@ -173,7 +172,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	}
 
 	if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
-		_, err := plugin.Command{}.Result(response.ID, task.BuildParams.Hook.ContainerCreate)
+		_, err := docker.Sdk.ExecResult(response.ID, task.BuildParams.Hook.ContainerCreate)
 		if err != nil {
 			slog.Debug("container create run hook", "hook", "container create", "error", err.Error())
 		}

@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	explorer2 "github.com/donknap/dpanel/common/service/docker/explorer"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
@@ -37,11 +38,8 @@ func (self Explorer) Export(http *gin.Context) {
 	}
 	var err error
 
-	zipTempFile, _ := os.CreateTemp("", "dpanel")
-	defer func() {
-		_ = os.Remove(zipTempFile.Name())
-	}()
-	zipWriter := zip.NewWriter(zipTempFile)
+	buffer := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(buffer)
 
 	// 需要先将每个目录导出，然后再合并起来。直接导出整个容器效率太低
 	for _, path := range params.FileList {
@@ -77,7 +75,7 @@ func (self Explorer) Export(http *gin.Context) {
 	}
 	http.Header("Content-Type", "application/zip")
 	http.Header("Content-Disposition", "attachment; filename=export.zip")
-	http.File(zipTempFile.Name())
+	http.Data(200, "text/plain", buffer.Bytes())
 	return
 }
 
@@ -96,9 +94,9 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("请指定绝对路径"), 500)
 		return
 	}
-	buf := new(bytes.Buffer)
+	buffer := new(bytes.Buffer)
 
-	tarWriter := tar.NewWriter(buf)
+	tarWriter := tar.NewWriter(buffer)
 	defer func() {
 		_ = tarWriter.Close()
 	}()
@@ -120,7 +118,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 	err := docker.Sdk.Client.CopyToContainer(docker.Sdk.Ctx,
 		params.Md5,
 		params.DestPath,
-		buf,
+		buffer,
 		container.CopyToContainerOptions{},
 	)
 	if err != nil {
@@ -257,7 +255,8 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	explorer, err := logic.NewExplorer(params.Md5)
+	explorer, err := explorer2.NewExplorer(explorer2.WithProxyPlugin(), explorer2.WithRootPathFromContainer(params.Md5))
+	//explorer, err := logic.NewExplorer(params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -280,30 +279,29 @@ func (self Explorer) GetPathList(http *gin.Context) {
 			tempChangeFileList[change.Path] = change
 		}
 	}
-	userList, err := explorer.GetPasswd()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 
-	for index, item := range result {
+	for _, item := range result {
 		if tempChangeFileList != nil {
 			if change, ok := tempChangeFileList[item.Name]; ok {
-				item.Change = int(change.Kind)
+				switch int(change.Kind) {
+				case 0:
+					item.Change = explorer2.FileItemChangeModified
+					break
+				case 1:
+					item.Change = explorer2.FileItemChangeAdd
+					break
+				case 2:
+					item.Change = explorer2.FileItemChangeDeleted
+					break
+				}
 			}
 		}
 		if !function.IsEmptyArray(containerInfo.Mounts) {
 			for _, mount := range containerInfo.Mounts {
 				if strings.HasPrefix(item.Name, mount.Destination) {
-					item.Change = 100
+					item.Change = explorer2.FileItemChangeVolume
 					break
 				}
-			}
-		}
-		for _, userItem := range userList {
-			if userItem.UID == item.Owner {
-				result[index].Owner = userItem.Username
-				result[index].Group = userItem.Username
 			}
 		}
 	}
@@ -407,26 +405,38 @@ func (self Explorer) Chmod(http *gin.Context) {
 	return
 }
 
-func (self Explorer) GetPasswd(http *gin.Context) {
+func (self Explorer) GetFileStat(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 string `json:"md5" binding:"required"`
+		Md5  string `json:"md5" binding:"required"`
+		Path string `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	explorer, err := logic.NewExplorer(params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	var err error
+	pathStat := container.PathStat{}
+	var target = params.Path
+	// 循环查找当前目录的链接最终对象
+	for i := 0; i < 10; i++ {
+		pathStat, err = docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Md5, target)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if pathStat.LinkTarget != "" {
+			target = pathStat.LinkTarget
+		} else {
+			break
+		}
 	}
-	userList, err := explorer.GetPasswd()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": userList,
+		"info": gin.H{
+			"isDir":  pathStat.Mode.IsDir(),
+			"target": target,
+			"name":   filepath.Base(target),
+		},
 	})
 	return
 }

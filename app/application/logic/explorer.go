@@ -3,12 +3,10 @@ package logic
 import (
 	"errors"
 	"fmt"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"log/slog"
-	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -141,58 +139,6 @@ func (self explorer) DeleteFileList(fileList []string) error {
 	return nil
 }
 
-// Deprecated: 获取文件不采用 shell 命令，不稳定且需要借助 file 命令才能判断文件类型
-// file 在 busybox 和 alpine 并未支持
-// 获取主谁的内容先把文件下载本地生成临时文件，再通过文件的导入提交修改
-func (self explorer) GetContent(file string) (string, error) {
-	if !strings.HasPrefix(file, "/") {
-		return "", errors.New("please use absolute address")
-	}
-	file = fmt.Sprintf("%s%s", self.rootPath, file)
-	cmd := fmt.Sprintf(`cat %s \n`, file)
-	out, err := plugin.Command{}.Result(self.pluginName, cmd)
-	if err != nil {
-		return "", err
-	}
-	if len(out) <= 8 {
-		return "", nil
-	}
-	return string(out[8:]), nil
-}
-
-func (self explorer) getSafePath(path string) (string, error) {
-	if !strings.HasPrefix(path, "/") {
-		return "", errors.New("please use absolute address")
-	}
-	return strings.TrimSuffix(path, "/") + "/", nil
-}
-
-// Deprecated: 无用
-func (self explorer) Create(path string, isDir bool) error {
-	path, err := self.getSafePath(path)
-	if err != nil {
-		return err
-	}
-	var cmd string
-	currentPath := fmt.Sprintf("%s%s", self.rootPath, path)
-	if isDir {
-		cmd = fmt.Sprintf(
-			`mkdir -p %s/NewFolder$(ls -al %s | grep NewFolder | wc -l | awk '{sub(/^[ \t]+/, ""); print $1+1}') \n`,
-			currentPath,
-			currentPath)
-	} else {
-		cmd = fmt.Sprintf(
-			`touch %s/NewFile$(ls -al %s | grep NewFile | wc -l | awk '{sub(/^[ \t]+/, ""); print $1+1}') \n`,
-			currentPath,
-			currentPath)
-	}
-	_, err = plugin.Command{}.Result(self.pluginName, cmd)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (self explorer) Chmod(fileList []string, mod int, hasChildren bool) error {
 	var changeFileList []string
 	for _, path := range fileList {
@@ -234,47 +180,9 @@ func (self explorer) Chown(containerName string, fileList []string, owner string
 	return nil
 }
 
-func (self explorer) GetPasswd() ([]*userItemResult, error) {
-	result := make([]*userItemResult, 0)
-	cmd := fmt.Sprintf("cd %s && cat etc/passwd \n", self.rootPath)
-	out, err := plugin.Command{}.Result(self.pluginName, cmd)
-	if err != nil {
-		return result, err
+func (self explorer) getSafePath(path string) (string, error) {
+	if !strings.HasPrefix(path, "/") {
+		return "", errors.New("please use absolute address")
 	}
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
-		if len(line) > 8 {
-			switch stdcopy.StdType(line[0]) {
-			case stdcopy.Stdin, stdcopy.Stdout, stdcopy.Stderr, stdcopy.Systemerr:
-				line = line[8:]
-			}
-		}
-		detail := strings.Split(string(line), ":")
-		if len(line) < 7 {
-			continue
-		}
-		result = append(result, &userItemResult{
-			Username:    detail[0],
-			UID:         detail[2],
-			GID:         detail[3],
-			Description: detail[4],
-			HomePath:    detail[5],
-		})
-	}
-	return result, nil
-}
-
-// Deprecated: 无用
-func (self explorer) Rename(file string, newFileName string) error {
-	if !strings.HasPrefix(file, "/") || strings.Contains(newFileName, "/") {
-		return errors.New("please use absolute address")
-	}
-	oldFile := fmt.Sprintf("%s%s", self.rootPath, file)
-	newFile := fmt.Sprintf("%s/%s", filepath.Dir(oldFile), newFileName)
-	cmd := fmt.Sprintf("mv %s %s \n", oldFile, newFile)
-	_, err := plugin.Command{}.Result(self.pluginName, cmd)
-	if err != nil {
-		return err
-	}
-	return nil
+	return strings.TrimSuffix(path, "/") + "/", nil
 }
