@@ -2,9 +2,9 @@ package accessor
 
 type DataPermissionItem struct {
 	Name    string        `json:"name"`
-	Uri     string        `json:"uri"`
-	Key     string        `json:"key,omitempty"`
-	Value   []interface{} `json:"value,omitempty"`
+	Uri     string        `json:"uri" binding:"required"`
+	Key     string        `json:"key,omitempty" binding:"required"`
+	Value   []interface{} `json:"value,omitempty" binding:"required"`
 	ShowKey string        `json:"showKey,omitempty"`
 }
 

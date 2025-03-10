@@ -27,6 +27,7 @@ var (
 var (
 	SettingGroupUser        = "user"
 	SettingGroupUserFounder = "founder"
+	SettingGroupUserManager = "manager"
 	SettingGroupUserMember  = "member"
 
 	SettingGroupUserStatusEnable  = uint8(2)
