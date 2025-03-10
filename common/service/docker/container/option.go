@@ -39,6 +39,20 @@ func WithContainerName(name string) Option {
 	}
 }
 
+func WithHostname(name string) Option {
+	return func(self *Builder) error {
+		self.containerConfig.Hostname = name
+		return nil
+	}
+}
+
+func WithDomainName(name string) Option {
+	return func(self *Builder) error {
+		self.containerConfig.Domainname = name
+		return nil
+	}
+}
+
 func WithEnv(item ...docker.EnvItem) Option {
 	return func(self *Builder) error {
 		self.containerConfig.Env = function.PluckArrayWalk(item, func(i docker.EnvItem) (string, bool) {

@@ -6,6 +6,7 @@ import (
 
 type SiteEnvOption struct {
 	Name            string                    `json:"name"`
+	Hostname        string                    `json:"hostname,omitempty"`
 	ContainerName   string                    `json:"containerName,omitempty"`
 	Environment     []docker.EnvItem          `json:"environment,omitempty"`
 	Links           []docker.LinkItem         `json:"links,omitempty"`

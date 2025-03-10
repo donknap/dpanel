@@ -110,8 +110,8 @@ func (self *Client) ReadMessage() {
 			if err != nil {
 				slog.Error("websocket", "unmarshal content", err)
 			}
-			slog.Debug("ws event", "event", content.Type, "fd", self.Fd)
 			if handler, ok := self.recvMessageHandler[content.Type]; ok {
+				slog.Debug("ws event", "event", content.Type, "fd", self.Fd, "message", recv)
 				handler(recv)
 			}
 		}
