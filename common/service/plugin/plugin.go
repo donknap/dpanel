@@ -56,7 +56,7 @@ func NewPlugin(name string, composeData map[string]*TemplateParser) (*plugin, er
 	if err != nil {
 		return nil, err
 	}
-
+	_ = os.RemoveAll(composer.Project.WorkingDir)
 	obj := &plugin{
 		asset:   asset,
 		name:    name,

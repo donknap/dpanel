@@ -179,13 +179,17 @@ func (self Home) WsConsole(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
+	startTime := time.Now()
 	dpanelContainerInfo := container.InspectResponse{}
 	new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo)
+	slog.Debug("info time", "use", time.Now().Sub(startTime).String())
 
+	startTime = time.Now()
 	info, _ := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if info.ID != "" {
 		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
 	}
+	slog.Debug("info time", "use", time.Now().Sub(startTime).String())
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,

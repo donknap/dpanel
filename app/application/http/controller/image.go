@@ -315,6 +315,7 @@ func (self Image) GetList(http *gin.Context) {
 	type ParamsValidate struct {
 		Tag   string `form:"tag" binding:"omitempty"`
 		Title string `json:"title"`
+		Use   int    `json:"use"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -390,6 +391,18 @@ func (self Image) GetList(http *gin.Context) {
 		result = imageList
 	}
 
+	if params.Use > 0 {
+		result = function.PluckArrayWalk(result, func(i image.Summary) (image.Summary, bool) {
+			if params.Use == 1 && i.Containers > 0 {
+				return i, true
+			}
+			if params.Use == 2 && i.Containers == 0 {
+				return i, true
+			}
+			return image.Summary{}, false
+		})
+	}
+
 	titleList := make(map[string]string)
 	imageDbList, err := dao.Image.Find()
 	if err == nil {
@@ -406,26 +419,40 @@ func (self Image) GetList(http *gin.Context) {
 
 func (self Image) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 string `form:"id" binding:"required"`
+		Md5          string `json:"md5" binding:"required"`
+		ShowFileList bool   `json:"showFileList"`
+		ShowLayer    bool   `json:"showLayer"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+	var err error
 
-	layer, err := docker.Sdk.Client.ImageHistory(docker.Sdk.Ctx, params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	imageDetail, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	layer := make([]image.HistoryResponseItem, 0)
+	if params.ShowLayer {
+		layer, err = docker.Sdk.Client.ImageHistory(docker.Sdk.Ctx, params.Md5)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	fileList := make([]string, 0)
+	if params.ShowFileList && !function.IsEmptyArray(imageDetail.RootFS.Layers) {
+
+	}
+
 	self.JsonResponseWithoutError(http, gin.H{
-		"layer": layer,
-		"info":  imageDetail,
+		"layer":    layer,
+		"info":     imageDetail,
+		"fileList": fileList,
 	})
 	return
 }
@@ -495,7 +522,12 @@ func (self Image) Export(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer out.Close()
+	defer func() {
+		err = out.Close()
+		if err != nil {
+			slog.Debug("image export close", "error", err)
+		}
+	}()
 
 	_, err = io.Copy(http.Writer, out)
 	if err != nil {

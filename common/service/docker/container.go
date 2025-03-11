@@ -8,15 +8,14 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/versions"
+	"github.com/donknap/dpanel/common/function"
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
-	"time"
 )
 
-// 获取单条容器 field 支持 id,name
+// ContainerByField 获取单条容器 field 支持 id,name
 func (self Builder) ContainerByField(field string, name ...string) (result map[string]*container.Summary, err error) {
 	if len(name) == 0 {
 		return nil, errors.New("please specify a container name")
@@ -70,28 +69,11 @@ func (self Builder) ContainerInfo(md5 string) (info container.InspectResponse, e
 	return info, nil
 }
 
-func (self Builder) ContainerCopyContentIn(containerName, fileName, content string, perm os.FileMode) error {
-	buf := new(bytes.Buffer)
-	tarWriter := tar.NewWriter(buf)
-	defer func() {
-		_ = tarWriter.Close()
-	}()
-	if err := tarWriter.WriteHeader(&tar.Header{
-		Name:    fileName,
-		Size:    int64(len(content)),
-		Mode:    int64(perm),
-		ModTime: time.Now(),
-	}); err != nil {
-		return err
-	}
-	if _, err := tarWriter.Write([]byte(content)); err != nil {
-		return err
-	}
-
+func (self Builder) ContainerImport(containerName string, file *ImportFile) error {
 	if err := self.Client.CopyToContainer(self.Ctx,
 		containerName,
 		"/",
-		buf,
+		file.Reader,
 		container.CopyToContainerOptions{},
 	); err != nil {
 		return err
@@ -99,45 +81,7 @@ func (self Builder) ContainerCopyContentIn(containerName, fileName, content stri
 	return nil
 }
 
-func (self Builder) ContainerCopyPathIn(containerName, containerDestPath string, file []string) error {
-	buf := new(bytes.Buffer)
-	tarWriter := tar.NewWriter(buf)
-	defer func() {
-		_ = tarWriter.Close()
-	}()
-	for _, item := range file {
-		sourceFile, err := os.Open(item)
-		if err != nil {
-			return err
-		}
-		fileInfo, _ := sourceFile.Stat()
-		if err := tarWriter.WriteHeader(&tar.Header{
-			Name:    filepath.Base(item),
-			Size:    fileInfo.Size(),
-			Mode:    int64(fileInfo.Mode()),
-			ModTime: fileInfo.ModTime(),
-		}); err != nil {
-			return err
-		}
-		content, err := io.ReadAll(sourceFile)
-		if _, err := tarWriter.Write(content); err != nil {
-			return err
-		}
-		_ = sourceFile.Close()
-	}
-
-	if err := self.Client.CopyToContainer(self.Ctx,
-		containerName,
-		containerDestPath,
-		buf,
-		container.CopyToContainerOptions{},
-	); err != nil {
-		return err
-	}
-	return nil
-}
-
-// 获取复制容器信息，兼容低版本的配置情况
+// ContainerCopyInspect 获取复制容器信息，兼容低版本的配置情况
 func (self Builder) ContainerCopyInspect(containerName string) (info container.InspectResponse, err error) {
 	info, err = Sdk.Client.ContainerInspect(Sdk.Ctx, containerName)
 	if err != nil {
@@ -159,6 +103,7 @@ func (self Builder) ContainerCopyInspect(containerName string) (info container.I
 	return info, nil
 }
 
+// ContainerExec 在容器内执行一条 shell 命令
 func (self Builder) ContainerExec(containerName string, option container.ExecOptions) (types.HijackedResponse, error) {
 	slog.Debug("docker exec", "command", option)
 	exec, err := self.Client.ContainerExecCreate(self.Ctx, containerName, option)
@@ -171,4 +116,42 @@ func (self Builder) ContainerExec(containerName string, option container.ExecOpt
 		Detach:      option.Detach,
 	}
 	return self.Client.ContainerExecAttach(self.Ctx, exec.ID, execAttachOption)
+}
+
+// ContainerReadFile 读取容器内的一个文件内容，传入 targetFile 则写入文件 否则返回一个 reader
+func (self Builder) ContainerReadFile(containerName string, inContainerPath string, targetFile *os.File) (io.Reader, error) {
+	pathStat, err := self.Client.ContainerStatPath(self.Ctx, containerName, inContainerPath)
+	if err != nil {
+		return nil, function.ErrorMessage(".containerExplorerUnzipTargetUnsupportedType")
+	}
+	if !pathStat.Mode.IsRegular() {
+		return nil, function.ErrorMessage(".containerExplorerUnzipTargetNotFile")
+	}
+	out, _, err := self.Client.CopyFromContainer(self.Ctx, containerName, inContainerPath)
+	if err != nil {
+		return nil, err
+	}
+	tarReader := tar.NewReader(out)
+	defer func() {
+		_ = out.Close()
+	}()
+
+	_, err = tarReader.Next()
+	if err != nil {
+		return nil, err
+	}
+	if targetFile != nil {
+		_, err = io.Copy(targetFile, tarReader)
+		if err != nil {
+			return nil, err
+		}
+		return targetFile, nil
+	} else {
+		buffer := new(bytes.Buffer)
+		_, err = io.Copy(buffer, tarReader)
+		if err != nil {
+			return nil, err
+		}
+		return buffer, nil
+	}
 }

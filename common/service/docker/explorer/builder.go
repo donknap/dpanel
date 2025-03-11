@@ -3,7 +3,6 @@ package explorer
 import (
 	"errors"
 	"fmt"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
@@ -20,27 +19,6 @@ const (
 	FileItemChangeDeleted  = 2
 	FileItemChangeVolume   = 100
 )
-
-type FileItemResult struct {
-	ShowName string `json:"showName"` // 展示名称，包含名称 + link 名称
-	Name     string `json:"name"`     // 完整的路径名称，不包含 linkname，eg: /dpanel/compose/compose1
-	LinkName string `json:"linkName"` // 链接目录或是文件
-	Size     string `json:"size"`
-	Mode     string `json:"mode"`
-	IsDir    bool   `json:"isDir"`
-	ModTime  string `json:"modTime"`
-	Change   int    `json:"change"`
-	Group    string `json:"group"`
-	Owner    string `json:"owner"`
-}
-
-type PasswdItemResult struct {
-	Username    string `json:"username"`
-	UID         string `json:"uid"`
-	GID         string `json:"gid"`
-	Description string `json:"description"`
-	HomePath    string `json:"homePath"`
-}
 
 func NewExplorer(opts ...Option) (*explorer, error) {
 	o := &explorer{}
@@ -61,7 +39,7 @@ type explorer struct {
 	rootPath     string
 }
 
-func (self explorer) GetListByPath(path string) (fileList []*FileItemResult, err error) {
+func (self explorer) GetListByPath(path string) (fileList []*docker.FileItemResult, err error) {
 	path, err = self.getSafePath(path)
 	if err != nil {
 		return fileList, err
@@ -106,7 +84,7 @@ func (self explorer) GetListByPath(path string) (fileList []*FileItemResult, err
 		switch row[0][0] {
 		case 'd', 'l', '-', 'b':
 			if !function.IsEmptyArray(row) {
-				item := &FileItemResult{
+				item := &docker.FileItemResult{
 					ShowName: strings.Join(row[8:], " "),
 					IsDir:    row[0][0] == 'd',
 					Size:     row[4],
@@ -139,7 +117,7 @@ func (self explorer) GetListByPath(path string) (fileList []*FileItemResult, err
 		}
 	}
 	if function.IsEmptyArray(fileList) {
-		return fileList, nil
+		return make([]*docker.FileItemResult, 0), nil
 	}
 	return fileList, nil
 }
@@ -172,58 +150,6 @@ func (self explorer) DeleteFileList(fileList []string) error {
 		deleteFileList = append(deleteFileList, path)
 	}
 	cmd := fmt.Sprintf("rm -rf \"%s\" \n", strings.Join(deleteFileList, "\" \""))
-	_, err = self.Result(cmd)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Deprecated: 获取文件不采用 shell 命令，不稳定且需要借助 file 命令才能判断文件类型
-// file 在 busybox 和 alpine 并未支持
-// 获取主谁的内容先把文件下载本地生成临时文件，再通过文件的导入提交修改
-func (self explorer) GetContent(path string) (string, error) {
-	path, err := self.getSafePath(path)
-	if err != nil {
-		return "", err
-	}
-	cmd := fmt.Sprintf(`cat %s \n`, path)
-	out, err := self.Result(cmd)
-	if err != nil {
-		return "", err
-	}
-	if len(out) <= 8 {
-		return "", nil
-	}
-	return string(out[8:]), nil
-}
-
-func (self explorer) getSafePath(path string) (string, error) {
-	if !filepath.IsAbs(path) {
-		return "", errors.New("please use absolute address")
-	}
-	return filepath.Join(self.rootPath, path), nil
-}
-
-// Deprecated: 无用
-func (self explorer) Create(path string, isDir bool) error {
-	path, err := self.getSafePath(path)
-	if err != nil {
-		return err
-	}
-	var cmd string
-	currentPath := fmt.Sprintf("%s%s", self.rootPath, path)
-	if isDir {
-		cmd = fmt.Sprintf(
-			`mkdir -p %s/NewFolder$(ls -al %s | grep NewFolder | wc -l | awk '{sub(/^[ \t]+/, ""); print $1+1}') \n`,
-			currentPath,
-			currentPath)
-	} else {
-		cmd = fmt.Sprintf(
-			`touch %s/NewFile$(ls -al %s | grep NewFile | wc -l | awk '{sub(/^[ \t]+/, ""); print $1+1}') \n`,
-			currentPath,
-			currentPath)
-	}
 	_, err = self.Result(cmd)
 	if err != nil {
 		return err
@@ -272,51 +198,13 @@ func (self explorer) Chown(containerName string, fileList []string, owner string
 	return nil
 }
 
-func (self explorer) GetPasswd() ([]*PasswdItemResult, error) {
-	result := make([]*PasswdItemResult, 0)
-	cmd := fmt.Sprintf("cd %s && cat etc/passwd \n", self.rootPath)
-	out, err := self.Result(cmd)
-	if err != nil {
-		return result, err
-	}
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
-		if len(line) > 8 {
-			switch stdcopy.StdType(line[0]) {
-			case stdcopy.Stdin, stdcopy.Stdout, stdcopy.Stderr, stdcopy.Systemerr:
-				line = line[8:]
-			}
-		}
-		detail := strings.Split(string(line), ":")
-		if len(line) < 7 {
-			continue
-		}
-		result = append(result, &PasswdItemResult{
-			Username:    detail[0],
-			UID:         detail[2],
-			GID:         detail[3],
-			Description: detail[4],
-			HomePath:    detail[5],
-		})
-	}
-	return result, nil
-}
-
-// Deprecated: 无用
-func (self explorer) Rename(file string, newFileName string) error {
-	if !strings.HasPrefix(file, "/") || strings.Contains(newFileName, "/") {
-		return errors.New("please use absolute address")
-	}
-	oldFile := fmt.Sprintf("%s%s", self.rootPath, file)
-	newFile := fmt.Sprintf("%s/%s", filepath.Dir(oldFile), newFileName)
-	cmd := fmt.Sprintf("mv %s %s \n", oldFile, newFile)
-	_, err := self.Result(cmd)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (self explorer) Result(cmd string) (string, error) {
 	return docker.Sdk.ExecResult(self.runContainer, cmd)
+}
+
+func (self explorer) getSafePath(path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		return "", errors.New("please use absolute address")
+	}
+	return filepath.Join(self.rootPath, path), nil
 }

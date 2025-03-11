@@ -2,10 +2,10 @@ package notice
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"runtime"
 	"time"
 )
@@ -50,13 +50,5 @@ func (self Message) push(level string, title string, message []string) error {
 }
 
 func (self Message) New(title string, message ...string) error {
-	jsonMessage, _ := json.Marshal(message)
-	row := &entity.Notice{
-		Title:     title,
-		Message:   string(jsonMessage),
-		Type:      TypeError,
-		CreatedAt: time.Now().Local(),
-	}
-	result, _ := json.Marshal(row)
-	return errors.New(string(result))
+	return function.ErrorMessage(title, message...)
 }
