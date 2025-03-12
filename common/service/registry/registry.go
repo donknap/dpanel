@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/storage"
 	"io"
 	"log/slog"
 	"net"
@@ -130,17 +131,18 @@ func (self Registry) getBearerUrl(challenge string, scope string) (*url.URL, err
 }
 
 func (self Registry) request(req *http.Request, scope string) (*http.Response, error) {
-	cacheKey := fmt.Sprintf("%s@%s", docker.Sdk.Name, req.URL.String())
+	cacheKey := fmt.Sprintf("registry:%s:%s", docker.Sdk.Name, req.URL.String())
 	slog.Debug("registry request", "cacheKey", cacheKey, "scope", scope)
-	if item, exists := cache.Load(cacheKey); exists && self.cacheTime > 0 {
-		c := item.(cacheItem)
-		if c.expireTime.After(time.Now()) {
+
+	if item, ok := storage.Cache.Get(cacheKey); ok {
+		if c, ok := item.(cacheItem); ok {
 			return &http.Response{
 				Header: c.header,
 				Body:   io.NopCloser(bytes.NewBuffer(c.body)),
 			}, nil
 		}
 	}
+
 	if token, err := self.accessToken(scope); err == nil {
 		req.Header.Set("Authorization", token)
 	} else {
@@ -176,12 +178,12 @@ func (self Registry) request(req *http.Request, scope string) (*http.Response, e
 
 	buffer := new(bytes.Buffer)
 	_, _ = io.Copy(buffer, res.Body)
-	cache.Store(cacheKey, cacheItem{
-		header:     res.Header,
-		body:       buffer.Bytes(),
-		expireTime: time.Now().Add(self.cacheTime).Local(),
-	})
-	res.Body = io.NopCloser(buffer)
 
+	storage.Cache.Set(cacheKey, cacheItem{
+		header: res.Header,
+		body:   buffer.Bytes(),
+	}, self.cacheTime)
+
+	res.Body = io.NopCloser(buffer)
 	return res, nil
 }

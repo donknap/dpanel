@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/registry"
 	"log/slog"
+	"net/http"
 	"strings"
 )
 
@@ -81,4 +82,9 @@ func (self Config) GetRegistryAuthString() string {
 			self.Username, self.Password,
 		)),
 	)
+}
+
+type cacheItem struct {
+	header http.Header
+	body   []byte
 }

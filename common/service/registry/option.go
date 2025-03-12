@@ -28,12 +28,6 @@ func WithCredentialsString(auth string) Option {
 }
 
 func WithRequestCacheTime(cacheTime time.Duration) Option {
-	cache.Range(func(key, value any) bool {
-		if value.(cacheItem).expireTime.Before(time.Now()) {
-			cache.Delete(key)
-		}
-		return true
-	})
 	return func(registry *Registry) {
 		registry.cacheTime = cacheTime
 	}
