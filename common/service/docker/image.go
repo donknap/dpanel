@@ -8,14 +8,17 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/mcuadros/go-version"
 	"io"
+	"log/slog"
 	"path"
+	"path/filepath"
+	"sort"
 	"strings"
 )
 
-func (self Builder) ImageInspectFileList(imageID string) (fileList []*FileItemResult, err error) {
+func (self Builder) ImageInspectFileList(imageID string) (pathInfo []*FileItemResult, path []string, err error) {
 	imageInfo, err := self.Client.ImageInspect(self.Ctx, imageID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	dockerVersion, _ := self.Client.ServerVersion(self.Ctx)
 	// 如果当前 docker 版本大于 25 则获取 rootfs 否则直接查找 tar 的文件
@@ -35,32 +38,47 @@ func (self Builder) ImageInspectFileList(imageID string) (fileList []*FileItemRe
 		if err != nil {
 			break
 		}
+		var tarFileList []*FileItemResult
 		if version.Compare(dockerVersion.Version, "25", ">=") && function.InArray(layers, header.Name) {
-			fileList, err = getFileListFromTar(tar.NewReader(tarReader))
+			tarFileList, err = getFileListFromTar(tar.NewReader(tarReader))
 			if err != nil {
-				return nil, err
+				slog.Debug("docker image inspect file list", "error", err)
+				continue
 			}
-			return fileList, nil
 		} else if strings.HasSuffix(header.Name, ".tar") {
-			fileList, err = getFileListFromTar(tar.NewReader(tarReader))
+			tarFileList, err = getFileListFromTar(tar.NewReader(tarReader))
 			if err != nil {
-				return nil, err
+				slog.Debug("docker image inspect file list", "error", err)
+				continue
 			}
-			return fileList, nil
 		} else if strings.HasSuffix(header.Name, ".tar.gz") || strings.HasSuffix(header.Name, "tgz") {
 			gzReader, err := gzip.NewReader(tarReader)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
-			fileList, err = getFileListFromTar(tar.NewReader(gzReader))
+			tarFileList, err = getFileListFromTar(tar.NewReader(gzReader))
 			_ = gzReader.Close()
 			if err != nil {
-				return nil, err
+				slog.Debug("docker image inspect file list", "error", err)
+				continue
 			}
-			return fileList, nil
 		}
+		pathInfo = append(pathInfo, tarFileList...)
 	}
-	return fileList, nil
+	sort.Slice(pathInfo, func(i, j int) bool {
+		return pathInfo[i].Name < pathInfo[j].Name
+	})
+
+	path = make([]string, 0)
+	pathInfo = function.PluckArrayWalk(pathInfo, func(i *FileItemResult) (*FileItemResult, bool) {
+		if function.InArray(path, i.Name) {
+			return nil, false
+		} else {
+			path = append(path, i.Name)
+			return i, true
+		}
+	})
+	return pathInfo, path, nil
 }
 
 func getFileListFromTar(tarReader *tar.Reader) (files []*FileItemResult, err error) {
@@ -86,7 +104,7 @@ func getFileListFromTar(tarReader *tar.Reader) (files []*FileItemResult, err err
 		default:
 			files = append(files, &FileItemResult{
 				ShowName: header.Name,
-				Name:     header.Name,
+				Name:     filepath.Join("/", header.Name),
 				LinkName: header.Linkname,
 				Size:     units.BytesSize(float64(header.Size)),
 				Mode:     fmt.Sprintf("%d", header.Mode),

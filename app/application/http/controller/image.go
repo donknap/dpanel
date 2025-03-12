@@ -419,9 +419,8 @@ func (self Image) GetList(http *gin.Context) {
 
 func (self Image) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5          string `json:"md5" binding:"required"`
-		ShowFileList bool   `json:"showFileList"`
-		ShowLayer    bool   `json:"showLayer"`
+		Md5       string `json:"md5" binding:"required"`
+		ShowLayer bool   `json:"showLayer"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -444,15 +443,9 @@ func (self Image) GetDetail(http *gin.Context) {
 		}
 	}
 
-	fileList := make([]string, 0)
-	if params.ShowFileList && !function.IsEmptyArray(imageDetail.RootFS.Layers) {
-
-	}
-
 	self.JsonResponseWithoutError(http, gin.H{
-		"layer":    layer,
-		"info":     imageDetail,
-		"fileList": fileList,
+		"layer": layer,
+		"info":  imageDetail,
 	})
 	return
 }
@@ -634,6 +627,34 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		"upgrade":     upgrade,
 		"digest":      digest,
 		"digestLocal": imageInfo.RepoDigests,
+	})
+	return
+}
+
+func (self Image) GetRootfs(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5 string `json:"md5" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	cacheKey := fmt.Sprintf("image:rootfs:%s", params.Md5)
+	if item, ok := storage.Cache.Get(cacheKey); ok {
+		self.JsonResponseWithoutError(http, gin.H{
+			"list": item,
+		})
+		return
+	}
+	var err error
+	_, pathList, err := docker.Sdk.ImageInspectFileList(params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	storage.Cache.Set(cacheKey, pathList, time.Hour)
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": pathList,
 	})
 	return
 }
