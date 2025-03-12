@@ -66,6 +66,12 @@ func (self Builder) ImageInspectFileList(imageID string) (pathInfo []*FileItemRe
 		pathInfo = append(pathInfo, tarFileList...)
 	}
 	sort.Slice(pathInfo, func(i, j int) bool {
+		return pathInfo[i].IsDir && !pathInfo[j].IsDir
+	})
+	sort.Slice(pathInfo, func(i, j int) bool {
+		if pathInfo[i].IsDir != pathInfo[j].IsDir {
+			return pathInfo[i].IsDir
+		}
 		return pathInfo[i].Name < pathInfo[j].Name
 	})
 
@@ -103,13 +109,13 @@ func getFileListFromTar(tarReader *tar.Reader) (files []*FileItemResult, err err
 			return nil, fmt.Errorf("unexptected tar file (XHeader): type=%v name=%s", header.Typeflag, name)
 		default:
 			files = append(files, &FileItemResult{
-				ShowName: header.Name,
+				ShowName: filepath.Base(header.Name),
 				Name:     filepath.Join("/", header.Name),
 				LinkName: header.Linkname,
 				Size:     units.BytesSize(float64(header.Size)),
 				Mode:     fmt.Sprintf("%d", header.Mode),
 				IsDir:    header.Typeflag == tar.TypeDir,
-				ModTime:  header.ModTime.Location().String(),
+				ModTime:  header.ModTime.String(),
 				Change:   0,
 				Group:    fmt.Sprintf("%d", header.Gid),
 				Owner:    fmt.Sprintf("%d", header.Uid),

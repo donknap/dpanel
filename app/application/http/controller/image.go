@@ -633,28 +633,49 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 
 func (self Image) GetRootfs(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 string `json:"md5" binding:"required"`
+		Md5  string `json:"md5" binding:"required"`
+		Path string `json:"path"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+
+	var pathInfoList []*docker.FileItemResult
+	var err error
+
 	cacheKey := fmt.Sprintf("image:rootfs:%s", params.Md5)
 	if item, ok := storage.Cache.Get(cacheKey); ok {
+		pathInfoList = item.([]*docker.FileItemResult)
+	} else {
+		pathInfoList, _, err = docker.Sdk.ImageInspectFileList(params.Md5)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		storage.Cache.Set(cacheKey, pathInfoList, time.Hour)
+	}
+	if params.Path == "" {
 		self.JsonResponseWithoutError(http, gin.H{
-			"list": item,
+			"list": function.PluckArrayWalk(pathInfoList, func(i *docker.FileItemResult) (string, bool) {
+				return i.Name, true
+			}),
 		})
 		return
+	} else {
+		subPathCount := strings.Count(params.Path, "/")
+		if params.Path != "/" {
+			subPathCount += 1
+		}
+		self.JsonResponseWithoutError(http, gin.H{
+			"info": function.PluckArrayWalk(pathInfoList, func(i *docker.FileItemResult) (*docker.FileItemResult, bool) {
+				if strings.HasPrefix(i.Name, params.Path) &&
+					strings.Count(i.Name, "/") == subPathCount &&
+					i.Name != params.Path {
+					return i, true
+				}
+				return i, false
+			}),
+		})
 	}
-	var err error
-	_, pathList, err := docker.Sdk.ImageInspectFileList(params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	storage.Cache.Set(cacheKey, pathList, time.Hour)
-	self.JsonResponseWithoutError(http, gin.H{
-		"list": pathList,
-	})
-	return
 }

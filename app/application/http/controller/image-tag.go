@@ -193,7 +193,6 @@ func (self Image) TagAdd(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_ = notice.Message{}.Info(".imageTagCreate", params.Tag)
 	self.JsonResponseWithoutError(http, gin.H{
 		"tag": params.Tag,
 	})
