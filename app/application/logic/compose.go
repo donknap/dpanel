@@ -275,21 +275,29 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
 	// windows 下无法使用 link 目录对齐到宿主机目录
+	linkComposePath := ""
 	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
 	for _, mount := range dpanelContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
-			if _, err := os.Stat(mount.Source); err != nil {
-				_ = os.MkdirAll(mount.Source, os.ModePerm)
-			}
-			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
-			err := os.Symlink(workingDir, filepath.Join(mount.Source, filepath.Base(workingDir)))
-			slog.Debug("make compose symlink", "workdir", workingDir, "target", filepath.Join(mount.Source, filepath.Base(workingDir)), "error", err)
-			workingDir = filepath.Join(mount.Source, filepath.Base(workingDir))
+			linkComposePath = filepath.Join(mount.Source, filepath.Base(workingDir))
 		}
+	}
+	for _, mount := range dpanelContainerInfo.Mounts {
+		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel/compose" && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
+			linkComposePath = mount.Source
+		}
+	}
+	if linkComposePath != "" {
+		if _, err := os.Stat(linkComposePath); err != nil {
+			_ = os.MkdirAll(linkComposePath, os.ModePerm)
+		}
+		// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
+		err := os.Symlink(workingDir, linkComposePath)
+		slog.Debug("make compose symlink", "workdir", workingDir, "target", linkComposePath, "error", err)
+		workingDir = linkComposePath
 	}
 
 	composeRun := self.LsItem(entity.Name)
-
 	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
 	if entity.Setting.Type == accessor.ComposeTypeRemoteUrl {
 		tempYamlFilePath := entity.Setting.GetUriFilePath()
