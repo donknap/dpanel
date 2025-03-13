@@ -51,12 +51,16 @@ func GetImageTagDetail(tag string) *ImageTagDetail {
 
 func GetRegistryUrl(address string) url.URL {
 	host := strings.TrimSuffix(address, "/")
+	protocol := "https"
+
 	parseUrl, err := url.Parse(host)
 	if err == nil && parseUrl.Host != "" {
 		host = parseUrl.Host
+		protocol = parseUrl.Scheme
 	}
+
 	return url.URL{
-		Scheme: "https",
+		Scheme: protocol,
 		Host:   host,
 		Path:   "/v2/",
 	}

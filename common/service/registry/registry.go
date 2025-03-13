@@ -99,7 +99,11 @@ func (self Registry) accessToken(scope string) (string, error) {
 		}
 		return "", err
 	}
-	return "", errors.New("unsupported challenge type from registry")
+
+	if challenge == "" {
+		slog.Debug("registry access-token unsupported challenge type from registry")
+	}
+	return "", nil
 }
 
 func (self Registry) getBearerUrl(challenge string, scope string) (*url.URL, error) {

@@ -28,6 +28,7 @@ func (self Registry) Create(http *gin.Context) {
 		ServerAddress string   `json:"serverAddress" binding:"required"`
 		Email         string   `json:"email" binding:"omitempty"`
 		Proxy         []string `json:"proxy"`
+		EnableHttp    bool     `json:"enableHttp"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -79,10 +80,11 @@ func (self Registry) Create(http *gin.Context) {
 		Title:         params.Title,
 		ServerAddress: params.ServerAddress,
 		Setting: &accessor.RegistrySettingOption{
-			Username: params.Username,
-			Email:    params.Email,
-			Proxy:    params.Proxy,
-			Password: "",
+			Username:   params.Username,
+			Email:      params.Email,
+			Proxy:      params.Proxy,
+			Password:   "",
+			EnableHttp: params.EnableHttp,
 		},
 	}
 	if params.Password != "" {
