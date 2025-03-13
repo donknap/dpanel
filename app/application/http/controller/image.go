@@ -389,6 +389,24 @@ func (self Image) GetList(http *gin.Context) {
 		result = imageList
 	}
 
+	type ImgInfo struct {
+		image.Summary
+		RepoTag string `json:"repoTag"`
+	}
+	var imgList []ImgInfo
+	for _, item := range result {
+		for _, tagName := range item.RepoTags {
+			if tagName != "<none>:<none>" {
+				info := ImgInfo{
+					Summary: item,
+					RepoTag: tagName,
+				}
+				info.RepoTags = []string{tagName}
+				imgList = append(imgList, info)
+			}
+		}
+	}
+
 	titleList := make(map[string]string)
 	imageDbList, err := dao.Image.Find()
 	if err == nil {
@@ -397,7 +415,7 @@ func (self Image) GetList(http *gin.Context) {
 		}
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"list":  result,
+		"list":  imgList,
 		"title": titleList,
 	})
 	return

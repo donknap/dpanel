@@ -33,6 +33,7 @@ type UserInfo struct {
 	Fd           string                          `json:"fd"`
 	UserId       int32                           `json:"userId"`
 	Username     string                          `json:"username"`
+	Email        string                          `json:"email"`
 	RoleIdentity string                          `json:"roleIdentity"`
 	Permission   *accessor.PermissionValueOption `json:"permission"`
 	jwt.RegisteredClaims
