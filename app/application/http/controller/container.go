@@ -240,8 +240,9 @@ func (self Container) Update(http *gin.Context) {
 
 func (self Container) Copy(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5      string `json:"md5" binding:"required"`
-		CopyName string `json:"copyName" binding:"required"`
+		Md5              string `json:"md5" binding:"required"`
+		CopyName         string `json:"copyName" binding:"required"`
+		EnableRandomPort bool   `json:"enableRandomPort"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -255,6 +256,16 @@ func (self Container) Copy(http *gin.Context) {
 	if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.CopyName); err == nil {
 		self.JsonResponseWithError(http, errors.New("指定的名称重复"), 500)
 		return
+	}
+	if params.EnableRandomPort && !function.IsEmptyMap(containerInfo.HostConfig.PortBindings) {
+		for destPort, bindings := range containerInfo.HostConfig.PortBindings {
+			if function.IsEmptyArray(bindings) {
+				continue
+			}
+			for i, _ := range bindings {
+				containerInfo.HostConfig.PortBindings[destPort][i].HostPort = ""
+			}
+		}
 	}
 	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
 		EndpointsConfig: containerInfo.NetworkSettings.Networks,

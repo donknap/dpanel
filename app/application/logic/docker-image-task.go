@@ -92,7 +92,14 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 	lastSendTime := time.Now()
 	pg := make(map[string]*docker.PullProgress)
 
+	lastJsonStr := new(bytes.Buffer)
+
 	w.OnWrite = func(p string) error {
+		if lastJsonStr.Len() > 0 {
+			p = lastJsonStr.String() + p
+			lastJsonStr.Reset()
+		}
+		slog.Error("image pull task", "data", p)
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
 		pd := docker.BuildMessage{}
 		for {
@@ -123,8 +130,9 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 					pg[pd.Id].Extracting = 100
 				}
 			} else {
-				slog.Error("docker", "image pull task", err)
-				return err
+				// 如果 json 解析失败，可能是最后一行 json 被截断了，存到中间变量中，下次再附加上。
+				lastJsonStr.Write(line)
+				slog.Debug("image pull task json", "error", err)
 			}
 		}
 		if time.Now().Sub(lastSendTime) < time.Second {
