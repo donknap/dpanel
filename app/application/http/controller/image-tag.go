@@ -128,15 +128,15 @@ func (self Image) TagRemote(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		// 取消掉加速的标签名
-		oldImageNameDetail := registry2.GetImageTagDetail(params.Tag)
-
-		if oldImageNameDetail.Registry != imageNameDetail.Registry {
-			_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, imageNameDetail.Uri(), image.RemoveOptions{})
-			if err != nil {
-				slog.Debug("image remote tag", "error", err)
-			}
-		}
+		// 不能取消掉原有的镜像文件会导致 digest 丢失
+		//oldImageNameDetail := registry2.GetImageTagDetail(params.Tag)
+		//
+		//if oldImageNameDetail.Registry != imageNameDetail.Registry {
+		//	_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, imageNameDetail.Uri(), image.RemoveOptions{})
+		//	if err != nil {
+		//		slog.Debug("image remote tag", "error", err)
+		//	}
+		//}
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
