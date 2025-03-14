@@ -288,8 +288,9 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		}
 	}
 	if linkComposePath != "" {
+		// 把软连的上级目录创建出来
 		if _, err := os.Stat(linkComposePath); err != nil {
-			_ = os.MkdirAll(linkComposePath, os.ModePerm)
+			_ = os.MkdirAll(filepath.Dir(linkComposePath), os.ModePerm)
 		}
 		// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
 		err := os.Symlink(workingDir, linkComposePath)
