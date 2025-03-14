@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"log/slog"
 	"path/filepath"
 	"regexp"
@@ -191,7 +190,7 @@ func (self explorer) Chown(containerName string, fileList []string, owner string
 		flag += " -R "
 	}
 	cmd := fmt.Sprintf("chown %s %s:%s %s \n", flag, owner, owner, strings.Join(changeFileList, " "))
-	_, err := plugin.Command{}.Result(containerName, cmd)
+	_, err := self.Result(cmd)
 	if err != nil {
 		return err
 	}

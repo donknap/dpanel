@@ -7,6 +7,7 @@ services:
     pid: host
     labels:
       - "com.dpanel.container.title=dpanel 文件管理助手"
+      - "com.dpanel.container.auto_remove=true"
     x-dpanel-service:
       image_tar:
         amd64: asset/plugin/explorer/image-amd64.tar

@@ -5,6 +5,7 @@ services:
     restart: no
     labels:
       - "com.dpanel.container.title=dpanel 备份助手"
+      - "com.dpanel.container.auto_remove=true"
     command:
 #{{- range $key, $val := .backup.Command }}
       - {{ $val | unescaped }}
