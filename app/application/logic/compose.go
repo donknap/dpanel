@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -292,12 +293,15 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		if _, err := os.Stat(linkComposePath); err != nil {
 			_ = os.MkdirAll(filepath.Dir(linkComposePath), os.ModePerm)
 		}
-		// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
-		err := os.Symlink(workingDir, linkComposePath)
-		slog.Debug("make compose symlink", "workdir", workingDir, "target", linkComposePath, "error", err)
+		if _, err := os.Readlink(linkComposePath); err != nil {
+			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
+			err := os.Symlink(workingDir, linkComposePath)
+			slog.Debug("make compose symlink", "workdir", workingDir, "target", linkComposePath, "error", err)
+		}
 		workingDir = linkComposePath
 	}
 
+	slog.Info("compose get task", "workDir", workingDir)
 	composeRun := self.LsItem(entity.Name)
 	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
 	if entity.Setting.Type == accessor.ComposeTypeRemoteUrl {
@@ -420,8 +424,8 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 			return nil, err
 		}
 		err = os.WriteFile(defaultEnvFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
-
-		options = append(options, cli.WithEnv(globalEnv))
+		// 环境变量只为生成 .env 文件，不能直接附加，可能会出来 环境变量中套用环境变量，产生值不对的情况
+		//options = append(options, cli.WithEnv(globalEnv))
 		options = append(options, cli.WithEnvFiles(defaultEnvFileName))
 		options = append(options, cli.WithDotEnv)
 	}
@@ -445,6 +449,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	// 最终Yaml需要用到原始的compose，创建一个原始的对象
 	originalComposer, err := compose.NewCompose(options...)
 	if err != nil {
+		slog.Warn("compose get task ", "error", err)
 		return nil, err
 	}
 
@@ -464,4 +469,27 @@ func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
 `), yaml...)
 	}
 	return yaml
+}
+
+func (self Compose) FilterContainer(taskName string) []*compose.ContainerResult {
+	result := make([]*compose.ContainerResult, 0)
+	if containerList, err := docker.Sdk.ContainerByField("label", "com.docker.compose.project="+taskName); err == nil {
+		result = function.PluckMapWalkArray(containerList, func(key string, item *container.Summary) (*compose.ContainerResult, bool) {
+			return &compose.ContainerResult{
+				Name:    item.Names[0],
+				Service: item.Labels["com.docker.compose.service"],
+				Publishers: function.PluckArrayWalk(item.Ports, func(i container.Port) (compose.ContainerPublishersResult, bool) {
+					return compose.ContainerPublishersResult{
+						URL:           i.IP,
+						TargetPort:    i.PrivatePort,
+						PublishedPort: i.PublicPort,
+						Protocol:      i.Type,
+					}, true
+				}),
+				State:  item.State,
+				Status: item.Status,
+			}, true
+		})
+	}
+	return result
 }

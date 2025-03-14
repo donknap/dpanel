@@ -283,7 +283,7 @@ func (self Compose) GetTask(http *gin.Context) {
 		data := gin.H{
 			"detail":        yamlRow,
 			"yaml":          yaml,
-			"containerList": make([]interface{}, 0),
+			"containerList": logic.Compose{}.FilterContainer(yamlRow.Name),
 		}
 		self.JsonResponseWithoutError(http, data)
 		return

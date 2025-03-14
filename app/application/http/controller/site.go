@@ -21,7 +21,6 @@ type Site struct {
 
 func (self Site) CreateByImage(http *gin.Context) {
 	type ParamsValidate struct {
-		Id          int32  `json:"id"`
 		SiteTitle   string `json:"siteTitle"`
 		SiteName    string `json:"siteName" binding:"required"`
 		ImageName   string `json:"imageName" binding:"required"`
@@ -73,7 +72,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 	}
 
 	// 重新部署，先删掉之前的容器
-	if params.Id != 0 || params.ContainerId != "" {
+	if params.ContainerId != "" {
 		// 删除容器时，先把记录设置为软删除，部署失败后在回收站中可以查看
 		_, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
 	}
