@@ -107,7 +107,9 @@ func (self User) Login(http *gin.Context) {
 }
 
 func (self User) GetUserInfo(http *gin.Context) {
-	result := gin.H{}
+	result := gin.H{
+		"menu": make([]string, 0),
+	}
 
 	data, exists := http.Get("userInfo")
 	if !exists {
