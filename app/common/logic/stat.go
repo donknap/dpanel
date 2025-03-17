@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/go-units"
@@ -9,7 +10,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type Stat struct {
@@ -33,7 +33,11 @@ func (self Stat) GetCommandResult() string {
 	option := docker.Sdk.GetRunCmd(
 		"stats", "-a",
 		"--format", "json", "--no-stream")
-	option = append(option, exec.WithTimeout(time.Minute*10))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+	}()
+	option = append(option, exec.WithCtx(ctx))
 	if cmd, err := exec.New(option...); err == nil {
 		return cmd.RunWithResult()
 	}

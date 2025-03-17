@@ -88,23 +88,18 @@ func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
 	return log.String(), nil
 }
 
-func (self DockerTask) ImageRemote(tag string, response io.ReadCloser) error {
-	if response == nil {
-		return errors.New("invalid image pull / push response")
-	}
-	defer func() {
-		if err := response.Close(); err != nil {
-			slog.Error("image pull / push close", "error", err.Error())
-		}
-	}()
-
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, tag))
-	defer wsBuffer.Close()
-
+func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 	lastSendTime := time.Now()
 	pg := make(map[string]*docker.PullProgress)
 
-	wsBuffer.OnWrite = func(p string) error {
+	lastJsonStr := new(bytes.Buffer)
+
+	w.OnWrite = func(p string) error {
+		if lastJsonStr.Len() > 0 {
+			p = lastJsonStr.String() + p
+			lastJsonStr.Reset()
+		}
+		slog.Debug("image pull task", "data", p)
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
 		pd := docker.BuildMessage{}
 		for {
@@ -135,18 +130,19 @@ func (self DockerTask) ImageRemote(tag string, response io.ReadCloser) error {
 					pg[pd.Id].Extracting = 100
 				}
 			} else {
-				slog.Error("docker", "image pull task", err)
-				return err
+				// 如果 json 解析失败，可能是最后一行 json 被截断了，存到中间变量中，下次再附加上。
+				lastJsonStr.Write(line)
+				slog.Debug("image pull task json", "error", err)
 			}
 		}
 		if time.Now().Sub(lastSendTime) < time.Second {
 			return nil
 		}
 		lastSendTime = time.Now()
-		wsBuffer.BroadcastMessage(pg)
+		w.BroadcastMessage(pg)
 		return nil
 	}
-	_, err := io.Copy(wsBuffer, response)
+	_, err := io.Copy(w, r)
 	if err != nil {
 		return err
 	}

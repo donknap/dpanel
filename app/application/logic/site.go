@@ -43,7 +43,7 @@ type Site struct {
 }
 
 func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnvOption, err error) {
-	info, _, err := docker.Sdk.Client.ContainerInspectWithRaw(docker.Sdk.Ctx, md5, true)
+	info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, md5)
 	if err != nil {
 		return envOption, err
 	}

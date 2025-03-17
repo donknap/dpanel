@@ -5,9 +5,11 @@ import (
 	"strings"
 )
 
+// 仅在应用商店中的配置文件 data.yml 中支持
 const (
 	ContainerDefaultName = "%CONTAINER_DEFAULT_NAME%"
 	CurrentUsername      = "%CURRENT_USERNAME%"
+	TaskIndex            = "%TASK_INDEX%"
 )
 
 type ReplaceFunc func(placeholder string) (string, error)

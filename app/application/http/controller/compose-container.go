@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
@@ -33,6 +34,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	var err error
 
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
@@ -69,6 +71,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			}
 		}
 	}
+	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
 
 	response, err := tasker.Deploy(params.DeployServiceName, params.RemoveOrphans)
 	if err != nil {
@@ -78,28 +81,35 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer wsBuffer.Close()
+
 	wsBuffer.OnWrite = func(p string) error {
 		wsBuffer.BroadcastMessage(p)
-		if strings.Contains(p, "denied: You may not login") {
-			_ = notice.Message{}.Error(".imagePullInvalidAuth")
-			return errors.New("image pull denied")
-		}
-		if strings.Contains(p, "Mounts denied") {
-			_ = notice.Message{}.Error(".containerMountPathDenied")
-			return errors.New("mounts path denied")
+		if strings.Contains(p, "Error") {
+			return errors.New(p)
 		}
 		return nil
 	}
+
 	_, err = io.Copy(wsBuffer, response)
 	if err != nil {
-		slog.Error("compose", "deploy copy error", err)
-	}
-
-	if composeRow.ID > 0 {
+		if function.ErrorHasKeyword(err, "denied: You may not login") {
+			_ = notice.Message{}.Error(".imagePullInvalidAuth")
+		} else if function.ErrorHasKeyword(err, "Mounts denied") {
+			_ = notice.Message{}.Error(".containerMountPathDenied")
+		}
+		composeRow.Setting.Message = err.Error()
+		composeRow.Setting.Status = accessor.ComposeStatusError
+	} else {
+		composeRow.Setting.Message = ""
 		composeRow.Setting.Status = ""
+	}
+	if composeRow.ID > 0 {
 		_, _ = dao.Compose.Updates(composeRow)
 	}
-	_ = notice.Message{}.Info(".composeDeploy", composeRow.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -208,7 +218,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 }
 
 func (self Compose) ContainerProcessKill(http *gin.Context) {
-	err := logic.Compose{}.Kill()
+	err := exec.Kill()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -219,15 +229,19 @@ func (self Compose) ContainerProcessKill(http *gin.Context) {
 
 func (self Compose) ContainerLog(http *gin.Context) {
 	type ParamsValidate struct {
-		Id string `json:"id" binding:"required"`
+		Id        string `json:"id" binding:"required"`
+		LineTotal int    `json:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000 5000 -1"`
+		Download  bool   `json:"download"`
+		ShowTime  bool   `json:"showTime"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		self.JsonResponseWithError(http, notice.Message{}.New(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	tasker, err := logic.Compose{}.GetTasker(composeRow)
@@ -235,10 +249,27 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	follow := true
+	if params.Download {
+		follow = false
+	}
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeComposeLog, params.Id))
-	response, err := tasker.Logs(500, true)
+
+	response, err := tasker.Logs(params.LineTotal, params.ShowTime, follow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.Download {
+		buffer, err := io.ReadAll(response)
+		_ = response.Close()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		http.Header("Content-Type", "text/plain")
+		http.Header("Content-Disposition", "attachment; filename="+params.Id+".log")
+		http.Data(200, "text/plain", buffer)
 		return
 	}
 	go func() {

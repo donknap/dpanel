@@ -2,7 +2,7 @@ package logic
 
 import (
 	"errors"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -88,8 +88,8 @@ func (self Setting) GetDockerClient(name string) (*docker.Client, error) {
 	return nil, errors.New("docker client not found " + name)
 }
 
-func (self Setting) GetDPanelInfo() (types.ContainerJSON, error) {
-	result := types.ContainerJSON{}
+func (self Setting) GetDPanelInfo() (container.InspectResponse, error) {
+	result := container.InspectResponse{}
 	if exists := self.GetByKey(SettingGroupSetting, SettingGroupSettingDPanelInfo, &result); exists {
 		return result, nil
 	}
@@ -131,7 +131,7 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 				exists = true
 				*v = setting.Value.IgnoreCheckUpgrade
 			}
-		case *types.ContainerJSON:
+		case *container.InspectResponse:
 			if setting.Value.DPanelInfo != nil {
 				exists = true
 				*v = *setting.Value.DPanelInfo

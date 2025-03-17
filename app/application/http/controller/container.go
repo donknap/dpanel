@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -82,7 +81,7 @@ func (self Container) GetList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	list := make([]types.Container, 0)
+	list := make([]container.Summary, 0)
 	filter := filters.NewArgs()
 	if params.Md5 != "" {
 		filter.Add("id", params.Md5)
@@ -99,7 +98,7 @@ func (self Container) GetList(http *gin.Context) {
 
 	if function.IsEmptyArray(list) {
 		self.JsonResponseWithoutError(http, gin.H{
-			"list": make([]types.Container, 0),
+			"list": make([]container.Port, 0),
 		})
 		return
 	}
@@ -115,7 +114,7 @@ func (self Container) GetList(http *gin.Context) {
 	}
 
 	type ContainerInfo struct {
-		types.Container
+		container.Summary
 		Name string `json:"name"`
 	}
 	var result []ContainerInfo
@@ -125,16 +124,16 @@ func (self Container) GetList(http *gin.Context) {
 		for _, item := range list {
 			if function.InArray(searchContainerIds, item.ID) {
 				result = append(result, ContainerInfo{
-					Container: item,
-					Name:      item.Names[0],
+					Summary: item,
+					Name:    item.Names[0],
 				})
 				continue
 			}
 			for _, name := range item.Names {
 				if strings.Contains(name, params.SiteTitle) {
 					result = append(result, ContainerInfo{
-						Container: item,
-						Name:      item.Names[0],
+						Summary: item,
+						Name:    item.Names[0],
 					})
 					break
 				}
@@ -143,8 +142,8 @@ func (self Container) GetList(http *gin.Context) {
 	} else {
 		for _, item := range list {
 			result = append(result, ContainerInfo{
-				Container: item,
-				Name:      item.Names[0],
+				Summary: item,
+				Name:    item.Names[0],
 			})
 		}
 	}
@@ -159,12 +158,12 @@ func (self Container) GetList(http *gin.Context) {
 		// 如果是直接绑定到宿主机网络，端口号不会显示到容器详情中
 		// 需要通过镜像允许再次获取下
 		if item.HostConfig.NetworkMode == "host" {
-			imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, item.ImageID)
+			imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
 			if err == nil {
-				ports := []types.Port{}
-				for port, _ := range imageInfo.Config.ExposedPorts {
+				ports := make([]container.Port, 0)
+				for port := range imageInfo.Config.ExposedPorts {
 					portInt, _ := strconv.Atoi(port.Port())
-					ports = append(ports, types.Port{
+					ports = append(ports, container.Port{
 						IP:          "0.0.0.0",
 						PublicPort:  uint16(portInt),
 						PrivatePort: uint16(portInt),
@@ -258,8 +257,9 @@ func (self Container) Update(http *gin.Context) {
 
 func (self Container) Copy(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5      string `json:"md5" binding:"required"`
-		CopyName string `json:"copyName" binding:"required"`
+		Md5              string `json:"md5" binding:"required"`
+		CopyName         string `json:"copyName" binding:"required"`
+		EnableRandomPort bool   `json:"enableRandomPort"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -273,6 +273,16 @@ func (self Container) Copy(http *gin.Context) {
 	if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.CopyName); err == nil {
 		self.JsonResponseWithError(http, errors.New("指定的名称重复"), 500)
 		return
+	}
+	if params.EnableRandomPort && !function.IsEmptyMap(containerInfo.HostConfig.PortBindings) {
+		for destPort, bindings := range containerInfo.HostConfig.PortBindings {
+			if function.IsEmptyArray(bindings) {
+				continue
+			}
+			for i, _ := range bindings {
+				containerInfo.HostConfig.PortBindings[destPort][i].HostPort = ""
+			}
+		}
 	}
 	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
 		EndpointsConfig: containerInfo.NetworkSettings.Networks,
@@ -327,7 +337,7 @@ func (self Container) Delete(http *gin.Context) {
 		// 获取该容器的网络，退出里面的容器
 		networkInfo, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, siteRow.SiteName, network.InspectOptions{})
 		if err == nil {
-			for md5, _ := range networkInfo.Containers {
+			for md5 := range networkInfo.Containers {
 				err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, siteRow.SiteName, md5, true)
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
@@ -351,8 +361,11 @@ func (self Container) Delete(http *gin.Context) {
 			slog.Debug("container delete domain", "error", err)
 		}
 	}
-	dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.ID)).Delete()
-
+	_, err = dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.ID)).Delete()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.ID, container.StopOptions{})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -385,7 +398,7 @@ func (self Container) Delete(http *gin.Context) {
 	}
 
 	if siteRow != nil {
-		dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
+		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
 		self.JsonResponseWithoutError(http, gin.H{
 			"siteId": siteRow.ID,
 			"md5":    params.Md5,
@@ -412,7 +425,9 @@ func (self Container) Export(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer out.Close()
+	defer func() {
+		_ = out.Close()
+	}()
 
 	data, err := io.ReadAll(out)
 	if err != nil {

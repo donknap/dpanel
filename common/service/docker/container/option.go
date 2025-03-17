@@ -3,7 +3,6 @@ package container
 import (
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -19,7 +18,7 @@ import (
 
 type Option func(builder *Builder) error
 
-func WithContainerInfo(containerInfo types.ContainerJSON) Option {
+func WithContainerInfo(containerInfo container.InspectResponse) Option {
 	return func(self *Builder) error {
 		self.containerConfig = containerInfo.Config
 		self.hostConfig = containerInfo.HostConfig
@@ -36,6 +35,20 @@ func WithContainerName(name string) Option {
 		self.containerConfig.AttachStdout = true
 		self.containerConfig.AttachStderr = true
 		self.containerConfig.Tty = true
+		return nil
+	}
+}
+
+func WithHostname(name string) Option {
+	return func(self *Builder) error {
+		self.containerConfig.Hostname = name
+		return nil
+	}
+}
+
+func WithDomainName(name string) Option {
+	return func(self *Builder) error {
+		self.containerConfig.Domainname = name
 		return nil
 	}
 }

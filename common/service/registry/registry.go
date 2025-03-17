@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/storage"
 	"io"
 	"log/slog"
 	"net"
@@ -98,7 +99,11 @@ func (self Registry) accessToken(scope string) (string, error) {
 		}
 		return "", err
 	}
-	return "", errors.New("unsupported challenge type from registry")
+
+	if challenge == "" {
+		slog.Debug("registry access-token unsupported challenge type from registry")
+	}
+	return "", nil
 }
 
 func (self Registry) getBearerUrl(challenge string, scope string) (*url.URL, error) {
@@ -115,7 +120,7 @@ func (self Registry) getBearerUrl(challenge string, scope string) (*url.URL, err
 		}
 	}
 	if values["realm"] == "" || values["service"] == "" {
-		return nil, fmt.Errorf("challenge header did not include all values needed to construct an auth url")
+		return nil, errors.New("challenge header did not include all values needed to construct an auth url")
 	}
 	authURL, _ := url.Parse(values["realm"])
 	q := authURL.Query()
@@ -125,23 +130,27 @@ func (self Registry) getBearerUrl(challenge string, scope string) (*url.URL, err
 	//scope := fmt.Sprintf("registry:catalog:pull")
 	q.Add("scope", scope)
 	authURL.RawQuery = q.Encode()
+	slog.Debug("registry auth url", "url", authURL.String())
 	return authURL, nil
 }
 
 func (self Registry) request(req *http.Request, scope string) (*http.Response, error) {
-	cacheKey := fmt.Sprintf("%s@%s", docker.Sdk.Name, req.URL.String())
+	cacheKey := fmt.Sprintf("registry:%s:%s", docker.Sdk.Name, req.URL.String())
 	slog.Debug("registry request", "cacheKey", cacheKey, "scope", scope)
-	if item, exists := cache.Load(cacheKey); exists && self.cacheTime > 0 {
-		c := item.(cacheItem)
-		if c.expireTime.After(time.Now()) {
+
+	if item, ok := storage.Cache.Get(cacheKey); ok {
+		if c, ok := item.(cacheItem); ok {
 			return &http.Response{
 				Header: c.header,
 				Body:   io.NopCloser(bytes.NewBuffer(c.body)),
 			}, nil
 		}
 	}
+
 	if token, err := self.accessToken(scope); err == nil {
 		req.Header.Set("Authorization", token)
+	} else {
+		return nil, err
 	}
 	req.Header.Set("User-Agent", docker.BuilderAuthor)
 	tr := &http.Transport{
@@ -173,12 +182,12 @@ func (self Registry) request(req *http.Request, scope string) (*http.Response, e
 
 	buffer := new(bytes.Buffer)
 	_, _ = io.Copy(buffer, res.Body)
-	cache.Store(cacheKey, cacheItem{
-		header:     res.Header,
-		body:       buffer.Bytes(),
-		expireTime: time.Now().Add(self.cacheTime).Local(),
-	})
-	res.Body = io.NopCloser(buffer)
 
+	storage.Cache.Set(cacheKey, cacheItem{
+		header: res.Header,
+		body:   buffer.Bytes(),
+	}, self.cacheTime)
+
+	res.Body = io.NopCloser(buffer)
 	return res, nil
 }

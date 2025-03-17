@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
@@ -21,6 +22,11 @@ import (
 const PluginExplorer = "explorer"
 const PluginBackup = "backup"
 const PluginWebShell = "webshell"
+
+const (
+	LabelContainerAutoRemove = "com.dpanel.container.auto_remove"
+	LabelContainerTitle      = "com.dpanel.container.title"
+)
 
 type TemplateParser struct {
 	Volumes       []string
@@ -51,11 +57,11 @@ func NewPlugin(name string, composeData map[string]*TemplateParser) (*plugin, er
 	if err != nil {
 		return nil, err
 	}
-	composer, err := compose.NewComposeWithYaml(buffer.Bytes())
+	composer, err := compose.NewCompose(compose.WithYamlContent(buffer.String()))
 	if err != nil {
 		return nil, err
 	}
-
+	_ = os.RemoveAll(composer.Project.WorkingDir)
 	obj := &plugin{
 		asset:   asset,
 		name:    name,
@@ -164,6 +170,9 @@ func (self plugin) Destroy() error {
 	}
 	containerRow, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, service.ContainerName)
 	if err == nil {
+		if v, ok := containerRow.Config.Labels[LabelContainerAutoRemove]; ok && v == "false" {
+			return nil
+		}
 		if containerRow.State.Running {
 			err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, service.ContainerName, container.StopOptions{})
 			if err != nil {
@@ -179,7 +188,7 @@ func (self plugin) Destroy() error {
 }
 
 func (self plugin) importImage(imageName string, imagePath string) error {
-	_, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, imageName)
+	_, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, imageName)
 	if err == nil {
 		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, imageName, image.RemoveOptions{
 			Force:         true,
@@ -194,7 +203,7 @@ func (self plugin) importImage(imageName string, imagePath string) error {
 	if os.IsNotExist(err) {
 		return errors.New("插件暂不支持该平台，请提交 issues ")
 	}
-	reader, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageFile, false)
+	reader, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageFile, client.ImageLoadWithQuiet(false))
 	if err != nil {
 		return err
 	}

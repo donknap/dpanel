@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -159,14 +160,6 @@ func (self Store) Sync(http *gin.Context) {
 				return
 			}
 		}
-		_, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, "1panel-network", network.InspectOptions{})
-		if err != nil {
-			_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, "1panel-network", network.CreateOptions{})
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
 		appList, err = logic.Store{}.GetAppByOnePanel(params.Name)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -208,7 +201,8 @@ func (self Store) Sync(http *gin.Context) {
 func (self Store) Deploy(http *gin.Context) {
 	type ParamsValidate struct {
 		StoreId     int32            `json:"storeId" binding:"required"`
-		Name        string           `json:"name" binding:"required"`
+		Name        string           `json:"name"`
+		AppName     string           `json:"appName"`
 		Title       string           `json:"title"`
 		ComposeFile string           `json:"composeFile" binding:"required"`
 		Environment []docker.EnvItem `json:"environment"`
@@ -217,17 +211,22 @@ func (self Store) Deploy(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(params.StoreId)).First()
+	storeRow, err := dao.Store.Where(dao.Store.ID.Eq(params.StoreId)).First()
 	if storeRow == nil {
-		self.JsonResponseWithError(http, errors.New("商店不存在"), 500)
+		slog.Debug("sto deploy get store", "error", err)
+		self.JsonResponseWithError(http, notice.Message{}.New(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 
-	composeRow, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"))...).First()
-	if composeRow != nil {
-		self.JsonResponseWithError(http, errors.New("该标识已经创建过任务，请先删除，"+params.Name), 500)
-		return
+	if storeRow.Setting.Type == accessor.StoreTypeOnePanel {
+		if _, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, "1panel-network", network.InspectOptions{}); err != nil {
+			if _, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, "1panel-network", network.CreateOptions{}); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
 	}
+
 	envReplaceTable := compose.NewReplaceTable(map[string]compose.ReplaceFunc{
 		compose.CurrentUsername: func(placeholder string) (string, error) {
 			if data, ok := http.Get("userInfo"); ok {
@@ -237,7 +236,26 @@ func (self Store) Deploy(http *gin.Context) {
 			}
 			return "", errors.New("not found userinfo")
 		},
+		compose.TaskIndex: func(placeholder string) (string, error) {
+			if total, err := dao.Compose.Where(dao.Compose.Name.Like(params.AppName + "-%")).Count(); err == nil {
+				return fmt.Sprintf("%d", total+1), nil
+			} else {
+				return fmt.Sprintf("%d", 1), nil
+			}
+		},
 	})
+
+	if strings.Contains(params.Name, compose.TaskIndex) {
+		_ = envReplaceTable.Replace(&params.Name)
+	}
+
+	params.Name = strings.ToLower(params.Name)
+	total, err := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"))...).Count()
+	if total != 0 {
+		self.JsonResponseWithError(http, notice.Message{}.New(".storeCreateNameExists", "name", params.Name), 500)
+		return
+	}
+
 	for i, item := range params.Environment {
 		v := item.Value
 		if err := envReplaceTable.Replace(&v); err == nil {
@@ -246,8 +264,9 @@ func (self Store) Deploy(http *gin.Context) {
 			slog.Debug("store replace env", "error", err)
 		}
 	}
+
 	composeNew := &entity.Compose{
-		Name:  strings.ToLower(params.Name),
+		Name:  params.Name,
 		Title: params.Title,
 		Setting: &accessor.ComposeSettingOption{
 			Type:        accessor.ComposeTypeStore,
@@ -265,7 +284,7 @@ func (self Store) Deploy(http *gin.Context) {
 		composeNew.Setting.DockerEnvName = dockerClient.Name
 	}
 
-	err := dao.Compose.Create(composeNew)
+	err = dao.Compose.Create(composeNew)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

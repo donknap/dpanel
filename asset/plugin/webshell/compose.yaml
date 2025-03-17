@@ -7,6 +7,7 @@ services:
     pid: host
     labels:
       - "com.dpanel.container.title=dpanel webshell 助手"
+      - "com.dpanel.container.auto_remove=true"
     command:
       - /bin/sh
       - "-c"

@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"fmt"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -30,6 +31,9 @@ func (self Image) GetRegistryConfig(imageName string) registry2.Config {
 	for _, item := range registryList {
 		if item.Setting == nil {
 			continue
+		}
+		if item.Setting.EnableHttp {
+			result.Proxy = append(result.Proxy, fmt.Sprintf("http://"+item.ServerAddress))
 		}
 		if !function.IsEmptyArray(item.Setting.Proxy) {
 			result.Proxy = append(result.Proxy, item.Setting.Proxy...)

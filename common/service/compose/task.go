@@ -90,13 +90,16 @@ func (self Task) Ctrl(op string) (io.Reader, error) {
 	return self.runCommand(cmd)
 }
 
-func (self Task) Logs(tail int, follow bool) (io.ReadCloser, error) {
+func (self Task) Logs(tail int, showTime, follow bool) (io.ReadCloser, error) {
 	cmd := []string{
 		//"--progress", "tty",
 		"logs",
 	}
 	if tail > 0 {
 		cmd = append(cmd, "--tail", fmt.Sprintf("%d", tail))
+	}
+	if showTime {
+		cmd = append(cmd, "-t")
 	}
 	if follow {
 		cmd = append(cmd, "-f")
@@ -108,23 +111,23 @@ func (self Task) Project() *types.Project {
 	return self.Composer.Project
 }
 
-type composeContainerResult struct {
-	Name       string                             `json:"name"`
-	Service    string                             `json:"service"`
-	Publishers []composeContainerPublishersResult `json:"publishers"`
-	State      string                             `json:"state"`
-	Status     string                             `json:"status"`
+type ContainerResult struct {
+	Name       string                      `json:"name"`
+	Service    string                      `json:"service"`
+	Publishers []ContainerPublishersResult `json:"publishers"`
+	State      string                      `json:"state"`
+	Status     string                      `json:"status"`
 }
 
-type composeContainerPublishersResult struct {
+type ContainerPublishersResult struct {
 	URL           string `json:"url"`
-	TargetPort    int    `json:"targetPort"`
-	PublishedPort int    `json:"publishedPort"`
+	TargetPort    uint16 `json:"targetPort"`
+	PublishedPort uint16 `json:"publishedPort"`
 	Protocol      string `json:"protocol"`
 }
 
-func (self Task) Ps() []*composeContainerResult {
-	result := make([]*composeContainerResult, 0)
+func (self Task) Ps() []*ContainerResult {
+	result := make([]*ContainerResult, 0)
 	if self.Name == "" {
 		return result
 	}
@@ -144,7 +147,7 @@ func (self Task) Ps() []*composeContainerResult {
 
 	if strings.HasPrefix(out, "[{") {
 		// 兼容 docker-compose ps 返回数据
-		temp := make([]*composeContainerResult, 0)
+		temp := make([]*ContainerResult, 0)
 		err := json.Unmarshal([]byte(out), &temp)
 		if err != nil {
 			slog.Debug("compose task docker-compose failed", err.Error())
@@ -163,7 +166,7 @@ func (self Task) Ps() []*composeContainerResult {
 			if isPrefix {
 				continue
 			}
-			temp := composeContainerResult{}
+			temp := ContainerResult{}
 			err = json.Unmarshal(line, &temp)
 			if err == nil {
 				result = append(result, &temp)
@@ -193,5 +196,5 @@ func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cmd.RunInTerminal(nil)
+	return cmd.RunInPip()
 }

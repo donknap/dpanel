@@ -2,7 +2,9 @@ package user
 
 import (
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
@@ -30,7 +32,16 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	founder, _ := dao.Setting.
 		Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
 		Where(dao.Setting.Name.Eq(logic.SettingGroupUserFounder)).First()
-
+	if founder == nil {
+		founder = &entity.Setting{
+			GroupName: logic.SettingGroupUser,
+			Name:      logic.SettingGroupUserFounder,
+			Value: &accessor.SettingValueOption{
+				Username: "",
+				Password: "",
+			},
+		}
+	}
 	username, err := cmd.Flags().GetString("username")
 	if err != nil {
 		color.Errorln("重置失败，", err.Error())
@@ -57,7 +68,7 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 
 	founder.Value.Password = logic.User{}.GetMd5Password(password, founder.Value.Username)
 
-	_, err = dao.Setting.Updates(founder)
+	err = dao.Setting.Save(founder)
 	if err != nil {
 		color.Errorln("重置失败，", err.Error())
 		return

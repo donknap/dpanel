@@ -49,7 +49,11 @@ func (self Container) Upgrade(http *gin.Context) {
 		containerInfo.Image = params.ImageTag
 	}
 
-	imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, containerInfo.Config.Image)
+	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, containerInfo.Config.Image)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	// 如果旧的容器使用的镜像和重新拉取的镜像一致则不升级
 	// 多平台下的其它平台镜像推送后，也会提示更新
 	// 不一定就是本平台镜像有更新

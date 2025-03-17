@@ -2,11 +2,13 @@ package logic
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -84,9 +86,17 @@ func (self Compose) Ls() []*composeItem {
 		"--format", "json",
 		"--all",
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+	}()
+
 	result := make([]*composeItem, 0)
-	cmd, err := exec.New(docker.Sdk.GetComposeCmd(command...)...)
+	options := docker.Sdk.GetComposeCmd(command...)
+	options = append(options, exec.WithCtx(ctx))
+	cmd, err := exec.New(options...)
 	if err != nil {
+		slog.Debug("compose ls", "error", err)
 		return result
 	}
 	err = json.Unmarshal([]byte(cmd.RunWithResult()), &result)
@@ -124,10 +134,6 @@ func (self Compose) LsItem(name string) *composeItem {
 	}
 }
 
-func (self Compose) Kill() error {
-	return exec.Command{}.Kill()
-}
-
 func (self Compose) FindRunTask() map[string]*entity.Compose {
 	dpanelMountDir := ""
 
@@ -154,6 +160,8 @@ func (self Compose) FindRunTask() map[string]*entity.Compose {
 					if _, err := os.Stat(filepath.Join("/dpanel", rel)); err != nil {
 						outComposeFileExists = false
 					}
+				} else {
+					outComposeFileExists = false
 				}
 			}
 		}
@@ -268,21 +276,33 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
 	// windows 下无法使用 link 目录对齐到宿主机目录
+	linkComposePath := ""
 	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
 	for _, mount := range dpanelContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
-			if _, err := os.Stat(mount.Source); err != nil {
-				_ = os.MkdirAll(mount.Source, os.ModePerm)
-			}
-			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
-			err := os.Symlink(workingDir, filepath.Join(mount.Source, filepath.Base(workingDir)))
-			slog.Debug("make compose symlink", "workdir", workingDir, "target", filepath.Join(mount.Source, filepath.Base(workingDir)), "error", err)
-			workingDir = filepath.Join(mount.Source, filepath.Base(workingDir))
+			linkComposePath = filepath.Join(mount.Source, filepath.Base(workingDir))
 		}
 	}
+	for _, mount := range dpanelContainerInfo.Mounts {
+		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel/compose" && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
+			linkComposePath = mount.Source
+		}
+	}
+	if linkComposePath != "" {
+		// 把软连的上级目录创建出来
+		if _, err := os.Stat(linkComposePath); err != nil {
+			_ = os.MkdirAll(filepath.Dir(linkComposePath), os.ModePerm)
+		}
+		if _, err := os.Readlink(linkComposePath); err != nil {
+			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
+			err := os.Symlink(workingDir, linkComposePath)
+			slog.Debug("make compose symlink", "workdir", workingDir, "target", linkComposePath, "error", err)
+		}
+		workingDir = linkComposePath
+	}
 
+	slog.Info("compose get task", "workDir", workingDir)
 	composeRun := self.LsItem(entity.Name)
-
 	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
 	if entity.Setting.Type == accessor.ComposeTypeRemoteUrl {
 		tempYamlFilePath := entity.Setting.GetUriFilePath()
@@ -357,7 +377,9 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 						return false
 					}); exists {
 						// 以 .env 中的数据为优先，因为最后保存的时候会同步一份给 .env
-						entity.Setting.Environment[i].Value = value
+						if entity.Setting.Environment[i].Value == "" {
+							entity.Setting.Environment[i].Value = value
+						}
 					} else {
 						entity.Setting.Environment = append(entity.Setting.Environment, docker.EnvItem{
 							Name:  name,
@@ -380,7 +402,9 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 					return false
 				}); exists {
 					// .dpanel.env 中的数据强制覆盖到 .env 中
-					entity.Setting.Environment[i].Value = value
+					if entity.Setting.Environment[i].Value == "" {
+						entity.Setting.Environment[i].Value = value
+					}
 				} else {
 					entity.Setting.Environment = append(entity.Setting.Environment, docker.EnvItem{
 						Name:  name,
@@ -400,8 +424,8 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 			return nil, err
 		}
 		err = os.WriteFile(defaultEnvFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
-
-		options = append(options, cli.WithEnv(globalEnv))
+		// 环境变量只为生成 .env 文件，不能直接附加，可能会出来 环境变量中套用环境变量，产生值不对的情况
+		//options = append(options, cli.WithEnv(globalEnv))
 		options = append(options, cli.WithEnvFiles(defaultEnvFileName))
 		options = append(options, cli.WithDotEnv)
 	}
@@ -425,6 +449,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	// 最终Yaml需要用到原始的compose，创建一个原始的对象
 	originalComposer, err := compose.NewCompose(options...)
 	if err != nil {
+		slog.Warn("compose get task ", "error", err)
 		return nil, err
 	}
 
@@ -444,4 +469,27 @@ func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
 `), yaml...)
 	}
 	return yaml
+}
+
+func (self Compose) FilterContainer(taskName string) []*compose.ContainerResult {
+	result := make([]*compose.ContainerResult, 0)
+	if containerList, err := docker.Sdk.ContainerByField("label", "com.docker.compose.project="+taskName); err == nil {
+		result = function.PluckMapWalkArray(containerList, func(key string, item *container.Summary) (*compose.ContainerResult, bool) {
+			return &compose.ContainerResult{
+				Name:    item.Names[0],
+				Service: item.Labels["com.docker.compose.service"],
+				Publishers: function.PluckArrayWalk(item.Ports, func(i container.Port) (compose.ContainerPublishersResult, bool) {
+					return compose.ContainerPublishersResult{
+						URL:           i.IP,
+						TargetPort:    i.PrivatePort,
+						PublishedPort: i.PublicPort,
+						Protocol:      i.Type,
+					}, true
+				}),
+				State:  item.State,
+				Status: item.Status,
+			}, true
+		})
+	}
+	return result
 }

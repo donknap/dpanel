@@ -20,7 +20,7 @@ type RunLog struct {
 
 func (self RunLog) Run(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5       string `json:"md5" binding:"required"`
+		Id        string `json:"id" binding:"required"`
 		LineTotal int    `json:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000 5000 -1"`
 		Download  bool   `json:"download"`
 		ShowTime  bool   `json:"showTime"`
@@ -39,7 +39,7 @@ func (self RunLog) Run(http *gin.Context) {
 	if params.LineTotal > 0 {
 		option.Tail = strconv.Itoa(params.LineTotal)
 	}
-	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerLog, params.Md5))
+	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerLog, params.Id))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -49,7 +49,7 @@ func (self RunLog) Run(http *gin.Context) {
 		option.Follow = false
 	}
 
-	response, err := docker.Sdk.Client.ContainerLogs(docker.Sdk.Ctx, params.Md5, option)
+	response, err := docker.Sdk.Client.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -62,7 +62,7 @@ func (self RunLog) Run(http *gin.Context) {
 			return
 		}
 		http.Header("Content-Type", "text/plain")
-		http.Header("Content-Disposition", "attachment; filename="+params.Md5+".log")
+		http.Header("Content-Disposition", "attachment; filename="+params.Id+".log")
 		http.Data(200, "text/plain", buffer.Bytes())
 		return
 	}
@@ -85,7 +85,7 @@ func (self RunLog) Run(http *gin.Context) {
 		}
 		select {
 		case <-progress.Done():
-			slog.Debug("container", "run log response close", fmt.Sprintf(ws.MessageTypeContainerLog, params.Md5))
+			slog.Debug("container", "run log response close", fmt.Sprintf(ws.MessageTypeContainerLog, params.Id))
 			_ = response.Close()
 		}
 	}()

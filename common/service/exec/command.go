@@ -26,18 +26,12 @@ func New(opts ...Option) (*Command, error) {
 		}
 	}
 
-	slog.Debug("run command", "args", c.cmd.Args)
+	slog.Debug("run command", "args", c.cmd.Args, "env", c.cmd.Env)
 
 	if c.cmd.Cancel == nil {
 		// 没有配置超时时间，则先杀掉上一个进程
 		// 如果配置了超时时间，自行处理命令的终止问题，不会在下次执行命令时被清理掉
-		if cmd != nil && cmd.Process != nil && cmd.Process.Pid > 0 {
-			err = cmd.Process.Kill()
-			if err == nil {
-				_, _ = cmd.Process.Wait()
-			}
-			slog.Debug("run command kill global cmd", "pid", cmd.Process.Pid, "name", cmd.String(), "error", err)
-		}
+		_ = Kill()
 		cmd = c.cmd
 	}
 
@@ -96,25 +90,18 @@ func (self Command) RunWithResult() string {
 		slog.Debug("run command with result", "arg", self.cmd.Args, "error", err.Error())
 		return string(out)
 	}
-	defer func() {
-		//err := self.cmd.Process.Release()
-		//if err != nil {
-		//	fmt.Printf("%v \n", err)
-		//}
-	}()
 	return string(out)
 }
 
-func (self Command) Kill() error {
-	if self.cmd != nil {
-		if self.cmd.Cancel != nil {
-			return self.cmd.Cancel()
+func Kill() error {
+	var err error
+
+	if cmd != nil && cmd.Process != nil && cmd.Process.Pid > 0 {
+		err = cmd.Process.Kill()
+		if err == nil {
+			_, _ = cmd.Process.Wait()
 		}
-		err := self.cmd.Process.Kill()
-		if err != nil {
-			return err
-		}
-		return self.cmd.Wait()
+		slog.Debug("run command kill global cmd", "pid", cmd.Process.Pid, "name", cmd.String(), "error", err)
 	}
 	return nil
 }

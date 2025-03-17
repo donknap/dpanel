@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunk=self.webpackChunk||[]).push([[6889],{96781:function(s,e,t){var n=t(67294),_=(0,n.createContext)({});e.Z=_},24943:function(s,e,t){t.r(e),t.d(e,{default:function(){return E}});var n=t(82346),_=t(67294),o=t(96781),u=t(85893);function E(){var a=(0,_.useRef)();return(0,u.jsx)(o.Z.Provider,{value:{listTableRef:a},children:(0,u.jsx)(n.Outlet,{})})}}}]);

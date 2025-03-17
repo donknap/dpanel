@@ -28,12 +28,6 @@ func WithCredentialsString(auth string) Option {
 }
 
 func WithRequestCacheTime(cacheTime time.Duration) Option {
-	cache.Range(func(key, value any) bool {
-		if value.(cacheItem).expireTime.Before(time.Now()) {
-			cache.Delete(key)
-		}
-		return true
-	})
 	return func(registry *Registry) {
 		registry.cacheTime = cacheTime
 	}
@@ -41,8 +35,7 @@ func WithRequestCacheTime(cacheTime time.Duration) Option {
 
 func WithRegistryHost(host string) Option {
 	return func(registry *Registry) {
-		host = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(host, "http://"), "https://"), "/")
-		if host == DefaultRegistryDomain {
+		if strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(host, "http://"), "https://"), "/") == DefaultRegistryDomain {
 			host = DefaultRegistryHost
 		}
 		registry.url = GetRegistryUrl(host)

@@ -3,7 +3,7 @@ package accessor
 import (
 	"database/sql/driver"
 	"fmt"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/service/docker"
 )
 
@@ -14,7 +14,7 @@ const (
 
 type SiteContainerInfoOption struct {
 	ID     string
-	Info   *types.ContainerJSON
+	Info   *container.InspectResponse
 	Err    string
 	Status int32
 }

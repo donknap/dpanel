@@ -2,7 +2,7 @@ package container
 
 import (
 	"encoding/json"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/ctrl/logic"
 	"github.com/gin-gonic/gin"
 	"github.com/gookit/color"
@@ -54,7 +54,7 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 	}
 	data := struct {
 		Data struct {
-			Info types.ContainerJSON `json:"info"`
+			Info container.InspectResponse `json:"info"`
 		} `json:"data"`
 	}{}
 	err = json.Unmarshal(raw, &data)

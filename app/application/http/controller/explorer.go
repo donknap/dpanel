@@ -6,20 +6,19 @@ import (
 	"bytes"
 	"errors"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/archive"
-	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/explorer"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
+	"github.com/h2non/filetype/matchers"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 type Explorer struct {
@@ -37,11 +36,8 @@ func (self Explorer) Export(http *gin.Context) {
 	}
 	var err error
 
-	zipTempFile, _ := os.CreateTemp("", "dpanel")
-	defer func() {
-		_ = os.Remove(zipTempFile.Name())
-	}()
-	zipWriter := zip.NewWriter(zipTempFile)
+	buffer := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(buffer)
 
 	// 需要先将每个目录导出，然后再合并起来。直接导出整个容器效率太低
 	for _, path := range params.FileList {
@@ -77,7 +73,7 @@ func (self Explorer) Export(http *gin.Context) {
 	}
 	http.Header("Content-Type", "application/zip")
 	http.Header("Content-Disposition", "attachment; filename=export.zip")
-	http.File(zipTempFile.Name())
+	http.Data(200, "text/plain", buffer.Bytes())
 	return
 }
 
@@ -93,36 +89,16 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		return
 	}
 	if !strings.HasPrefix(params.File, "/") || !strings.HasPrefix(params.DestPath, "/") {
-		self.JsonResponseWithError(http, errors.New("请指定绝对路径"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerUseAbsolutePath"), 500)
 		return
 	}
-	buf := new(bytes.Buffer)
 
-	tarWriter := tar.NewWriter(buf)
-	defer func() {
-		_ = tarWriter.Close()
-	}()
-
-	if err := tarWriter.WriteHeader(&tar.Header{
-		Name:    params.File,
-		Size:    int64(len(params.Content)),
-		Mode:    0666,
-		ModTime: time.Now(),
-	}); err != nil {
+	importFile, err := docker.NewFileImport(params.DestPath, docker.WithImportContent(params.File, []byte(params.Content), 0666))
+	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if _, err := tarWriter.Write([]byte(params.Content)); err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	err := docker.Sdk.Client.CopyToContainer(docker.Sdk.Ctx,
-		params.Md5,
-		params.DestPath,
-		buf,
-		container.CopyToContainerOptions{},
-	)
+	err = docker.Sdk.ContainerImport(params.Md5, importFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -143,42 +119,28 @@ func (self Explorer) Import(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	defer func() {
+		for _, s := range params.FileList {
+			realPath := storage.Local{}.GetRealPath(s.Path)
+			_ = os.Remove(realPath)
+		}
+	}()
 	_, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	uploadTempDir, _ := os.MkdirTemp("", "dpanel-explorer")
-	defer os.RemoveAll(uploadTempDir)
+	options := make([]docker.ImportFileOption, 0)
 	for _, item := range params.FileList {
-		sourceFile, err := os.Open(storage.Local{}.GetRealPath(item.Path))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer sourceFile.Close()
-		os.Remove(sourceFile.Name())
-
-		destFile, err := os.Create(uploadTempDir + "/" + item.Name)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer destFile.Close()
-
-		_, err = io.Copy(destFile, sourceFile)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
+		realPath := storage.Local{}.GetRealPath(item.Path)
+		options = append(options, docker.WithImportFilePath(realPath, item.Name))
 	}
-	tarReader, err := archive.Tar(uploadTempDir, archive.Uncompressed)
-	err = docker.Sdk.Client.CopyToContainer(docker.Sdk.Ctx,
-		params.Md5,
-		params.DestPath,
-		tarReader,
-		container.CopyToContainerOptions{},
-	)
+	importFile, err := docker.NewFileImport(params.DestPath, options...)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = docker.Sdk.ContainerImport(params.Md5, importFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -189,19 +151,48 @@ func (self Explorer) Import(http *gin.Context) {
 
 func (self Explorer) Unzip(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5  string `json:"md5" binding:"required"`
-		File string `json:"file" binding:"required"`
+		Md5  string   `json:"md5" binding:"required"`
+		File []string `json:"file" binding:"required"`
+		Path string   `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	explorer, err := logic.NewExplorer(params.Md5)
+	options := make([]docker.ImportFileOption, 0)
+	for _, path := range params.File {
+		targetFile, _ := os.CreateTemp("", "dpanel-explorer")
+		defer func() {
+			_ = targetFile.Close()
+			_ = os.Remove(targetFile.Name())
+		}()
+		_, err := docker.Sdk.ContainerReadFile(params.Md5, path, targetFile)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		fileType, _ := filetype.MatchFile(targetFile.Name())
+		switch fileType {
+		case matchers.TypeZip:
+			options = append(options, docker.WithImportZipFile(targetFile.Name()))
+			break
+		case matchers.TypeTar:
+			options = append(options, docker.WithImportTarFile(targetFile.Name()))
+			break
+		case matchers.TypeGz:
+			options = append(options, docker.WithImportTarGzFile(targetFile.Name()))
+			break
+		default:
+			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerTargetUnsupportedType"), 500)
+			return
+		}
+	}
+	importFile, err := docker.NewFileImport(params.Path, options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = explorer.Unzip(filepath.Dir(params.File), filepath.Base(params.File))
+	err = docker.Sdk.ContainerImport(params.Md5, importFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -229,12 +220,12 @@ func (self Explorer) Delete(http *gin.Context) {
 			return
 		}
 	}
-	explorer, err := logic.NewExplorer(params.Md5)
+	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Md5))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = explorer.DeleteFileList(params.FileList)
+	err = builder.DeleteFileList(params.FileList)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -257,12 +248,12 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	explorer, err := logic.NewExplorer(params.Md5)
+	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Md5))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	result, err := explorer.GetListByPath(params.Path)
+	result, err := builder.GetListByPath(params.Path)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -280,30 +271,29 @@ func (self Explorer) GetPathList(http *gin.Context) {
 			tempChangeFileList[change.Path] = change
 		}
 	}
-	userList, err := explorer.GetPasswd()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 
-	for index, item := range result {
+	for _, item := range result {
 		if tempChangeFileList != nil {
 			if change, ok := tempChangeFileList[item.Name]; ok {
-				item.Change = int(change.Kind)
+				switch int(change.Kind) {
+				case 0:
+					item.Change = explorer.FileItemChangeModified
+					break
+				case 1:
+					item.Change = explorer.FileItemChangeAdd
+					break
+				case 2:
+					item.Change = explorer.FileItemChangeDeleted
+					break
+				}
 			}
 		}
 		if !function.IsEmptyArray(containerInfo.Mounts) {
 			for _, mount := range containerInfo.Mounts {
 				if strings.HasPrefix(item.Name, mount.Destination) {
-					item.Change = 100
+					item.Change = explorer.FileItemChangeVolume
 					break
 				}
-			}
-		}
-		for _, userItem := range userList {
-			if userItem.UID == item.Owner {
-				result[index].Owner = userItem.Username
-				result[index].Group = userItem.Username
 			}
 		}
 	}
@@ -327,48 +317,38 @@ func (self Explorer) GetContent(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("超过1M的文件请通过导入&导出修改文件"), 500)
 		return
 	}
-	out, _, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Md5, params.File)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	tempFile, err := os.CreateTemp("", "dpanel-explorer")
 	if err != nil {
 		slog.Error("explorer", "get content", err)
 	}
-	defer os.Remove(tempFile.Name())
+	defer func() {
+		_ = os.Remove(tempFile.Name())
+	}()
 
-	tarReader := tar.NewReader(out)
-	for {
-		file, err := tarReader.Next()
-		if err != nil {
-			break
-		}
-		if file.Typeflag != tar.TypeReg {
-			continue
-		}
-		if file.Name != filepath.Base(params.File) {
-			continue
-		}
-		_, err = io.Copy(tempFile, tarReader)
-		if err != nil {
-			slog.Error("explorer", "get content", err)
-		}
-	}
-	_ = out.Close()
-	content, err := os.ReadFile(tempFile.Name())
+	_, err = docker.Sdk.ContainerReadFile(params.Md5, params.File, tempFile)
 	if err != nil {
-		self.JsonResponseWithError(http, errors.New("获取文件失败"), 500)
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fileType, _ := filetype.Match(content)
+	_, err = tempFile.Seek(0, io.SeekStart)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	content, err := io.ReadAll(tempFile)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileType, _ := filetype.MatchFile(tempFile.Name())
 	if fileType == filetype.Unknown {
 		self.JsonResponseWithoutError(http, gin.H{
 			"content": string(content),
 		})
 		return
 	} else {
-		self.JsonResponseWithError(http, errors.New("文件类型不支持在线编辑"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerContentUnsupportedType"), 500)
 		return
 	}
 }
@@ -385,18 +365,18 @@ func (self Explorer) Chmod(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	explorer, err := logic.NewExplorer(params.Md5)
+	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Md5))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = explorer.Chmod(params.FileList, params.Mod, params.HasChildren)
+	err = builder.Chmod(params.FileList, params.Mod, params.HasChildren)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	if params.Owner != "" {
-		err = explorer.Chown(params.Md5, params.FileList, params.Owner, params.HasChildren)
+		err = builder.Chown(params.Md5, params.FileList, params.Owner, params.HasChildren)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -407,26 +387,38 @@ func (self Explorer) Chmod(http *gin.Context) {
 	return
 }
 
-func (self Explorer) GetPasswd(http *gin.Context) {
+func (self Explorer) GetFileStat(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 string `json:"md5" binding:"required"`
+		Md5  string `json:"md5" binding:"required"`
+		Path string `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	explorer, err := logic.NewExplorer(params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	var err error
+	pathStat := container.PathStat{}
+	var target = params.Path
+	// 循环查找当前目录的链接最终对象
+	for i := 0; i < 10; i++ {
+		pathStat, err = docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Md5, target)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if pathStat.LinkTarget != "" {
+			target = pathStat.LinkTarget
+		} else {
+			break
+		}
 	}
-	userList, err := explorer.GetPasswd()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": userList,
+		"info": gin.H{
+			"isDir":  pathStat.Mode.IsDir(),
+			"target": target,
+			"name":   filepath.Base(target),
+		},
 	})
 	return
 }

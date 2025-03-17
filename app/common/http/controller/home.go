@@ -128,7 +128,7 @@ func (self Home) WsConsole(http *gin.Context) {
 				_ = notice.Message{}.Info(".consoleDestroyPlugin", pluginName)
 
 				if webShellPlugin, err := plugin.NewPlugin(plugin.PluginWebShell, map[string]*plugin.TemplateParser{
-					"webshell": &plugin.TemplateParser{
+					"webshell": {
 						ContainerName: pluginName,
 					},
 				}); err == nil {
@@ -179,13 +179,17 @@ func (self Home) WsConsole(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
-	dpanelContainerInfo := types.ContainerJSON{}
+	startTime := time.Now()
+	dpanelContainerInfo := container.InspectResponse{}
 	new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo)
+	slog.Debug("info time", "use", time.Now().Sub(startTime).String())
 
+	startTime = time.Now()
 	info, _ := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if info.ID != "" {
 		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
 	}
+	slog.Debug("info time", "use", time.Now().Sub(startTime).String())
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,
@@ -247,13 +251,13 @@ func (self Home) Usage(http *gin.Context) {
 		})
 		if err == nil {
 			// 去掉无用的信息
-			for i, _ := range diskUsage.Containers {
+			for i := range diskUsage.Containers {
 				diskUsage.Containers[i].Labels = make(map[string]string)
 			}
-			for i, _ := range diskUsage.Images {
+			for i := range diskUsage.Images {
 				diskUsage.Images[i].Labels = make(map[string]string)
 			}
-			for i, _ := range diskUsage.Volumes {
+			for i := range diskUsage.Volumes {
 				diskUsage.Volumes[i].Labels = make(map[string]string)
 			}
 			if !function.IsEmptyArray(diskUsage.Images) {
@@ -276,7 +280,7 @@ func (self Home) Usage(http *gin.Context) {
 				})
 			}
 
-			logic.Setting{}.Save(&entity.Setting{
+			_ = logic.Setting{}.Save(&entity.Setting{
 				GroupName: logic.SettingGroupSetting,
 				Name:      logic.SettingGroupSettingDiskUsage,
 				Value: &accessor.SettingValueOption{
@@ -324,9 +328,9 @@ func (self Home) Usage(http *gin.Context) {
 			}
 			usePort := make([]*portItem, 0)
 			if item.HostConfig.NetworkMode == "host" {
-				imageInfo, _, err := docker.Sdk.Client.ImageInspectWithRaw(docker.Sdk.Ctx, item.ImageID)
+				imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
 				if err == nil {
-					for port, _ := range imageInfo.Config.ExposedPorts {
+					for port := range imageInfo.Config.ExposedPorts {
 						usePort = append(usePort, &portItem{
 							Name: item.Names[0],
 							Port: docker.PortItem{
@@ -436,7 +440,7 @@ func (self Home) GetStatList(http *gin.Context) {
 }
 
 func (self Home) UpgradeScript(http *gin.Context) {
-	dpanelContainerInfo := types.ContainerJSON{}
+	dpanelContainerInfo := container.InspectResponse{}
 	if exists := new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo); !exists {
 		self.JsonResponseWithError(http, notice.Message{}.New(".systemUpgradeDPanelNotFound"), 500)
 		return

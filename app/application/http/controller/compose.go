@@ -5,12 +5,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
@@ -33,14 +35,15 @@ type Compose struct {
 
 func (self Compose) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id           int32            `json:"id"`
-		Title        string           `json:"title"`
-		Name         string           `json:"name" binding:"required,lowercase"`
-		Type         string           `json:"type" binding:"required"`
-		Yaml         string           `json:"yaml"`
-		YamlOverride string           `json:"yamlOverride"`
-		RemoteUrl    string           `json:"remoteUrl"`
-		Environment  []docker.EnvItem `json:"environment"`
+		Id               string           `json:"id"`
+		Title            string           `json:"title"`
+		Name             string           `json:"name" binding:"required,lowercase"`
+		Type             string           `json:"type" binding:"required"`
+		Yaml             string           `json:"yaml"`
+		YamlOverride     string           `json:"yamlOverride"`
+		RemoteUrl        string           `json:"remoteUrl"`
+		Environment      []docker.EnvItem `json:"environment"`
+		DeployBackground bool             `json:"deployBackground"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -60,22 +63,14 @@ func (self Compose) Create(http *gin.Context) {
 		dockerEnvName = docker.DefaultClientName
 	}
 
-	if params.Id > 0 {
-		yamlRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(params.Id)).First()
+	if params.Id != "" {
+		yamlRow, _ = logic.Compose{}.Get(params.Id)
 		if yamlRow == nil {
 			self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
 			return
 		}
-	} else if params.Type == accessor.ComposeTypeOutPath {
-		yamlRow, _ = logic.Compose{}.Get(params.Name)
-		if !function.IsEmptyArray(params.Environment) {
-			// 提交写入 .dpanel.env 文件
-			globalEnv := function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
-				return fmt.Sprintf("%s=%s", i.Name, i.Value), true
-			})
-			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), logic.ComposeDefaultEnvFileName)
-			_ = os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
-			err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
+		if params.Title != "" {
+			yamlRow.Title = params.Title
 		}
 	} else {
 		if params.Type == accessor.ComposeTypeStoragePath {
@@ -112,7 +107,6 @@ func (self Compose) Create(http *gin.Context) {
 	}
 
 	if params.Yaml != "" {
-		fmt.Printf("%v \n", yamlRow.Setting.GetUriFilePath())
 		err := os.MkdirAll(filepath.Dir(yamlRow.Setting.GetUriFilePath()), os.ModePerm)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -149,13 +143,33 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
-	if params.Id > 0 {
-		yamlRow.Title = params.Title
-		yamlRow.Setting.Environment = params.Environment
+	if !function.IsEmptyArray(params.Environment) {
+		if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
+			// 如果是外部任务，不插件数据库，有变动后直接修改原文件
+			// 提交写入 .dpanel.env 文件
+			globalEnv := function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
+				return fmt.Sprintf("%s=%s", i.Name, i.Value), true
+			})
+			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), logic.ComposeDefaultEnvFileName)
+			_ = os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
+			err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
+		} else {
+			yamlRow.Setting.Environment = params.Environment
+		}
+	}
+
+	if params.DeployBackground {
+		yamlRow.Setting.Status = accessor.ComposeStatusDeploying
+	} else {
+		yamlRow.Setting.Status = ""
+	}
+
+	if yamlRow.ID > 0 {
 		_, _ = dao.Compose.Updates(yamlRow)
 	} else if yamlRow.Setting.Type != accessor.ComposeTypeOutPath {
 		_ = dao.Compose.Create(yamlRow)
 	}
+
 	if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
 		self.JsonResponseWithoutError(http, gin.H{
 			"id": yamlRow.Name,
@@ -218,7 +232,12 @@ func (self Compose) GetList(http *gin.Context) {
 	runComposeList := logic.Compose{}.FindRunTask()
 
 	for i, item := range composeList {
-		composeList[i].Setting.Status = accessor.ComposeStatusWaiting
+		if !function.InArray([]string{
+			accessor.ComposeStatusDeploying,
+			accessor.ComposeStatusError,
+		}, item.Setting.Status) {
+			composeList[i].Setting.Status = accessor.ComposeStatusWaiting
+		}
 
 		if find, ok := runComposeList[item.Name]; ok {
 			composeList[i].Setting.Status = find.Setting.Status
@@ -255,7 +274,18 @@ func (self Compose) GetTask(http *gin.Context) {
 	}
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		// 如果获取任务失败，可能是没有文件或是Yaml文件错误，直接返回内容待用户修改
+		yaml, err := yamlRow.Setting.GetYaml()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		data := gin.H{
+			"detail":        yamlRow,
+			"yaml":          yaml,
+			"containerList": logic.Compose{}.FilterContainer(yamlRow.Name),
+		}
+		self.JsonResponseWithoutError(http, data)
 		return
 	}
 
@@ -336,7 +366,9 @@ func (self Compose) GetFromUri(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		defer response.Body.Close()
+		defer func() {
+			_ = response.Body.Close()
+		}()
 		content, err = io.ReadAll(response.Body)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -357,27 +389,48 @@ func (self Compose) GetFromUri(http *gin.Context) {
 
 func (self Compose) Parse(http *gin.Context) {
 	type ParamsValidate struct {
-		Yaml string `json:"yaml" binding:"required"`
-		Id   string `json:"id"`
+		Yaml        []string         `json:"yaml" binding:"required"`
+		Id          string           `json:"id"`
+		Environment []docker.EnvItem `json:"environment"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+
+	var composer *compose.Wrapper
 	var err error
-	composeRow, err := logic.Compose{}.Get(params.Id)
-	if err != nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
-		return
+
+	if params.Id != "" {
+		composeRow, err := logic.Compose{}.Get(params.Id)
+		if err != nil {
+			self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+			return
+		}
+		tasker, err := logic.Compose{}.GetTasker(composeRow)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		composer = tasker.Composer
+	} else {
+		options := make([]cli.ProjectOptionsFn, 0)
+		if !function.IsEmptyArray(params.Environment) {
+			options = append(options, compose.WithDockerEnvItem(params.Environment...))
+		}
+		options = append(options, compose.WithYamlContent(params.Yaml...))
+
+		composer, err = compose.NewCompose(options...)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_ = os.RemoveAll(composer.Project.WorkingDir)
 	}
-	tasker, err := logic.Compose{}.GetTasker(composeRow)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+
 	self.JsonResponseWithoutError(http, gin.H{
-		"project":     tasker.Composer.Project,
-		"environment": tasker.Composer.Project.Environment,
+		"project":     composer.Project,
+		"environment": composer.Project.Environment,
 		"error":       "",
 	})
 	return

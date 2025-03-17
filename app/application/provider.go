@@ -77,6 +77,8 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/image/update-title", controller.Image{}.UpdateTitle)
 			cors.POST("/app/image/check-upgrade", controller.Image{}.CheckUpgrade)
 
+			cors.POST("/app/image/get-rootfs", controller.Image{}.GetRootfs)
+
 			// 文件相关
 			cors.POST("/app/explorer/export", controller.Explorer{}.Export)
 			cors.POST("/app/explorer/import", controller.Explorer{}.Import)
@@ -86,7 +88,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/explorer/delete", controller.Explorer{}.Delete)
 			cors.POST("/app/explorer/get-content", controller.Explorer{}.GetContent)
 			cors.POST("/app/explorer/chmod", controller.Explorer{}.Chmod)
-			cors.POST("/app/explorer/get-passwd", controller.Explorer{}.GetPasswd)
+			cors.POST("/app/explorer/get-file-stat", controller.Explorer{}.GetFileStat)
 
 			// 日志相关
 			cors.POST("/app/log/run", controller.RunLog{}.Run)

@@ -2,6 +2,7 @@ package logic
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/common/accessor"
@@ -45,11 +46,12 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 	}()
 	slog.Debug("store git download", "path", tempDownloadPath)
 
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*60*5)
 	cmd, err := exec.New(
 		exec.WithCommandName("git"),
 		exec.WithArgs("clone", "--depth", "1",
 			gitUrl, tempDownloadPath),
-		exec.WithTimeout(time.Second*60*5),
+		exec.WithCtx(ctx),
 	)
 	if err != nil {
 		return err
@@ -243,12 +245,43 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 					Label: "容器名称",
 					Value: compose.ContainerDefaultName,
 				})
-				for _, field := range fields {
-					env = append(env, docker.EnvItem{
+				for index, field := range fields {
+					envItem := docker.EnvItem{
+						Label: field["labelZh"],
 						Name:  field["envKey"],
 						Value: field["default"],
-						Label: field["labelZh"],
-					})
+						Rule: &docker.ValueRuleItem{
+							Kind:   0,
+							Option: make([]docker.ValueItem, 0),
+						},
+					}
+
+					if field["required"] == "true" {
+						envItem.Rule.Kind |= docker.EnvValueRuleRequired
+					}
+					if field["disabled"] == "true" {
+						envItem.Rule.Kind |= docker.EnvValueRuleDisabled
+					}
+
+					switch field["type"] {
+					case "text":
+						envItem.Rule.Kind |= docker.EnvValueTypeText
+						break
+					case "number":
+						envItem.Rule.Kind |= docker.EnvValueTypeNumber
+						break
+					case "select":
+						envItem.Rule.Kind |= docker.EnvValueTypeSelect
+						envItem.Rule.Option = function.PluckArrayWalk(
+							yamlData.GetSliceStringMapString(fmt.Sprintf("additionalProperties.formFields.%d.values", index)),
+							func(i map[string]string) (docker.ValueItem, bool) {
+								return docker.ValueItem{
+									Name:  i["label"],
+									Value: i["value"],
+								}, true
+							})
+					}
+					env = append(env, envItem)
 				}
 				storeVersionItem.Environment = env
 			}

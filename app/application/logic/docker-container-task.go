@@ -1,13 +1,13 @@
 package logic
 
 import (
+	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"log/slog"
 )
 
@@ -51,6 +51,8 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 
 	options = append(options, []builder.Option{
 		builder.WithContainerName(task.SiteName),
+		builder.WithHostname(task.BuildParams.Hostname),
+		builder.WithDomainName(fmt.Sprintf(docker.HostnameTemplate, task.SiteName)),
 		builder.WithImage(task.BuildParams.ImageName, false),
 		builder.WithEnv(task.BuildParams.Environment...),
 		builder.WithVolumesFrom(task.BuildParams.Links...),
@@ -170,7 +172,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	}
 
 	if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
-		_, err := plugin.Command{}.Result(response.ID, task.BuildParams.Hook.ContainerCreate)
+		_, err := docker.Sdk.ExecResult(response.ID, task.BuildParams.Hook.ContainerCreate)
 		if err != nil {
 			slog.Debug("container create run hook", "hook", "container create", "error", err.Error())
 		}

@@ -2,9 +2,9 @@ package exec
 
 import (
 	"context"
+	"errors"
 	"github.com/donknap/dpanel/common/function"
 	"os/exec"
-	"time"
 )
 
 type Option func(command *Command) error
@@ -34,15 +34,6 @@ func WithCommandName(commandName string) Option {
 	}
 }
 
-func WithTimeout(timeout time.Duration) Option {
-	return func(self *Command) error {
-		// 配置超时间后
-		ctx, _ := context.WithTimeout(context.Background(), timeout)
-		self.cmd = exec.CommandContext(ctx, self.cmd.Args[0], self.cmd.Args[1:]...)
-		return nil
-	}
-}
-
 func WithDir(dir string) Option {
 	return func(self *Command) error {
 		if dir == "" {
@@ -56,6 +47,19 @@ func WithDir(dir string) Option {
 func WithEnv(env []string) Option {
 	return func(self *Command) error {
 		self.cmd.Env = env
+		return nil
+	}
+}
+
+func WithCtx(ctx context.Context) Option {
+	return func(self *Command) error {
+		if function.IsEmptyArray(self.cmd.Args) {
+			return errors.New("invalid arguments")
+		}
+		newCmd := exec.CommandContext(ctx, self.cmd.Args[0], self.cmd.Args[1:]...)
+		newCmd.Env = self.cmd.Env
+		newCmd.Dir = self.cmd.Dir
+		self.cmd = newCmd
 		return nil
 	}
 }
