@@ -392,14 +392,8 @@ func (self Home) GetStatList(http *gin.Context) {
 	}
 	var err error
 
-	dockerInfo, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
 	if !params.Follow {
-		list, err := logic.Stat{}.GetStat(dockerInfo, logic.Stat{}.GetCommandResult())
+		list, err := logic.Stat{}.GetStat(logic.Stat{}.GetCommandResult())
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -430,7 +424,7 @@ func (self Home) GetStatList(http *gin.Context) {
 			http.Abort()
 			return
 		default:
-			list, err := logic.Stat{}.GetStat(dockerInfo, logic.Stat{}.GetCommandResult())
+			list, err := logic.Stat{}.GetStat(logic.Stat{}.GetCommandResult())
 			if err != nil {
 				break
 			}

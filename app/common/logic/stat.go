@@ -3,11 +3,9 @@ package logic
 import (
 	"context"
 	"encoding/json"
-	"github.com/docker/docker/api/types/system"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
-	"math"
 	"strconv"
 	"strings"
 )
@@ -44,7 +42,7 @@ func (self Stat) GetCommandResult() string {
 	return ""
 }
 
-func (self Stat) GetStat(dockerInfo system.Info, response string) ([]*statItemResult, error) {
+func (self Stat) GetStat(response string) ([]*statItemResult, error) {
 	result := make([]*statItemResult, 0)
 	statJsonItem := struct {
 		BlockIO   string
@@ -72,8 +70,9 @@ func (self Stat) GetStat(dockerInfo system.Info, response string) ([]*statItemRe
 		}
 		cpu, _ := strconv.ParseFloat(strings.TrimSuffix(statJsonItem.CPUPerc, "%"), 64)
 		// 使用率超过100%时，代表该容器使用超过1核。需要将占用转换成100%之内的占用
+		// 后端不进行转换，在前端计算在所有核心下的占用
 		if cpu > 100 {
-			cpu = math.Round(cpu/float64(dockerInfo.NCPU)*100) / 100
+			//cpu = math.Round(cpu/float64(dockerInfo.NCPU)*100) / 100
 		}
 		r.Cpu += cpu
 		if strings.Contains(statJsonItem.MemUsage, "/") {
