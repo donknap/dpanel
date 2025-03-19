@@ -13,7 +13,7 @@ import (
 type Provider struct {
 }
 
-func (providder *Provider) Register(httpServer *server.Server, consoleServer console.Console) {
+func (self *Provider) Register(httpServer *server.Server, consoleServer console.Console) {
 	slog.Debug("provider load enterprise edition")
 	new(pro.Provider).Register(httpServer)
 }

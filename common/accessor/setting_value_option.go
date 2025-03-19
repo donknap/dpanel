@@ -23,6 +23,8 @@ type SettingValueOption struct {
 	ThemeConfig        *ThemeConfig               `json:"theme,omitempty"`
 	ThemeUserConfig    *ThemeUserConfig           `json:"themeUser,omitempty"`
 	DnsApi             []DnsApi                   `json:"dnsApi,omitempty"`
+	EmailServer        *EmailServer               `json:"emailServer,omitempty"`
+	SecurityPassword   *SecurityPassword          `json:"securityPassword,omitempty"`
 }
 
 type IgnoreCheckUpgrade []string
@@ -76,4 +78,15 @@ type DnsApi struct {
 	Title      string           `json:"title,omitempty"`
 	ServerName string           `json:"serverName,omitempty"`
 	Env        []docker.EnvItem `json:"env,omitempty"`
+}
+
+type EmailServer struct {
+	Host  string `json:"host,omitempty"`
+	Port  int    `json:"port,omitempty"`
+	Email string `json:"email,omitempty"`
+	Code  string `json:"code,omitempty"`
+}
+
+type SecurityPassword struct {
+	Enable bool `json:"enable,omitempty"`
 }

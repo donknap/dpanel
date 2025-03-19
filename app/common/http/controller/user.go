@@ -10,7 +10,6 @@ import (
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/pquerna/otp/totp"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -59,13 +58,6 @@ func (self User) Login(http *gin.Context) {
 		logic.User{}.Lock(params.Username, code == "")
 	}()
 
-	var expireAddTime time.Duration
-	if params.AutoLogin {
-		expireAddTime = time.Hour * 24 * 30
-	} else {
-		expireAddTime = time.Hour * 24
-	}
-
 	currentUser, err := logic.User{}.GetUserByUsername(params.Username)
 	if err != nil {
 		self.JsonResponseWithError(http, notice.Message{}.New(".usernameOrPasswordError"), 500)
@@ -82,16 +74,7 @@ func (self User) Login(http *gin.Context) {
 
 	password := logic.User{}.GetMd5Password(params.Password, params.Username)
 	if params.Username == currentUser.Value.Username && currentUser.Value.Password == password {
-		jwtSecret := logic.User{}.GetJwtSecret()
-		jwtClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, logic.UserInfo{
-			UserId:       currentUser.ID,
-			Username:     currentUser.Value.Username,
-			RoleIdentity: currentUser.Name,
-			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(expireAddTime)),
-			},
-		})
-		code, err = jwtClaims.SignedString(jwtSecret)
+		code, err = logic.User{}.GetUserOauthToken(currentUser, params.AutoLogin)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
