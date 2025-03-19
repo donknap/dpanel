@@ -1,11 +1,8 @@
 package logic
 
 import (
-	"context"
 	"encoding/json"
 	"github.com/docker/go-units"
-	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/exec"
 	"strconv"
 	"strings"
 )
@@ -27,21 +24,6 @@ type ioItemResult struct {
 	Out int64 `json:"out"`
 }
 
-func (self Stat) GetCommandResult() string {
-	option := docker.Sdk.GetRunCmd(
-		"stats", "-a",
-		"--format", "json", "--no-stream")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-	}()
-	option = append(option, exec.WithCtx(ctx))
-	if cmd, err := exec.New(option...); err == nil {
-		return cmd.RunWithResult()
-	}
-	return ""
-}
-
 func (self Stat) GetStat(response string) ([]*statItemResult, error) {
 	result := make([]*statItemResult, 0)
 	statJsonItem := struct {
@@ -60,6 +42,13 @@ func (self Stat) GetStat(response string) ([]*statItemResult, error) {
 		if line == "" || !strings.Contains(line, "\"Name\":") {
 			continue
 		}
+		// 只取 {} 之间的数据
+		start := strings.Index(line, "{")
+		end := strings.LastIndex(line, "}")
+		if start == -1 || end == -1 {
+			continue
+		}
+		line = line[start : end+1]
 		err := json.Unmarshal([]byte(line), &statJsonItem)
 		if err != nil {
 			return nil, err
