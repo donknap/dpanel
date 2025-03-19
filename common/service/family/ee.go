@@ -20,11 +20,8 @@ func (self *Provider) Register(httpServer *server.Server, consoleServer console.
 
 func (self Provider) Feature() []string {
 	return []string{
-		"ee",
-		FeatureTwoFa,
-		FeatureImageRemoteTag,
-		FeatureThemeUser,
-		FeatureUserManager,
+		FeatureFamilyEe,
+		FeatureEnableSystemUser,
 	}
 }
 

@@ -32,7 +32,7 @@ func (self User) Login(http *gin.Context) {
 		return
 	}
 
-	if new(family.Provider).Check(family.FeatureTwoFa) {
+	if new(family.Provider).Check(family.FeatureFamilyPe) || new(family.Provider).Check(family.FeatureFamilyEe) {
 		twoFa := accessor.TwoFa{}
 		exists := logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa, &twoFa)
 		if exists && twoFa.Enable {
@@ -91,7 +91,8 @@ func (self User) Login(http *gin.Context) {
 
 func (self User) GetUserInfo(http *gin.Context) {
 	result := gin.H{
-		"menu": make([]string, 0),
+		"menu":      make([]string, 0),
+		"themeUser": make(map[string]string),
 	}
 
 	data, exists := http.Get("userInfo")
@@ -102,9 +103,7 @@ func (self User) GetUserInfo(http *gin.Context) {
 	}
 	result["user"] = data.(logic.UserInfo)
 
-	feature := []string{
-		family.FeatureComposeStore,
-	}
+	var feature []string
 	if facade.GetConfig().GetString("app.env") != "lite" && docker.Sdk.Name == docker.DefaultClientName {
 		feature = append(feature, family.FeatureContainerDomain)
 	}

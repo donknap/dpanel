@@ -1,4 +1,4 @@
-//go:build ce
+//go:build !pe && !ee
 
 package family
 
@@ -12,7 +12,7 @@ import (
 type Provider struct {
 }
 
-func (self *Provider) Register(httpServer *server.Server, consoleServer console.Console) {
+func (providder *Provider) Register(httpServer *server.Server, consoleServer console.Console) {
 	slog.Debug("provider load community edition")
 }
 

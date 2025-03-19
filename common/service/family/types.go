@@ -1,10 +1,10 @@
 package family
 
 const (
-	FeatureTwoFa           = "twoFa"
-	FeatureThemeUser       = "themeUser"
-	FeatureImageRemoteTag  = "imageRemoteTag"
-	FeatureComposeStore    = "composeStore"
-	FeatureContainerDomain = "containerDomain"
-	FeatureUserManager     = "userManager"
+	FeatureEnableTwoFa      = "canSeeEnableTwoFa"
+	FeatureEnableThemeUser  = "canSeeEnableThemeUser"
+	FeatureContainerDomain  = "canSeeEnableContainerDomain"
+	FeatureEnableSystemUser = "canSeeEnableSystemUser"
+	FeatureFamilyPe         = "canSeePe"
+	FeatureFamilyEe         = "canSeeEe"
 )
