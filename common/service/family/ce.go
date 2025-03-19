@@ -1,4 +1,4 @@
-//go:build !pe
+//go:build !pe && !ee
 
 package family
 

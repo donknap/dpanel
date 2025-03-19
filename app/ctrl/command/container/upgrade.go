@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/ctrl/logic"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
@@ -37,6 +38,9 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 	if err != nil {
 		color.Error.Println(err)
 		return
+	}
+	if dockerEnv == "" {
+		dockerEnv = docker.DefaultClientName
 	}
 	out, _, err := logic.Proxy{}.Post("/api/common/env/switch", code, gin.H{
 		"name": dockerEnv,
@@ -75,4 +79,5 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 		color.Error.Println("当前容器无可用更新镜像")
 		return
 	}
+
 }

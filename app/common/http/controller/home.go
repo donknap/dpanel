@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/registry"
@@ -22,6 +24,7 @@ import (
 	"github.com/mcuadros/go-version"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"io"
 	"log/slog"
 	"sort"
 	"strconv"
@@ -391,15 +394,25 @@ func (self Home) GetStatList(http *gin.Context) {
 		return
 	}
 	var err error
-
-	dockerInfo, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	command := []string{
+		"stats", "-a",
+		"--format", "json",
 	}
-
+	option := make([]exec.Option, 0)
 	if !params.Follow {
-		list, err := logic.Stat{}.GetStat(dockerInfo, logic.Stat{}.GetCommandResult())
+		ctx, cancel := context.WithCancel(context.Background())
+		defer func() {
+			cancel()
+		}()
+		command = append(command, "--no-stream")
+		option = append(option, docker.Sdk.GetRunCmd(command...)...)
+		option = append(option, exec.WithCtx(ctx))
+		cmd, err := exec.New(option...)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		list, err := logic.Stat{}.GetStat(cmd.RunWithResult())
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -422,21 +435,52 @@ func (self Home) GetStatList(http *gin.Context) {
 		})
 		return
 	}
-
-	for {
-		select {
-		case <-progress.Done():
-			slog.Debug("container", "container stat response close", ws.MessageTypeContainerStat)
-			http.Abort()
-			return
-		default:
-			list, err := logic.Stat{}.GetStat(dockerInfo, logic.Stat{}.GetCommandResult())
-			if err != nil {
-				break
-			}
-			progress.BroadcastMessage(list)
+	defer progress.Close()
+	lastSendTime := time.Now()
+	progress.OnWrite = func(p string) error {
+		if p == "" {
+			return nil
 		}
+		list, err := logic.Stat{}.GetStat(p)
+		if err != nil {
+			return err
+		}
+		if function.IsEmptyArray(list) {
+			return nil
+		}
+		if time.Now().Sub(lastSendTime) > 2*time.Second {
+			progress.BroadcastMessage(list)
+			lastSendTime = time.Now()
+		}
+		return nil
 	}
+
+	option = append(option, docker.Sdk.GetRunCmd(command...)...)
+	option = append(option, exec.WithCtx(progress.Context()))
+	cmd, err := exec.New(option...)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	out, err := cmd.RunInPip()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	_, err = io.Copy(progress, out)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	// 等待进程退出
+	err = cmd.Cmd().Wait()
+	if err != nil {
+		slog.Warn("home stat wait process", "error", err)
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": "",
+	})
+	return
 }
 
 func (self Home) UpgradeScript(http *gin.Context) {
