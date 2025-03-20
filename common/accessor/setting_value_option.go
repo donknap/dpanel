@@ -13,7 +13,7 @@ type SettingValueOption struct {
 	Email              string                     `json:"email,omitempty"`
 	UserStatus         uint8                      `json:"userStatus,omitempty"`
 	UserRemark         string                     `json:"userRemark,omitempty"`
-	RegisterAt         time.Time                  `json:"registerAt,omitempty"`
+	RegisterAt         *time.Time                 `json:"registerAt,omitempty"`
 	ServerIp           string                     `json:"serverIp,omitempty"`
 	Docker             map[string]*docker.Client  `json:"docker,omitempty"`
 	DiskUsage          *DiskUsage                 `json:"diskUsage,omitempty"`
@@ -24,7 +24,6 @@ type SettingValueOption struct {
 	ThemeUserConfig    *ThemeUserConfig           `json:"themeUser,omitempty"`
 	DnsApi             []DnsApi                   `json:"dnsApi,omitempty"`
 	EmailServer        *EmailServer               `json:"emailServer,omitempty"`
-	SecurityPassword   *SecurityPassword          `json:"securityPassword,omitempty"`
 }
 
 type IgnoreCheckUpgrade []string
@@ -85,8 +84,4 @@ type EmailServer struct {
 	Port  int    `json:"port,omitempty"`
 	Email string `json:"email,omitempty"`
 	Code  string `json:"code,omitempty"`
-}
-
-type SecurityPassword struct {
-	Enable bool `json:"enable,omitempty"`
 }

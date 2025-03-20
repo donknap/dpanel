@@ -189,6 +189,7 @@ func (self User) CreateFounder(http *gin.Context) {
 		return
 	}
 
+	registerAt := time.Now()
 	err := dao.Setting.Create(&entity.Setting{
 		GroupName: logic.SettingGroupUser,
 		Name:      logic.SettingGroupUserFounder,
@@ -196,7 +197,7 @@ func (self User) CreateFounder(http *gin.Context) {
 			Password:   logic.User{}.GetMd5Password(params.Password, params.Username),
 			Username:   params.Username,
 			UserStatus: logic.SettingGroupUserStatusEnable,
-			RegisterAt: time.Now(),
+			RegisterAt: &registerAt,
 		},
 	})
 	if err != nil {
