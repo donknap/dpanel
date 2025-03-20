@@ -1,10 +1,11 @@
-package family
+package types
 
 const (
 	FeatureEnableTwoFa      = "canSeeEnableTwoFa"
 	FeatureEnableThemeUser  = "canSeeEnableThemeUser"
 	FeatureContainerDomain  = "canSeeEnableContainerDomain"
 	FeatureEnableSystemUser = "canSeeEnableSystemUser"
-	FeatureFamilyPe         = "canSeePe"
-	FeatureFamilyEe         = "canSeeEe"
+	FeatureFamilyPe         = "canSeeEnablePe"
+	FeatureFamilyEe         = "canSeeEnableEe"
+	FeatureFamilyCe         = "canSeeEnableCe"
 )
