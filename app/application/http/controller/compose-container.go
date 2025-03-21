@@ -110,6 +110,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	self.JsonSuccessResponse(http)
 	return
 }

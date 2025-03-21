@@ -65,3 +65,32 @@ func GetRegistryUrl(address string) url.URL {
 		Path:   "/v2/",
 	}
 }
+
+func GetRegistryAddressByImageName(imageName string) string {
+	// 去掉digest和tag
+	digestIndex := strings.Index(imageName, "@")
+	if digestIndex != -1 {
+		imageName = imageName[:digestIndex]
+	}
+	tagIndex := strings.LastIndex(imageName, ":")
+	if tagIndex != -1 {
+		// 需要检查后面的内容是否含有"/"
+		afterColon := imageName[tagIndex+1:]
+		if !strings.Contains(afterColon, "/") {
+			imageName = imageName[:tagIndex]
+		}
+	}
+
+	parts := strings.SplitN(imageName, "/", 2)
+	if len(parts) == 1 {
+		return DefaultRegistryDomain
+	}
+	firstPart := parts[0]
+
+	info, err := url.Parse(firstPart)
+	if err == nil && info.Host != "" {
+		return info.Host
+	}
+
+	return DefaultRegistryDomain
+}

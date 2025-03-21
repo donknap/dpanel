@@ -14,12 +14,14 @@ import (
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/events"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	"log/slog"
@@ -396,6 +398,11 @@ func (self Container) Delete(http *gin.Context) {
 			}
 		}
 	}
+
+	facade.GetEvent().Publish(events.ContainerDeleteEvent, events.ContainerDelete{
+		Name: containerInfo.Name,
+		Ctx:  http,
+	})
 
 	if siteRow != nil {
 		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
