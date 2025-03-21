@@ -3,6 +3,7 @@ package registry
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -87,10 +88,9 @@ func GetRegistryAddressByImageName(imageName string) string {
 	}
 	firstPart := parts[0]
 
-	info, err := url.Parse(firstPart)
-	if err == nil && info.Host != "" {
-		return info.Host
+	if !regexp.MustCompile(`^(?i)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`).MatchString(firstPart) {
+		return DefaultRegistryDomain
 	}
 
-	return DefaultRegistryDomain
+	return firstPart
 }

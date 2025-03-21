@@ -7,9 +7,9 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
-	"github.com/donknap/dpanel/common/events"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -157,9 +157,14 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Message: "",
 	})
 
-	facade.GetEvent().Publish(events.ContainerCreateEvent, events.ContainerCreate{
-		ContainerID: containerId,
-		Name:        params.SiteName,
+	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerId)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	facade.GetEvent().Publish(event.ContainerCreateEvent, event.ContainerCreate{
+		InspectInfo: detail,
 		Ctx:         http,
 	})
 
