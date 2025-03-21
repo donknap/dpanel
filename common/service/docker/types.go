@@ -3,7 +3,6 @@ package docker
 import (
 	"archive/tar"
 	"fmt"
-	"github.com/docker/go-connections/nat"
 	"io"
 	"os"
 	"strings"
@@ -99,20 +98,16 @@ type PortItem struct {
 	Protocol string `json:"protocol"`
 }
 
-func (self *PortItem) Parse() (hostPort nat.PortBinding, destPort nat.Port) {
+func (self *PortItem) Parse() PortItem {
 	if hostIp, port, exists := strings.Cut(self.Host, ":"); exists {
-		hostPort.HostIP = hostIp
-		hostPort.HostPort = port
-	} else {
-		hostPort.HostIP = self.HostIp
-		hostPort.HostPort = self.Host
+		self.HostIp = hostIp
+		self.Host = port
 	}
 	if port, protocol, exists := strings.Cut(self.Dest, "/"); exists {
-		destPort, _ = nat.NewPort(protocol, port)
-	} else {
-		destPort, _ = nat.NewPort(self.Protocol, self.Dest)
+		self.Dest = port
+		self.Protocol = protocol
 	}
-	return hostPort, destPort
+	return *self
 }
 
 type LogDriverItem struct {
