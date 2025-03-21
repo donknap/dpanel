@@ -157,14 +157,19 @@ func WithPort(item ...docker.PortItem) Option {
 	return func(self *Builder) error {
 		self.containerConfig.ExposedPorts = make(nat.PortSet)
 		self.hostConfig.PortBindings = make(nat.PortMap)
-
 		for _, portItem := range item {
-			hostPort, destPort := portItem.Parse()
-			self.containerConfig.ExposedPorts[destPort] = struct{}{}
-			if self.hostConfig.PortBindings[destPort] == nil {
-				self.hostConfig.PortBindings[destPort] = make([]nat.PortBinding, 0)
+			portItem = portItem.Parse()
+			bind, err := nat.ParsePortSpec(fmt.Sprintf("%s:%s:%s/%s", portItem.HostIp, portItem.Host, portItem.Dest, portItem.Protocol))
+			if err != nil {
+				return err
 			}
-			self.hostConfig.PortBindings[destPort] = append(self.hostConfig.PortBindings[destPort], hostPort)
+			for _, mapping := range bind {
+				self.containerConfig.ExposedPorts[mapping.Port] = struct{}{}
+				if self.hostConfig.PortBindings[mapping.Port] == nil {
+					self.hostConfig.PortBindings[mapping.Port] = make([]nat.PortBinding, 0)
+				}
+				self.hostConfig.PortBindings[mapping.Port] = append(self.hostConfig.PortBindings[mapping.Port], mapping.Binding)
+			}
 		}
 		return nil
 	}
