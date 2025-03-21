@@ -92,11 +92,14 @@ func (self YamlGetter) getValueInterface(path string) interface{} {
 }
 
 func (self YamlGetter) toSlice(data interface{}) []interface{} {
-	temp := data.(YamlGetter)
-	result := make([]interface{}, len(temp))
-	for key, value := range temp {
-		k := cast.ToInt(key)
-		result[k] = value
+	if temp, ok := data.(YamlGetter); ok {
+		result := make([]interface{}, len(temp))
+		for key, value := range temp {
+			k := cast.ToInt(key)
+			result[k] = value
+		}
+		return result
+	} else {
+		return make([]interface{}, 0)
 	}
-	return result
 }
