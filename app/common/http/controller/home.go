@@ -93,7 +93,7 @@ func (self Home) WsConsole(http *gin.Context) {
 	if params.WorkDir == "" {
 		params.WorkDir = "/"
 	}
-	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, container.ExecOptions{
+	out, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, container.ExecOptions{
 		Privileged:   true,
 		Tty:          true,
 		AttachStdin:  true,
@@ -112,7 +112,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	shell, err := docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, container.ExecStartOptions{
+	shell, err := docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, out.ID, container.ExecStartOptions{
 		Tty: true,
 	})
 	if err != nil {

@@ -6,7 +6,6 @@ import (
 	"github.com/donknap/dpanel/app/ctrl/logic"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
-	"github.com/gookit/color"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 	"time"
@@ -21,12 +20,13 @@ func (self Upgrade) GetName() string {
 }
 
 func (self Upgrade) GetDescription() string {
-	return "拉取最新的镜像升级当前容器"
+	return "检测当前容器更新"
 }
 
 func (self Upgrade) Configure(command *cobra.Command) {
 	command.Flags().String("name", "", "容器名称")
 	command.Flags().String("docker-env", "", "指定 docker 环境")
+	command.Flags().Bool("upgrade", false, "是否升级容器")
 	_ = command.MarkFlagRequired("name")
 }
 
@@ -36,7 +36,7 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 
 	code, err := logic.User{}.GetAuth(time.Now().Add(time.Minute))
 	if err != nil {
-		color.Error.Println(err)
+		logic.Result{}.Error(err)
 		return
 	}
 	if dockerEnv == "" {
@@ -46,14 +46,14 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 		"name": dockerEnv,
 	})
 	if err != nil {
-		color.Errorln(err)
+		logic.Result{}.Error(err)
 		return
 	}
 	_, raw, err := logic.Proxy{}.Post("/api/app/container/get-detail", code, gin.H{
 		"md5": name,
 	})
 	if err != nil {
-		color.Errorln(err)
+		logic.Result{}.Error(err)
 		return
 	}
 	data := struct {
@@ -63,7 +63,7 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 	}{}
 	err = json.Unmarshal(raw, &data)
 	if err != nil {
-		color.Errorln(err)
+		logic.Result{}.Error(err)
 		return
 	}
 	out, _, err = logic.Proxy{}.Post("/api/app/image/check-upgrade", code, gin.H{
@@ -71,13 +71,9 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 		"md5": data.Data.Info.Image,
 	})
 	if err != nil {
-		color.Error.Println(err)
+		logic.Result{}.Error(err)
 		return
 	}
-	hasUpgrade := out.Data.(map[string]interface{})["upgrade"].(bool)
-	if !hasUpgrade {
-		color.Error.Println("当前容器无可用更新镜像")
-		return
-	}
-
+	logic.Result{}.Success(out.Data)
+	return
 }
