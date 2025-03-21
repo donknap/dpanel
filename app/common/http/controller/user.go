@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/types"
 	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp/totp"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -32,7 +33,7 @@ func (self User) Login(http *gin.Context) {
 		return
 	}
 
-	if new(family.Provider).Check(family.FeatureFamilyPe) || new(family.Provider).Check(family.FeatureFamilyEe) {
+	if !new(family.Provider).Check(types.FeatureFamilyCe) {
 		twoFa := accessor.TwoFa{}
 		exists := logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa, &twoFa)
 		if exists && twoFa.Enable {
@@ -67,7 +68,13 @@ func (self User) Login(http *gin.Context) {
 		self.JsonResponseWithError(http, notice.Message{}.New(".usernameOrPasswordError"), 500)
 		return
 	}
+
 	if currentUser.Value.UserStatus == logic.SettingGroupUserStatusDisable {
+		self.JsonResponseWithError(http, notice.Message{}.New(".userDisable"), 500)
+		return
+	}
+
+	if !(family.Provider{}).Check(types.FeatureFamilyEe) && currentUser.Name != logic.SettingGroupUserFounder {
 		self.JsonResponseWithError(http, notice.Message{}.New(".userDisable"), 500)
 		return
 	}
@@ -103,9 +110,9 @@ func (self User) GetUserInfo(http *gin.Context) {
 	}
 	result["user"] = data.(logic.UserInfo)
 
-	var feature []string
+	feature := make([]string, 0)
 	if facade.GetConfig().GetString("app.env") != "lite" && docker.Sdk.Name == docker.DefaultClientName {
-		feature = append(feature, family.FeatureContainerDomain)
+		feature = append(feature, types.FeatureContainerDomain)
 	}
 	result["feature"] = append(feature, family.Provider{}.Feature()...)
 
