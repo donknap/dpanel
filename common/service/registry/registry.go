@@ -138,7 +138,7 @@ func (self Registry) request(req *http.Request, scope string) (*http.Response, e
 	cacheKey := fmt.Sprintf("registry:%s:%s", docker.Sdk.Name, req.URL.String())
 	slog.Debug("registry request", "cacheKey", cacheKey, "scope", scope)
 
-	if item, ok := storage.Cache.Get(cacheKey); ok {
+	if item, ok := storage.Cache.Get(cacheKey); self.cacheTime > 0 && ok {
 		if c, ok := item.(cacheItem); ok {
 			return &http.Response{
 				Header: c.header,
