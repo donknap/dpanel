@@ -167,8 +167,8 @@ func (self User) SaveThemeConfig(http *gin.Context) {
 func (self User) CreateFounder(http *gin.Context) {
 	type ParamsValidate struct {
 		Username        string `json:"username" binding:"required"`
-		Password        string `json:"password" binding:"password"`
-		ConfirmPassword string `json:"confirmPassword" binding:"password"`
+		Password        string `json:"password"`
+		ConfirmPassword string `json:"confirmPassword"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
