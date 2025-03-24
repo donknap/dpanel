@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -269,6 +270,12 @@ func (self Env) Delete(http *gin.Context) {
 		}
 	}
 	_ = logic.Setting{}.Save(setting)
+
+	facade.GetEvent().Publish(event.EnvDeleteEvent, event.EnvDelete{
+		Names: params.Name,
+		Ctx:   http,
+	})
+
 	self.JsonSuccessResponse(http)
 	return
 }
