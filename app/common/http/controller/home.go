@@ -428,6 +428,9 @@ func (self Home) GetStatList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	time.AfterFunc(time.Hour, func() {
+		progress.Close()
+	})
 
 	if progress.IsShadow() {
 		self.JsonResponseWithoutError(http, gin.H{
