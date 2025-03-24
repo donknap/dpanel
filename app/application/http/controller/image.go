@@ -405,15 +405,15 @@ func (self Image) GetList(http *gin.Context) {
 
 	type ImgInfo struct {
 		image.Summary
-		RepoTag string `json:"repoTag"`
+		ServerAddress string `json:"serverAddress"`
 	}
 	var imgList []ImgInfo
 	for _, item := range result {
 		for _, tagName := range item.RepoTags {
 			if tagName != "<none>:<none>" {
 				info := ImgInfo{
-					Summary: item,
-					RepoTag: tagName,
+					Summary:       item,
+					ServerAddress: registry.GetRegistryAddressByImageName(tagName),
 				}
 				info.RepoTags = []string{tagName}
 				imgList = append(imgList, info)

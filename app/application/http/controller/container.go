@@ -18,8 +18,10 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	"log/slog"
@@ -113,39 +115,23 @@ func (self Container) GetList(http *gin.Context) {
 		}
 	}
 
-	type ContainerInfo struct {
-		container.Summary
-		Name string `json:"name"`
-	}
-	var result []ContainerInfo
-
+	var result []container.Summary
 	if params.SiteTitle != "" {
-		result = make([]ContainerInfo, 0)
+		result = make([]container.Summary, 0)
 		for _, item := range list {
 			if function.InArray(searchContainerIds, item.ID) {
-				result = append(result, ContainerInfo{
-					Summary: item,
-					Name:    item.Names[0],
-				})
+				result = append(result, item)
 				continue
 			}
 			for _, name := range item.Names {
 				if strings.Contains(name, params.SiteTitle) {
-					result = append(result, ContainerInfo{
-						Summary: item,
-						Name:    item.Names[0],
-					})
+					result = append(result, item)
 					break
 				}
 			}
 		}
 	} else {
-		for _, item := range list {
-			result = append(result, ContainerInfo{
-				Summary: item,
-				Name:    item.Names[0],
-			})
-		}
+		result = list
 	}
 
 	var md5List []driver.Valuer
@@ -328,6 +314,11 @@ func (self Container) Delete(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
 		ID: params.Md5,
 	})).First()
@@ -396,6 +387,12 @@ func (self Container) Delete(http *gin.Context) {
 			}
 		}
 	}
+
+	facade.GetEvent().Publish(event.ContainerDeleteEvent, event.ContainerDelete{
+		InspectInfo: &detail,
+		ContainerId: params.Md5,
+		Ctx:         http,
+	})
 
 	if siteRow != nil {
 		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()

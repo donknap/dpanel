@@ -9,7 +9,9 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/gorm"
 	"strings"
@@ -153,6 +155,18 @@ func (self Site) CreateByImage(http *gin.Context) {
 		},
 		Status:  accessor.StatusSuccess,
 		Message: "",
+	})
+
+	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerId)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	facade.GetEvent().Publish(event.ContainerCreateEvent, event.ContainerCreate{
+		InspectInfo: &detail,
+		ContainerId: containerId,
+		Ctx:         http,
 	})
 
 	self.JsonResponseWithoutError(http, gin.H{"siteId": siteRow.ID})

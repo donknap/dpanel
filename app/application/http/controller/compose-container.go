@@ -110,6 +110,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -176,6 +177,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		}
 	}
 	_ = notice.Message{}.Info(".composeDestroy", "name", composeRow.Name)
+
 	self.JsonSuccessResponse(http)
 	return
 }

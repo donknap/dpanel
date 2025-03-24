@@ -12,7 +12,9 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
@@ -300,6 +302,12 @@ func (self Store) Deploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposeCreate{
+		Compose: composeNew,
+		Ctx:     http,
+	})
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"id": composeNew.ID,
 	})
