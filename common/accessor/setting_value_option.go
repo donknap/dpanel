@@ -80,10 +80,9 @@ type DnsApi struct {
 }
 
 type EmailServer struct {
-	Host   string   `json:"host,omitempty"`
-	Port   int      `json:"port,omitempty"`
-	Sender string   `json:"sender,omitempty"`
-	Email  string   `json:"email,omitempty"`
-	Code   string   `json:"code,omitempty"`
+	Host   string   `json:"host,omitempty" binding:"required"`
+	Port   int      `json:"port,omitempty" binding:"required"`
+	Email  string   `json:"email,omitempty" binding:"required"`
+	Code   string   `json:"code,omitempty" binding:"required"`
 	Status []string `json:"status,omitempty"`
 }
