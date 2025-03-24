@@ -8,6 +8,7 @@ import (
 var ContainerDeleteEvent = "container_delete"
 
 type ContainerDelete struct {
-	InspectInfo container.InspectResponse
+	InspectInfo *container.InspectResponse
+	ContainerId string
 	Ctx         context.Context
 }

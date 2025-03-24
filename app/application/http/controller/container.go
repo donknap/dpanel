@@ -405,7 +405,8 @@ func (self Container) Delete(http *gin.Context) {
 	}
 
 	facade.GetEvent().Publish(event.ContainerDeleteEvent, event.ContainerDelete{
-		InspectInfo: detail,
+		InspectInfo: &detail,
+		ContainerId: params.Md5,
 		Ctx:         http,
 	})
 
