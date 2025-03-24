@@ -13,9 +13,7 @@ import (
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ws"
-	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"io"
 	"log/slog"
 	"os"
@@ -113,11 +111,6 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
-	facade.GetEvent().Publish(event.ComposeDeployEvent, event.ComposeDeploy{
-		Task: tasker,
-		Ctx:  http,
-	})
-
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -184,11 +177,6 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		}
 	}
 	_ = notice.Message{}.Info(".composeDestroy", "name", composeRow.Name)
-
-	facade.GetEvent().Publish(event.ComposeDestroyEvent, event.ComposeDestroy{
-		Task: tasker,
-		Ctx:  http,
-	})
 
 	self.JsonSuccessResponse(http)
 	return

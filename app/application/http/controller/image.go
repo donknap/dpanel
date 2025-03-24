@@ -405,7 +405,6 @@ func (self Image) GetList(http *gin.Context) {
 
 	type ImgInfo struct {
 		image.Summary
-		RepoTag       string `json:"repoTag"`
 		ServerAddress string `json:"serverAddress"`
 	}
 	var imgList []ImgInfo
@@ -414,7 +413,6 @@ func (self Image) GetList(http *gin.Context) {
 			if tagName != "<none>:<none>" {
 				info := ImgInfo{
 					Summary:       item,
-					RepoTag:       tagName,
 					ServerAddress: registry.GetRegistryAddressByImageName(tagName),
 				}
 				info.RepoTags = []string{tagName}

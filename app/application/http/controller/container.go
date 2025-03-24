@@ -115,39 +115,23 @@ func (self Container) GetList(http *gin.Context) {
 		}
 	}
 
-	type ContainerInfo struct {
-		container.Summary
-		Name string `json:"name"`
-	}
-	var result []ContainerInfo
-
+	var result []container.Summary
 	if params.SiteTitle != "" {
-		result = make([]ContainerInfo, 0)
+		result = make([]container.Summary, 0)
 		for _, item := range list {
 			if function.InArray(searchContainerIds, item.ID) {
-				result = append(result, ContainerInfo{
-					Summary: item,
-					Name:    item.Names[0],
-				})
+				result = append(result, item)
 				continue
 			}
 			for _, name := range item.Names {
 				if strings.Contains(name, params.SiteTitle) {
-					result = append(result, ContainerInfo{
-						Summary: item,
-						Name:    item.Names[0],
-					})
+					result = append(result, item)
 					break
 				}
 			}
 		}
 	} else {
-		for _, item := range list {
-			result = append(result, ContainerInfo{
-				Summary: item,
-				Name:    item.Names[0],
-			})
-		}
+		result = list
 	}
 
 	var md5List []driver.Valuer
