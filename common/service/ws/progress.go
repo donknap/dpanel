@@ -86,6 +86,7 @@ func (self ProgressPip) BroadcastMessage(data interface{}) {
 
 func (self ProgressPip) Close() {
 	self.cancel()
+	collect.progressPip.Delete(self.messageType)
 }
 
 func (self *ProgressPip) CloseFd(fd string) {
