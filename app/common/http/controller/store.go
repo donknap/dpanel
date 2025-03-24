@@ -252,7 +252,7 @@ func (self Store) Deploy(http *gin.Context) {
 		},
 	})
 
-	if strings.Contains(params.Name, compose.TaskIndex) {
+	if strings.Contains(params.Name, compose.CurrentDate) {
 		_ = envReplaceTable.Replace(&params.Name)
 	}
 
