@@ -115,9 +115,8 @@ func (self Container) GetList(http *gin.Context) {
 		}
 	}
 
-	var result []container.Summary
+	result := make([]container.Summary, 0)
 	if params.SiteTitle != "" {
-		result = make([]container.Summary, 0)
 		for _, item := range list {
 			if function.InArray(searchContainerIds, item.ID) {
 				result = append(result, item)
@@ -314,11 +313,6 @@ func (self Container) Delete(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
 		ID: params.Md5,
 	})).First()
@@ -389,7 +383,7 @@ func (self Container) Delete(http *gin.Context) {
 	}
 
 	facade.GetEvent().Publish(event.ContainerDeleteEvent, event.ContainerDelete{
-		InspectInfo: &detail,
+		InspectInfo: &containerInfo,
 		ContainerId: params.Md5,
 		Ctx:         http,
 	})

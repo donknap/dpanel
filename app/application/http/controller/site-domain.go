@@ -3,7 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -97,7 +97,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		}
 		// 转发时必须保证当前环境有 dpanel 面板
 		// 将当前容器加入到默认 dpanel-local 网络中，并指定 Hostname 用于 Nginx 反向代理
-		dpanelContainerInfo := types.ContainerJSON{}
+		dpanelContainerInfo := container.InspectResponse{}
 		if dpanelContainerInfo, err = docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, facade.GetConfig().GetString("app.name")); err != nil {
 			self.JsonResponseWithError(http, notice.Message{}.New(".siteDomainNotFoundDPanel"), 500)
 			return
