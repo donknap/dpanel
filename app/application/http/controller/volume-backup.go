@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/mount"
-	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -232,7 +231,7 @@ func (self Volume) Restore(http *gin.Context) {
 	composeTemplateParser[pluginName].External.VolumesFrom = []string{
 		containerInfo.ID,
 	}
-	if backupInfo.Setting.BackupTargetType == logic.BackupTypeDPanel {
+	if backupInfo.Setting.BackupTargetType == "" {
 		if strings.Contains(backupInfo.Setting.BackupPath, "/") {
 			composeTemplateParser[pluginName].Volumes = []string{
 				backupInfo.Setting.BackupPath + ":/backup",

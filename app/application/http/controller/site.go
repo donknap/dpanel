@@ -107,7 +107,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			SiteName:  params.SiteName,
 			SiteTitle: params.SiteTitle,
 			Env:       &buildParams,
-			Status:    logic.StatusStop,
+			Status:    docker.ImageBuildStatusStop,
 			ContainerInfo: &accessor.SiteContainerInfoOption{
 				ID: "",
 			},
@@ -121,7 +121,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		dao.Site.Select(dao.Site.ALL).Where(dao.Site.SiteName.Eq(params.SiteName)).Updates(&entity.Site{
 			SiteTitle: params.SiteTitle,
 			Env:       &buildParams,
-			Status:    logic.StatusStop,
+			Status:    docker.ImageBuildStatusStop,
 			Message:   "",
 			DeletedAt: gorm.DeletedAt{},
 		})

@@ -256,7 +256,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 			Platform:        params.Platform,
 		},
 		BuildType: params.BuildType,
-		Status:    logic.StatusStop,
+		Status:    docker.ImageBuildStatusStop,
 		Message:   "",
 	}
 	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
@@ -285,7 +285,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 
 	log, err := logic.DockerTask{}.ImageBuild(buildImageTask)
 	if err != nil {
-		imageRow.Status = logic.StatusError
+		imageRow.Status = docker.ImageBuildStatusError
 		imageRow.Message = log + "\n" + err.Error()
 		if imageRow.ID > 0 {
 			_, _ = dao.Image.Updates(imageRow)
@@ -295,7 +295,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	imageRow.Status = logic.StatusSuccess
+	imageRow.Status = docker.ImageBuildStatusSuccess
 	imageRow.Message = log
 	imageRow.ImageInfo = &accessor.ImageInfoOption{
 		Id: imageNameDetail.Uri(),

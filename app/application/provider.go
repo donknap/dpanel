@@ -51,6 +51,9 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/container/get-stat-info", controller.Container{}.GetStatInfo)
 			cors.POST("/app/container/get-process-info", controller.Container{}.GetProcessInfo)
 
+			// 容器备份相关
+			cors.POST("/app/container-backup/create", controller.ContainerBackup{}.Create)
+
 			// 镜像相关
 			cors.POST("/app/image/create-by-dockerfile", controller.Image{}.CreateByDockerfile)
 			cors.POST("/app/image/get-list", controller.Image{}.GetList)
@@ -108,10 +111,6 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/volume/prune", controller.Volume{}.Prune)
 			cors.POST("/app/volume/create", controller.Volume{}.Create)
 			cors.POST("/app/volume/delete", controller.Volume{}.Delete)
-			cors.POST("/app/volume/backup", controller.Volume{}.Backup)
-			cors.POST("/app/volume/restore", controller.Volume{}.Restore)
-			cors.POST("/app/volume/get-backup-list", controller.Volume{}.GetBackupList)
-			cors.POST("/app/volume/delete-backup", controller.Volume{}.DeleteBackup)
 
 			// Compose 相关
 			cors.POST("/app/compose/create", controller.Compose{}.Create)

@@ -264,7 +264,7 @@ func (self Container) Copy(http *gin.Context) {
 			if function.IsEmptyArray(bindings) {
 				continue
 			}
-			for i, _ := range bindings {
+			for i := range bindings {
 				containerInfo.HostConfig.PortBindings[destPort][i].HostPort = ""
 			}
 		}
