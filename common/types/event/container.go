@@ -5,11 +5,11 @@ import (
 	"github.com/docker/docker/api/types/container"
 )
 
-var ContainerUpgradeEvent = "container_upgrade"
+var ContainerCreateEvent = "container_create"
+var ContainerDeleteEvent = "container_delete"
+var ContainerEditEvent = "container_edit"
 
-type ContainerUpgrade struct {
-	ContainerId    string
-	OldContainerId string
+type ContainerPayload struct {
 	InspectInfo    *container.InspectResponse
 	OldInspectInfo *container.InspectResponse
 	Ctx            context.Context

@@ -171,7 +171,7 @@ func (self Compose) Create(http *gin.Context) {
 	} else if yamlRow.Setting.Type != accessor.ComposeTypeOutPath {
 		_ = dao.Compose.Create(yamlRow)
 
-		facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposeCreate{
+		facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposePayload{
 			Compose: yamlRow,
 			Ctx:     http,
 		})
@@ -329,14 +329,12 @@ func (self Compose) Delete(http *gin.Context) {
 		return
 	}
 	composeRunList := logic.Compose{}.Ls()
-	var rows []*entity.Compose
 	for _, id := range params.Id {
 		row, err := dao.Compose.Where(dao.Compose.ID.Eq(id)).First()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		rows = append(rows, row)
 		for _, runItem := range composeRunList {
 			if fmt.Sprintf(logic.ComposeProjectName, row.Name) == runItem.Name {
 				self.JsonResponseWithError(http, errors.New("请先销毁容器"), 500)
@@ -352,12 +350,12 @@ func (self Compose) Delete(http *gin.Context) {
 		if err != nil {
 			slog.Error("compose", "delete", err.Error())
 		}
-	}
 
-	facade.GetEvent().Publish(event.ComposeDeleteEvent, event.ComposeDelete{
-		Composes: rows,
-		Ctx:      http,
-	})
+		facade.GetEvent().Publish(event.ComposeDeleteEvent, event.ComposePayload{
+			Compose: row,
+			Ctx:     http,
+		})
+	}
 
 	self.JsonSuccessResponse(http)
 	return

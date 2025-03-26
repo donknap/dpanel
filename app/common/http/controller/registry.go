@@ -108,12 +108,12 @@ func (self Registry) Create(http *gin.Context) {
 	}
 
 	if params.Id <= 0 {
-		facade.GetEvent().Publish(event.ImageRegistryCreateEvent, event.ImageRegistryCreate{
+		facade.GetEvent().Publish(event.ImageRegistryCreateEvent, event.ImageRegistryPayload{
 			Registry: registryNew,
 			Ctx:      http,
 		})
 	} else {
-		facade.GetEvent().Publish(event.ImageRegistryEditEvent, event.ImageRegistryEdit{
+		facade.GetEvent().Publish(event.ImageRegistryEditEvent, event.ImageRegistryPayload{
 			Registry:    registryNew,
 			OldRegistry: registryRow,
 			Ctx:         http,
@@ -240,11 +240,12 @@ func (self Registry) Delete(http *gin.Context) {
 	delServerAddress := make([]string, 0)
 	for _, item := range rows {
 		delServerAddress = append(delServerAddress, item.ServerAddress)
+
+		facade.GetEvent().Publish(event.ImageRegistryDeleteEvent, event.ImageRegistryPayload{
+			Registry: item,
+			Ctx:      http,
+		})
 	}
-	facade.GetEvent().Publish(event.ImageRegistryDeleteEvent, event.ImageRegistryDelete{
-		Registries: rows,
-		Ctx:        http,
-	})
 
 	self.JsonSuccessResponse(http)
 	return

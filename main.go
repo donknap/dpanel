@@ -143,7 +143,6 @@ func initDb() error {
 		&entity.Store{},
 		&entity.Cron{},
 		&entity.CronLog{},
-		&entity.UserPermission{},
 	)
 	if err != nil {
 		return err

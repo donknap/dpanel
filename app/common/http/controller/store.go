@@ -93,7 +93,6 @@ func (self Store) Delete(http *gin.Context) {
 		return
 	}
 
-	rows := make([]*entity.Store, 0)
 	for _, id := range params.Id {
 		storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(id)).First()
 		if storeRow == nil {
@@ -110,13 +109,12 @@ func (self Store) Delete(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		rows = append(rows, storeRow)
-	}
 
-	facade.GetEvent().Publish(event.StoreDeleteEvent, event.StoreDelete{
-		Stores: rows,
-		Ctx:    http,
-	})
+		facade.GetEvent().Publish(event.StoreDeleteEvent, event.StorePayload{
+			Store: storeRow,
+			Ctx:   http,
+		})
+	}
 
 	self.JsonSuccessResponse(http)
 	return
@@ -306,7 +304,7 @@ func (self Store) Deploy(http *gin.Context) {
 		return
 	}
 
-	facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposeCreate{
+	facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposePayload{
 		Compose: composeNew,
 		Ctx:     http,
 	})
