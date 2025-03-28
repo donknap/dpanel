@@ -53,6 +53,9 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 			// 容器备份相关
 			cors.POST("/app/container-backup/create", controller.ContainerBackup{}.Create)
+			cors.POST("/app/container-backup/get-list", controller.ContainerBackup{}.GetList)
+			cors.POST("/app/container-backup/delete", controller.ContainerBackup{}.Delete)
+			cors.POST("/app/container-backup/restore", controller.ContainerBackup{}.Restore)
 
 			// 镜像相关
 			cors.POST("/app/image/create-by-dockerfile", controller.Image{}.CreateByDockerfile)

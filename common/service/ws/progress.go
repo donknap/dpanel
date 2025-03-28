@@ -61,9 +61,10 @@ type ProgressPip struct {
 	cancel       context.CancelFunc
 	OnWrite      func(p string) error
 	OnWriteBytes func(p []byte) error
+	IsKeepAlive  bool // 保持运行，除非前端终止或是 process:close，不受 ws 连接断开影响
 }
 
-func (self ProgressPip) Write(p []byte) (n int, err error) {
+func (self *ProgressPip) Write(p []byte) (n int, err error) {
 	temp := string(p)
 	if self.OnWrite != nil {
 		err = self.OnWrite(temp)
@@ -76,7 +77,7 @@ func (self ProgressPip) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (self ProgressPip) BroadcastMessage(data interface{}) {
+func (self *ProgressPip) BroadcastMessage(data interface{}) {
 	BroadcastMessage <- &RespMessage{
 		Type:   self.messageType,
 		Data:   data,
@@ -84,7 +85,7 @@ func (self ProgressPip) BroadcastMessage(data interface{}) {
 	}
 }
 
-func (self ProgressPip) Close() {
+func (self *ProgressPip) Close() {
 	self.cancel()
 	collect.progressPip.Delete(self.messageType)
 }
@@ -101,14 +102,19 @@ func (self *ProgressPip) CloseFd(fd string) {
 	}
 }
 
-func (self ProgressPip) IsShadow() bool {
+func (self *ProgressPip) IsShadow() bool {
 	return len(self.fd) > 1
 }
 
-func (self ProgressPip) Done() <-chan struct{} {
+func (self *ProgressPip) Done() <-chan struct{} {
 	return self.ctx.Done()
 }
 
-func (self ProgressPip) Context() context.Context {
+func (self *ProgressPip) Context() context.Context {
 	return self.ctx
+}
+
+func (self *ProgressPip) KeepAlive() *ProgressPip {
+	self.IsKeepAlive = true
+	return self
 }

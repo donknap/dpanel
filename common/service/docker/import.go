@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -170,6 +171,10 @@ func WithImportTar(reader *tar.Reader) ImportFileOption {
 		for {
 			header, err := reader.Next()
 			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				slog.Warn("docker import file", "error", err)
 				break
 			}
 			header.Name = filepath.Join(self.containerRootPath, header.Name)

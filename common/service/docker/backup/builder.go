@@ -1,18 +1,8 @@
 package backup
 
-import (
-	"archive/tar"
-	"compress/gzip"
-	"context"
-	"github.com/docker/docker/api/types"
-)
-
 func New(opts ...Option) (*Builder, error) {
 	var err error
-	c := &Builder{
-		Write: &write{},
-	}
-	c.ctx, c.cancel = context.WithCancel(context.Background())
+	c := &Builder{}
 
 	for _, opt := range opts {
 		err = opt(c)
@@ -21,34 +11,40 @@ func New(opts ...Option) (*Builder, error) {
 		}
 	}
 
-	gzWriter := gzip.NewWriter(c.Write.file)
-	c.Write.tarWriter = tar.NewWriter(gzWriter)
-
-	go func() {
-		select {
-		case <-c.ctx.Done():
-			_ = c.Write.tarWriter.Close()
-			_ = gzWriter.Close()
-			_ = c.Write.file.Close()
-		}
-	}()
-
 	return c, nil
 }
 
 type Builder struct {
-	Write  *write
-	ctx    context.Context
-	cancel context.CancelFunc
+	tarFilePath   string
+	tarPathPrefix string
+	Writer        *writer
+	Reader        *reader
 }
 
-func (self Builder) Close() {
-	self.cancel()
+func (self Builder) Close() (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = e.(error)
+		}
+		if self.Writer != nil {
+			_ = self.Writer.tarWriter.Close()
+		}
+		if self.Reader != nil {
+			_ = self.Reader.file.Close()
+		}
+	}()
+	if self.Writer != nil {
+		_ = self.Writer.tarWriter.Close()
+		_ = self.Writer.file.Close()
+	}
+	if self.Reader != nil {
+		_ = self.Reader.file.Close()
+	}
+	return err
 }
 
 type Manifest struct {
-	ServerVersion types.Version
-	Config        string
-	Volume        []string
-	Image         string
+	Config string
+	Image  string
+	Volume []string
 }

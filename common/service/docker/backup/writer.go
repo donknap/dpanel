@@ -2,6 +2,8 @@ package backup
 
 import (
 	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,34 +15,25 @@ import (
 	"time"
 )
 
-type write struct {
+type writer struct {
 	file          *os.File
 	tarPathPrefix string
 	tarWriter     *tar.Writer
 }
 
-func (self write) WriteBlob(content []byte) (path string, err error) {
+func (self writer) WriteBlob(content []byte) (path string, err error) {
 	path, err = self.getBlobPath(function.GetSha256(content))
 	if err != nil {
 		return path, err
 	}
-	err = self.tarWriter.WriteHeader(&tar.Header{
-		Name:    path,
-		Size:    int64(len(content)),
-		Mode:    0o644,
-		ModTime: time.Now(),
-	})
-	if err != nil {
-		return path, err
+	if self.tarWriter == nil {
+		return "", errors.New("context canceled")
 	}
-	_, err = self.tarWriter.Write(content)
-	if err != nil {
-		return path, err
-	}
-	return strings.TrimLeft(path, self.tarPathPrefix), nil
+	buffer := bytes.NewBuffer(content)
+	return self.WriteBlobReader(function.GetSha256(content), io.NopCloser(buffer))
 }
 
-func (self write) WriteBlobStruct(v interface{}) (path string, err error) {
+func (self writer) WriteBlobStruct(v interface{}) (path string, err error) {
 	configContent, err := json.Marshal(v)
 	if err != nil {
 		return path, err
@@ -48,13 +41,13 @@ func (self write) WriteBlobStruct(v interface{}) (path string, err error) {
 	return self.WriteBlob(configContent)
 }
 
-func (self write) WriteManifest(v interface{}) error {
+func (self writer) WriteConfigFile(fileName string, v interface{}) error {
 	content, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 	err = self.tarWriter.WriteHeader(&tar.Header{
-		Name:    fmt.Sprintf("%s/manifest.json", self.tarPathPrefix),
+		Name:    fmt.Sprintf("%s/%s", self.tarPathPrefix, fileName),
 		Size:    int64(len(content)),
 		Mode:    0o644,
 		ModTime: time.Now(),
@@ -69,13 +62,18 @@ func (self write) WriteManifest(v interface{}) error {
 	return nil
 }
 
-func (self write) WriteBlobReader(sha256 string, out io.ReadCloser) (path string, err error) {
+func (self writer) WriteBlobReader(sha256 string, out io.ReadCloser) (path string, err error) {
+	defer func() {
+		if out != nil {
+			_ = out.Close()
+		}
+	}()
 	var tempFile *os.File
 	path, err = self.getBlobPath(sha256)
 	if err != nil {
 		return path, err
 	}
-	tempFile, err = os.OpenFile(fmt.Sprintf("%s.%s.temp", self.file.Name(), filepath.Base(path)), os.O_CREATE|os.O_RDWR, 0o644)
+	tempFile, err = os.OpenFile(filepath.Join(filepath.Dir(self.file.Name()), fmt.Sprintf("%s.%s.temp", filepath.Base(self.file.Name()), filepath.Base(path))), os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return path, err
 	}
@@ -83,10 +81,12 @@ func (self write) WriteBlobReader(sha256 string, out io.ReadCloser) (path string
 		_ = tempFile.Close()
 		//_ = os.Remove(tempFile.Name())
 	}()
-	defer func() {
-		_ = out.Close()
-	}()
-	_, err = io.Copy(tempFile, out)
+	gzWriter := gzip.NewWriter(tempFile)
+	_, err = io.Copy(gzWriter, out)
+	if err != nil {
+		return path, err
+	}
+	err = gzWriter.Close()
 	if err != nil {
 		return path, err
 	}
@@ -102,6 +102,7 @@ func (self write) WriteBlobReader(sha256 string, out io.ReadCloser) (path string
 		Mode:    int64(fileInfo.Mode()),
 		ModTime: fileInfo.ModTime(),
 	})
+
 	if err != nil {
 		return path, err
 	}
@@ -112,7 +113,7 @@ func (self write) WriteBlobReader(sha256 string, out io.ReadCloser) (path string
 	return strings.TrimLeft(path, self.tarPathPrefix), nil
 }
 
-func (self write) getBlobPath(sha256 string) (path string, err error) {
+func (self writer) getBlobPath(sha256 string) (path string, err error) {
 	if b, a, ok := strings.Cut(sha256, ":"); ok {
 		return filepath.Join(self.tarPathPrefix, "blobs", b, a), nil
 	} else {

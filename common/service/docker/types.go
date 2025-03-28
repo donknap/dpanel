@@ -195,3 +195,7 @@ const (
 	StepContainerBuild      = "containerBuild" // 创建容器
 	StepContainerRun        = "containerRun"   // 运行容器
 )
+
+const (
+	ContainerBackupTypeSnapshot = "snapshot"
+)

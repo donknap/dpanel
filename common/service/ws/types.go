@@ -7,20 +7,21 @@ import (
 )
 
 const (
-	MessageTypeEvent          = "event"
-	MessageTypeSignalAbort    = "signal:abort"
-	MessageTypeEventFd        = "event:fd"
-	MessageTypeCompose        = "compose:%s"
-	MessageTypeComposeLog     = "compose:log:%s"
-	MessageTypeConsole        = "console:%s"
-	MessageTypeContainerLog   = "container:log:%s"
-	MessageTypeContainerStat  = "container:stat"
-	MessageTypeImagePull      = "image:pull:%s"
-	MessageTypeImageBuild     = "image:build:%d"
-	MessageTypeImageImport    = "image:import:%s"
-	MessageTypeProgressClose  = "progress:close"
-	MessageTypeDomainApply    = "domain:apply"
-	MessageTypeUserPermission = "user:permission:%s"
+	MessageTypeEvent           = "event"
+	MessageTypeSignalAbort     = "signal:abort"
+	MessageTypeEventFd         = "event:fd"
+	MessageTypeCompose         = "compose:%s"
+	MessageTypeComposeLog      = "compose:log:%s"
+	MessageTypeConsole         = "console:%s"
+	MessageTypeContainerLog    = "container:log:%s"
+	MessageTypeContainerStat   = "container:stat"
+	MessageTypeContainerBackup = "container:backup:%d"
+	MessageTypeImagePull       = "image:pull:%s"
+	MessageTypeImageBuild      = "image:build:%d"
+	MessageTypeImageImport     = "image:import:%s"
+	MessageTypeProgressClose   = "progress:close"
+	MessageTypeDomainApply     = "domain:apply"
+	MessageTypeUserPermission  = "user:permission:%s"
 )
 
 type RespMessage struct {
