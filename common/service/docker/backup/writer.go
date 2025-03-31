@@ -79,7 +79,7 @@ func (self writer) WriteBlobReader(sha256 string, out io.ReadCloser) (path strin
 	}
 	defer func() {
 		_ = tempFile.Close()
-		//_ = os.Remove(tempFile.Name())
+		_ = os.Remove(tempFile.Name())
 	}()
 	gzWriter := gzip.NewWriter(tempFile)
 	_, err = io.Copy(gzWriter, out)

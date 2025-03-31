@@ -160,7 +160,9 @@ type ImportFile struct {
 func (self ImportFile) Test(path string) {
 	if file, err := os.Create(path); err == nil {
 		fmt.Printf("%v \n", file.Name())
-		defer file.Close()
+		defer func() {
+			_ = file.Close()
+		}()
 		_, _ = io.Copy(file, self.Reader)
 	}
 }

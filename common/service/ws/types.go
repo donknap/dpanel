@@ -8,7 +8,6 @@ import (
 
 const (
 	MessageTypeEvent           = "event"
-	MessageTypeSignalAbort     = "signal:abort"
 	MessageTypeEventFd         = "event:fd"
 	MessageTypeCompose         = "compose:%s"
 	MessageTypeComposeLog      = "compose:log:%s"
