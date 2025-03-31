@@ -144,7 +144,7 @@ func (self Container) GetList(http *gin.Context) {
 		// 需要通过镜像允许再次获取下
 		if item.HostConfig.NetworkMode == "host" {
 			imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
-			if err == nil {
+			if err == nil && imageInfo.Config != nil {
 				ports := make([]container.Port, 0)
 				for port := range imageInfo.Config.ExposedPorts {
 					portInt, _ := strconv.Atoi(port.Port())
