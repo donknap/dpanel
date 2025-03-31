@@ -27,6 +27,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/site-domain/get-list", controller.SiteDomain{}.GetList)
 			cors.POST("/app/site-domain/get-detail", controller.SiteDomain{}.GetDetail)
 			cors.POST("/app/site-domain/restart-nginx", controller.SiteDomain{}.RestartNginx)
+			cors.POST("/app/site-domain/update-vhost", controller.SiteDomain{}.UpdateVhost)
 
 			cors.POST("/app/site-cert/apply", controller.SiteCert{}.Apply)
 			cors.POST("/app/site-cert/get-list", controller.SiteCert{}.GetList)
@@ -56,6 +57,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/container-backup/get-list", controller.ContainerBackup{}.GetList)
 			cors.POST("/app/container-backup/delete", controller.ContainerBackup{}.Delete)
 			cors.POST("/app/container-backup/restore", controller.ContainerBackup{}.Restore)
+			cors.POST("/app/container-backup/get-detail", controller.ContainerBackup{}.GetDetail)
 
 			// 镜像相关
 			cors.POST("/app/image/create-by-dockerfile", controller.Image{}.CreateByDockerfile)

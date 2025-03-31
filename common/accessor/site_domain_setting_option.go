@@ -8,6 +8,7 @@ type SiteDomainSettingOption struct {
 	ServerName                string        `json:"serverName"`
 	ServerNameAlias           []string      `json:"serverNameAlias,omitempty"`
 	ServerAddress             string        `json:"serverAddress"`
+	ServerProtocol            string        `json:"serverProtocol"`
 	TargetName                string        `json:"targetName"`
 	Port                      int32         `json:"port"`
 	EnableBlockCommonExploits bool          `json:"enableBlockCommonExploits"`

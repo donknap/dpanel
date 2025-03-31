@@ -41,6 +41,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		ServerName                string   `json:"serverName" binding:"required"`
 		ServerNameAlias           []string `json:"serverNameAlias"`
 		Hostname                  string   `json:"hostname"`
+		Protocol                  string   `json:"protocol"`
 		Port                      int32    `json:"port" binding:"required"`
 		EnableBlockCommonExploits bool     `json:"enableBlockCommonExploits"`
 		EnableAssetCache          bool     `json:"enableAssetCache"`
@@ -155,6 +156,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		ServerName:                params.ServerName,
 		ServerNameAlias:           params.ServerNameAlias,
 		ServerAddress:             hostname,
+		ServerProtocol:            params.Protocol,
 		Port:                      params.Port,
 		EnableBlockCommonExploits: params.EnableBlockCommonExploits,
 		EnableWs:                  params.EnableWs,
@@ -313,6 +315,32 @@ func (self SiteDomain) RestartNginx(http *gin.Context) {
 	)
 	out = cmd.RunWithResult()
 	slog.Debug("site domain stop nginx", "out", out)
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self SiteDomain) UpdateVhost(http *gin.Context) {
+	type ParamsValidate struct {
+		Id    int32  `json:"id" binding:"required"`
+		Vhost string `json:"vhost" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	siteDomainRow, err := dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(params.Id)).First()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	nginxConfPath := filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(logic.VhostFileName, siteDomainRow.Setting.ServerName))
+	err = os.WriteFile(nginxConfPath, []byte(params.Vhost), 0666)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
 	self.JsonSuccessResponse(http)
 	return
 }
