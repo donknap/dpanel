@@ -13,6 +13,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -67,16 +68,20 @@ func (self Container) Upgrade(http *gin.Context) {
 	}
 
 	// 成功的创建一个新的容器后再对旧的进停止或是删除操作
-	_ = notice.Message{}.Info(".containerCreate", containerInfo.Name)
+	_ = notice.Message{}.Info(".containerUpgradeCreate", containerInfo.Name)
 	newContainerName := fmt.Sprintf("%s-copy-%s", containerInfo.Name, bakTime)
 
 	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
 		EndpointsConfig: containerInfo.NetworkSettings.Networks,
 	}, &v1.Platform{}, newContainerName)
-
 	if err != nil {
 		errRemove := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, newContainerName, container.RemoveOptions{})
 		self.JsonResponseWithError(http, errors.Join(err, errRemove), 500)
+		return
+	}
+	newContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, out.ID)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
@@ -102,7 +107,7 @@ func (self Container) Upgrade(http *gin.Context) {
 
 	// 未备份旧容器，需要先删除，否则名称会冲突
 	if params.EnableBak {
-		_ = notice.Message{}.Info(".containerBackup", "name", containerInfo.Name)
+		_ = notice.Message{}.Info(".containerUpgradeBackup", "name", containerInfo.Name)
 
 		if !containerInfo.HostConfig.AutoRemove {
 			// 备份旧容器
@@ -167,6 +172,14 @@ func (self Container) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	facade.GetEvent().Publish(event.ContainerUpgradeEvent, event.ContainerUpgrade{
+		ContainerId:    out.ID,
+		OldContainerId: params.Md5,
+		InspectInfo:    &newContainerInfo,
+		OldInspectInfo: &containerInfo,
+		Ctx:            http,
+	})
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"containerId": out.ID,

@@ -41,7 +41,7 @@ func (self *Collection) Leave(c *Client) {
 	self.clients.Delete(c.Fd)
 
 	self.progressPip.Range(func(key, value any) bool {
-		if v, ok := value.(*ProgressPip); ok {
+		if v, ok := value.(*ProgressPip); ok && !v.IsKeepAlive {
 			v.CloseFd(c.Fd)
 		}
 		return true
@@ -50,13 +50,12 @@ func (self *Collection) Leave(c *Client) {
 	// 所有客户端都退出时，销毁所有通道
 	if self.Total() == 0 {
 		self.progressPip.Range(func(key, value any) bool {
-			if p, success := value.(*ProgressPip); success {
+			if p, success := value.(*ProgressPip); success && !p.IsKeepAlive {
 				p.Close()
+				self.progressPip.Delete(p.messageType)
 			}
 			return true
 		})
-		self.progressPip.Clear()
-
 		// 没有任何用户时，中断 docker 的所有请求
 		slog.Debug("docker client cancel")
 		//docker.Sdk.CtxCancelFunc()

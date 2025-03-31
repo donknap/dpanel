@@ -18,8 +18,10 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	"log/slog"
@@ -142,7 +144,7 @@ func (self Container) GetList(http *gin.Context) {
 		// 需要通过镜像允许再次获取下
 		if item.HostConfig.NetworkMode == "host" {
 			imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
-			if err == nil && imageInfo.Config.ExposedPorts != nil {
+			if err == nil && imageInfo.Config != nil {
 				ports := make([]container.Port, 0)
 				for port := range imageInfo.Config.ExposedPorts {
 					portInt, _ := strconv.Atoi(port.Port())
@@ -262,7 +264,7 @@ func (self Container) Copy(http *gin.Context) {
 			if function.IsEmptyArray(bindings) {
 				continue
 			}
-			for i, _ := range bindings {
+			for i := range bindings {
 				containerInfo.HostConfig.PortBindings[destPort][i].HostPort = ""
 			}
 		}
@@ -379,6 +381,12 @@ func (self Container) Delete(http *gin.Context) {
 			}
 		}
 	}
+
+	facade.GetEvent().Publish(event.ContainerDeleteEvent, event.ContainerDelete{
+		InspectInfo: &containerInfo,
+		ContainerId: params.Md5,
+		Ctx:         http,
+	})
 
 	if siteRow != nil {
 		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()

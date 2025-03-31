@@ -57,3 +57,8 @@ relation:
       value:
         type: CronLogValueOption
         serializer: json
+  - table: ims_user_permission
+    column:
+      value:
+        type: PermissionValueOption
+        serializer: json

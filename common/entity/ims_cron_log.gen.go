@@ -12,7 +12,7 @@ const TableNameCronLog = "ims_cron_log"
 
 // CronLog mapped from table <ims_cron_log>
 type CronLog struct {
-	ID     int32                        `gorm:"column:id;type:INTEGER" json:"id"`
+	ID     int32                        `gorm:"column:id;primaryKey" json:"id"`
 	CronID int32                        `gorm:"column:cron_id" json:"cronId"`
 	Value  *accessor.CronLogValueOption `gorm:"column:value;serializer:json" json:"value"`
 }

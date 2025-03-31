@@ -2,6 +2,7 @@ package function
 
 import (
 	"crypto/md5"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -80,4 +81,10 @@ func IpInSubnet(ipAddress, subnetAddress string) (bool, error) {
 		return false, errors.New("ip 地址与子网地址不匹配")
 	}
 	return true, nil
+}
+
+func GetSha256(str []byte) string {
+	hash := sha256.New()
+	hash.Write(str)
+	return fmt.Sprintf("sha256:%x", hash.Sum(nil))
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -42,14 +43,15 @@ func (self Registry) Create(http *gin.Context) {
 		return
 	}
 	params.ServerAddress = urls.Host
+	var registryRow *entity.Registry
 	if params.Id <= 0 {
-		registryRow, _ := dao.Registry.Where(dao.Registry.ServerAddress.Eq(params.ServerAddress)).First()
+		registryRow, _ = dao.Registry.Where(dao.Registry.ServerAddress.Eq(params.ServerAddress)).First()
 		if registryRow != nil {
 			self.JsonResponseWithError(http, errors.New("仓库已经存在"), 500)
 			return
 		}
 	} else {
-		registryRow, _ := dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).First()
+		registryRow, _ = dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).First()
 		if registryRow == nil {
 			self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
 			return
@@ -103,6 +105,19 @@ func (self Registry) Create(http *gin.Context) {
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+
+	if params.Id <= 0 {
+		facade.GetEvent().Publish(event.ImageRegistryCreateEvent, event.ImageRegistryCreate{
+			Registry: registryNew,
+			Ctx:      http,
+		})
+	} else {
+		facade.GetEvent().Publish(event.ImageRegistryEditEvent, event.ImageRegistryEdit{
+			Registry:    registryNew,
+			OldRegistry: registryRow,
+			Ctx:         http,
+		})
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
@@ -194,6 +209,7 @@ func (self Registry) Update(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"id": params.Id,
 	})
@@ -208,11 +224,28 @@ func (self Registry) Delete(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+
+	rows, _ := dao.Registry.Where(dao.Registry.ID.In(params.Id...)).Find()
+	if rows == nil || len(rows) == 0 {
+		self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
+		return
+	}
+
 	_, err := dao.Registry.Where(dao.Registry.ID.In(params.Id...)).Delete()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	delServerAddress := make([]string, 0)
+	for _, item := range rows {
+		delServerAddress = append(delServerAddress, item.ServerAddress)
+	}
+	facade.GetEvent().Publish(event.ImageRegistryDeleteEvent, event.ImageRegistryDelete{
+		Registries: rows,
+		Ctx:        http,
+	})
+
 	self.JsonSuccessResponse(http)
 	return
 }

@@ -16,19 +16,20 @@ import (
 )
 
 var (
-	Q          = new(Query)
-	Backup     *backup
-	Compose    *compose
-	Cron       *cron
-	CronLog    *cronLog
-	Event      *event
-	Image      *image
-	Notice     *notice
-	Registry   *registry
-	Setting    *setting
-	Site       *site
-	SiteDomain *siteDomain
-	Store      *store
+	Q              = new(Query)
+	Backup         *backup
+	Compose        *compose
+	Cron           *cron
+	CronLog        *cronLog
+	Event          *event
+	Image          *image
+	Notice         *notice
+	Registry       *registry
+	Setting        *setting
+	Site           *site
+	SiteDomain     *siteDomain
+	Store          *store
+	UserPermission *userPermission
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
@@ -45,60 +46,64 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	Site = &Q.Site
 	SiteDomain = &Q.SiteDomain
 	Store = &Q.Store
+	UserPermission = &Q.UserPermission
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:         db,
-		Backup:     newBackup(db, opts...),
-		Compose:    newCompose(db, opts...),
-		Cron:       newCron(db, opts...),
-		CronLog:    newCronLog(db, opts...),
-		Event:      newEvent(db, opts...),
-		Image:      newImage(db, opts...),
-		Notice:     newNotice(db, opts...),
-		Registry:   newRegistry(db, opts...),
-		Setting:    newSetting(db, opts...),
-		Site:       newSite(db, opts...),
-		SiteDomain: newSiteDomain(db, opts...),
-		Store:      newStore(db, opts...),
+		db:             db,
+		Backup:         newBackup(db, opts...),
+		Compose:        newCompose(db, opts...),
+		Cron:           newCron(db, opts...),
+		CronLog:        newCronLog(db, opts...),
+		Event:          newEvent(db, opts...),
+		Image:          newImage(db, opts...),
+		Notice:         newNotice(db, opts...),
+		Registry:       newRegistry(db, opts...),
+		Setting:        newSetting(db, opts...),
+		Site:           newSite(db, opts...),
+		SiteDomain:     newSiteDomain(db, opts...),
+		Store:          newStore(db, opts...),
+		UserPermission: newUserPermission(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	Backup     backup
-	Compose    compose
-	Cron       cron
-	CronLog    cronLog
-	Event      event
-	Image      image
-	Notice     notice
-	Registry   registry
-	Setting    setting
-	Site       site
-	SiteDomain siteDomain
-	Store      store
+	Backup         backup
+	Compose        compose
+	Cron           cron
+	CronLog        cronLog
+	Event          event
+	Image          image
+	Notice         notice
+	Registry       registry
+	Setting        setting
+	Site           site
+	SiteDomain     siteDomain
+	Store          store
+	UserPermission userPermission
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:         db,
-		Backup:     q.Backup.clone(db),
-		Compose:    q.Compose.clone(db),
-		Cron:       q.Cron.clone(db),
-		CronLog:    q.CronLog.clone(db),
-		Event:      q.Event.clone(db),
-		Image:      q.Image.clone(db),
-		Notice:     q.Notice.clone(db),
-		Registry:   q.Registry.clone(db),
-		Setting:    q.Setting.clone(db),
-		Site:       q.Site.clone(db),
-		SiteDomain: q.SiteDomain.clone(db),
-		Store:      q.Store.clone(db),
+		db:             db,
+		Backup:         q.Backup.clone(db),
+		Compose:        q.Compose.clone(db),
+		Cron:           q.Cron.clone(db),
+		CronLog:        q.CronLog.clone(db),
+		Event:          q.Event.clone(db),
+		Image:          q.Image.clone(db),
+		Notice:         q.Notice.clone(db),
+		Registry:       q.Registry.clone(db),
+		Setting:        q.Setting.clone(db),
+		Site:           q.Site.clone(db),
+		SiteDomain:     q.SiteDomain.clone(db),
+		Store:          q.Store.clone(db),
+		UserPermission: q.UserPermission.clone(db),
 	}
 }
 
@@ -112,51 +117,54 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:         db,
-		Backup:     q.Backup.replaceDB(db),
-		Compose:    q.Compose.replaceDB(db),
-		Cron:       q.Cron.replaceDB(db),
-		CronLog:    q.CronLog.replaceDB(db),
-		Event:      q.Event.replaceDB(db),
-		Image:      q.Image.replaceDB(db),
-		Notice:     q.Notice.replaceDB(db),
-		Registry:   q.Registry.replaceDB(db),
-		Setting:    q.Setting.replaceDB(db),
-		Site:       q.Site.replaceDB(db),
-		SiteDomain: q.SiteDomain.replaceDB(db),
-		Store:      q.Store.replaceDB(db),
+		db:             db,
+		Backup:         q.Backup.replaceDB(db),
+		Compose:        q.Compose.replaceDB(db),
+		Cron:           q.Cron.replaceDB(db),
+		CronLog:        q.CronLog.replaceDB(db),
+		Event:          q.Event.replaceDB(db),
+		Image:          q.Image.replaceDB(db),
+		Notice:         q.Notice.replaceDB(db),
+		Registry:       q.Registry.replaceDB(db),
+		Setting:        q.Setting.replaceDB(db),
+		Site:           q.Site.replaceDB(db),
+		SiteDomain:     q.SiteDomain.replaceDB(db),
+		Store:          q.Store.replaceDB(db),
+		UserPermission: q.UserPermission.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	Backup     IBackupDo
-	Compose    IComposeDo
-	Cron       ICronDo
-	CronLog    ICronLogDo
-	Event      IEventDo
-	Image      IImageDo
-	Notice     INoticeDo
-	Registry   IRegistryDo
-	Setting    ISettingDo
-	Site       ISiteDo
-	SiteDomain ISiteDomainDo
-	Store      IStoreDo
+	Backup         IBackupDo
+	Compose        IComposeDo
+	Cron           ICronDo
+	CronLog        ICronLogDo
+	Event          IEventDo
+	Image          IImageDo
+	Notice         INoticeDo
+	Registry       IRegistryDo
+	Setting        ISettingDo
+	Site           ISiteDo
+	SiteDomain     ISiteDomainDo
+	Store          IStoreDo
+	UserPermission IUserPermissionDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		Backup:     q.Backup.WithContext(ctx),
-		Compose:    q.Compose.WithContext(ctx),
-		Cron:       q.Cron.WithContext(ctx),
-		CronLog:    q.CronLog.WithContext(ctx),
-		Event:      q.Event.WithContext(ctx),
-		Image:      q.Image.WithContext(ctx),
-		Notice:     q.Notice.WithContext(ctx),
-		Registry:   q.Registry.WithContext(ctx),
-		Setting:    q.Setting.WithContext(ctx),
-		Site:       q.Site.WithContext(ctx),
-		SiteDomain: q.SiteDomain.WithContext(ctx),
-		Store:      q.Store.WithContext(ctx),
+		Backup:         q.Backup.WithContext(ctx),
+		Compose:        q.Compose.WithContext(ctx),
+		Cron:           q.Cron.WithContext(ctx),
+		CronLog:        q.CronLog.WithContext(ctx),
+		Event:          q.Event.WithContext(ctx),
+		Image:          q.Image.WithContext(ctx),
+		Notice:         q.Notice.WithContext(ctx),
+		Registry:       q.Registry.WithContext(ctx),
+		Setting:        q.Setting.WithContext(ctx),
+		Site:           q.Site.WithContext(ctx),
+		SiteDomain:     q.SiteDomain.WithContext(ctx),
+		Store:          q.Store.WithContext(ctx),
+		UserPermission: q.UserPermission.WithContext(ctx),
 	}
 }
 

@@ -98,6 +98,7 @@ func main() {
 				engine.StaticFS("/dpanel/static/asset", http2.FS(subFs))
 				engine.StaticFileFS("/favicon.ico", "dpanel.ico", http2.FS(subFs))
 				engine.NoRoute(func(http *gin.Context) {
+					slog.Debug("http route not found", "uri", http.Request.URL.String())
 					indexHtml, _ := Asset.ReadFile("asset/static/index.html")
 					http.Data(http2.StatusOK, "text/html; charset=UTF-8", indexHtml)
 					return

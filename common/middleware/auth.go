@@ -22,6 +22,7 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 	if strings.Contains(http.Request.URL.Path, "/api/common/user/login") ||
 		strings.Contains(http.Request.URL.Path, "/pro/home/login-info") ||
 		strings.Contains(http.Request.URL.Path, "/api/common/user/create-founder") ||
+		strings.Contains(http.Request.URL.Path, "/pro/user/reset-info") ||
 		!strings.Contains(http.Request.URL.Path, "/api") {
 		http.Next()
 		return

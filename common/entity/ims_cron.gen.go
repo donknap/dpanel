@@ -12,7 +12,7 @@ const TableNameCron = "ims_cron"
 
 // Cron mapped from table <ims_cron>
 type Cron struct {
-	ID      int32                       `gorm:"column:id;type:INTEGER" json:"id"`
+	ID      int32                       `gorm:"column:id;primaryKey" json:"id"`
 	Title   string                      `gorm:"column:title" json:"title"`
 	Setting *accessor.CronSettingOption `gorm:"column:setting;serializer:json" json:"setting"`
 }

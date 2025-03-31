@@ -21,13 +21,13 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/site/get-list", controller.Site{}.GetList)
 			cors.POST("/app/site/get-detail", controller.Site{}.GetDetail)
 			cors.POST("/app/site/delete", controller.Site{}.Delete)
-			cors.POST("/app/site/update-title", controller.Site{}.UpdateTitle)
 
 			cors.POST("/app/site-domain/create", controller.SiteDomain{}.Create)
 			cors.POST("/app/site-domain/delete", controller.SiteDomain{}.Delete)
 			cors.POST("/app/site-domain/get-list", controller.SiteDomain{}.GetList)
 			cors.POST("/app/site-domain/get-detail", controller.SiteDomain{}.GetDetail)
 			cors.POST("/app/site-domain/restart-nginx", controller.SiteDomain{}.RestartNginx)
+			cors.POST("/app/site-domain/update-vhost", controller.SiteDomain{}.UpdateVhost)
 
 			cors.POST("/app/site-cert/apply", controller.SiteCert{}.Apply)
 			cors.POST("/app/site-cert/get-list", controller.SiteCert{}.GetList)
@@ -51,6 +51,13 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 			cors.POST("/app/container/get-stat-info", controller.Container{}.GetStatInfo)
 			cors.POST("/app/container/get-process-info", controller.Container{}.GetProcessInfo)
+
+			// 容器备份相关
+			cors.POST("/app/container-backup/create", controller.ContainerBackup{}.Create)
+			cors.POST("/app/container-backup/get-list", controller.ContainerBackup{}.GetList)
+			cors.POST("/app/container-backup/delete", controller.ContainerBackup{}.Delete)
+			cors.POST("/app/container-backup/restore", controller.ContainerBackup{}.Restore)
+			cors.POST("/app/container-backup/get-detail", controller.ContainerBackup{}.GetDetail)
 
 			// 镜像相关
 			cors.POST("/app/image/create-by-dockerfile", controller.Image{}.CreateByDockerfile)
@@ -109,10 +116,6 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/volume/prune", controller.Volume{}.Prune)
 			cors.POST("/app/volume/create", controller.Volume{}.Create)
 			cors.POST("/app/volume/delete", controller.Volume{}.Delete)
-			cors.POST("/app/volume/backup", controller.Volume{}.Backup)
-			cors.POST("/app/volume/restore", controller.Volume{}.Restore)
-			cors.POST("/app/volume/get-backup-list", controller.Volume{}.GetBackupList)
-			cors.POST("/app/volume/delete-backup", controller.Volume{}.DeleteBackup)
 
 			// Compose 相关
 			cors.POST("/app/compose/create", controller.Compose{}.Create)

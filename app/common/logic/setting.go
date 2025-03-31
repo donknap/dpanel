@@ -21,12 +21,18 @@ var (
 	SettingGroupSettingThemeConfig          = "themeConfig"
 	SettingGroupSettingThemeUserConfig      = "themeUserConfig"
 	SettingGroupSettingDnsApi               = "dnsApi"
+	SettingGroupSettingEmailServer          = "emailServer"
 )
 
 // 用户相关数据
 var (
 	SettingGroupUser        = "user"
 	SettingGroupUserFounder = "founder"
+	SettingGroupUserManager = "manager"
+	SettingGroupUserMember  = "member"
+
+	SettingGroupUserStatusEnable  = uint8(2)
+	SettingGroupUserStatusDisable = uint8(1)
 )
 
 type Setting struct {
@@ -145,6 +151,11 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 			if setting.Value.DnsApi != nil {
 				exists = true
 				*v = setting.Value.DnsApi
+			}
+		case *accessor.EmailServer:
+			if setting.Value.EmailServer != nil {
+				exists = true
+				*v = *setting.Value.EmailServer
 			}
 		}
 	}

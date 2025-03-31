@@ -93,7 +93,7 @@ func (self Home) WsConsole(http *gin.Context) {
 	if params.WorkDir == "" {
 		params.WorkDir = "/"
 	}
-	out, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, container.ExecOptions{
+	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, container.ExecOptions{
 		Privileged:   true,
 		Tty:          true,
 		AttachStdin:  true,
@@ -112,7 +112,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	shell, err := docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, out.ID, container.ExecStartOptions{
+	shell, err := docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, container.ExecStartOptions{
 		Tty: true,
 	})
 	if err != nil {
@@ -332,7 +332,7 @@ func (self Home) Usage(http *gin.Context) {
 			usePort := make([]*portItem, 0)
 			if item.HostConfig.NetworkMode == "host" {
 				imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
-				if err == nil && imageInfo.Config.ExposedPorts != nil {
+				if err == nil && imageInfo.Config != nil {
 					for port := range imageInfo.Config.ExposedPorts {
 						usePort = append(usePort, &portItem{
 							Name: item.Names[0],

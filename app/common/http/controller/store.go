@@ -12,7 +12,9 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
@@ -90,6 +92,8 @@ func (self Store) Delete(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+
+	rows := make([]*entity.Store, 0)
 	for _, id := range params.Id {
 		storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(id)).First()
 		if storeRow == nil {
@@ -106,7 +110,13 @@ func (self Store) Delete(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		rows = append(rows, storeRow)
 	}
+
+	facade.GetEvent().Publish(event.StoreDeleteEvent, event.StoreDelete{
+		Stores: rows,
+		Ctx:    http,
+	})
 
 	self.JsonSuccessResponse(http)
 	return
@@ -149,8 +159,13 @@ func (self Store) Sync(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	storeRootPath := filepath.Join(storage.Local{}.GetStorePath(), params.Name)
 	var err error
+
+	storeRootPath := filepath.Join(storage.Local{}.GetStorePath(), params.Name)
+	if _, err = os.Stat(storeRootPath); err != nil && params.Type == accessor.StoreTypeOnePanelLocal {
+		_ = os.MkdirAll(filepath.Join(storeRootPath, "apps"), os.ModePerm)
+	}
+
 	appList := make([]accessor.StoreAppItem, 0)
 	if params.Type == accessor.StoreTypeOnePanel || params.Type == accessor.StoreTypeOnePanelLocal {
 		if params.Type == accessor.StoreTypeOnePanel {
@@ -245,7 +260,7 @@ func (self Store) Deploy(http *gin.Context) {
 		},
 	})
 
-	if strings.Contains(params.Name, compose.TaskIndex) {
+	if strings.Contains(params.Name, compose.CurrentDate) {
 		_ = envReplaceTable.Replace(&params.Name)
 	}
 
@@ -295,6 +310,12 @@ func (self Store) Deploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposeCreate{
+		Compose: composeNew,
+		Ctx:     http,
+	})
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"id": composeNew.ID,
 	})

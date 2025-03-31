@@ -15,7 +15,9 @@ import (
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
@@ -168,6 +170,11 @@ func (self Compose) Create(http *gin.Context) {
 		_, _ = dao.Compose.Updates(yamlRow)
 	} else if yamlRow.Setting.Type != accessor.ComposeTypeOutPath {
 		_ = dao.Compose.Create(yamlRow)
+
+		facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposeCreate{
+			Compose: yamlRow,
+			Ctx:     http,
+		})
 	}
 
 	if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
@@ -322,12 +329,14 @@ func (self Compose) Delete(http *gin.Context) {
 		return
 	}
 	composeRunList := logic.Compose{}.Ls()
+	var rows []*entity.Compose
 	for _, id := range params.Id {
 		row, err := dao.Compose.Where(dao.Compose.ID.Eq(id)).First()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		rows = append(rows, row)
 		for _, runItem := range composeRunList {
 			if fmt.Sprintf(logic.ComposeProjectName, row.Name) == runItem.Name {
 				self.JsonResponseWithError(http, errors.New("请先销毁容器"), 500)
@@ -344,6 +353,12 @@ func (self Compose) Delete(http *gin.Context) {
 			slog.Error("compose", "delete", err.Error())
 		}
 	}
+
+	facade.GetEvent().Publish(event.ComposeDeleteEvent, event.ComposeDelete{
+		Composes: rows,
+		Ctx:      http,
+	})
+
 	self.JsonSuccessResponse(http)
 	return
 }

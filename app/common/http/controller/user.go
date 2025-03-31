@@ -9,13 +9,11 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/types"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/pquerna/otp/totp"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"gorm.io/datatypes"
-	"gorm.io/gen"
 	"time"
 )
 
@@ -35,7 +33,7 @@ func (self User) Login(http *gin.Context) {
 		return
 	}
 
-	if new(family.Provider).Check(family.FeatureTwoFa) {
+	if !new(family.Provider).Check(types.FeatureFamilyCe) {
 		twoFa := accessor.TwoFa{}
 		exists := logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa, &twoFa)
 		if exists && twoFa.Enable {
@@ -61,32 +59,29 @@ func (self User) Login(http *gin.Context) {
 		logic.User{}.Lock(params.Username, code == "")
 	}()
 
-	var expireAddTime time.Duration
-	if params.AutoLogin {
-		expireAddTime = time.Hour * 24 * 30
-	} else {
-		expireAddTime = time.Hour * 24
-	}
-
-	currentUser, err := dao.Setting.Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
-		Where(gen.Cond(datatypes.JSONQuery("value").Equals(params.Username, "username"))...).First()
+	currentUser, err := logic.User{}.GetUserByUsername(params.Username)
 	if err != nil {
 		self.JsonResponseWithError(http, notice.Message{}.New(".usernameOrPasswordError"), 500)
+		return
+	}
+	if currentUser.Value.Password == "" {
+		self.JsonResponseWithError(http, notice.Message{}.New(".usernameOrPasswordError"), 500)
+		return
+	}
+
+	if currentUser.Value.UserStatus == logic.SettingGroupUserStatusDisable {
+		self.JsonResponseWithError(http, notice.Message{}.New(".userDisable"), 500)
+		return
+	}
+
+	if !(family.Provider{}).Check(types.FeatureFamilyEe) && currentUser.Name != logic.SettingGroupUserFounder {
+		self.JsonResponseWithError(http, notice.Message{}.New(".userDisable"), 500)
 		return
 	}
 
 	password := logic.User{}.GetMd5Password(params.Password, params.Username)
 	if params.Username == currentUser.Value.Username && currentUser.Value.Password == password {
-		jwtSecret := logic.User{}.GetJwtSecret()
-		jwtClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, logic.UserInfo{
-			UserId:       currentUser.ID,
-			Username:     currentUser.Value.Username,
-			RoleIdentity: currentUser.Name,
-			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(expireAddTime)),
-			},
-		})
-		code, err = jwtClaims.SignedString(jwtSecret)
+		code, err = logic.User{}.GetUserOauthToken(currentUser, params.AutoLogin)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -102,7 +97,10 @@ func (self User) Login(http *gin.Context) {
 }
 
 func (self User) GetUserInfo(http *gin.Context) {
-	result := gin.H{}
+	result := gin.H{
+		"menu":      make([]string, 0),
+		"themeUser": make(map[string]string),
+	}
 
 	data, exists := http.Get("userInfo")
 	if !exists {
@@ -112,11 +110,9 @@ func (self User) GetUserInfo(http *gin.Context) {
 	}
 	result["user"] = data.(logic.UserInfo)
 
-	feature := []string{
-		family.FeatureComposeStore,
-	}
+	feature := make([]string, 0)
 	if facade.GetConfig().GetString("app.env") != "lite" && docker.Sdk.Name == docker.DefaultClientName {
-		feature = append(feature, family.FeatureContainerDomain)
+		feature = append(feature, types.FeatureContainerDomain)
 	}
 	result["feature"] = append(feature, family.Provider{}.Feature()...)
 
@@ -171,8 +167,8 @@ func (self User) SaveThemeConfig(http *gin.Context) {
 func (self User) CreateFounder(http *gin.Context) {
 	type ParamsValidate struct {
 		Username        string `json:"username" binding:"required"`
-		Password        string `json:"password" binding:"required"`
-		ConfirmPassword string `json:"confirmPassword" binding:"required"`
+		Password        string `json:"password"`
+		ConfirmPassword string `json:"confirmPassword"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -184,15 +180,24 @@ func (self User) CreateFounder(http *gin.Context) {
 		return
 	}
 	if params.Password != params.ConfirmPassword {
-		self.JsonResponseWithError(http, errors.New(".userPasswordConfirmFailed"), 500)
+		self.JsonResponseWithError(http, notice.Message{}.New(".userPasswordConfirmFailed"), 500)
 		return
 	}
+
+	if (logic.User{}.GetBuiltInPublicUsername()) == params.Username {
+		self.JsonResponseWithServerError(http, notice.Message{}.New(".userFounderExists"))
+		return
+	}
+
+	registerAt := time.Now()
 	err := dao.Setting.Create(&entity.Setting{
 		GroupName: logic.SettingGroupUser,
 		Name:      logic.SettingGroupUserFounder,
 		Value: &accessor.SettingValueOption{
-			Password: logic.User{}.GetMd5Password(params.Password, params.Username),
-			Username: params.Username,
+			Password:   logic.User{}.GetMd5Password(params.Password, params.Username),
+			Username:   params.Username,
+			UserStatus: logic.SettingGroupUserStatusEnable,
+			RegisterAt: &registerAt,
 		},
 	})
 	if err != nil {

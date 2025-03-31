@@ -2,7 +2,9 @@ package compose
 
 import (
 	"errors"
+	"github.com/donknap/dpanel/common/function"
 	"strings"
+	"time"
 )
 
 // 仅在应用商店中的配置文件 data.yml 中支持
@@ -10,6 +12,7 @@ const (
 	ContainerDefaultName = "%CONTAINER_DEFAULT_NAME%"
 	CurrentUsername      = "%CURRENT_USERNAME%"
 	TaskIndex            = "%TASK_INDEX%"
+	CurrentDate          = "%CURRENT_DATE%"
 )
 
 type ReplaceFunc func(placeholder string) (string, error)
@@ -22,6 +25,9 @@ func NewReplaceTable(rt ...ReplaceTable) ReplaceTable {
 		},
 		CurrentUsername: func(placeholder string) (string, error) {
 			return "", errors.New("not implemented")
+		},
+		CurrentDate: func(placeholder string) (string, error) {
+			return time.Now().Format(function.YmdHis), nil
 		},
 	}
 	for _, item := range rt {

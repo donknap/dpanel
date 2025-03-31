@@ -24,7 +24,6 @@ type Provider struct {
 }
 
 func (provider *Provider) Register(httpServer *http_server.Server) {
-
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		cors := engine.Group("/api", common.CorsMiddleware{}.Process)
 
