@@ -253,6 +253,9 @@ func (self Compose) GetList(http *gin.Context) {
 	}
 
 	for _, item := range runComposeList {
+		if params.Name != "" && !strings.Contains(item.Name, params.Name) {
+			continue
+		}
 		composeList = append(composeList, item)
 	}
 
