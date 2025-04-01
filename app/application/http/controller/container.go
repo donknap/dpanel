@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
@@ -14,6 +13,7 @@ import (
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
@@ -23,6 +23,9 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"gorm.io/datatypes"
+	"gorm.io/gen"
+	"gorm.io/gorm"
 	"io"
 	"log/slog"
 	"os"
@@ -109,8 +112,8 @@ func (self Container) GetList(http *gin.Context) {
 	if params.SiteTitle != "" {
 		searchSiteList, _ := dao.Site.Where(dao.Site.SiteTitle.Like("%" + params.SiteTitle + "%")).Find()
 		for _, item := range searchSiteList {
-			if item.ContainerInfo.ID != "" {
-				searchContainerIds = append(searchContainerIds, item.ContainerInfo.ID)
+			if item.ContainerInfo.Id != "" {
+				searchContainerIds = append(searchContainerIds, item.ContainerInfo.Id)
 			}
 		}
 	}
@@ -133,41 +136,44 @@ func (self Container) GetList(http *gin.Context) {
 		result = list
 	}
 
-	var md5List []driver.Valuer
-	var nameList []string
+	var containerName []string
 	for index, item := range result {
-		md5List = append(md5List, &accessor.SiteContainerInfoOption{
-			ID: item.ID,
-		})
-		nameList = append(nameList, item.Names...)
-		// 如果是直接绑定到宿主机网络，端口号不会显示到容器详情中
-		// 需要通过镜像允许再次获取下
-		if item.HostConfig.NetworkMode == "host" {
-			imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
-			if err == nil && imageInfo.Config != nil {
+		containerName = append(containerName, item.Names...)
+		// 如果是直接绑定到宿主机网络或是 Macvlan，端口号不会显示到容器详情中
+		// 需要通过获取镜像详情数据获取一下
+		if function.IsEmptyArray(item.Ports) {
+			if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID); err == nil && info.HostConfig != nil && !function.IsEmptyMap(info.HostConfig.PortBindings) {
 				ports := make([]container.Port, 0)
-				for port := range imageInfo.Config.ExposedPorts {
-					portInt, _ := strconv.Atoi(port.Port())
-					ports = append(ports, container.Port{
-						IP:          "0.0.0.0",
-						PublicPort:  uint16(portInt),
-						PrivatePort: uint16(portInt),
-						Type:        port.Proto(),
-					})
+				for port, bindings := range info.HostConfig.PortBindings {
+					for _, binding := range bindings {
+						hostPort, _ := strconv.Atoi(binding.HostPort)
+						if binding.HostIP == "" {
+							binding.HostIP = "0.0.0.0"
+						}
+						ports = append(ports, container.Port{
+							IP:          binding.HostIP,
+							PublicPort:  uint16(hostPort),
+							PrivatePort: uint16(port.Int()),
+							Type:        port.Proto(),
+						})
+					}
 				}
 				result[index].Ports = ports
 			}
 		}
 	}
 
-	query := dao.Site.Where(dao.Site.ContainerInfo.In(md5List...))
+	query := dao.Site.Where(dao.Site.SiteName.In(function.PluckArrayWalk(containerName, func(i string) (string, bool) {
+		return strings.TrimLeft(i, "/"), true
+	})...))
 	siteList, _ := query.Find()
 
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Names[0] < result[j].Names[0]
 	})
 
-	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(nameList...)).Find()
+	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(containerName...)).Find()
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"list":       result,
 		"siteList":   siteList,
@@ -234,6 +240,10 @@ func (self Container) Update(http *gin.Context) {
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
+		}
+		if siteRow, err := dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.Md5, "Id"))...).First(); err == nil {
+			siteRow.SiteName = strings.TrimLeft(params.Name, "/")
+			_ = dao.Site.Save(siteRow)
 		}
 	}
 	self.JsonSuccessResponse(http)
@@ -313,31 +323,39 @@ func (self Container) Delete(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-		ID: params.Md5,
-	})).First()
-
-	if siteRow != nil && siteRow.SiteName != "" {
-		// 删除网络
-		// 获取该容器的网络，退出里面的容器
-		networkInfo, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, siteRow.SiteName, network.InspectOptions{})
-		if err == nil {
-			for md5 := range networkInfo.Containers {
-				err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, siteRow.SiteName, md5, true)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
-				}
-
-			}
-			err = docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, siteRow.SiteName)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
+	runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
+	if err != nil {
+		slog.Warn("container delete create recycle", "error", err)
 	}
+	runOption.Command = ""
+	runOption.Entrypoint = ""
+	runOption.WorkDir = ""
 
+	siteRow, _ := dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(strings.TrimLeft(containerInfo.Name, "/"))).First()
+	// 创建回收站数据
+	if siteRow == nil {
+
+		siteRow = &entity.Site{
+			SiteName: strings.TrimLeft(containerInfo.Name, "/"),
+			Env:      &runOption,
+			ContainerInfo: &accessor.SiteContainerInfoOption{
+				Info: containerInfo,
+				Id:   containerInfo.ID,
+			},
+			Status:     0,
+			StatusStep: "",
+			Message:    "",
+			DeletedAt:  gorm.DeletedAt{},
+		}
+
+	} else {
+		siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
+			Info: containerInfo,
+			Id:   containerInfo.ID,
+		}
+		siteRow.Env = &runOption
+	}
+	_ = dao.Site.Save(siteRow)
 	// 删除域名、配置、证书
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.Name)).Find()
 	for _, domain := range domainList {
@@ -346,24 +364,29 @@ func (self Container) Delete(http *gin.Context) {
 			slog.Debug("container delete domain", "error", err)
 		}
 	}
+
 	_, err = dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.ID)).Delete()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.ID, container.StopOptions{})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.ID, container.RemoveOptions{
 		RemoveVolumes: params.DeleteVolume,
 		RemoveLinks:   params.DeleteLink,
 	})
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	if params.DeleteImage {
 		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, containerInfo.Image, image.RemoveOptions{
 			Force:         true,

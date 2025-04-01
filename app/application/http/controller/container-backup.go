@@ -138,6 +138,18 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		}
 		item.Config = configPath
 
+		if containerInfo.NetworkSettings != nil && !function.IsEmptyMap(containerInfo.NetworkSettings.Networks) {
+			for name, _ := range containerInfo.NetworkSettings.Networks {
+				if info, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, name, network.InspectOptions{}); err == nil {
+					configPath, err = b.Writer.WriteBlobStruct(info)
+					if err != nil {
+						return err
+					}
+					item.Network = append(item.Network, configPath)
+				}
+			}
+		}
+
 		manifest = append(manifest, item)
 		return nil
 	}()
@@ -243,16 +255,70 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			}
 		}
 
+		var networkCreate []network.Inspect
+		if !function.IsEmptyArray(item.Network) {
+			for _, s := range item.Network {
+				networkConfigContent, err := b.Reader.ReadBlobsContent(s)
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+				networkInfo := network.Inspect{}
+				err = json.Unmarshal(networkConfigContent, &networkInfo)
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+				if _, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, networkInfo.Name, network.InspectOptions{}); err != nil {
+					networkCreate = append(networkCreate, networkInfo)
+					_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, networkInfo.Name, network.CreateOptions{
+						Driver:     networkInfo.Driver,
+						Scope:      networkInfo.Scope,
+						EnableIPv4: &networkInfo.EnableIPv4,
+						EnableIPv6: &networkInfo.EnableIPv6,
+						IPAM:       &networkInfo.IPAM,
+						Internal:   networkInfo.Internal,
+						Attachable: networkInfo.Attachable,
+						Ingress:    networkInfo.Ingress,
+						ConfigOnly: networkInfo.ConfigOnly,
+						ConfigFrom: &networkInfo.ConfigFrom,
+						Options:    networkInfo.Options,
+						Labels:     networkInfo.Labels,
+					})
+					if err != nil {
+						self.JsonResponseWithError(http, err, 500)
+						return
+					}
+				}
+			}
+		}
+
 		newContainerName := containerInfo.Name
 		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, newContainerName); err != nil {
-			_, err = docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
-				EndpointsConfig: containerInfo.NetworkSettings.Networks,
-			}, &v1.Platform{}, newContainerName)
+			networkingConfig := &network.NetworkingConfig{
+				EndpointsConfig: map[string]*network.EndpointSettings{},
+			}
+			if containerInfo.NetworkSettings != nil && !function.IsEmptyMap(containerInfo.NetworkSettings.Networks) {
+				for name, settings := range containerInfo.NetworkSettings.Networks {
+					settings.EndpointID = ""
+					settings.NetworkID = ""
+					networkingConfig.EndpointsConfig[name] = settings
+				}
+			}
+			_, err = docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, networkingConfig, &v1.Platform{}, newContainerName)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-			_ = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, newContainerName, container.StartOptions{})
+			err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, newContainerName, container.StartOptions{})
+			if err != nil {
+				for _, inspect := range networkCreate {
+					_ = docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, inspect.Name)
+				}
+				_ = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, newContainerName, container.RemoveOptions{})
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 
 		for _, volume := range item.Volume {

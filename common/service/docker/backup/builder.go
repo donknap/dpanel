@@ -44,7 +44,8 @@ func (self Builder) Close() (err error) {
 }
 
 type Manifest struct {
-	Config string
-	Image  string
-	Volume []string
+	Config  string
+	Image   string
+	Volume  []string
+	Network []string
 }

@@ -17,6 +17,8 @@ import (
 	"github.com/gin-gonic/gin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"gorm.io/datatypes"
+	"gorm.io/gen"
 	"log/slog"
 	"slices"
 	"strings"
@@ -39,7 +41,7 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 	if containerInfo.Name == "/"+facade.GetConfig().GetString("APP_NAME") || containerInfo.Name == "/dpanel" {
-		self.JsonResponseWithError(http, errors.New("面板无法升级自身，请通过【系统更新】查看 dpanel 面板升级脚本"), 500)
+		self.JsonResponseWithError(http, errors.New("面板无法升级自身，请通过【系统更新】查看面板升级脚本"), 500)
 		return
 	}
 
@@ -56,9 +58,9 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 	// 如果旧的容器使用的镜像和重新拉取的镜像一致则不升级
-	// 多平台下的其它平台镜像推送后，也会提示更新
+	// 多平台下的其它平台镜像推送后，也会导致 digest 不一致
 	// 不一定就是本平台镜像有更新
-	// 这里还是选择对齐 digest
+	// 这里还是选择更新对齐 digest
 	oldContainerImageId := containerInfo.Image
 	if containerInfo.Image == imageInfo.ID {
 		//self.JsonResponseWithoutError(http, gin.H{
@@ -68,7 +70,7 @@ func (self Container) Upgrade(http *gin.Context) {
 	}
 
 	// 成功的创建一个新的容器后再对旧的进停止或是删除操作
-	_ = notice.Message{}.Info(".containerUpgradeCreate", containerInfo.Name)
+	_ = notice.Message{}.Info(".containerCreate", containerInfo.Name)
 	newContainerName := fmt.Sprintf("%s-copy-%s", containerInfo.Name, bakTime)
 
 	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
@@ -92,7 +94,7 @@ func (self Container) Upgrade(http *gin.Context) {
 			return
 		}
 		if containerInfo.HostConfig.AutoRemove {
-			// 如果是自动删除，则等待容器自动被销毁
+			// 如果是旧容器配置了自动删除，则等待容器自动被销毁
 			for {
 				time.Sleep(time.Second * 1)
 				if _, err = docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerInfo.Name); err != nil {
@@ -160,10 +162,12 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 
-	if siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-		ID: params.Md5,
-	})).First(); siteRow != nil {
-		siteRow.ContainerInfo.ID = out.ID
+	// 容器升级后，将表中的数据更新为新的容器数据
+	if siteRow, _ := dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.Md5, "Id"))...).First(); siteRow != nil {
+		siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
+			Id:   out.ID,
+			Info: newContainerInfo,
+		}
 		_, _ = dao.Site.Updates(siteRow)
 	}
 

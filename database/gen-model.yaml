@@ -8,6 +8,7 @@ relation:
         type: SiteEnvOption
       container_info:
         type: SiteContainerInfoOption
+        serializer: json
   - table: ims_image
     column:
       image_info:

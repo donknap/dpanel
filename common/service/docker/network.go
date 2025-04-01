@@ -67,12 +67,19 @@ func (self Builder) NetworkConnect(networkRow NetworkItem, containerName string)
 	endpointSetting := &network.EndpointSettings{
 		Aliases:    networkRow.Alise,
 		IPAMConfig: &network.EndpointIPAMConfig{},
+		DNSNames:   make([]string, 0),
 	}
 	if networkRow.IpV4 != "" {
 		endpointSetting.IPAMConfig.IPv4Address = networkRow.IpV4
 	}
 	if networkRow.IpV6 != "" {
 		endpointSetting.IPAMConfig.IPv6Address = networkRow.IpV6
+	}
+	if !function.IsEmptyArray(networkRow.DnsName) {
+		endpointSetting.DNSNames = networkRow.DnsName
+	}
+	if networkRow.MacAddress != "" {
+		endpointSetting.MacAddress = networkRow.MacAddress
 	}
 	return self.Client.NetworkConnect(self.Ctx, networkRow.Name, containerName, endpointSetting)
 }

@@ -13,7 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"gorm.io/datatypes"
+	"gorm.io/gen"
 	"gorm.io/gorm"
+	"strconv"
 	"strings"
 )
 
@@ -104,13 +107,11 @@ func (self Site) CreateByImage(http *gin.Context) {
 	siteRow, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).First()
 	if siteRow == nil {
 		siteRow = &entity.Site{
-			SiteName:  params.SiteName,
-			SiteTitle: params.SiteTitle,
-			Env:       &buildParams,
-			Status:    docker.ImageBuildStatusStop,
-			ContainerInfo: &accessor.SiteContainerInfoOption{
-				ID: "",
-			},
+			SiteName:      params.SiteName,
+			SiteTitle:     params.SiteTitle,
+			Env:           &buildParams,
+			Status:        docker.ImageBuildStatusStop,
+			ContainerInfo: &accessor.SiteContainerInfoOption{},
 		}
 		err := dao.Site.Create(siteRow)
 		if err != nil {
@@ -118,12 +119,13 @@ func (self Site) CreateByImage(http *gin.Context) {
 			return
 		}
 	} else {
-		dao.Site.Select(dao.Site.ALL).Where(dao.Site.SiteName.Eq(params.SiteName)).Updates(&entity.Site{
-			SiteTitle: params.SiteTitle,
-			Env:       &buildParams,
-			Status:    docker.ImageBuildStatusStop,
-			Message:   "",
-			DeletedAt: gorm.DeletedAt{},
+		_, _ = dao.Site.Select(dao.Site.ALL).Where(dao.Site.SiteName.Eq(params.SiteName)).Updates(&entity.Site{
+			SiteTitle:     params.SiteTitle,
+			Env:           &buildParams,
+			Status:        docker.ImageBuildStatusStop,
+			Message:       "",
+			ContainerInfo: &accessor.SiteContainerInfoOption{},
+			DeletedAt:     gorm.DeletedAt{},
 		})
 	}
 	runTaskRow := &logic.CreateContainerOption{
@@ -141,7 +143,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			}
 		}
 		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(entity.Site{
-			Status:  accessor.StatusError,
+			Status:  docker.ImageBuildStatusError,
 			Message: err.Error(),
 		})
 		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
@@ -149,19 +151,20 @@ func (self Site) CreateByImage(http *gin.Context) {
 		return
 	}
 
-	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(&entity.Site{
-		ContainerInfo: &accessor.SiteContainerInfoOption{
-			ID: containerId,
-		},
-		Status:  accessor.StatusSuccess,
-		Message: "",
-	})
-
 	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerId)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(&entity.Site{
+		ContainerInfo: &accessor.SiteContainerInfoOption{
+			Id:   containerId,
+			Info: detail,
+		},
+		Status:  docker.ImageBuildStatusSuccess,
+		Message: "",
+	})
 
 	facade.GetEvent().Publish(event.ContainerCreateEvent, event.ContainerCreate{
 		InspectInfo: &detail,
@@ -219,54 +222,63 @@ func (self Site) GetList(http *gin.Context) {
 
 func (self Site) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 string `form:"md5" binding:"required_if=Id 0"`
-		Id  int32  `json:"id"`
+		Id string `json:"id" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
+	var containerName string
 	var siteRow *entity.Site
-	if params.Id != 0 {
-		siteRow, _ = dao.Site.Unscoped().Where(dao.Site.ID.Eq(params.Id)).First()
-	} else {
-		siteRow, _ = dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-			ID: params.Md5,
-		})).First()
-	}
-	if params.Md5 == "" {
-		self.JsonResponseWithoutError(http, siteRow)
-		return
-	}
-	runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	// 站点不存在，返回容器那部分，并建立 env 字段的内容
-	if siteRow == nil {
-		info, err := docker.Sdk.ContainerInfo(params.Md5)
+	var runOption accessor.SiteEnvOption
+
+	if id, err := strconv.Atoi(params.Id); err == nil {
+		siteRow, err = dao.Site.Unscoped().Where(dao.Site.ID.Eq(int32(id))).First()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		siteRow = &entity.Site{
-			ContainerInfo: &accessor.SiteContainerInfoOption{
-				ID:   params.Md5,
-				Info: &info,
-			},
-			SiteTitle: info.Name,
-			SiteName:  info.Name,
+		containerName = siteRow.SiteName
+	} else {
+		containerName = params.Id
+		siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.Id, "Id"))...).First()
+		info, err := docker.Sdk.ContainerInfo(containerName)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
 		}
-
-		runOption.Command = ""
-		runOption.Entrypoint = ""
-		runOption.WorkDir = ""
-		siteRow.Env = &runOption
+		runOption, err = logic.Site{}.GetEnvOptionByContainer(containerName)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		// 站点不存在，表示容器没有通过面板创建，则创建出来站点数据
+		if siteRow == nil {
+			siteRow = &entity.Site{
+				ContainerInfo: &accessor.SiteContainerInfoOption{
+					Id:   params.Id,
+					Info: info,
+				},
+				SiteTitle: info.Name,
+				SiteName:  strings.TrimLeft(info.Name, "/"),
+			}
+			runOption.Command = ""
+			runOption.Entrypoint = ""
+			runOption.WorkDir = ""
+			siteRow.Env = &runOption
+			_ = dao.Site.Save(siteRow)
+		}
 	}
-	siteRow.Env.Network = runOption.Network
-	siteRow.Env.CapAdd = runOption.CapAdd
+
+	// 站点有些数据需要从容器信息上获取，这里是否可以直接使用 containerInfo ?
+	if !function.IsEmptyArray(runOption.Network) {
+		siteRow.Env.Network = runOption.Network
+	}
+	if !function.IsEmptyArray(runOption.CapAdd) {
+		siteRow.Env.CapAdd = runOption.CapAdd
+	}
+
 	self.JsonResponseWithoutError(http, siteRow)
 	return
 }
