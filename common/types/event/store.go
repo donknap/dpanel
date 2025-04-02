@@ -7,7 +7,7 @@ import (
 
 var StoreDeleteEvent = "store_delete"
 
-type StoreDelete struct {
-	Stores []*entity.Store
-	Ctx    context.Context
+type StorePayload struct {
+	Store *entity.Store
+	Ctx   context.Context
 }

@@ -37,7 +37,6 @@ storage:
   local:
     path: ${STORAGE_LOCAL_PATH}
 jwt:
-  reset_user_info_ttl_seconds: 3600
   secret: ${DP_JWT_SECRET}
 common:
   public_user_name: ${PUBLIC_USERNAME-__public__}

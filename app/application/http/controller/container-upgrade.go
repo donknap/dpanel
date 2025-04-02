@@ -81,11 +81,6 @@ func (self Container) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.Join(err, errRemove), 500)
 		return
 	}
-	newContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, out.ID)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 
 	if containerInfo.State.Running {
 		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.Name, container.StopOptions{})
@@ -177,13 +172,14 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 
-	facade.GetEvent().Publish(event.ContainerUpgradeEvent, event.ContainerUpgrade{
-		ContainerId:    out.ID,
-		OldContainerId: params.Md5,
-		InspectInfo:    &newContainerInfo,
-		OldInspectInfo: &containerInfo,
-		Ctx:            http,
-	})
+	newContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, out.ID)
+	if err == nil {
+		facade.GetEvent().Publish(event.ContainerEditEvent, event.ContainerPayload{
+			InspectInfo:    &newContainerInfo,
+			OldInspectInfo: &containerInfo,
+			Ctx:            http,
+		})
+	}
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"containerId": out.ID,

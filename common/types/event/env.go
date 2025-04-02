@@ -4,7 +4,7 @@ import "context"
 
 var EnvDeleteEvent = "env_delete"
 
-type EnvDelete struct {
-	Names []string
-	Ctx   context.Context
+type EnvPayload struct {
+	Name string
+	Ctx  context.Context
 }
