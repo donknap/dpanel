@@ -115,7 +115,7 @@ func (self Container) GetList(http *gin.Context) {
 		}
 	}
 
-	var result []container.Summary
+	result := make([]container.Summary, 0)
 	if params.SiteTitle != "" {
 		for _, item := range list {
 			if function.InArray(searchContainerIds, item.ID) {
@@ -144,7 +144,7 @@ func (self Container) GetList(http *gin.Context) {
 		// 需要通过镜像允许再次获取下
 		if item.HostConfig.NetworkMode == "host" {
 			imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
-			if err == nil {
+			if err == nil && imageInfo.Config != nil {
 				ports := make([]container.Port, 0)
 				for port := range imageInfo.Config.ExposedPorts {
 					portInt, _ := strconv.Atoi(port.Port())
@@ -264,7 +264,7 @@ func (self Container) Copy(http *gin.Context) {
 			if function.IsEmptyArray(bindings) {
 				continue
 			}
-			for i, _ := range bindings {
+			for i := range bindings {
 				containerInfo.HostConfig.PortBindings[destPort][i].HostPort = ""
 			}
 		}
@@ -308,7 +308,7 @@ func (self Container) Delete(http *gin.Context) {
 		return
 	}
 	var err error
-	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	containerInfo, err := docker.Sdk.ContainerInfo(params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

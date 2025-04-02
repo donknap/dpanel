@@ -65,7 +65,6 @@ func (self Builder) ContainerInfo(md5 string) (info container.InspectResponse, e
 	if err != nil {
 		return info, err
 	}
-	info.Name = strings.TrimPrefix(info.Name, "/")
 	return info, nil
 }
 

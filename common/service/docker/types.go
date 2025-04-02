@@ -160,7 +160,9 @@ type ImportFile struct {
 func (self ImportFile) Test(path string) {
 	if file, err := os.Create(path); err == nil {
 		fmt.Printf("%v \n", file.Name())
-		defer file.Close()
+		defer func() {
+			_ = file.Close()
+		}()
 		_, _ = io.Copy(file, self.Reader)
 	}
 }
@@ -179,3 +181,23 @@ type FileItemResult struct {
 	Group    string `json:"group"`
 	Owner    string `json:"owner"`
 }
+
+const (
+	ImageBuildStatusStop    = 0  // 未开始
+	ImageBuildStatusProcess = 10 // 进行中
+	ImageBuildStatusError   = 20 // 有错误
+	ImageBuildStatusSuccess = 30 // 部署成功
+)
+
+const (
+	StepImagePull           = "imagePull"      // 拉取镜像中
+	StepImageBuild          = "imageBuild"     // 开始构建镜像
+	StepImageBuildUploadTar = "uploadTar"      // 上传构建 tar 包
+	StepImageBuildRun       = "imageBuildRun"  // 开始执行dockerfile
+	StepContainerBuild      = "containerBuild" // 创建容器
+	StepContainerRun        = "containerRun"   // 运行容器
+)
+
+const (
+	ContainerBackupTypeSnapshot = "snapshot"
+)

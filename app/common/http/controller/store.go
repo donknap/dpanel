@@ -157,8 +157,13 @@ func (self Store) Sync(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	storeRootPath := filepath.Join(storage.Local{}.GetStorePath(), params.Name)
 	var err error
+
+	storeRootPath := filepath.Join(storage.Local{}.GetStorePath(), params.Name)
+	if _, err = os.Stat(storeRootPath); err != nil && params.Type == accessor.StoreTypeOnePanelLocal {
+		_ = os.MkdirAll(filepath.Join(storeRootPath, "apps"), os.ModePerm)
+	}
+
 	appList := make([]accessor.StoreAppItem, 0)
 	if params.Type == accessor.StoreTypeOnePanel || params.Type == accessor.StoreTypeOnePanelLocal {
 		if params.Type == accessor.StoreTypeOnePanel {
@@ -253,7 +258,7 @@ func (self Store) Deploy(http *gin.Context) {
 		},
 	})
 
-	if strings.Contains(params.Name, compose.TaskIndex) {
+	if strings.Contains(params.Name, compose.CurrentDate) {
 		_ = envReplaceTable.Replace(&params.Name)
 	}
 

@@ -107,7 +107,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			SiteName:  params.SiteName,
 			SiteTitle: params.SiteTitle,
 			Env:       &buildParams,
-			Status:    logic.StatusStop,
+			Status:    docker.ImageBuildStatusStop,
 			ContainerInfo: &accessor.SiteContainerInfoOption{
 				ID: "",
 			},
@@ -121,7 +121,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		dao.Site.Select(dao.Site.ALL).Where(dao.Site.SiteName.Eq(params.SiteName)).Updates(&entity.Site{
 			SiteTitle: params.SiteTitle,
 			Env:       &buildParams,
-			Status:    logic.StatusStop,
+			Status:    docker.ImageBuildStatusStop,
 			Message:   "",
 			DeletedAt: gorm.DeletedAt{},
 		})
@@ -282,53 +282,6 @@ func (self Site) Delete(http *gin.Context) {
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Site) UpdateTitle(http *gin.Context) {
-	type ParamsValidate struct {
-		Md5   string `json:"md5" binding:"required"`
-		Title string `json:"title" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	siteRow, _ := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-		ID: params.Md5,
-	})).First()
-	if siteRow != nil {
-		_, err := dao.Site.Where(dao.Site.ContainerInfo.Eq(&accessor.SiteContainerInfoOption{
-			ID: params.Md5,
-		})).Updates(&entity.Site{
-			SiteTitle: params.Title,
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-
-	} else {
-		runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-
-		err = dao.Site.Create(&entity.Site{
-			SiteTitle: params.Title,
-			Env:       &runOption,
-			ContainerInfo: &accessor.SiteContainerInfoOption{
-				ID: params.Md5,
-			},
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-
 	}
 	self.JsonSuccessResponse(http)
 	return

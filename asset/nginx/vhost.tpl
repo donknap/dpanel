@@ -18,7 +18,7 @@ server {
 {{end}}
 
 server {
-  set $forward_scheme http;
+  set $forward_scheme {{.ServerProtocol}};
   {{if .EnableSSL}}
   listen 443 ssl;
   {{else}}

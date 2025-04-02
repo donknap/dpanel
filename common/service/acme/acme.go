@@ -92,11 +92,7 @@ func (self *Cert) FillCertContent() {
 }
 
 func (self *Cert) GetRootPath() string {
-	if self.IsImport() {
-		return self.RootPath
-	} else {
-		return self.RootPath + "_ecc"
-	}
+	return self.RootPath + "_ecc"
 }
 
 func (self *Cert) GetConfigPath() string {

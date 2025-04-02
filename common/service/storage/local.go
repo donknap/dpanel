@@ -45,6 +45,10 @@ func (self Local) GetScriptTemplatePath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "script")
 }
 
+func (self Local) GetBackupPath() string {
+	return filepath.Join(self.GetStorageLocalPath(), "backup")
+}
+
 func (self Local) GetStorageLocalPath() string {
 	if facade.GetConfig() == nil {
 		slog.Debug("storage local path empty")
