@@ -157,6 +157,11 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 
+	newContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, out.ID)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	// 容器升级后，将表中的数据更新为新的容器数据
 	if siteRow, _ := dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.Md5, "Id"))...).First(); siteRow != nil {
 		siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
@@ -172,14 +177,11 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 
-	newContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, out.ID)
-	if err == nil {
-		facade.GetEvent().Publish(event.ContainerEditEvent, event.ContainerPayload{
-			InspectInfo:    &newContainerInfo,
-			OldInspectInfo: &containerInfo,
-			Ctx:            http,
-		})
-	}
+	facade.GetEvent().Publish(event.ContainerEditEvent, event.ContainerPayload{
+		InspectInfo:    &newContainerInfo,
+		OldInspectInfo: &containerInfo,
+		Ctx:            http,
+	})
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"containerId": out.ID,
