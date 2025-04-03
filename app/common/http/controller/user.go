@@ -111,9 +111,17 @@ func (self User) GetUserInfo(http *gin.Context) {
 	result["user"] = data.(logic.UserInfo)
 
 	feature := make([]string, 0)
-	if facade.GetConfig().GetString("app.env") != "lite" && docker.Sdk.Name == docker.DefaultClientName {
-		feature = append(feature, types.FeatureContainerDomain)
+
+	if facade.GetConfig().GetString("app.env") == "lite" {
+		feature = append(feature, types.FeatureVersionEnvLite)
+	} else {
+		feature = append(feature, types.FeatureVersionEnvStandard)
 	}
+
+	if docker.Sdk.Name == docker.DefaultClientName {
+		feature = append(feature, types.FeatureDockerEnvLocal)
+	}
+
 	result["feature"] = append(feature, family.Provider{}.Feature()...)
 
 	themeConfig := accessor.ThemeConfig{}

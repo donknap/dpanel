@@ -193,9 +193,6 @@ func (self Site) GetList(http *gin.Context) {
 	if params.Page < 1 {
 		params.Page = 1
 	}
-	if params.PageSize < 1 {
-		params.PageSize = 10
-	}
 
 	query := dao.Site.Order(dao.Site.ID.Desc())
 	if params.Status != 0 {
@@ -210,13 +207,21 @@ func (self Site) GetList(http *gin.Context) {
 	if params.IsDelete {
 		query = query.Unscoped().Where(dao.Site.DeletedAt.IsNotNull())
 	}
-	list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
-
-	self.JsonResponseWithoutError(http, gin.H{
-		"total": total,
-		"page":  params.Page,
-		"list":  list,
-	})
+	if params.PageSize > 0 {
+		list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
+		self.JsonResponseWithoutError(http, gin.H{
+			"total": total,
+			"page":  params.Page,
+			"list":  list,
+		})
+	} else {
+		list, _ := query.Find()
+		self.JsonResponseWithoutError(http, gin.H{
+			"total": len(list),
+			"page":  params.Page,
+			"list":  list,
+		})
+	}
 	return
 }
 
@@ -233,7 +238,7 @@ func (self Site) GetDetail(http *gin.Context) {
 	var siteRow *entity.Site
 	var runOption accessor.SiteEnvOption
 
-	if id, err := strconv.Atoi(params.Id); err == nil {
+	if id, err := strconv.Atoi(params.Id); err == nil && len(params.Id) < 64 {
 		siteRow, err = dao.Site.Unscoped().Where(dao.Site.ID.Eq(int32(id))).First()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
