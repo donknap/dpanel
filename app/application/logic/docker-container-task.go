@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
@@ -52,7 +51,6 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	options = append(options, []builder.Option{
 		builder.WithContainerName(task.SiteName),
 		builder.WithHostname(task.BuildParams.Hostname),
-		builder.WithDomainName(fmt.Sprintf(docker.HostnameTemplate, task.SiteName)),
 		builder.WithImage(task.BuildParams.ImageName, false),
 		builder.WithEnv(task.BuildParams.Environment...),
 		builder.WithVolumesFrom(task.BuildParams.Links...),
