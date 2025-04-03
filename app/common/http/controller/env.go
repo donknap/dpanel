@@ -273,14 +273,14 @@ func (self Env) Delete(http *gin.Context) {
 				_ = docker.Sdk.Client.Close()
 			}
 			delete(setting.Value.Docker, name)
+
+			facade.GetEvent().Publish(event.EnvDeleteEvent, event.EnvPayload{
+				Name: name,
+				Ctx:  http,
+			})
 		}
 	}
 	_ = logic.Setting{}.Save(setting)
-
-	facade.GetEvent().Publish(event.EnvDeleteEvent, event.EnvDelete{
-		Names: params.Name,
-		Ctx:   http,
-	})
 
 	self.JsonSuccessResponse(http)
 	return

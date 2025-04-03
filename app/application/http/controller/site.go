@@ -166,9 +166,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Message: "",
 	})
 
-	facade.GetEvent().Publish(event.ContainerCreateEvent, event.ContainerCreate{
+	facade.GetEvent().Publish(event.ContainerCreateEvent, event.ContainerPayload{
 		InspectInfo: &detail,
-		ContainerId: containerId,
 		Ctx:         http,
 	})
 

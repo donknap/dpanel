@@ -22,6 +22,7 @@ import (
 	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
+	commonTypes "github.com/donknap/dpanel/common/types"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
@@ -403,21 +404,11 @@ func (self Image) GetList(http *gin.Context) {
 		})
 	}
 
-	type ImgInfo struct {
-		image.Summary
-		ServerAddress string `json:"serverAddress"`
-	}
-	var imgList []ImgInfo
+	var imgList commonTypes.ImgList
 	for _, item := range result {
 		for _, tagName := range item.RepoTags {
-			if tagName != "<none>:<none>" {
-				info := ImgInfo{
-					Summary:       item,
-					ServerAddress: registry.GetRegistryAddressByImageName(tagName),
-				}
-				info.RepoTags = []string{tagName}
-				imgList = append(imgList, info)
-			}
+			item.RepoTags = []string{tagName}
+			imgList = append(imgList, item)
 		}
 	}
 
