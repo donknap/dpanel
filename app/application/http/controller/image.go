@@ -522,7 +522,8 @@ func (self Image) BuildPrune(http *gin.Context) {
 
 func (self Image) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 []string `json:"md5" binding:"required"`
+		Md5                []string `json:"md5" binding:"required"`
+		EnableExportToPath bool     `json:"enableExportToPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -540,23 +541,29 @@ func (self Image) Export(http *gin.Context) {
 		}
 	}()
 
-	_, err = io.Copy(http.Writer, out)
+	var writer io.Writer
+	var file *os.File
+
+	if params.EnableExportToPath {
+		file, err = storage.Local{}.CreateTempFile(fmt.Sprintf("image-export-%s-%s.tar", strings.Join(params.Md5, "-"), time.Now().Format(function.YmdHis)))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer func() {
+			_ = file.Close()
+		}()
+		writer = file
+	} else {
+		writer = http.Writer
+	}
+	_, err = io.Copy(writer, out)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	self.JsonSuccessResponse(http)
 	return
-	//tempFile, _ := os.CreateTemp("", "dpanel")
-	//defer tempFile.Close()
-	//defer os.Remove(tempFile.Name())
-	//_, err = io.Copy(tempFile, out)
-	//if err != nil {
-	//	self.JsonResponseWithError(http, err, 500)
-	//	return
-	//}
-	//http.File(tempFile.Name())
-	//return
 }
 
 func (self Image) UpdateTitle(http *gin.Context) {
