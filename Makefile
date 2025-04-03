@@ -65,7 +65,7 @@ test: amd64 arm64
 	. --push
 test-pe: amd64 arm64
 	docker buildx build \
-	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION}-pe-lite \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:${VERSION}-lite \
 	--platform linux/amd64 \
 	--build-arg APP_VERSION=${VERSION} \
 	--build-arg APP_FAMILY=pe \

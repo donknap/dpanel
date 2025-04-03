@@ -175,7 +175,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		item.Config = configPath
 
 		if containerInfo.NetworkSettings != nil && !function.IsEmptyMap(containerInfo.NetworkSettings.Networks) {
-			for name, _ := range containerInfo.NetworkSettings.Networks {
+			for name := range containerInfo.NetworkSettings.Networks {
 				if info, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, name, network.InspectOptions{}); err == nil {
 					configPath, err = b.Writer.WriteBlobStruct(info)
 					if err != nil {

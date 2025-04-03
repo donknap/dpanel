@@ -22,7 +22,7 @@
 </div>
 
 <p>
-   <a href="README_EN.md"> English <a/> | 中文
+   <a href="README_EN.md"> English </a> | 中文
 </p>
 
 ### Pro 版
