@@ -9,29 +9,37 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 var (
-	Sdk               = &Builder{}
-	BuilderAuthor     = "DPanel"
-	BuildDesc         = "DPanel is a docker web management panel"
-	BuildWebSite      = "https://dpanel.cc"
-	BuildVersion      = "1.0.0"
-	HostnameTemplate  = "%s.pod.dpanel.local"
-	DefaultClientName = "local"
+	Sdk                        = &Builder{}
+	BuilderAuthor              = "DPanel"
+	BuildDesc                  = "DPanel is a docker web management panel"
+	BuildWebSite               = "https://dpanel.cc"
+	BuildVersion               = "1.0.0"
+	HostnameTemplate           = "%s.pod.dpanel.local"
+	DefaultClientName          = "local"
+	ConnectDockerServerTimeout = time.Second * 20
 )
 
 type Client struct {
-	Name              string `json:"name,omitempty"`
-	Title             string `json:"title,omitempty"`
-	Address           string `json:"address,omitempty"` // docker api 地址
-	Default           bool   `json:"default,omitempty"`
-	TlsCa             string `json:"tlsCa,omitempty"`
-	TlsCert           string `json:"tlsCert,omitempty"`
-	TlsKey            string `json:"tlsKey,omitempty"`
-	EnableTLS         bool   `json:"enableTLS,omitempty"`
-	EnableComposePath bool   `json:"enableComposePath,omitempty"` // 启用 compose 独享目录
-	ComposePath       string `json:"composePath,omitempty"`
+	Name              string            `json:"name,omitempty"`
+	Title             string            `json:"title,omitempty"`
+	Address           string            `json:"address,omitempty"` // docker api 地址
+	Default           bool              `json:"default,omitempty"`
+	TlsCa             string            `json:"tlsCa,omitempty"`
+	TlsCert           string            `json:"tlsCert,omitempty"`
+	TlsKey            string            `json:"tlsKey,omitempty"`
+	EnableTLS         bool              `json:"enableTLS,omitempty"`
+	EnableComposePath bool              `json:"enableComposePath,omitempty"` // 启用 compose 独享目录
+	ComposePath       string            `json:"composePath,omitempty"`
+	DockerInfo        *ClientDockerInfo `json:"dockerInfo,omitempty"`
+}
+
+type ClientDockerInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 func (self Client) GetDockerEnv() []string {

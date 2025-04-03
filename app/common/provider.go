@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
@@ -122,10 +123,17 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		options = append(options, docker.WithTLS(defaultDockerEnv.TlsCa, defaultDockerEnv.TlsCert, defaultDockerEnv.TlsKey))
 	}
 	docker.Sdk, err = docker.NewBuilder(options...)
-	_, err = docker.Sdk.Client.Info(docker.Sdk.Ctx)
 
-	_ = logic.Setting{}.Delete(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo)
+	// 使用超时上下文，避免 docker 连接地址时间过长卡死程序
+	ctx, _ := context.WithTimeout(context.Background(), docker.ConnectDockerServerTimeout)
+	defaultDockerInfo, err := docker.Sdk.Client.Info(ctx)
+
 	if err == nil {
+		defaultDockerEnv.DockerInfo = &docker.ClientDockerInfo{
+			Name: defaultDockerInfo.Name,
+			ID:   defaultDockerInfo.ID,
+		}
+		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
 		// 获取面板信息
 		if info, err := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name")); err == nil {
 			_ = logic.Setting{}.Save(&entity.Setting{
@@ -136,9 +144,14 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 				},
 			})
 		} else {
-			slog.Debug("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err.Error())
+			_ = logic.Setting{}.Delete(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo)
+			slog.Warn("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err)
 		}
 		go logic.EventLogic{}.MonitorLoop()
+	} else {
+		slog.Warn("connect default docker server failed", "name", defaultDockerEnv.Name, "address", defaultDockerEnv.Address, "error", err)
+		defaultDockerEnv.DockerInfo = nil
+		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
 	}
 
 	// 启动时，初始化计划任务
