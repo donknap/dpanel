@@ -53,7 +53,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		return
 	}
 
-	suffix := fmt.Sprintf("dpanel-%s", time.Now().Format(function.YmdHis))
+	suffix := fmt.Sprintf("dpanel-%s-%s", strings.TrimLeft(containerInfo.Name, "/"), time.Now().Format(function.YmdHis))
 	backupRelTar := filepath.Join(containerInfo.Name, suffix+".snapshot")
 	backupTar := filepath.Join(storage.Local{}.GetBackupPath(), backupRelTar)
 
