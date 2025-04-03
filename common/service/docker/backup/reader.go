@@ -23,6 +23,30 @@ type reader struct {
 	blobs         []blobItem
 }
 
+func (self *reader) Info() (*Info, error) {
+	tarReader := tar.NewReader(self.file)
+	info := &Info{}
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			break
+		}
+		headerName := strings.TrimLeft(header.Name, "/")
+		if strings.HasSuffix(headerName, "info.json") {
+			content, err := io.ReadAll(tarReader)
+			if err != nil {
+				return nil, err
+			}
+			err = json.Unmarshal(content, &info)
+			if err != nil {
+				return nil, err
+			}
+			return info, nil
+		}
+	}
+	return nil, errors.New("info file not found in archive")
+}
+
 func (self *reader) Manifest() ([]Manifest, error) {
 	var offset int64
 	tarReader := tar.NewReader(self.file)
