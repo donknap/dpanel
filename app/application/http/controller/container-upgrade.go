@@ -40,7 +40,7 @@ func (self Container) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if containerInfo.Name == "/"+facade.GetConfig().GetString("APP_NAME") || containerInfo.Name == "/dpanel" {
+	if containerInfo.Name == "/"+facade.GetConfig().GetString("APP_NAME") {
 		self.JsonResponseWithError(http, errors.New("面板无法升级自身，请通过【系统更新】查看面板升级脚本"), 500)
 		return
 	}

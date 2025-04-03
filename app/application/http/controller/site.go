@@ -264,7 +264,7 @@ func (self Site) GetDetail(http *gin.Context) {
 					Id:   params.Id,
 					Info: info,
 				},
-				SiteTitle: info.Name,
+				SiteTitle: "",
 				SiteName:  strings.TrimLeft(info.Name, "/"),
 			}
 			runOption.Command = ""

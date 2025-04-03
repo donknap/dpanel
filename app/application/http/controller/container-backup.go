@@ -370,10 +370,17 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		}
 
 		for _, volume := range item.Volume {
+			destPath := "/"
+			for _, mount := range containerInfo.Mounts {
+				if strings.HasSuffix(function.GetSha256([]byte(mount.Destination)), filepath.Base(volume)) {
+					// 导出的数据是按最后一个目录或是文件名存放，所以需要脱一级目录做为根目录
+					destPath = filepath.Dir(mount.Destination)
+				}
+			}
 			reader, _ := b.Reader.ReadBlobs(volume)
 			gzReader, _ := gzip.NewReader(reader)
 			tarReader := tar.NewReader(gzReader)
-			if options, err := docker.NewFileImport("/", docker.WithImportTar(tarReader)); err == nil {
+			if options, err := docker.NewFileImport(destPath, docker.WithImportTar(tarReader)); err == nil {
 				err = docker.Sdk.ContainerImport(newContainerName, options)
 				if err != nil {
 					slog.Warn("container backup restore", "error", err)
