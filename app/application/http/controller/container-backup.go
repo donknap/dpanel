@@ -15,6 +15,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/backup"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -25,6 +26,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -34,8 +36,10 @@ type ContainerBackup struct {
 
 func (self ContainerBackup) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id          string `json:"id" binding:"required"`
-		EnableImage bool   `json:"enableImage"`
+		Id                string   `json:"id" binding:"required"`
+		EnableImage       bool     `json:"enableImage"`
+		EnableCommitImage bool     `json:"enableCommitImage"`
+		Volume            []string `json:"volume"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -49,8 +53,8 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		return
 	}
 
-	suffix := time.Now().Format(function.YmdHis)
-	backupRelTar := filepath.Join(containerInfo.Name, suffix+".tar.gz")
+	suffix := fmt.Sprintf("dpanel-%s", time.Now().Format(function.YmdHis))
+	backupRelTar := filepath.Join(containerInfo.Name, suffix+".snapshot")
 	backupTar := filepath.Join(storage.Local{}.GetBackupPath(), backupRelTar)
 
 	backupRow := &entity.Backup{
@@ -90,25 +94,53 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		}
 	}()
 
+	info := backup.Info{}
+	info.Docker, err = docker.Sdk.Client.ServerVersion(progress.Context())
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
 	manifest := make([]backup.Manifest, 0)
 	err = func() error {
-		dockerVersion, err := docker.Sdk.Client.ServerVersion(progress.Context())
-		if err != nil {
-			return err
-		}
-		err = b.Writer.WriteConfigFile("version.json", dockerVersion)
-		if err != nil {
-			return err
-		}
+
 		item := backup.Manifest{}
 		if params.EnableImage {
+			imageId := containerInfo.Image
+			imageName := containerInfo.Config.Image
+
+			if params.EnableCommitImage {
+				imageDetail := registry.GetImageTagDetail(containerInfo.Config.Image)
+				imageName = fmt.Sprintf("%s-%s", imageDetail.Uri(), suffix)
+
+				response, err := docker.Sdk.Client.ContainerCommit(progress.Context(), containerInfo.ID, container.CommitOptions{
+					Reference: imageName,
+				})
+				if err != nil {
+					return err
+				}
+				defer func() {
+					_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, response.ID, image.RemoveOptions{
+						Force: true,
+					})
+					if err != nil {
+						slog.Warn("container backup remove image", "error", err)
+					}
+				}()
+
+				imageId = response.ID
+			}
+
+			// 如果当前容器 commit 自己为新镜像时，需要在配置中更新名称
+			containerInfo.Config.Image = imageName
+
 			out, err := docker.Sdk.Client.ImageSave(progress.Context(), []string{
-				containerInfo.Config.Image,
+				imageName,
 			})
 			if err != nil {
 				return err
 			}
-			imagePath, err := b.Writer.WriteBlobReader(containerInfo.Image, out)
+			imagePath, err := b.Writer.WriteBlobReader(imageId, out)
 			if err != nil {
 				return err
 			}
@@ -117,7 +149,11 @@ func (self ContainerBackup) Create(http *gin.Context) {
 
 		if !function.IsEmptyArray(containerInfo.Mounts) {
 			for _, mount := range containerInfo.Mounts {
+				if !function.IsEmptyArray(params.Volume) && !function.InArray(params.Volume, mount.Destination) {
+					continue
+				}
 				backupRow.Setting.VolumePathList = append(backupRow.Setting.VolumePathList, mount.Destination)
+
 				out, info, err := docker.Sdk.Client.CopyFromContainer(progress.Context(), params.Id, mount.Destination)
 				if err != nil {
 					return err
@@ -149,7 +185,6 @@ func (self ContainerBackup) Create(http *gin.Context) {
 				}
 			}
 		}
-
 		manifest = append(manifest, item)
 		return nil
 	}()
@@ -170,6 +205,8 @@ func (self ContainerBackup) Create(http *gin.Context) {
 	}
 	_ = dao.Backup.Save(backupRow)
 
+	info.Backup = backupRow
+	err = b.Writer.WriteConfigFile("info.json", info)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -255,46 +292,57 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			}
 		}
 
-		var networkCreate []network.Inspect
-		if !function.IsEmptyArray(item.Network) {
-			for _, s := range item.Network {
-				networkConfigContent, err := b.Reader.ReadBlobsContent(s)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
-				}
-				networkInfo := network.Inspect{}
-				err = json.Unmarshal(networkConfigContent, &networkInfo)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
-				}
-				if _, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, networkInfo.Name, network.InspectOptions{}); err != nil {
-					networkCreate = append(networkCreate, networkInfo)
-					_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, networkInfo.Name, network.CreateOptions{
-						Driver:     networkInfo.Driver,
-						Scope:      networkInfo.Scope,
-						EnableIPv4: &networkInfo.EnableIPv4,
-						EnableIPv6: &networkInfo.EnableIPv6,
-						IPAM:       &networkInfo.IPAM,
-						Internal:   networkInfo.Internal,
-						Attachable: networkInfo.Attachable,
-						Ingress:    networkInfo.Ingress,
-						ConfigOnly: networkInfo.ConfigOnly,
-						ConfigFrom: &networkInfo.ConfigFrom,
-						Options:    networkInfo.Options,
-						Labels:     networkInfo.Labels,
-					})
+		newContainerName := containerInfo.Name
+		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, newContainerName); err != nil {
+			var networkCreate []network.Inspect
+			if !function.IsEmptyArray(item.Network) {
+				for _, s := range item.Network {
+					networkConfigContent, err := b.Reader.ReadBlobsContent(s)
 					if err != nil {
 						self.JsonResponseWithError(http, err, 500)
 						return
 					}
+					networkInfo := network.Inspect{}
+					err = json.Unmarshal(networkConfigContent, &networkInfo)
+					if err != nil {
+						self.JsonResponseWithError(http, err, 500)
+						return
+					}
+					if _, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, networkInfo.Name, network.InspectOptions{}); err != nil {
+						networkCreate = append(networkCreate, networkInfo)
+						_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, networkInfo.Name, network.CreateOptions{
+							Driver:     networkInfo.Driver,
+							Scope:      networkInfo.Scope,
+							EnableIPv4: &networkInfo.EnableIPv4,
+							EnableIPv6: &networkInfo.EnableIPv6,
+							IPAM:       &networkInfo.IPAM,
+							Internal:   networkInfo.Internal,
+							Attachable: networkInfo.Attachable,
+							Ingress:    networkInfo.Ingress,
+							ConfigOnly: networkInfo.ConfigOnly,
+							ConfigFrom: &networkInfo.ConfigFrom,
+							Options:    networkInfo.Options,
+							Labels:     networkInfo.Labels,
+						})
+						if err != nil {
+							if function.ErrorHasKeyword(err, "Pool overlaps with other one on this address space") {
+								self.JsonResponseWithError(http,
+									function.ErrorMessage(
+										".containerBackupRestoreNetworkConflict",
+										"name", networkInfo.Name,
+										"subnet", strings.Join(function.PluckArrayWalk(networkInfo.IPAM.Config, func(i network.IPAMConfig) (string, bool) {
+											return i.Subnet, true
+										}), ","),
+									), 500)
+								return
+							}
+							self.JsonResponseWithError(http, err, 500)
+							return
+						}
+					}
 				}
 			}
-		}
 
-		newContainerName := containerInfo.Name
-		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, newContainerName); err != nil {
 			networkingConfig := &network.NetworkingConfig{
 				EndpointsConfig: map[string]*network.EndpointSettings{},
 			}

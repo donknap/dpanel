@@ -1,5 +1,10 @@
 package backup
 
+import (
+	"github.com/docker/docker/api/types"
+	"github.com/donknap/dpanel/common/entity"
+)
+
 func New(opts ...Option) (*Builder, error) {
 	var err error
 	c := &Builder{}
@@ -48,4 +53,9 @@ type Manifest struct {
 	Image   string
 	Volume  []string
 	Network []string
+}
+
+type Info struct {
+	Docker types.Version
+	Backup *entity.Backup
 }
