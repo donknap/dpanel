@@ -84,7 +84,7 @@ func WithImportPath(rootPath string) ImportFileOption {
 					Typeflag: tar.TypeDir,
 					Name:     filepath.Join(self.containerRootPath, containerTargetPath),
 					Size:     0,
-					Mode:     int64(os.ModePerm),
+					Mode:     int64(info.Mode()),
 				})
 			} else {
 				err = self.tar.WriteHeader(&tar.Header{
@@ -125,7 +125,7 @@ func WithImportZip(reader *zip.ReadCloser) ImportFileOption {
 					Typeflag: tar.TypeDir,
 					Name:     filepath.Join(self.containerRootPath, file.Name),
 					Size:     0,
-					Mode:     int64(os.ModePerm),
+					Mode:     int64(file.Mode()),
 				})
 			} else {
 				err = self.tar.WriteHeader(&tar.Header{

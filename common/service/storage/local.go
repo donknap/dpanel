@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Local struct {
@@ -66,4 +67,11 @@ func (self Local) GetNginxCertPath() string {
 		return override
 	}
 	return fmt.Sprintf("%s/cert/", self.GetStorageLocalPath())
+}
+
+func (self Local) CreateTempFile(name string) (*os.File, error) {
+	if name == "" {
+		name = fmt.Sprintf("dpanel-%d", time.Now().UnixMilli())
+	}
+	return os.Create(filepath.Join(self.GetSaveRootPath(), name))
 }
