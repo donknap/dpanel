@@ -4,4 +4,5 @@ import "github.com/donknap/dpanel/common/function"
 
 var (
 	ErrorMessageCommonDataNotFoundOrDeleted = function.ErrorMessage(".commonDataNotFoundOrDeleted")
+	ErrorMessageCommonNotFoundDPanel        = function.ErrorMessage(".commonNotFoundDPanel")
 )

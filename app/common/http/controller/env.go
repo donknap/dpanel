@@ -151,7 +151,7 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_, err = dockerClient.Client.Info(docker.Sdk.Ctx)
+	_, err = dockerClient.Client.Info(dockerClient.Ctx)
 	if err != nil {
 		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，错误信息："+err.Error()), 500)
 		return
@@ -166,6 +166,12 @@ func (self Env) Create(http *gin.Context) {
 					DPanelInfo: &info,
 				},
 			})
+		}
+		if defaultDockerInfo, err := dockerClient.Client.Info(dockerClient.Ctx); err == nil {
+			client.DockerInfo = &docker.ClientDockerInfo{
+				Name: defaultDockerInfo.Name,
+				ID:   defaultDockerInfo.ID,
+			}
 		}
 	}
 	logic.DockerEnv{}.UpdateEnv(client)

@@ -185,14 +185,18 @@ func (self Home) Info(http *gin.Context) {
 	startTime := time.Now()
 	dpanelContainerInfo := container.InspectResponse{}
 	new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo)
-	slog.Debug("info time", "use", time.Now().Sub(startTime).String())
+	slog.Debug("dpanel info time", "use", time.Now().Sub(startTime).String())
 
 	startTime = time.Now()
-	info, _ := docker.Sdk.Client.Info(docker.Sdk.Ctx)
+	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	if info.ID != "" {
 		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
 	}
-	slog.Debug("info time", "use", time.Now().Sub(startTime).String())
+	slog.Debug("docker info time", "use", time.Now().Sub(startTime).String())
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":       info,

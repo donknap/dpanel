@@ -347,13 +347,11 @@ func (self Container) Delete(http *gin.Context) {
 			Message:    "",
 			DeletedAt:  gorm.DeletedAt{},
 		}
-
 	} else {
 		siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
 			Info: containerInfo,
 			Id:   containerInfo.ID,
 		}
-		siteRow.Env = &runOption
 	}
 	_ = dao.Site.Save(siteRow)
 	// 删除域名、配置、证书
