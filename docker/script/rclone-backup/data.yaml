@@ -1,0 +1,52 @@
+task:
+  name: rclone-backup
+  descriptionZh: |
+    使用 rclone 备份宿主机的某个目录到云存储
+  descriptionEn: |
+    Backup a directory from host to Cloud Storage using rclone
+  script: |
+    BACKUP_FILE_NAME=$(echo $BACKUP_SOURCE_PATH | tr "/" "_")_$(date +"%Y%m%d%H%M%S").tar.gz
+
+    docker run -it --rm --name dpanel-host-backup-rclone \
+      -v ${BACKUP_SOURCE_PATH}:/source \
+      --entrypoint /bin/sh \
+      rclone/rclone \
+      -c "\
+        tar czvf /tmp/${BACKUP_FILE_NAME} -C /source . && \
+        rclone copy /tmp/${BACKUP_FILE_NAME} :s3:${S3_BUCKET}/${S3_PREFIX} \
+          --s3-provider ${S3_PROVIDER} \
+          --s3-access-key-id=${S3_ACCESS_KEY} \
+          --s3-secret-access-key=${S3_SECRET_KEY} \
+          --s3-endpoint=${S3_ENDPOINT} \
+          --s3-region=${S3_REGION} \
+          -v && \
+        echo '✅ 上传成功：${S3_BUCKET}/${S3_PREFIX}/${BACKUP_FILE_NAME}'"
+  tag:
+    - run-in-dpanel
+    - rclone
+    - s3
+  environment:
+    - name: BACKUP_SOURCE_PATH
+      labelZh: 需要备份的主机目录
+      labelEn: Backup source path of host
+    - name: S3_PROVIDER
+      labelZh: S3 提供商（例如 Alibaba / TencentCOS / Qiniu / Minio）
+      labelEn: S3 provider (e.g., Alibaba / TencentCOS / Qiniu / Minio)
+    - name: S3_ACCESS_KEY
+      labelZh: S3 COS 的 SecretId
+      labelEn: SecretId for S3 COS
+    - name: S3_SECRET_KEY
+      labelZh: S3 COS 的 SecretKey
+      labelEn: SecretKey for S3 COS
+    - name: S3_ENDPOINT
+      labelZh: COS Endpoint（例如：cos.ap-guangzhou.myqcloud.com）
+      labelEn: COS Endpoint (e.g., cos.ap-guangzhou.myqcloud.com)
+    - name: S3_REGION
+      labelZh: COS 区域（例如：ap-nanjing）
+      labelEn: COS region (e.g., ap-nanjing)
+    - name: S3_BUCKET
+      labelZh: COS 存储桶名称（例如：backup）
+      labelEn: COS bucket name (e.g., backup)
+    - name: S3_PREFIX
+      labelZh: 上传文件保存的路径前缀（可为空）
+      labelEn: Path prefix in bucket for storing uploaded file (optional)
