@@ -348,6 +348,9 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			}
 			if containerInfo.NetworkSettings != nil && !function.IsEmptyMap(containerInfo.NetworkSettings.Networks) {
 				for name, settings := range containerInfo.NetworkSettings.Networks {
+					if name == network.NetworkBridge {
+						continue
+					}
 					settings.EndpointID = ""
 					settings.NetworkID = ""
 					networkingConfig.EndpointsConfig[name] = settings

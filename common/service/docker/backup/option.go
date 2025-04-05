@@ -59,8 +59,7 @@ func WithReader() Option {
 			return err
 		}
 		self.Reader = &reader{
-			file:          file,
-			tarPathPrefix: self.tarPathPrefix,
+			file: file,
 		}
 		if err != nil {
 			return err

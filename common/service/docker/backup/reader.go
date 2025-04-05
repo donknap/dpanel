@@ -8,7 +8,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -18,9 +17,8 @@ type blobItem struct {
 }
 
 type reader struct {
-	file          *os.File
-	tarPathPrefix string
-	blobs         []blobItem
+	file  *os.File
+	blobs []blobItem
 }
 
 func (self *reader) Info() (*Info, error) {
@@ -56,8 +54,7 @@ func (self *reader) Manifest() ([]Manifest, error) {
 		if err != nil {
 			break
 		}
-		headerName := strings.TrimLeft(header.Name, "/")
-		if headerName == filepath.Join(self.tarPathPrefix, "manifest.json") {
+		if strings.HasSuffix(header.Name, "manifest.json") {
 			content, err := io.ReadAll(tarReader)
 			if err != nil {
 				return nil, err
@@ -67,10 +64,10 @@ func (self *reader) Manifest() ([]Manifest, error) {
 				return nil, err
 			}
 		}
-		if strings.HasPrefix(headerName, filepath.Join(self.tarPathPrefix, "blobs/sha256/")) {
+		if strings.Contains(header.Name, "blobs/sha256/") {
 			offset, _ = self.file.Seek(0, io.SeekCurrent)
 			self.blobs = append(self.blobs, blobItem{
-				Name:   headerName,
+				Name:   header.Name,
 				Offset: offset - 512,
 			})
 		}
@@ -85,7 +82,7 @@ func (self *reader) ReadBlobs(fileName string) (io.Reader, error) {
 	var index int
 	var ok bool
 	if ok, index = function.IndexArrayWalk(self.blobs, func(i blobItem) bool {
-		return i.Name == filepath.Join(self.tarPathPrefix, fileName)
+		return strings.HasSuffix(i.Name, fileName)
 	}); !ok {
 		return nil, errors.New("blob file not found in archive")
 	}
