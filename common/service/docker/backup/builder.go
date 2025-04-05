@@ -3,6 +3,7 @@ package backup
 import (
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/common/entity"
+	"log/slog"
 )
 
 func New(opts ...Option) (*Builder, error) {
@@ -43,7 +44,10 @@ func (self Builder) Close() (err error) {
 		_ = self.Writer.file.Close()
 	}
 	if self.Reader != nil {
-		_ = self.Reader.file.Close()
+		err = self.Reader.file.Close()
+		if err != nil {
+			slog.Warn("container backup reader close file", "error", err)
+		}
 	}
 	return err
 }
