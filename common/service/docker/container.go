@@ -86,6 +86,10 @@ func (self Builder) ContainerCopyInspect(containerName string) (info container.I
 	if err != nil {
 		return info, err
 	}
+	return self.ContainerInspectCompat(info)
+}
+
+func (self Builder) ContainerInspectCompat(info container.InspectResponse) (container.InspectResponse, error) {
 	if versions.LessThanOrEqualTo(Sdk.Client.ClientVersion(), "1.44") {
 		macAddress := ""
 		for name, settings := range info.NetworkSettings.Networks {

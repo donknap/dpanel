@@ -353,7 +353,12 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					networkingConfig.EndpointsConfig[name] = settings
 				}
 			}
-			_, err = docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, networkingConfig, &v1.Platform{}, newContainerName)
+			compatContainerInfo, err := docker.Sdk.ContainerInspectCompat(containerInfo)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			_, err = docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, compatContainerInfo.Config, compatContainerInfo.HostConfig, networkingConfig, &v1.Platform{}, newContainerName)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
