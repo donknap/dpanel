@@ -202,7 +202,8 @@ func (self explorer) Result(cmd string) (string, error) {
 }
 
 func (self explorer) getSafePath(path string) (string, error) {
-	if !filepath.IsAbs(path) {
+	// 目录必须是以 / 开头
+	if !strings.HasPrefix(path, "/") {
 		return "", errors.New("please use absolute address")
 	}
 	return filepath.Join(self.rootPath, path), nil
