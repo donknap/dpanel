@@ -161,7 +161,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 	}
 	options := make([]docker.ImportFileOption, 0)
 	for _, path := range params.File {
-		targetFile, _ := os.CreateTemp("", "dpanel-explorer")
+		targetFile, _ := storage.Local{}.CreateTempFile("")
 		defer func() {
 			_ = targetFile.Close()
 			_ = os.Remove(targetFile.Name())
@@ -183,7 +183,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			options = append(options, docker.WithImportTarGzFile(targetFile.Name()))
 			break
 		default:
-			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerTargetUnsupportedType"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerUnzipTargetUnsupportedType"), 500)
 			return
 		}
 	}
@@ -317,7 +317,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("超过1M的文件请通过导入&导出修改文件"), 500)
 		return
 	}
-	tempFile, err := os.CreateTemp("", "dpanel-explorer")
+	tempFile, err := storage.Local{}.CreateTempFile("")
 	if err != nil {
 		slog.Error("explorer", "get content", err)
 	}
@@ -419,6 +419,42 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 			"target": target,
 			"name":   filepath.Base(target),
 		},
+	})
+	return
+}
+
+func (self Explorer) GetUserList(http *gin.Context) {
+	type ParamsValidate struct {
+		Md5 string `json:"md5" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	tempFile, err := storage.Local{}.CreateTempFile("")
+	if err != nil {
+		slog.Error("explorer", "get content", err)
+	}
+	defer func() {
+		_ = os.Remove(tempFile.Name())
+	}()
+
+	var result []byte
+	if _, err = docker.Sdk.ContainerReadFile(params.Md5, "/etc/passwd", tempFile); err == nil {
+		_, err = tempFile.Seek(0, io.SeekStart)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		result, err = io.ReadAll(tempFile)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"content": string(result),
 	})
 	return
 }
