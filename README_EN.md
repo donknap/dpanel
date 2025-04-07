@@ -52,6 +52,11 @@ docker run -it -d --name dpanel --restart=always \
 curl -sSL https://dpanel.cc/quick.sh -o quick.sh && sudo bash quick.sh
 ```
 
+#### Thanks Contributors
+
+[![Contributors](https://contrib.rocks/image?repo=donknap/dpanel)](https://github.com/donknap/dpanel/graphs/contributors)
+
+
 #### Preview
 
 ###### overview

@@ -97,6 +97,10 @@ QQ: 837583876
 
 <img src="https://github.com/donknap/dpanel-docs/blob/master/storage/image/qq.png?raw=true" width="300" />
 
+#### 感谢贡献人员
+
+[![Contributors](https://contrib.rocks/image?repo=donknap/dpanel)](https://github.com/donknap/dpanel/graphs/contributors)
+
 #### 界面预览
 
 ###### pro 自定义皮肤

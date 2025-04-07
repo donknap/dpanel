@@ -3,7 +3,7 @@ package controller
 import (
 	"archive/tar"
 	"archive/zip"
-	"bytes"
+	"encoding/json"
 	"errors"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/function"
@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type Explorer struct {
@@ -34,18 +35,30 @@ func (self Explorer) Export(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+
 	var err error
 
-	buffer := new(bytes.Buffer)
-	zipWriter := zip.NewWriter(buffer)
+	tempFile, err := storage.Local{}.CreateTempFile("")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		_ = tempFile.Close()
+		_ = os.Remove(tempFile.Name())
+	}()
 
+	pathInfo := make([]container.PathStat, 0)
+	zipWriter := zip.NewWriter(tempFile)
 	// 需要先将每个目录导出，然后再合并起来。直接导出整个容器效率太低
 	for _, path := range params.FileList {
-		out, _, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Md5, path)
+		out, info, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Md5, path)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		pathInfo = append(pathInfo, info)
+
 		tarReader := tar.NewReader(out)
 		for {
 			file, err := tarReader.Next()
@@ -66,6 +79,17 @@ func (self Explorer) Export(http *gin.Context) {
 		}
 		_ = out.Close()
 	}
+
+	if info, err := json.Marshal(pathInfo); err == nil {
+		writer, _ := zipWriter.CreateHeader(&zip.FileHeader{
+			Name:               "manifest.json",
+			Method:             zip.Deflate,
+			UncompressedSize64: uint64(len(info)),
+			Modified:           time.Now(),
+		})
+		_, _ = writer.Write(info)
+	}
+
 	err = zipWriter.Close()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -73,7 +97,7 @@ func (self Explorer) Export(http *gin.Context) {
 	}
 	http.Header("Content-Type", "application/zip")
 	http.Header("Content-Disposition", "attachment; filename=export.zip")
-	http.Data(200, "text/plain", buffer.Bytes())
+	http.File(tempFile.Name())
 	return
 }
 

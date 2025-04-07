@@ -126,6 +126,7 @@ jobs:
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG}-lite \
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${VERSION_TAG} \
+          --build-arg APP_FAMILY=ce \
           -f Dockerfile-lite \
           . --push
 
@@ -138,6 +139,7 @@ jobs:
           -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG} \
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${VERSION_TAG} \
+          --build-arg APP_FAMILY=ce \
           . --push
           
           # pe

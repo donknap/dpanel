@@ -157,7 +157,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		return
 	}
 
-	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(&entity.Site{
+	_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(&entity.Site{
 		ContainerInfo: &accessor.SiteContainerInfoOption{
 			Id:   containerId,
 			Info: detail,
