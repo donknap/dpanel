@@ -32,7 +32,7 @@ Pro 版仅是社区版的一个增强和补充，对于通用的、广泛的功�
 
 如果你热衷于开源产品，并且想获得更多有意思的新特性， Pro 版是适合你的，感谢支持与厚爱。
 
-🚀🚀🚀 [功能介绍及对比](http://localhost:3000/#/zh-cn/manual/pro?id=%e4%bb%b7%e6%a0%bc%e5%8f%8a%e5%8a%9f%e8%83%bd) 🚀🚀🚀
+🚀🚀🚀 [功能介绍及对比](http://dpanel.cc/#/zh-cn/manual/pro?id=%e4%bb%b7%e6%a0%bc%e5%8f%8a%e5%8a%9f%e8%83%bd) 🚀🚀🚀
 
 
 ### 开始使用
