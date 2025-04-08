@@ -19,7 +19,6 @@ import (
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/storage"
 	"io"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -195,40 +194,47 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 		return make(map[string]*entity.Compose)
 	}
 
+	var linkRealPath string
 	// 如果是软链接，获取到实际指向的目录
 	if fileInfo, err := os.Lstat(rootDir); err == nil && fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
-		if linkRealPath, err := os.Readlink(rootDir); err == nil {
+		if linkRealPath, err = os.Readlink(rootDir); err == nil {
 			rootDir = linkRealPath
 		}
 	}
 
+	slog.Debug("compose find yaml in path", "path", rootDir, "link path", linkRealPath)
+
 	findComposeList := make(map[string]*entity.Compose)
-	_ = filepath.Walk(rootDir, func(path string, info fs.FileInfo, err error) error {
+	pathList, err := os.ReadDir(rootDir)
+	if err != nil {
+		return findComposeList
+	}
+
+	for _, path := range pathList {
+		if !path.IsDir() {
+			continue
+		}
 		for _, suffix := range ComposeFileNameSuffix {
-			if strings.HasSuffix(path, suffix) {
-				rel, _ := filepath.Rel(rootDir, path)
-				// 只同步二级目录下的 yaml
-				if segments := strings.Split(filepath.Clean(rel), string(filepath.Separator)); len(segments) == 2 {
-					// 强制转为小写
-					name := strings.ToLower(filepath.Dir(rel))
-					findRow := &entity.Compose{
-						Name:  name,
-						Title: "",
-						Setting: &accessor.ComposeSettingOption{
-							Type:   accessor.ComposeTypeStoragePath,
-							Status: "",
-							Uri: []string{
-								rel,
-							},
+			relYamlFilePath := filepath.Join(path.Name(), suffix)
+			name := strings.ToLower(path.Name())
+			if _, err = os.Stat(filepath.Join(rootDir, relYamlFilePath)); err == nil {
+				// 强制转为小写
+				findRow := &entity.Compose{
+					Name:  name,
+					Title: "",
+					Setting: &accessor.ComposeSettingOption{
+						Type:   accessor.ComposeTypeStoragePath,
+						Status: "",
+						Uri: []string{
+							relYamlFilePath,
 						},
-					}
-					findComposeList[name] = findRow
+					},
 				}
+				findComposeList[name] = findRow
 				break
 			}
 		}
-		return nil
-	})
+	}
 	return findComposeList
 }
 

@@ -53,8 +53,8 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	suffix := fmt.Sprintf("dpanel-%s-%s", strings.TrimLeft(containerInfo.Name, "/"), time.Now().Format(function.YmdHis))
+	backupTime := time.Now().Format(function.YmdHis)
+	suffix := fmt.Sprintf("dpanel-%s-%s", strings.TrimLeft(containerInfo.Name, "/"), backupTime)
 	backupRelTar := filepath.Join(containerInfo.Name, suffix+".snapshot")
 	backupTar := filepath.Join(storage.Local{}.GetBackupPath(), backupRelTar)
 
@@ -112,7 +112,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 
 			if params.EnableCommitImage {
 				imageDetail := registry.GetImageTagDetail(containerInfo.Config.Image)
-				imageName = fmt.Sprintf("%s-%s", imageDetail.Uri(), suffix)
+				imageName = fmt.Sprintf("%s-%s", imageDetail.Uri(), backupTime)
 
 				response, err := docker.Sdk.Client.ContainerCommit(progress.Context(), containerInfo.ID, container.CommitOptions{
 					Reference: imageName,
