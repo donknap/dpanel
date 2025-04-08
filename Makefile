@@ -54,6 +54,7 @@ test: amd64 arm64
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta \
 	--platform linux/amd64,linux/arm64 \
 	--build-arg APP_VERSION=${VERSION} \
+	--build-arg APP_FAMILY=ce \
 	--build-arg PROXY="https_proxy=http://172.16.1.198:7890 http_proxy=http://172.16.1.198:7890" \
 	-f Dockerfile \
 	. --push
@@ -61,11 +62,12 @@ test: amd64 arm64
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite \
 	--platform linux/amd64,linux/arm64 \
 	--build-arg APP_VERSION=${VERSION} \
+	--build-arg APP_FAMILY=ce \
 	-f Dockerfile-lite \
 	. --push
 test-pe: amd64 arm64
 	docker buildx build \
-	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:${VERSION}-lite \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:beta-lite \
 	--platform linux/amd64 \
 	--build-arg APP_VERSION=${VERSION} \
 	--build-arg APP_FAMILY=pe \

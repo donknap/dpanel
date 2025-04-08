@@ -189,11 +189,7 @@ func (self Home) Info(http *gin.Context) {
 
 	startTime = time.Now()
 	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if info.ID != "" {
+	if err == nil && info.ID != "" {
 		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
 	}
 	slog.Debug("docker info time", "use", time.Now().Sub(startTime).String())
