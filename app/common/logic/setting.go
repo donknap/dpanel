@@ -17,6 +17,7 @@ var (
 	SettingGroupSettingTwoFa                = "twoFa"  // 双因素
 	SettingGroupSettingDiskUsage            = "diskUsage"
 	SettingGroupSettingCheckContainerIgnore = "checkContainerIgnore"
+	SettingGroupSettingCheckContainerAll    = "checkContainerAll"
 	SettingGroupSettingDPanelInfo           = "DPanelInfo"
 	SettingGroupSettingThemeConfig          = "themeConfig"
 	SettingGroupSettingThemeUserConfig      = "themeUserConfig"
@@ -156,6 +157,11 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 			if setting.Value.EmailServer != nil {
 				exists = true
 				*v = *setting.Value.EmailServer
+			}
+		case *accessor.ContainerCheckAllUpgrade:
+			if setting.Value.ContainerCheckAllUpgrade != nil {
+				exists = true
+				*v = *setting.Value.ContainerCheckAllUpgrade
 			}
 		}
 	}

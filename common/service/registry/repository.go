@@ -33,7 +33,9 @@ func (self repository) GetImageDigest(imageName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	return res.Header.Get(ContentDigestHeader), nil
 }
