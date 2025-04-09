@@ -276,7 +276,7 @@ func (self Site) GetDetail(http *gin.Context) {
 			runOption.WorkDir = ""
 			siteRow.Env = &runOption
 			_ = dao.Site.Save(siteRow)
-		} else if siteRow.ContainerInfo == nil || siteRow.ContainerInfo.Info.Name == "" {
+		} else if siteRow.ContainerInfo == nil || siteRow.ContainerInfo.Info.ContainerJSONBase == nil {
 			siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
 				Id:   params.Id,
 				Info: containerInfo,
