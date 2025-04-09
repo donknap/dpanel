@@ -31,7 +31,7 @@ type Cron struct {
 
 func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 	option := make([]crontab.Option, 0)
-
+	option = append(option, crontab.WithName(task.Title))
 	expression := make([]string, 0)
 	for _, item := range task.Setting.Expression {
 		expression = append(expression, item.ToString())
@@ -170,5 +170,5 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 	}))
 
 	cronJob := crontab.New(option...)
-	return crontab.Wrapper.AddJob(expression, cronJob)
+	return crontab.Wrapper.AddJob(cronJob, expression...)
 }

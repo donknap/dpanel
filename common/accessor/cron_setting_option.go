@@ -7,6 +7,18 @@ import (
 	"time"
 )
 
+const (
+	CronUnitPreWeek     = "preWeek"
+	CronUnitPreMonth    = "preMonth"
+	CronUnitPreDay      = "preDay"
+	CronUnitPreHour     = "preHour"
+	CronUnitPreAtDay    = "preAtDay"
+	CronUnitPreAtHour   = "preAtHour"
+	CronUnitPreAtMinute = "preAtMinute"
+	CronUnitPreAtSecond = "preAtSecond"
+	CronUnitCode        = "code"
+)
+
 type CronSettingExpression struct {
 	Unit       string `json:"unit"`
 	Code       string `json:"code,omitempty"`
@@ -20,23 +32,23 @@ type CronSettingExpression struct {
 
 func (self CronSettingExpression) ToString() string {
 	switch self.Unit {
-	case "preWeek":
+	case CronUnitPreWeek:
 		return fmt.Sprintf("0 %s %s * * %s", self.Minutes, self.Hours, self.DayOfWeek)
-	case "preMonth":
+	case CronUnitPreMonth:
 		return fmt.Sprintf("0 %s %s %s * *", self.Minutes, self.Hours, self.DayOfMonth)
-	case "preDay":
+	case CronUnitPreDay:
 		return fmt.Sprintf("0 %s %s * * *", self.Minutes, self.Hours)
-	case "preHour":
+	case CronUnitPreHour:
 		return fmt.Sprintf("0 %s * * * *", self.Minutes)
-	case "preAtDay":
+	case CronUnitPreAtDay:
 		return fmt.Sprintf("0 %s %s */%s * *", self.Minutes, self.Hours, self.DayOfMonth)
-	case "preAtHour":
+	case CronUnitPreAtHour:
 		return fmt.Sprintf("0 %s 0-23/%s * * *", self.Minutes, self.Hours)
-	case "preAtMinute":
+	case CronUnitPreAtMinute:
 		return fmt.Sprintf("0 */%s * * * *", self.Minutes)
-	case "preAtSecond":
+	case CronUnitPreAtSecond:
 		return fmt.Sprintf("*/%s * * * * *", self.Seconds)
-	case "code":
+	case CronUnitCode:
 		return self.Code
 	}
 	return "0 0 0 * * *"
