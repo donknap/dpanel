@@ -17,7 +17,7 @@ var (
 	SettingGroupSettingTwoFa                = "twoFa"  // 双因素
 	SettingGroupSettingDiskUsage            = "diskUsage"
 	SettingGroupSettingCheckContainerIgnore = "checkContainerIgnore"
-	SettingGroupSettingCheckContainerAll    = "checkContainerAll"
+	SettingGroupSettingCheckContainerAll    = "checkContainerAllUpgrade"
 	SettingGroupSettingDPanelInfo           = "DPanelInfo"
 	SettingGroupSettingThemeConfig          = "themeConfig"
 	SettingGroupSettingThemeUserConfig      = "themeUserConfig"

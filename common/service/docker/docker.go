@@ -35,6 +35,7 @@ type Client struct {
 	EnableComposePath bool              `json:"enableComposePath,omitempty"` // 启用 compose 独享目录
 	ComposePath       string            `json:"composePath,omitempty"`
 	DockerInfo        *ClientDockerInfo `json:"dockerInfo,omitempty"`
+	ServerUrl         string            `json:"serverUrl,omitempty"`
 }
 
 type ClientDockerInfo struct {

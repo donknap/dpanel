@@ -6,11 +6,8 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"net/url"
-	"strings"
 )
 
 type Setting struct {
@@ -107,24 +104,4 @@ func (self Setting) GetSetting(http *gin.Context) {
 	})
 	return
 
-}
-
-func (self Setting) GetServerIp(http *gin.Context) {
-	serverIp := ""
-	if docker.Sdk.Name == docker.DefaultClientName {
-		row, _ := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingServer)
-		if row != nil && row.Value != nil {
-			serverIp = row.Value.ServerIp
-		}
-	} else {
-		if d, err := url.Parse(docker.Sdk.Client.DaemonHost()); err == nil {
-			if b, _, exists := strings.Cut(d.Host, ":"); exists {
-				serverIp = b
-			}
-		}
-	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"ip": serverIp,
-	})
-	return
 }

@@ -55,6 +55,7 @@ func (self Env) Create(http *gin.Context) {
 		Name              string `json:"name" binding:"required"`
 		Title             string `json:"title" binding:"required"`
 		Address           string `json:"address" binding:"required"`
+		ServerUrl         string `json:"serverUrl"`
 		TlsCa             string `json:"tlsCa"`
 		TlsCert           string `json:"tlsCert"`
 		TlsKey            string `json:"tlsKey"`
@@ -89,6 +90,7 @@ func (self Env) Create(http *gin.Context) {
 		Name:              params.Name,
 		Title:             params.Title,
 		Address:           params.Address,
+		ServerUrl:         params.ServerUrl,
 		TlsCa:             params.TlsCa,
 		TlsCert:           params.TlsCert,
 		TlsKey:            params.TlsKey,
@@ -283,5 +285,26 @@ func (self Env) Delete(http *gin.Context) {
 	_ = logic.Setting{}.Save(setting)
 
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Env) GetDetail(http *gin.Context) {
+	type ParamsValidate struct {
+		Name string `json:"name"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if params.Name == "" {
+		params.Name = docker.Sdk.Name
+	}
+
+	dockerEnv, err := logic.DockerEnv{}.GetEnvByName(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, dockerEnv)
 	return
 }
