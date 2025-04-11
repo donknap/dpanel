@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 type Local struct {
@@ -71,8 +70,17 @@ func (self Local) GetNginxCertPath() string {
 
 func (self Local) CreateTempFile(name string) (*os.File, error) {
 	if name == "" {
-		name = fmt.Sprintf("dpanel-%d", time.Now().UnixMilli())
+		return os.CreateTemp(self.GetSaveRootPath(), "dpanel-")
 	}
 	_ = os.MkdirAll(filepath.Dir(filepath.Join(self.GetSaveRootPath(), name)), os.ModePerm)
 	return os.Create(filepath.Join(self.GetSaveRootPath(), name))
+}
+
+func (self Local) CreateTempDir(name string) (string, error) {
+	if name == "" {
+		return os.MkdirTemp(self.GetSaveRootPath(), "dpanel-")
+	}
+	path := filepath.Dir(filepath.Join(self.GetSaveRootPath(), name))
+	err := os.MkdirAll(path, os.ModePerm)
+	return path, err
 }

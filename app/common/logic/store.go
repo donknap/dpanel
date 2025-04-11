@@ -79,7 +79,7 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 }
 
 func (self Store) SyncByZip(path, zipUrl string, root string) error {
-	zipTempFile, _ := os.CreateTemp("", "dpanel-store")
+	zipTempFile, _ := storage.Local{}.CreateTempFile("")
 	defer func() {
 		_ = zipTempFile.Close()
 		_ = os.RemoveAll(zipTempFile.Name())

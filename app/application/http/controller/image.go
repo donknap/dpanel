@@ -206,6 +206,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 		}
 	}
 
+	notice.Message{}.Info(".imageImport", "name", strings.Join(importImageTag, ", "))
 	self.JsonResponseWithoutError(http, gin.H{
 		"tag": importImageTag,
 	})
@@ -557,7 +558,7 @@ func (self Image) Export(http *gin.Context) {
 	if params.EnableExportToPath {
 		names := function.PluckArrayWalk(params.Md5, func(i string) (string, bool) {
 			imageDetail := registry.GetImageTagDetail(i)
-			return strings.ReplaceAll(imageDetail.BaseName, "/", "-"), true
+			return strings.ReplaceAll(strings.ReplaceAll(imageDetail.BaseName, "-", "_"), "/", "_"), true
 		})
 		file, err = storage.Local{}.CreateTempFile(fmt.Sprintf("export/image/%s-%s.tar", strings.Join(names, "-"), time.Now().Format(function.YmdHis)))
 		if err != nil {

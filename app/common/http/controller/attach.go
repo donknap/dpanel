@@ -21,8 +21,10 @@ func (self Attach) Upload(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("请指定上传文件"), 500)
 		return
 	}
-	defer fileUploader.Close()
-	file, err := os.CreateTemp(storage.Local{}.GetSaveRootPath(), "dpanel-upload")
+	defer func() {
+		_ = fileUploader.Close()
+	}()
+	file, err := storage.Local{}.CreateTempFile("")
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

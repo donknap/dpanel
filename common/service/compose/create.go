@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/storage"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -29,10 +30,8 @@ func WithYamlContent(content ...string) cli.ProjectOptionsFn {
 		if !function.IsEmptyArray(options.ConfigPaths) {
 			return errors.New("already configured yaml file path")
 		}
-
-		tempPath, _ := os.MkdirTemp("", "dpanel-compose")
+		tempPath, _ := storage.Local{}.CreateTempDir("")
 		tempEnvFile := filepath.Join(tempPath, ".env")
-
 		for i, c := range content {
 			tempComposeFile := filepath.Join(tempPath, fmt.Sprintf("compose.%d.yaml", i))
 			err := os.WriteFile(
