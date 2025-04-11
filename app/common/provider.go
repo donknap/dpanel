@@ -57,7 +57,6 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/setting/save", controller.Setting{}.Save)
 		cors.POST("/common/setting/founder", controller.Setting{}.Founder)
 		cors.POST("/common/setting/get-setting", controller.Setting{}.GetSetting)
-		cors.POST("/common/setting/get-server-ip", controller.Setting{}.GetServerIp)
 
 		cors.POST("/common/home/info", controller.Home{}.Info)
 		cors.POST("/common/home/check-new-version", controller.Home{}.CheckNewVersion)
@@ -70,6 +69,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/env/create", controller.Env{}.Create)
 		cors.POST("/common/env/switch", controller.Env{}.Switch)
 		cors.POST("/common/env/delete", controller.Env{}.Delete)
+		cors.POST("/common/env/get-detail", controller.Env{}.GetDetail)
 
 		// 应用商店
 		cors.POST("/common/store/create", controller.Store{}.Create)

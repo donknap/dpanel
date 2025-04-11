@@ -6,5 +6,9 @@ import (
 )
 
 var (
+	CacheKeyImageRemoteList = "image:remoteTag:%s"
+)
+
+var (
 	Cache = cache.New(cache.DefaultExpiration, 5*time.Minute)
 )

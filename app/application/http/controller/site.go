@@ -157,7 +157,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		return
 	}
 
-	dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(&entity.Site{
+	_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(&entity.Site{
 		ContainerInfo: &accessor.SiteContainerInfoOption{
 			Id:   containerId,
 			Info: detail,
@@ -245,12 +245,16 @@ func (self Site) GetDetail(http *gin.Context) {
 		}
 		containerName = siteRow.SiteName
 	} else {
-		containerName = params.Id
-		siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.Id, "Id"))...).First()
-		info, err := docker.Sdk.ContainerInfo(containerName)
+		containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Id)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
+		}
+		containerName = params.Id
+		// 先使用容器名称查询，查询不到时通过 md5 再次查询
+		siteRow, _ = dao.Site.Where(dao.Site.SiteName.Eq(strings.TrimLeft(containerInfo.Name, "/"))).First()
+		if siteRow == nil {
+			siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.Id, "Id"))...).First()
 		}
 		runOption, err = logic.Site{}.GetEnvOptionByContainer(containerName)
 		if err != nil {
@@ -262,15 +266,21 @@ func (self Site) GetDetail(http *gin.Context) {
 			siteRow = &entity.Site{
 				ContainerInfo: &accessor.SiteContainerInfoOption{
 					Id:   params.Id,
-					Info: info,
+					Info: containerInfo,
 				},
 				SiteTitle: "",
-				SiteName:  strings.TrimLeft(info.Name, "/"),
+				SiteName:  strings.TrimLeft(containerInfo.Name, "/"),
 			}
 			runOption.Command = ""
 			runOption.Entrypoint = ""
 			runOption.WorkDir = ""
 			siteRow.Env = &runOption
+			_ = dao.Site.Save(siteRow)
+		} else if siteRow.ContainerInfo == nil || siteRow.ContainerInfo.Info.ContainerJSONBase == nil {
+			siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
+				Id:   params.Id,
+				Info: containerInfo,
+			}
 			_ = dao.Site.Save(siteRow)
 		}
 	}

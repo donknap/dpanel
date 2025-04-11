@@ -32,24 +32,14 @@ Pro 版仅是社区版的一个增强和补充，对于通用的、广泛的功�
 
 如果你热衷于开源产品，并且想获得更多有意思的新特性， Pro 版是适合你的，感谢支持与厚爱。
 
-##### 专属功能及开发计划
+🚀🚀🚀 [功能介绍及对比](http://dpanel.cc/#/zh-cn/manual/pro?id=%e4%bb%b7%e6%a0%bc%e5%8f%8a%e5%8a%9f%e8%83%bd) 🚀🚀🚀
 
-- [x] 可开启登录 2Fa 验证
-- [x] 镜像详情页面可查看所有远程 Tag
-- [x] 宿主机 WebShell，可在面板直接进入宿主机命令行
-- [x] 多语言（中、英双语）
-- [x] 导入容器快照数据快带迁移容器
-- [ ] 概览页面中查看当前所有容器是否有新版镜像
-- [ ] 批量更新容器
-- [x] 删除容器后在回收站中可快速恢复
-- [x] 配置标题、logo、底部信息
-- [x] 自定义面板皮肤，背景图，主色系及透明度
 
 ### 开始使用
 
 > [!IMPORTANT]  
 > macos 下需要先将 docker.sock 文件 link 到 /var/run/docker.sock 目录中 \
-> ln -s -f /Users/用户/.docker/run/docker.sock  /var/run/docker.sock
+> sudo ln -s -f /Users/用户/.docker/run/docker.sock  /var/run/docker.sock
 
 > 国内镜像 \
 > registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest \
@@ -96,6 +86,10 @@ https://afdian.com/a/dpanel
 QQ: 837583876
 
 <img src="https://github.com/donknap/dpanel-docs/blob/master/storage/image/qq.png?raw=true" width="300" />
+
+#### 感谢贡献人员
+
+[![Contributors](https://contrib.rocks/image?repo=donknap/dpanel)](https://github.com/donknap/dpanel/graphs/contributors)
 
 #### 界面预览
 

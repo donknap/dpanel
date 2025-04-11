@@ -93,7 +93,7 @@ func (self Home) WsConsole(http *gin.Context) {
 	if params.WorkDir == "" {
 		params.WorkDir = "/"
 	}
-	exec, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, container.ExecOptions{
+	out, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, container.ExecOptions{
 		Privileged:   true,
 		Tty:          true,
 		AttachStdin:  true,
@@ -112,7 +112,7 @@ func (self Home) WsConsole(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	shell, err := docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, exec.ID, container.ExecStartOptions{
+	shell, err := docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, out.ID, container.ExecStartOptions{
 		Tty: true,
 	})
 	if err != nil {
@@ -189,11 +189,7 @@ func (self Home) Info(http *gin.Context) {
 
 	startTime = time.Now()
 	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if info.ID != "" {
+	if err == nil && info.ID != "" {
 		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
 	}
 	slog.Debug("docker info time", "use", time.Now().Sub(startTime).String())
@@ -334,18 +330,24 @@ func (self Home) Usage(http *gin.Context) {
 				containerRunningTotal.Unhealthy += 1
 			}
 			usePort := make([]*portItem, 0)
-			if item.HostConfig.NetworkMode == "host" {
-				imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.ImageID)
-				if err == nil && imageInfo.Config != nil {
-					for port := range imageInfo.Config.ExposedPorts {
-						usePort = append(usePort, &portItem{
-							Name: item.Names[0],
-							Port: docker.PortItem{
-								Host:   port.Port(),
-								Dest:   port.Port(),
-								HostIp: "0.0.0.0",
-							},
-						})
+			if function.IsEmptyArray(item.Ports) {
+				if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID); err == nil && info.HostConfig != nil && !function.IsEmptyMap(info.HostConfig.PortBindings) {
+					for port, bindings := range info.HostConfig.PortBindings {
+						for _, binding := range bindings {
+							hostPort, _ := strconv.Atoi(binding.HostPort)
+							if binding.HostIP == "" {
+								binding.HostIP = "0.0.0.0"
+							}
+							usePort = append(usePort, &portItem{
+								Name: item.Names[0],
+								Port: docker.PortItem{
+									Host:     strconv.Itoa(hostPort),
+									Dest:     strconv.Itoa(port.Int()),
+									HostIp:   binding.HostIP,
+									Protocol: port.Proto(),
+								},
+							})
+						}
 					}
 				}
 			} else {

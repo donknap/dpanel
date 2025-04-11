@@ -27,6 +27,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	"log/slog"
+	http2 "net/http"
 	"os"
 	"strings"
 	"time"
@@ -104,48 +105,21 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 
 func (self Image) ImportByImageTar(http *gin.Context) {
 	type ParamsValidate struct {
-		Tar string `json:"tar" binding:"required"`
-		Tag string `json:"tag"`
+		LocalUrl  []string `json:"localUrl"`
+		RemoteUrl []string `json:"remoteUrl"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if params.Tag != "" {
-		imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.Tag)
-		if err == nil && imageInfo.ID != "" {
-			self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
-			return
-		}
-	}
 
-	imageTar, err := os.Open(storage.Local{}.GetRealPath(params.Tar))
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		_ = os.Remove(imageTar.Name())
-	}()
-	_ = notice.Message{}.Info(".imageBuild", params.Tag)
-
-	response, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageTar, client.ImageLoadWithQuiet(false))
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		if response.Body.Close() != nil {
-			slog.Error("docker", "image import ", err)
-		}
-	}()
-
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImageImport, params.Tag))
+	wsBuffer := ws.NewProgressPip(ws.MessageTypeImageImport)
 	defer wsBuffer.Close()
 
-	imageTag := make([]string, 0)
-	buffer := new(bytes.Buffer)
+	importImageTag := make([]string, 0)
 	wsBuffer.OnWrite = func(p string) error {
+		slog.Debug("docker", "image build task", p)
+
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
 		for {
 			line, _, err := newReader.ReadLine()
@@ -156,39 +130,84 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 			if err = json.Unmarshal(line, &msg); err == nil {
 				if msg.Stream != "" && strings.Contains(msg.Stream, "Loaded image:") {
 					if _, after, exists := strings.Cut(msg.Stream, "Loaded image: "); exists {
-						imageTag = append(imageTag, after)
+						importImageTag = append(importImageTag, after)
 					}
 				}
 				if msg.ErrorDetail.Message != "" {
 					return errors.New(msg.ErrorDetail.Message)
 				}
-				buffer.WriteString(fmt.Sprintf("\r%s: %s", msg.Id, msg.Progress))
 			} else {
 				slog.Error("docker", "image build task", err, "data", p)
 				return err
 			}
 		}
-		if buffer.Len() < 512 {
-			return nil
-		}
-		wsBuffer.BroadcastMessage(buffer.String())
-		buffer.Reset()
 		return nil
 	}
-	_, err = io.Copy(wsBuffer, response.Body)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+
+	tarPathList := make([]string, 0)
+	if !function.IsEmptyArray(params.RemoteUrl) {
+		for _, s := range params.RemoteUrl {
+			err := func() error {
+				response, err := http2.Get(s)
+				if err != nil {
+					return err
+				}
+				defer func() {
+					_ = response.Body.Close()
+				}()
+				tempFile, err := storage.Local{}.CreateTempFile("")
+				if err != nil {
+					return err
+				}
+				defer func() {
+					_ = tempFile.Close()
+				}()
+				_, _ = io.Copy(tempFile, response.Body)
+				tarPathList = append(tarPathList, tempFile.Name())
+				return nil
+			}()
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
 	}
-	if imageTag != nil && len(imageTag) == 1 && params.Tag != "" {
-		err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, strings.TrimSpace(imageTag[0]), params.Tag)
+
+	if !function.IsEmptyArray(params.LocalUrl) {
+		for _, s := range params.LocalUrl {
+			tarPathList = append(tarPathList, storage.Local{}.GetRealPath(s))
+		}
+	}
+
+	for _, s := range tarPathList {
+		err := func() error {
+			imageTar, err := os.Open(s)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = os.Remove(imageTar.Name())
+			}()
+			response, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageTar, client.ImageLoadWithQuiet(false))
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if response.Body.Close() != nil {
+					slog.Error("docker", "image import ", err)
+				}
+			}()
+			_, err = io.Copy(wsBuffer, response.Body)
+			return nil
+		}()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 	}
+
 	self.JsonResponseWithoutError(http, gin.H{
-		"tag": imageTag,
+		"tag": importImageTag,
 	})
 	return
 }
@@ -536,7 +555,11 @@ func (self Image) Export(http *gin.Context) {
 	var file *os.File
 
 	if params.EnableExportToPath {
-		file, err = storage.Local{}.CreateTempFile(fmt.Sprintf("image-export-%s-%s.tar", strings.Join(params.Md5, "-"), time.Now().Format(function.YmdHis)))
+		names := function.PluckArrayWalk(params.Md5, func(i string) (string, bool) {
+			imageDetail := registry.GetImageTagDetail(i)
+			return strings.ReplaceAll(imageDetail.BaseName, "/", "-"), true
+		})
+		file, err = storage.Local{}.CreateTempFile(fmt.Sprintf("export/image/%s-%s.tar", strings.Join(names, "-"), time.Now().Format(function.YmdHis)))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -545,6 +568,7 @@ func (self Image) Export(http *gin.Context) {
 			_ = file.Close()
 		}()
 		writer = file
+		_ = notice.Message{}.Info(".imageExportInPath", "path", file.Name())
 	} else {
 		writer = http.Writer
 	}

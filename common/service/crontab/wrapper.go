@@ -3,6 +3,7 @@ package crontab
 import (
 	"errors"
 	"github.com/robfig/cron/v3"
+	"log/slog"
 	"os"
 	"time"
 )
@@ -44,7 +45,7 @@ func (self wrapper) CheckExpression(expression []string) error {
 	return nil
 }
 
-func (self wrapper) AddJob(expression []string, job cron.Job) ([]cron.EntryID, error) {
+func (self wrapper) AddJob(job *Job, expression ...string) ([]cron.EntryID, error) {
 	if job == nil {
 		return nil, errors.New("invalid job")
 	}
@@ -57,6 +58,7 @@ func (self wrapper) AddJob(expression []string, job cron.Job) ([]cron.EntryID, e
 			return nil, err
 		}
 	}
+	slog.Debug("cron add job", "name", job.Name, "next run time", self.GetNextRunTime(ids...))
 	return ids, nil
 }
 

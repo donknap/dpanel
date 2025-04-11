@@ -14,6 +14,12 @@ func WithRunFunc(callback RunFunc) Option {
 	}
 }
 
+func WithName(name string) Option {
+	return func(job *Job) {
+		job.Name = name
+	}
+}
+
 func New(opts ...Option) *Job {
 	c := &Job{
 		runFunc: make([]RunFunc, 0),
@@ -25,6 +31,7 @@ func New(opts ...Option) *Job {
 }
 
 type Job struct {
+	Name    string
 	runFunc []RunFunc
 }
 

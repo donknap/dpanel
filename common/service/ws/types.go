@@ -17,7 +17,7 @@ const (
 	MessageTypeContainerBackup = "container:backup:%d"
 	MessageTypeImagePull       = "image:pull:%s"
 	MessageTypeImageBuild      = "image:build:%d"
-	MessageTypeImageImport     = "image:import:%s"
+	MessageTypeImageImport     = "image:import"
 	MessageTypeProgressClose   = "progress:close"
 	MessageTypeDomainApply     = "domain:apply"
 	MessageTypeUserPermission  = "user:permission:%s"

@@ -8,22 +8,22 @@ import (
 )
 
 type SettingValueOption struct {
-	Username           string                     `json:"username,omitempty"`
-	Password           string                     `json:"password,omitempty"`
-	Email              string                     `json:"email,omitempty"`
-	UserStatus         uint8                      `json:"userStatus,omitempty"`
-	UserRemark         string                     `json:"userRemark,omitempty"`
-	RegisterAt         *time.Time                 `json:"registerAt,omitempty"`
-	ServerIp           string                     `json:"serverIp,omitempty"`
-	Docker             map[string]*docker.Client  `json:"docker,omitempty"`
-	DiskUsage          *DiskUsage                 `json:"diskUsage,omitempty"`
-	TwoFa              *TwoFa                     `json:"twoFa,omitempty"`
-	IgnoreCheckUpgrade IgnoreCheckUpgrade         `json:"ignoreCheckUpgrade,omitempty"`
-	DPanelInfo         *container.InspectResponse `json:"DPanelInfo,omitempty"`
-	ThemeConfig        *ThemeConfig               `json:"theme,omitempty"`
-	ThemeUserConfig    *ThemeUserConfig           `json:"themeUser,omitempty"`
-	DnsApi             []DnsApi                   `json:"dnsApi,omitempty"`
-	EmailServer        *EmailServer               `json:"emailServer,omitempty"`
+	Username                 string                     `json:"username,omitempty"`
+	Password                 string                     `json:"password,omitempty"`
+	Email                    string                     `json:"email,omitempty"`
+	UserStatus               uint8                      `json:"userStatus,omitempty"`
+	UserRemark               string                     `json:"userRemark,omitempty"`
+	RegisterAt               *time.Time                 `json:"registerAt,omitempty"`
+	Docker                   map[string]*docker.Client  `json:"docker,omitempty"`
+	DiskUsage                *DiskUsage                 `json:"diskUsage,omitempty"`
+	TwoFa                    *TwoFa                     `json:"twoFa,omitempty"`
+	IgnoreCheckUpgrade       IgnoreCheckUpgrade         `json:"ignoreCheckUpgrade,omitempty"`
+	ContainerCheckAllUpgrade *ContainerCheckAllUpgrade  `json:"containerCheckAllUpgrade,omitempty"`
+	DPanelInfo               *container.InspectResponse `json:"DPanelInfo,omitempty"`
+	ThemeConfig              *ThemeConfig               `json:"theme,omitempty"`
+	ThemeUserConfig          *ThemeUserConfig           `json:"themeUser,omitempty"`
+	DnsApi                   []DnsApi                   `json:"dnsApi,omitempty"`
+	EmailServer              *EmailServer               `json:"emailServer,omitempty"`
 }
 
 type IgnoreCheckUpgrade []string
@@ -85,4 +85,12 @@ type EmailServer struct {
 	Email  string   `json:"email,omitempty" binding:"required"`
 	Code   string   `json:"code,omitempty" binding:"required"`
 	Status []string `json:"status,omitempty"`
+}
+
+type ContainerCheckAllUpgrade struct {
+	Upgrade   int                 `json:"upgrade"`
+	Failed    int                 `json:"failed"`
+	Local     int                 `json:"local"`
+	Ignore    int                 `json:"ignore"`
+	Container []map[string]string `json:"container"`
 }

@@ -125,10 +125,10 @@ func (self Builder) ContainerExec(containerName string, option container.ExecOpt
 func (self Builder) ContainerReadFile(containerName string, inContainerPath string, targetFile *os.File) (io.Reader, error) {
 	pathStat, err := self.Client.ContainerStatPath(self.Ctx, containerName, inContainerPath)
 	if err != nil {
-		return nil, function.ErrorMessage(".containerExplorerUnzipTargetUnsupportedType")
+		return nil, err
 	}
 	if !pathStat.Mode.IsRegular() {
-		return nil, function.ErrorMessage(".containerExplorerUnzipTargetNotFile")
+		return nil, function.ErrorMessage(".containerExplorerContentUnsupportedType")
 	}
 	out, _, err := self.Client.CopyFromContainer(self.Ctx, containerName, inContainerPath)
 	if err != nil {
