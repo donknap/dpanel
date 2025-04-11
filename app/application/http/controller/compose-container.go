@@ -18,7 +18,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -82,11 +81,10 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer wsBuffer.Close()
 
+	lastMessage := ""
 	wsBuffer.OnWrite = func(p string) error {
+		lastMessage = p
 		wsBuffer.BroadcastMessage(p)
-		if strings.Contains(p, "Error") {
-			return errors.New(p)
-		}
 		return nil
 	}
 
@@ -106,9 +104,28 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	if composeRow.ID > 0 {
 		_, _ = dao.Compose.Updates(composeRow)
 	}
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+	// 再次验证 任务是否部署成功，从而判断要不要输出错误信息
+	tasker, err = logic.Compose{}.GetTasker(composeRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	taskContainerList := tasker.Ps()
+	if function.IsEmptyArray(taskContainerList) {
+		self.JsonResponseWithError(http, errors.New(lastMessage), 500)
+		return
+	}
+
+	for _, item := range taskContainerList {
+		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.Name); err != nil {
+			self.JsonResponseWithError(http, errors.New(lastMessage), 500)
+			return
+		}
 	}
 
 	self.JsonSuccessResponse(http)
