@@ -116,61 +116,17 @@ jobs:
         run: |
           VERSION_TAG=${GITHUB_REF_NAME#v}
           VERSION_GROUP_TAG=${VERSION_TAG%.*.*}
-          
-          docker buildx build \
-          -t dpanel/dpanel:lite \
-          -t dpanel/dpanel:${VERSION_TAG}-lite \
-          -t dpanel/dpanel:${VERSION_GROUP_TAG}-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_TAG}-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG}-lite \
-          --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${VERSION_TAG} \
-          --build-arg APP_FAMILY=ce \
-          -f Dockerfile-lite \
-          . --push
 
           docker buildx build \
           -t dpanel/dpanel:latest \
           -t dpanel/dpanel:${VERSION_TAG} \
           -t dpanel/dpanel:${VERSION_GROUP_TAG} \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_TAG} \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG} \
-          --platform linux/arm64,linux/amd64,linux/arm/v7 \
+          -t dpanel:latest \
+          -t dpanel:${VERSION_TAG} \
+          -t dpanel:${VERSION_GROUP_TAG} \
+          --platform linux/arm64,linux/amd64 \
           --build-arg APP_VERSION=${VERSION_TAG} \
           --build-arg APP_FAMILY=ce \
-          . --push
-          
-          # pe
-          
-          docker buildx build \
-          -t dpanel/dpanel:pe-lite \
-          -t dpanel/dpanel-pe:lite \
-          -t dpanel/dpanel-pe:${VERSION_TAG}-lite \
-          -t dpanel/dpanel-pe:${VERSION_GROUP_TAG}-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:pe-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:${VERSION_TAG}-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:${VERSION_GROUP_TAG}-lite \
-          --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${VERSION_TAG} \
-          --build-arg APP_FAMILY=pe \
-          -f Dockerfile-lite \
-          . --push
-
-          docker buildx build \
-          -t dpanel/dpanel:pe-latest \
-          -t dpanel/dpanel-pe:latest \
-          -t dpanel/dpanel-pe:${VERSION_TAG} \
-          -t dpanel/dpanel-pe:${VERSION_GROUP_TAG} \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:pe-latest \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:latest \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:${VERSION_TAG} \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:${VERSION_GROUP_TAG} \
-          --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${VERSION_TAG} \
-          --build-arg APP_FAMILY=pe \
           . --push
 
       - name: upload artifact
