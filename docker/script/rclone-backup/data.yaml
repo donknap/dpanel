@@ -6,21 +6,88 @@ task:
     Backup a directory from host to Cloud Storage using rclone
   script: |
     BACKUP_FILE_NAME=$(echo $BACKUP_SOURCE_PATH | tr "/" "_")_$(date +"%Y%m%d%H%M%S").tar.gz
+    
+    BACKUP_SOURCE_PATH_STR=$(echo $BACKUP_SOURCE_PATH | tr "/" "_")_
 
+    echo "📦 开始压缩目录文件: ${BACKUP_SOURCE_PATH}"
+  
     docker run -it --rm --name dpanel-host-backup-rclone \
-      -v ${BACKUP_SOURCE_PATH}:/source \
-      --entrypoint /bin/sh \
-      rclone/rclone \
-      -c "\
-        tar czvf /tmp/${BACKUP_FILE_NAME} -C /source . && \
-        rclone copy /tmp/${BACKUP_FILE_NAME} :s3:${S3_BUCKET}/${S3_PREFIX} \
-          --s3-provider ${S3_PROVIDER} \
-          --s3-access-key-id=${S3_ACCESS_KEY} \
-          --s3-secret-access-key=${S3_SECRET_KEY} \
-          --s3-endpoint=${S3_ENDPOINT} \
-          --s3-region=${S3_REGION} \
-          -v && \
-        echo '✅ 上传成功：${S3_BUCKET}/${S3_PREFIX}/${BACKUP_FILE_NAME}'"
+    -v ${BACKUP_SOURCE_PATH}:/source \
+    -e S3_ACCESS_KEY=${S3_ACCESS_KEY} \
+    -e S3_SECRET_KEY=${S3_SECRET_KEY} \
+    -e S3_PROVIDER=${S3_PROVIDER} \
+    -e S3_ENDPOINT=${S3_ENDPOINT} \
+    -e S3_REGION=${S3_REGION} \
+    -e S3_BUCKET=${S3_BUCKET} \
+    -e BACKUP_SOURCE_PATH_STR=${BACKUP_SOURCE_PATH_STR} \
+    -e BACKUP_FILE_NAME=${BACKUP_FILE_NAME} \
+    -e BACKUP_FILE_MAX_NUM=${BACKUP_FILE_MAX_NUM} \
+    -e BACKUP_EXCLUDE_DIRS=${BACKUP_EXCLUDE_DIRS} \
+    --entrypoint /bin/sh \
+    rclone/rclone \
+    -c "$(cat <<'EOF'
+      echo "ℹ️ 排除目录: ${BACKUP_EXCLUDE_DIRS}"
+  
+      # 构建排除目录的参数
+      EXCLUDE_PARAMS=""
+      for dir in $(echo ${BACKUP_EXCLUDE_DIRS} | tr ',' '\n'); do
+        EXCLUDE_PARAMS="$EXCLUDE_PARAMS --exclude=$dir"
+      done
+  
+      echo "ℹ️ 开始压缩目录文件"
+  
+      tar czvf /tmp/${BACKUP_FILE_NAME} -C /source . $EXCLUDE_PARAMS
+  
+      echo "ℹ️ 开始上传文件: ${BACKUP_FILE_NAME}"
+  
+      rclone copy /tmp/${BACKUP_FILE_NAME} :s3:${S3_BUCKET}/${S3_PREFIX} \
+        --s3-provider ${S3_PROVIDER} \
+        --s3-access-key-id=${S3_ACCESS_KEY} \
+        --s3-secret-access-key=${S3_SECRET_KEY} \
+        --s3-endpoint=${S3_ENDPOINT} \
+        --s3-region=${S3_REGION} \
+        -v
+  
+      echo "✅ 上传成功：${S3_BUCKET}/${S3_PREFIX}/${BACKUP_FILE_NAME}"
+  
+      if [ ! -z ${BACKUP_FILE_MAX_NUM} ] && [ ${BACKUP_FILE_MAX_NUM} -gt 0 ]; then
+        ALL_FILES=$(rclone lsf :s3:${S3_BUCKET}/${S3_PREFIX} \
+                       --s3-provider ${S3_PROVIDER} \
+                       --s3-access-key-id=${S3_ACCESS_KEY} \
+                       --s3-secret-access-key=${S3_SECRET_KEY} \
+                       --s3-endpoint=${S3_ENDPOINT} \
+                       --s3-region=${S3_REGION} \
+                       --files-only | grep ${BACKUP_SOURCE_PATH_STR} | sort)
+  
+        echo "$ALL_FILES"
+  
+        TOTAL_COUNT=$(echo "$ALL_FILES" | wc -l | tr -d ' ')
+  
+        echo "ℹ️ 开始检查备份文件是否超出最大数量，当前数量：${TOTAL_COUNT}，最大数量：${BACKUP_FILE_MAX_NUM}"
+  
+        DELETE_COUNT=$(expr $TOTAL_COUNT - $BACKUP_FILE_MAX_NUM)
+  
+        if [ "$DELETE_COUNT" -gt 0 ]; then
+          echo "🗑️ 需要删除 ${DELETE_COUNT} 个旧文件..."
+          echo "$ALL_FILES" | head -n $DELETE_COUNT | while read oldfile; do
+            echo "🧹 删除旧文件: :s3:${S3_BUCKET}/${S3_PREFIX}/$oldfile"
+            rclone delete ":s3:${S3_BUCKET}/${S3_PREFIX}/$oldfile" \
+              --s3-provider ${S3_PROVIDER} \
+              --s3-access-key-id=${S3_ACCESS_KEY} \
+              --s3-secret-access-key=${S3_SECRET_KEY} \
+              --s3-endpoint=${S3_ENDPOINT} \
+              --s3-region=${S3_REGION} \
+              -v
+          done
+        else
+          echo "ℹ️ 当前备份数量未超过 ($BACKUP_FILE_MAX_NUM)，无需删除。"
+        fi
+      else
+        echo "ℹ️ 当前未设置最大备份数量，无需删除。"
+      fi
+    EOF
+    )"
+
   tag:
     - run-in-dpanel
     - rclone
@@ -29,6 +96,12 @@ task:
     - name: BACKUP_SOURCE_PATH
       labelZh: 需要备份的主机目录
       labelEn: Backup source path of host
+    - name: BACKUP_EXCLUDE_DIRS
+      labelZh: 需要备份排除的目录（可为空）
+      labelEn: Excluded directories need to be backed up (optional)
+    - name: BACKUP_FILE_MAX_NUM
+      labelZh: 最大保存文件数量（可为空）
+      labelEn: Maximum number of saved files (optional)
     - name: S3_PROVIDER
       labelZh: S3 提供商（例如 Alibaba / TencentCOS / Qiniu / Minio）
       labelEn: S3 provider (e.g., Alibaba / TencentCOS / Qiniu / Minio)
