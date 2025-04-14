@@ -70,7 +70,7 @@ func (self Local) GetNginxCertPath() string {
 
 func (self Local) CreateTempFile(name string) (*os.File, error) {
 	if name == "" {
-		return os.CreateTemp(self.GetSaveRootPath(), "dpanel-")
+		return os.CreateTemp(self.GetSaveRootPath(), "dpanel-temp-")
 	}
 	_ = os.MkdirAll(filepath.Dir(filepath.Join(self.GetSaveRootPath(), name)), os.ModePerm)
 	return os.Create(filepath.Join(self.GetSaveRootPath(), name))
@@ -78,7 +78,7 @@ func (self Local) CreateTempFile(name string) (*os.File, error) {
 
 func (self Local) CreateTempDir(name string) (string, error) {
 	if name == "" {
-		return os.MkdirTemp(self.GetSaveRootPath(), "dpanel-")
+		return os.MkdirTemp(self.GetSaveRootPath(), "dpanel-temp-")
 	}
 	path := filepath.Dir(filepath.Join(self.GetSaveRootPath(), name))
 	err := os.MkdirAll(path, os.ModePerm)

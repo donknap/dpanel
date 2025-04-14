@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -304,6 +305,13 @@ func (self Env) GetDetail(http *gin.Context) {
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+	if dockerEnv.ServerUrl == "" {
+		if d, err := url.Parse(dockerEnv.Address); err == nil {
+			if b, _, exists := strings.Cut(d.Host, ":"); exists {
+				dockerEnv.ServerUrl = b
+			}
+		}
 	}
 	self.JsonResponseWithoutError(http, dockerEnv)
 	return
