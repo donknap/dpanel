@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/acme"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"log/slog"
@@ -83,4 +84,28 @@ func (self Local) CreateTempDir(name string) (string, error) {
 	path := filepath.Dir(filepath.Join(self.GetSaveRootPath(), name))
 	err := os.MkdirAll(path, os.ModePerm)
 	return path, err
+}
+
+func (self Local) SaveUploadImage(uploadFileName, newFileNamePrefix string, appendRandomString bool) string {
+	// 删除旧的前缀文件
+	rootPath := filepath.Join(self.GetSaveRootPath(), "image")
+	if matches, err := filepath.Glob(filepath.Join(rootPath, newFileNamePrefix+"*")); err == nil {
+		for _, match := range matches {
+			_ = os.Remove(match)
+		}
+	}
+	var newFileName string
+	if appendRandomString {
+		newFileName = fmt.Sprintf("%s-%s.png", newFileNamePrefix, function.GetRandomString(5))
+	} else {
+		newFileName = fmt.Sprintf("%s.png", newFileNamePrefix)
+	}
+
+	newBgFile := filepath.Join(rootPath, newFileName)
+	_ = os.MkdirAll(filepath.Dir(newBgFile), 0777)
+	_ = os.Rename(
+		filepath.Join(self.GetSaveRootPath(), uploadFileName),
+		newBgFile,
+	)
+	return "/dpanel/static/image/" + newFileName
 }

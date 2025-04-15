@@ -27,6 +27,18 @@ func InArray[T cmp.Ordered](v []T, item T) bool {
 	return false
 }
 
+func InArrayArray[T cmp.Ordered](v []T, item ...T) bool {
+	if v == nil {
+		return false
+	}
+	for _, t := range item {
+		if found := InArray(v, t); found {
+			return true
+		}
+	}
+	return false
+}
+
 func InArrayWalk[T interface{}](v []T, walk func(i T) bool) bool {
 	exists, _ := IndexArrayWalk(v, walk)
 	return exists
