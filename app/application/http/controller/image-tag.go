@@ -117,8 +117,6 @@ func (self Image) TagRemote(http *gin.Context) {
 
 	if params.Type == "pull" {
 		// 如果使用了加速，需要给镜像 tag 一个原来的名称
-		_ = notice.Message{}.Info(".imagePullUseProxy", "name", imageNameDetail.Registry)
-
 		// 当 tag 中包含 @ digest 值时，不能直接 tag 成新名称，需要获取到其实中的版本号
 		if tag, _, ok := strings.Cut(params.Tag, "@"); ok {
 			params.Tag = tag

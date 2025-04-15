@@ -22,7 +22,6 @@ import (
 	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
-	commonTypes "github.com/donknap/dpanel/common/types"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
@@ -424,14 +423,6 @@ func (self Image) GetList(http *gin.Context) {
 		})
 	}
 
-	var imgList commonTypes.ImgList
-	for _, item := range result {
-		for _, tagName := range item.RepoTags {
-			item.RepoTags = []string{tagName}
-			imgList = append(imgList, item)
-		}
-	}
-
 	titleList := make(map[string]string)
 	imageDbList, err := dao.Image.Find()
 	if err == nil {
@@ -440,7 +431,7 @@ func (self Image) GetList(http *gin.Context) {
 		}
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"list":  imgList,
+		"list":  result,
 		"title": titleList,
 	})
 	return
