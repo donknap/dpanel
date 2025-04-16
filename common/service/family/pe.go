@@ -20,9 +20,11 @@ func (self *Provider) Register(httpServer *server.Server, consoleServer console.
 }
 
 func (self Provider) Feature() []string {
-	return []string{
+	result := []string{
 		types.FeatureFamilyPe,
+		types.FeatureEnableHomeTag,
 	}
+	return result
 }
 
 func (self Provider) Check(name string) bool {

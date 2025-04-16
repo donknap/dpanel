@@ -164,7 +164,7 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 				exists = true
 				*v = *setting.Value.ContainerCheckAllUpgrade
 			}
-		case *[]accessor.ContainerTagItem:
+		case *[]accessor.ContainerTag:
 			if setting.Value.ContainerTag != nil {
 				exists = true
 				*v = setting.Value.ContainerTag
