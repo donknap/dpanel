@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	ComposeProjectName           = "dpanel-c-%s"
+	ComposeProjectPrefix         = "dpanel-c-"
+	ComposeProjectName           = ComposeProjectPrefix + "%s"
 	ComposeProjectDeployFileName = "dpanel-deploy.yaml"
 	ComposeProjectEnvFileName    = ".dpanel.env"
 	ComposeDefaultEnvFileName    = ".env"
@@ -63,6 +64,10 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 		}
 		return nil, errors.New("db compose not found")
 	} else {
+		// 尝试去掉前缀先查询一次
+		if item, ok := runTaskList[strings.ReplaceAll(key, ComposeProjectPrefix, "")]; ok {
+			return item, nil
+		}
 		if item, ok := runTaskList[key]; ok {
 			return item, nil
 		} else {
