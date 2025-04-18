@@ -55,28 +55,46 @@ func (self Setting) Founder(http *gin.Context) {
 	return
 }
 
-func (self Setting) Save(http *gin.Context) {
-	type ParamsValidate struct {
-		GroupName string                      `json:"groupName" binding:"required"`
-		Name      string                      `json:"name" binding:"required"`
-		Value     accessor.SettingValueOption `json:"value" binding:"required"`
-	}
-	params := ParamsValidate{}
+func (self Setting) Email(http *gin.Context) {
+	params := accessor.EmailServer{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	settingRow := &entity.Setting{
-		GroupName: params.GroupName,
-		Name:      params.Name,
-		Value:     &params.Value,
-	}
-	err := logic.Setting{}.Save(settingRow)
+	err := logic.Setting{}.Save(&entity.Setting{
+		GroupName: logic.SettingGroupSetting,
+		Name:      logic.SettingGroupSettingEmailServer,
+		Value: &accessor.SettingValueOption{
+			EmailServer: &params,
+		},
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	self.JsonSuccessResponse(http)
 	return
+}
+
+func (self Setting) EmailTest(http *gin.Context) {
+	type ParamsValidate struct {
+		Subject string `json:"subject" binding:"required"`
+		Content string `json:"content" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	emailServer := accessor.EmailServer{}
+	if ok := (logic.Setting{}).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingEmailServer, &emailServer); !ok {
+		self.JsonResponseWithError(http, function.ErrorMessage(".settingBasicEmailInvalid"), 500)
+		return
+	}
+	err := logic.Notice{}.Send(emailServer, emailServer.Email, params.Subject, params.Content)
+	if err != nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(".settingBasicEmailInvalid", err.Error()), 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
 }
 
 func (self Setting) GetSetting(http *gin.Context) {

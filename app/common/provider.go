@@ -54,8 +54,9 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/user/save-theme-config", controller.User{}.SaveThemeConfig)
 
 		// 配置
-		cors.POST("/common/setting/save", controller.Setting{}.Save)
 		cors.POST("/common/setting/founder", controller.Setting{}.Founder)
+		cors.POST("/common/setting/email", controller.Setting{}.Email)
+		cors.POST("/common/setting/email-test", controller.Setting{}.EmailTest)
 		cors.POST("/common/setting/get-setting", controller.Setting{}.GetSetting)
 
 		cors.POST("/common/home/info", controller.Home{}.Info)

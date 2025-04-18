@@ -313,6 +313,9 @@ func (self Env) GetDetail(http *gin.Context) {
 			}
 		}
 	}
+	if dockerEnv.ServerUrl == "" {
+		dockerEnv.ServerUrl = "127.0.0.1"
+	}
 	self.JsonResponseWithoutError(http, dockerEnv)
 	return
 }

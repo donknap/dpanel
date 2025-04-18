@@ -55,6 +55,10 @@ func (self Local) GetStorageLocalPath() string {
 		slog.Debug("storage local path empty")
 		return ""
 	}
+	path := facade.GetConfig().GetString("storage.local.path")
+	if path == "" {
+		panic("storage.local.path empty")
+	}
 	return facade.GetConfig().GetString("storage.local.path")
 }
 

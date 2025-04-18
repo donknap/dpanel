@@ -38,7 +38,7 @@ func (self ContainerTag) Create(http *gin.Context) {
 		return false
 	}); ok {
 		if ok, j := function.IndexArrayWalk(containerTag[i].Container, func(item accessor.ContainerTagItem) bool {
-			return item.ContainerName == params.ContainerName
+			return item.ContainerName != "" && item.ContainerName == params.ContainerName
 		}); ok {
 			containerTag[i].Container[j] = params.ContainerTagItem
 		} else {
