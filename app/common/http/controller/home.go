@@ -48,7 +48,7 @@ func (self Home) WsNotice(http *gin.Context) {
 		return
 	}
 
-	client, err := ws.NewClient(http, ws.ClientOption{})
+	client, err := ws.NewClient(http)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -93,7 +93,59 @@ func (self Home) WsConsole(http *gin.Context) {
 	if params.WorkDir == "" {
 		params.WorkDir = "/"
 	}
-	out, err := docker.Sdk.Client.ContainerExecCreate(docker.Sdk.Ctx, containerName, container.ExecOptions{
+	var err error
+	var shell types.HijackedResponse
+
+	type command struct {
+		Type    string `json:"type"`
+		Content struct {
+			Command string `json:"command"`
+		} `json:"content"`
+	}
+	messageType := fmt.Sprintf(ws.MessageTypeConsole, params.Id)
+	client, err := ws.NewClient(http,
+		ws.WithMessageRecvHandler(messageType, func(recvMessage *ws.RecvMessage) {
+			var cmd command
+			err = json.Unmarshal(recvMessage.Message, &cmd)
+			if err != nil {
+				slog.Error("console", "json unmarshal", err.Error())
+			}
+			if shell.Conn == nil {
+				slog.Debug("console", "shell is nil", err.Error())
+				return
+			}
+			_, err = shell.Conn.Write([]byte(cmd.Content.Command))
+			if err != nil {
+				slog.Error("console", "shell read", err.Error())
+			}
+		}),
+	)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	go func() {
+		select {
+		case <-client.CtxContext.Done():
+			if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
+				_ = notice.Message{}.Info(".consoleDestroyPlugin", pluginName)
+
+				if webShellPlugin, err := plugin.NewPlugin(plugin.PluginWebShell, map[string]*plugin.TemplateParser{
+					"webshell": {
+						ContainerName: pluginName,
+					},
+				}); err == nil {
+					_ = webShellPlugin.Destroy()
+				}
+			}
+			if shell.Conn != nil {
+				shell.Close()
+			}
+			return
+		}
+	}()
+
+	out, err := docker.Sdk.Client.ContainerExecCreate(client.CtxContext, containerName, container.ExecOptions{
 		Privileged:   true,
 		Tty:          true,
 		AttachStdin:  true,
@@ -112,52 +164,14 @@ func (self Home) WsConsole(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	shell, err := docker.Sdk.Client.ContainerExecAttach(docker.Sdk.Ctx, out.ID, container.ExecStartOptions{
+	shell, err = docker.Sdk.Client.ContainerExecAttach(client.CtxContext, out.ID, container.ExecStartOptions{
 		Tty: true,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	type command struct {
-		Type    string `json:"type"`
-		Content struct {
-			Command string `json:"command"`
-		} `json:"content"`
-	}
-	client, err := ws.NewClient(http, ws.ClientOption{
-		CloseHandler: func() {
-			if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
-				_ = notice.Message{}.Info(".consoleDestroyPlugin", pluginName)
 
-				if webShellPlugin, err := plugin.NewPlugin(plugin.PluginWebShell, map[string]*plugin.TemplateParser{
-					"webshell": {
-						ContainerName: pluginName,
-					},
-				}); err == nil {
-					_ = webShellPlugin.Destroy()
-				}
-			}
-			shell.Close()
-		},
-		RecvMessageHandler: map[string]ws.RecvMessageHandlerFn{
-			"console": func(recvMessage *ws.RecvMessage) {
-				var cmd command
-				err = json.Unmarshal(recvMessage.Message, &cmd)
-				if err != nil {
-					slog.Error("console", "json unmarshal", err.Error())
-				}
-				_, err = shell.Conn.Write([]byte(cmd.Content.Command))
-				if err != nil {
-					slog.Error("console", "shell read", err.Error())
-				}
-			},
-		},
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	lock := sync.RWMutex{}
 	go client.ReadMessage()
 	go func() {
@@ -170,7 +184,7 @@ func (self Home) WsConsole(http *gin.Context) {
 			processedOutput := string(out[:n])
 			lock.Lock()
 			err = client.Conn.WriteMessage(websocket.TextMessage, ws.RespMessage{
-				Type: fmt.Sprintf(ws.MessageTypeConsole, params.Id),
+				Type: messageType,
 				Data: processedOutput,
 			}.ToJson())
 			lock.Unlock()

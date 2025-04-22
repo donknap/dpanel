@@ -91,6 +91,11 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/cron/prune-log", controller.Cron{}.PruneLog)
 		cors.POST("/common/cron/template", controller.Cron{}.Template)
 
+		// 标签及分组
+		cors.POST("/app/tag/create", controller.Tag{}.Create)
+		cors.POST("/app/tag/get-list", controller.Tag{}.GetList)
+		cors.POST("/app/tag/delete", controller.Tag{}.Delete)
+
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

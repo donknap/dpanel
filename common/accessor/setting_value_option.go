@@ -24,7 +24,7 @@ type SettingValueOption struct {
 	ThemeUserConfig          *ThemeUserConfig           `json:"themeUser,omitempty"`
 	DnsApi                   []DnsApi                   `json:"dnsApi,omitempty"`
 	EmailServer              *EmailServer               `json:"emailServer,omitempty"`
-	ContainerTag             []ContainerTag             `json:"containerTag,omitempty"`
+	Tag                      []Tag                      `json:"tag,omitempty"`
 }
 
 type IgnoreCheckUpgrade []string
@@ -96,17 +96,17 @@ type ContainerCheckAllUpgrade struct {
 	Container []map[string]string `json:"container"`
 }
 
-type ContainerTagItem struct {
-	ContainerName string `json:"containerName,omitempty"`
-	Title         string `json:"title,omitempty"`
-	Description   string `json:"description,omitempty"`
-	Url           string `json:"url,omitempty"`
-	Icon          string `json:"icon,omitempty"`
+type TagItem struct {
+	Name        string `json:"name,omitempty"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	Url         string `json:"url,omitempty"`
+	Icon        string `json:"icon,omitempty"`
 }
 
-type ContainerTag struct {
-	EnableShowGroup bool               `json:"enableShowGroup"`
-	Tag             string             `json:"tag,omitempty" binding:"required"` // 为分组显示时，tag 为分组标题
-	TagColor        string             `json:"tagColor,omitempty"`
-	Container       []ContainerTagItem `json:"container,omitempty"`
+type Tag struct {
+	EnableShowGroup bool      `json:"enableShowGroup"`
+	Tag             string    `json:"tag,omitempty" binding:"required"` // 为分组显示时，tag 为分组标题
+	TagColor        string    `json:"tagColor,omitempty"`
+	Item            []TagItem `json:"item,omitempty"`
 }

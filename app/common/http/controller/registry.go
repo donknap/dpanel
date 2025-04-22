@@ -169,7 +169,7 @@ func (self Registry) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
 		return
 	}
-	if registryItem.Setting.Password != "" {
+	if registryItem.Setting != nil && registryItem.Setting.Password != "" {
 		key := facade.GetConfig().GetString("app.name")
 		registryItem.Setting.Password, _ = function.AseDecode(key, registryItem.Setting.Password)
 	}

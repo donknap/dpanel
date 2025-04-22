@@ -18,23 +18,15 @@ var (
 	sendMessageLock = sync.RWMutex{}
 )
 
-type ClientOption struct {
-	RecvMessageHandler map[string]RecvMessageHandlerFn
-	CloseHandler       func()
-}
-
-func NewClient(ctx *gin.Context, options ClientOption) (*Client, error) {
-	if options.RecvMessageHandler == nil {
-		options.RecvMessageHandler = map[string]RecvMessageHandlerFn{}
-	}
+func NewClient(ctx *gin.Context, options ...Option) (*Client, error) {
 	fd := fmt.Sprintf("fd:%s", ctx.Request.Header.Get("Sec-WebSocket-Key"))
 	// ws 主动关掉管道
-	options.RecvMessageHandler[MessageTypeProgressClose] = func(message *RecvMessage) {
+	options = append(options, WithMessageRecvHandler(MessageTypeProgressClose, func(message *RecvMessage) {
 		closeMessage := struct {
 			Type string `json:"type"`
 			Data string `json:"data"`
 		}{}
-
+		slog.Debug("ws event", "event", MessageTypeProgressClose, "fd", fd, "message", string(message.Message))
 		if err := json.Unmarshal(message.Message, &closeMessage); err == nil {
 			if p, ok := collect.progressPip.Load(closeMessage.Data); ok {
 				if v, ok := p.(*ProgressPip); ok {
@@ -42,7 +34,7 @@ func NewClient(ctx *gin.Context, options ClientOption) (*Client, error) {
 				}
 			}
 		}
-	}
+	}))
 	ws := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -55,15 +47,18 @@ func NewClient(ctx *gin.Context, options ClientOption) (*Client, error) {
 	}
 	ctxWs, ctxWsCancel := context.WithCancel(context.Background())
 	client := &Client{
-		Fd:                 fd,
-		Conn:               wsConn,
-		CtxContext:         ctxWs,
-		CtxCancelFunc:      ctxWsCancel,
-		closeHandler:       options.CloseHandler,
-		recvMessageHandler: options.RecvMessageHandler,
+		Fd:            fd,
+		Conn:          wsConn,
+		CtxContext:    ctxWs,
+		CtxCancelFunc: ctxWsCancel,
+	}
+	for _, option := range options {
+		err = option(client)
+		if err != nil {
+			return nil, err
+		}
 	}
 	collect.Join(client)
-
 	slog.Info("ws connect", "fd", client.Fd, "goroutine", runtime.NumGoroutine(), "client total", collect.Total(), "progress total", collect.ProgressTotal())
 	return client, nil
 }
@@ -74,7 +69,6 @@ type Client struct {
 	CtxCancelFunc      context.CancelFunc
 	CtxContext         context.Context
 	recvMessageHandler map[string]RecvMessageHandlerFn
-	closeHandler       func()
 }
 
 func (self *Client) ReadMessage() {
@@ -111,7 +105,6 @@ func (self *Client) ReadMessage() {
 				slog.Error("websocket", "unmarshal content", err)
 			}
 			if handler, ok := self.recvMessageHandler[content.Type]; ok {
-				slog.Debug("ws event", "event", content.Type, "fd", self.Fd, "message", recv)
 				handler(recv)
 			}
 		}
@@ -129,9 +122,6 @@ func (self *Client) SendMessage(message *RespMessage) error {
 }
 
 func (self *Client) Close() error {
-	if self.closeHandler != nil {
-		self.closeHandler()
-	}
 	collect.Leave(self)
 	err := self.Conn.CloseHandler()(websocket.ClosePolicyViolation, "close repeat login")
 	if err != nil {

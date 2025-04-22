@@ -55,4 +55,7 @@ type recvMessageContent struct {
 }
 
 type RecvMessageHandlerFn func(message *RecvMessage)
+
 type SendMessageQueue chan *RespMessage // 普通队列，有数据即推送客户端
+
+type Option func(self *Client) error
