@@ -64,6 +64,15 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 		}
 		return nil, errors.New("db compose not found")
 	} else {
+		// 尝试通过标识查询一次
+		if row, err := dao.Compose.Where(dao.Compose.Name.Eq(key)).First(); err == nil {
+			if run, ok := runTaskList[row.Name]; ok {
+				row.Setting.Status = run.Setting.Status
+			} else {
+				row.Setting.Status = accessor.ComposeStatusWaiting
+			}
+			return row, nil
+		}
 		// 尝试去掉前缀先查询一次
 		if item, ok := runTaskList[strings.ReplaceAll(key, ComposeProjectPrefix, "")]; ok {
 			return item, nil

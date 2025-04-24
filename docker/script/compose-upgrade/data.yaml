@@ -1,0 +1,36 @@
+task:
+  name: compose-upgrade
+  descriptionZh: |
+    更新一个 compose 任务
+  descriptionEn: |
+    upgrade compose task
+  script: |
+    /app/server/dpanel compose:deploy -f /app/server/config.yaml --name=${COMPOSE_NAME} --pull-image ${PULl_IMAGE} --remove-orphans ${REMOVE_ORPHANS}
+  tag:
+    - dpanel
+    - run-in-dpanel
+  environment:
+    - name: COMPOSE_NAME
+      labelZh: compose 任务名称
+      labelEn: compose task name
+      required: true
+    - name: PULl_IMAGE
+      type: select
+      required: true
+      values:
+        - label: 使用面板拉取
+          value: "dpanel"
+        - label: 使用命令拉取
+          value: "command"
+      labelZh: 拉取镜像方式
+      labelEn: pull image type
+    - name: REMOVE_ORPHANS
+      type: select
+      required: true
+      values:
+        - label: 清理
+          value: "1"
+        - label: 保留
+          value: "0"
+      labelZh: 清理失效的容器
+      labelEn: pull image type

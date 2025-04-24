@@ -1,7 +1,7 @@
 task:
   name: container-backup
   descriptionZh: |
-    生成容器快照
+    生成容器快照，支持备份容器配置存储，一键恢复。
   descriptionEn: |
     Create container snapshot
   script: |

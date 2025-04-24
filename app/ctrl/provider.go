@@ -1,6 +1,7 @@
 package ctrl
 
 import (
+	"github.com/donknap/dpanel/app/ctrl/command/compose"
 	"github.com/donknap/dpanel/app/ctrl/command/container"
 	"github.com/donknap/dpanel/app/ctrl/command/store"
 	"github.com/donknap/dpanel/app/ctrl/command/user"
@@ -17,4 +18,6 @@ func (provider *Provider) Register(console console.Console) {
 	// 容器相关
 	console.RegisterCommand(new(container.Upgrade))
 	console.RegisterCommand(new(container.Backup))
+
+	console.RegisterCommand(new(compose.Deploy))
 }

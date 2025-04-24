@@ -73,7 +73,8 @@ func (self *Client) Post(uri string, payload any) (data io.Reader, err error) {
 	if err = json.NewDecoder(response.Body).Decode(&responseMessage); err == nil {
 		switch response.StatusCode {
 		case 500:
-			return nil, fmt.Errorf("url: %s, error: %s", strings.ReplaceAll(uri, self.apiUrl, ""), responseMessage.Error)
+			v, _ := json.Marshal(payload)
+			return nil, fmt.Errorf("url: %s, error: %s, data: %s", strings.ReplaceAll(uri, self.apiUrl, ""), responseMessage.Error, string(v))
 		case 401:
 			return nil, errors.New("invalid auth token, please configure the DP_JWT_SECRET environment variable of the dpanel container")
 		case 200:
