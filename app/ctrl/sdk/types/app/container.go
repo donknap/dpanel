@@ -19,3 +19,14 @@ type ContainerUpgradeOption struct {
 type ContainerUpgradeResult struct {
 	ContainerId string `json:"containerId"`
 }
+
+type ContainerBackupOption struct {
+	Id                string   `json:"id"`
+	EnableImage       bool     `json:"enableImage"`
+	EnableCommitImage bool     `json:"enableCommitImage"`
+	Volume            []string `json:"volume"`
+}
+
+type ContainerBackupResult struct {
+	Path string `json:"path"`
+}

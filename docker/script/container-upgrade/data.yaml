@@ -16,6 +16,7 @@ task:
       required: true
     - name: UPGRADE
       type: select
+      required: true
       values:
         - label: 执行升级
           value: "1"

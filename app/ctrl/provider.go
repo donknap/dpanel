@@ -16,4 +16,5 @@ func (provider *Provider) Register(console console.Console) {
 
 	// 容器相关
 	console.RegisterCommand(new(container.Upgrade))
+	console.RegisterCommand(new(container.Backup))
 }

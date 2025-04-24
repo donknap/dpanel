@@ -212,7 +212,9 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	self.JsonSuccessResponse(http)
+	self.JsonResponseWithoutError(http, gin.H{
+		"path": backupTar,
+	})
 	return
 }
 

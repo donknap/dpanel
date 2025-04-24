@@ -1,18 +1,11 @@
 task:
   name: container-backup
   descriptionZh: |
-    备份容器中存储卷或是挂载目录
+    生成容器快照
   descriptionEn: |
-    Backup the mount directory or volume in the container
+    Create container snapshot
   script: |
-    BACKUP_FILE_NAME=${CONTAINER_NAME}_$(date +"%Y%m%d%H%M%S").tar
-    BACKUP_CONTAINER_PATH=$(docker inspect ${CONTAINER_NAME} --format '{{range .Mounts}}{{.Destination}} {{end}}')
-    echo "备份目录为 ${BACKUP_PATH}"
-    docker run -i --rm --name dpanel-task-backup \
-    --volumes-from ${CONTAINER_NAME} \
-    -v ${BACKUP_PATH}:/backup busybox \
-    tar czvf /backup/${BACKUP_FILE_NAME} ${BACKUP_CONTAINER_PATH}
-    echo "备份完成，备份文件位于: ${BACKUP_PATH}/${BACKUP_FILE_NAME}"
+    /app/server/dpanel container:backup -f /app/server/config.yaml --name=${CONTAINER_NAME} --enable-image ${ENABLE_IMAGE}
   tag:
     - dpanel
     - run-in-dpanel
@@ -20,6 +13,14 @@ task:
     - name: CONTAINER_NAME
       labelZh: 容器名称
       labelEn: container name
-    - name: BACKUP_PATH
-      labelZh: 备份到主机目录
-      labelEn: host backup path
+      required: true
+    - name: ENABLE_IMAGE
+      labelZh: 是否备份容器镜像
+      required: true
+      labelEn: backup container image
+      type: select
+      values:
+        - label: 是
+          value: "1"
+        - label: 否
+          value: "0"

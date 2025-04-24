@@ -25,3 +25,12 @@ func (self *Client) AppContainerUpgrade(params *app.ContainerUpgradeOption) (res
 	err = json.NewDecoder(data).Decode(&result)
 	return result, err
 }
+
+func (self *Client) AppContainerBackupCreate(params *app.ContainerBackupOption) (result app.ContainerBackupResult, err error) {
+	data, err := self.Post("/api/app/container-backup/create", params)
+	if err != nil {
+		return result, err
+	}
+	err = json.NewDecoder(data).Decode(&result)
+	return result, err
+}
