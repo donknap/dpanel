@@ -14,6 +14,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"io"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 )
@@ -62,7 +63,8 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 		var out string
 		if containerName == "" {
 			// 如果没有指定容器，则直接在面板 shell 中执行
-			// 生成 script.sh 文件
+			// 在面板容器中执行还需要把 env 注入到命令中
+			globalEnv = append(globalEnv, os.Environ()...)
 			cmd, _ := exec.New(
 				exec.WithCommandName("/bin/sh"),
 				exec.WithArgs("-c", task.Setting.Script),

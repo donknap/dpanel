@@ -1,14 +1,11 @@
 package container
 
 import (
-	"encoding/json"
-	"github.com/docker/docker/api/types/container"
-	"github.com/donknap/dpanel/app/ctrl/logic"
-	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/gin-gonic/gin"
+	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
+	"github.com/donknap/dpanel/app/ctrl/sdk/types/app"
+	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
-	"time"
 )
 
 type Upgrade struct {
@@ -26,54 +23,71 @@ func (self Upgrade) GetDescription() string {
 func (self Upgrade) Configure(command *cobra.Command) {
 	command.Flags().String("name", "", "容器名称")
 	command.Flags().String("docker-env", "", "指定 docker 环境")
-	command.Flags().Bool("upgrade", false, "是否升级容器")
+	command.Flags().Int("upgrade", 0, "是否升级容器")
 	_ = command.MarkFlagRequired("name")
 }
 
 func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 	name, _ := cmd.Flags().GetString("name")
 	dockerEnv, _ := cmd.Flags().GetString("docker-env")
+	isUpgrade, _ := cmd.Flags().GetInt("upgrade")
 
-	code, err := logic.User{}.GetAuth(time.Now().Add(time.Minute))
+	proxyClient, err := proxy.NewProxyClient()
 	if err != nil {
-		logic.Result{}.Error(err)
+		utils.Result{}.Error(err)
 		return
 	}
-	if dockerEnv == "" {
-		dockerEnv = docker.DefaultClientName
+	dockerEnvList, err := proxyClient.CommonEnvGetList()
+	if err != nil {
+		utils.Result{}.Error(err)
+		return
 	}
-	out, _, err := logic.Proxy{}.Post("/api/common/env/switch", code, gin.H{
-		"name": dockerEnv,
+	if dockerEnv != "" && dockerEnv != dockerEnvList.CurrentName {
+		err = proxyClient.CommonEnvSwitch(dockerEnv)
+		if err != nil {
+			utils.Result{}.Error(err)
+			return
+		}
+		defer func() {
+			_ = proxyClient.CommonEnvSwitch(dockerEnvList.CurrentName)
+		}()
+	}
+	containerInfo, err := proxyClient.AppContainerGetDetail(name)
+	if err != nil {
+		utils.Result{}.Error(err)
+		return
+	}
+	result, err := proxyClient.AppImageCheckUpgrade(&app.ImageCheckUpgradeOption{
+		Tag:       containerInfo.Info.Config.Image,
+		Md5:       containerInfo.Info.Image,
+		CacheTime: 0,
 	})
 	if err != nil {
-		logic.Result{}.Error(err)
+		utils.Result{}.Error(err)
 		return
 	}
-	_, raw, err := logic.Proxy{}.Post("/api/app/container/get-detail", code, gin.H{
-		"md5": name,
+	if isUpgrade <= 0 {
+		utils.Result{}.Success(result)
+		return
+	}
+	_, err = proxyClient.AppImageTagRemote(&app.ImageTagRemoteOption{
+		Tag:  containerInfo.Info.Config.Image,
+		Type: "pull",
 	})
 	if err != nil {
-		logic.Result{}.Error(err)
+		utils.Result{}.Error(err)
 		return
 	}
-	data := struct {
-		Data struct {
-			Info container.InspectResponse `json:"info"`
-		} `json:"data"`
-	}{}
-	err = json.Unmarshal(raw, &data)
-	if err != nil {
-		logic.Result{}.Error(err)
-		return
-	}
-	out, _, err = logic.Proxy{}.Post("/api/app/image/check-upgrade", code, gin.H{
-		"tag": data.Data.Info.Config.Image,
-		"md5": data.Data.Info.Image,
+	containerUpgradeResult, err := proxyClient.AppContainerUpgrade(&app.ContainerUpgradeOption{
+		Md5:       containerInfo.Info.ID,
+		EnableBak: true,
 	})
+
 	if err != nil {
-		logic.Result{}.Error(err)
+		utils.Result{}.Error(err)
 		return
 	}
-	logic.Result{}.Success(out.Data)
+
+	utils.Result{}.Success(containerUpgradeResult)
 	return
 }

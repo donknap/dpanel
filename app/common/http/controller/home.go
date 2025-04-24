@@ -166,6 +166,9 @@ func (self Home) WsConsole(http *gin.Context) {
 	}
 	shell, err = docker.Sdk.Client.ContainerExecAttach(client.CtxContext, out.ID, container.ExecStartOptions{
 		Tty: true,
+		ConsoleSize: &[2]uint{
+			params.Height, params.Width,
+		},
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

@@ -1,0 +1,25 @@
+task:
+  name: container-upgrade
+  descriptionZh: |
+    检测容器更新并升级
+  descriptionEn: |
+    Check container update and upgrade
+  script: |
+    /app/server/dpanel container:upgrade -f /app/server/config.yaml --name=${CONTAINER_NAME} --upgrade ${UPGRADE}
+  tag:
+    - dpanel
+    - run-in-dpanel
+  environment:
+    - name: CONTAINER_NAME
+      labelZh: 容器名称
+      labelEn: container name
+      required: true
+    - name: UPGRADE
+      type: select
+      values:
+        - label: 执行升级
+          value: "1"
+        - label: 只检测更新
+          value: "0"
+      labelZh: 是否执行升级
+      labelEn: upgrade container

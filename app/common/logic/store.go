@@ -40,7 +40,7 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 		return errors.New("同步商店仓库需要使用 git 命令，请先安装")
 	}
 	// 先创建一个临时目录，下载完成后再同步数据，否则失败时原先的数据会被删除
-	tempDownloadPath, _ := os.MkdirTemp("", "dpanel-store")
+	tempDownloadPath, _ := storage.Local{}.CreateTempDir("")
 	defer func() {
 		_ = os.RemoveAll(tempDownloadPath)
 	}()
@@ -255,32 +255,19 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 							Option: make([]docker.ValueItem, 0),
 						},
 					}
-
-					if field["required"] == "true" {
-						envItem.Rule.Kind |= docker.EnvValueRuleRequired
-					}
-					if field["disabled"] == "true" {
-						envItem.Rule.Kind |= docker.EnvValueRuleDisabled
-					}
-
-					switch field["type"] {
-					case "text":
-						envItem.Rule.Kind |= docker.EnvValueTypeText
-						break
-					case "number":
-						envItem.Rule.Kind |= docker.EnvValueTypeNumber
-						break
-					case "select":
-						envItem.Rule.Kind |= docker.EnvValueTypeSelect
-						envItem.Rule.Option = function.PluckArrayWalk(
-							yamlData.GetSliceStringMapString(fmt.Sprintf("additionalProperties.formFields.%d.values", index)),
-							func(i map[string]string) (docker.ValueItem, bool) {
-								return docker.ValueItem{
-									Name:  i["label"],
-									Value: i["value"],
-								}, true
-							})
-					}
+					envItem.Rule = self.ParseSettingField(field, func(item *docker.ValueRuleItem) {
+						if (item.Kind & docker.EnvValueTypeSelect) != 0 {
+							item.Option = function.PluckArrayWalk(
+								yamlData.GetSliceStringMapString(fmt.Sprintf("additionalProperties.formFields.%d.values", index)),
+								func(i map[string]string) (docker.ValueItem, bool) {
+									return docker.ValueItem{
+										Name:  i["label"],
+										Value: i["value"],
+									}, true
+								},
+							)
+						}
+					})
 					env = append(env, envItem)
 				}
 				storeVersionItem.Environment = env
@@ -397,4 +384,31 @@ func (self Store) GetAppByCasaos(storePath string) ([]accessor.StoreAppItem, err
 		return nil, err
 	}
 	return result, nil
+}
+
+func (self Store) ParseSettingField(field map[string]string, call func(item *docker.ValueRuleItem)) *docker.ValueRuleItem {
+	valueRule := &docker.ValueRuleItem{}
+
+	if field["required"] == "true" {
+		valueRule.Kind |= docker.EnvValueRuleRequired
+	}
+	if field["disabled"] == "true" {
+		valueRule.Kind |= docker.EnvValueRuleDisabled
+	}
+
+	switch field["type"] {
+	case "text":
+		valueRule.Kind |= docker.EnvValueTypeText
+		break
+	case "number":
+		valueRule.Kind |= docker.EnvValueTypeNumber
+		break
+	case "select":
+		valueRule.Kind |= docker.EnvValueTypeSelect
+	}
+
+	if call != nil {
+		call(valueRule)
+	}
+	return valueRule
 }

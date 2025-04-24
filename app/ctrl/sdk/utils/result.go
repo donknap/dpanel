@@ -1,9 +1,9 @@
-package logic
+package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/gookit/color"
 )
 
 type Result struct{}
@@ -17,7 +17,13 @@ func (self Result) Error(err error) {
 		self.Error(err)
 		return
 	}
-	color.Errorln("\033c", string(str))
+
+	fmt.Println(string(str))
+	return
+}
+
+func (self Result) Errorf(format string, a ...any) {
+	self.Error(fmt.Errorf(format, a))
 	return
 }
 
@@ -27,5 +33,5 @@ func (self Result) Success(data interface{}) {
 		self.Error(err)
 		return
 	}
-	color.Successln("\033c", string(str))
+	fmt.Println(string(str))
 }

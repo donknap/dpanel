@@ -1,13 +1,13 @@
 package store
 
 import (
-	"errors"
-	"github.com/donknap/dpanel/app/ctrl/logic"
+	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
+	"github.com/donknap/dpanel/app/ctrl/sdk/types/common"
+	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
-	"time"
 )
 
 type Sync struct {
@@ -29,33 +29,31 @@ func (self Sync) Configure(command *cobra.Command) {
 
 func (self Sync) Handle(cmd *cobra.Command, args []string) {
 	name, _ := cmd.Flags().GetString("name")
-	code, err := logic.User{}.GetAuth(time.Now().Add(time.Minute))
-	if err != nil {
-		logic.Result{}.Error(err)
-		return
-	}
+
 	store, _ := dao.Store.Where(dao.Store.Name.Eq(name)).First()
 	if store == nil {
-		logic.Result{}.Error(errors.New("商店不存在，请先添加"))
+		utils.Result{}.Errorf("%s 商店不存在，请先添加", name)
 		return
 	}
-	out, _, err := logic.Proxy{}.Post("/api/common/store/sync", code, gin.H{
-		"id":   store.ID,
-		"name": store.Name,
-		"type": store.Setting.Type,
-		"url":  store.Setting.Url,
+	proxyClient, err := proxy.NewProxyClient()
+	if err != nil {
+		utils.Result{}.Error(err)
+		return
+	}
+
+	appList, err := proxyClient.CommonStoreSync(&common.StoreSyncOption{
+		Id:   store.ID,
+		Name: store.Name,
+		Type: store.Setting.Type,
+		Url:  store.Setting.Url,
 	})
 	if err != nil {
-		logic.Result{}.Error(err)
+		utils.Result{}.Error(err)
 		return
 	}
-	appList := out.Data.(map[string]interface{})
-	if _, ok := appList["list"]; ok {
-		logic.Result{}.Success(gin.H{
-			"total": len(appList["list"].([]interface{})),
-		})
-		return
-	}
-	logic.Result{}.Error(errors.New("同步失败"))
+
+	utils.Result{}.Success(gin.H{
+		"total": len(appList),
+	})
 	return
 }

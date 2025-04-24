@@ -2,6 +2,7 @@ package logic
 
 import (
 	"errors"
+	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -68,7 +69,7 @@ func (self Setting) GetValue(groupName string, name string) (*entity.Setting, er
 		dao.Setting.Name.Eq(name),
 	).First()
 	if setting == nil || setting.Value == nil {
-		return nil, errors.New("setting not found")
+		return nil, fmt.Errorf("%s:%s setting not found", groupName, name)
 	}
 	return setting, nil
 
