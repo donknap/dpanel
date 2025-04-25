@@ -19,10 +19,14 @@ func (self Upgrade20250401) Upgrade() error {
 	}
 
 	var ids []int32
-	db.Table("ims_site").Select("id").Where("LENGTH(container_info) = ?", 64).Debug().Pluck("id", &ids)
+	db.Table("ims_site").Select("id").Where("LENGTH(container_info) = ?", 64).Pluck("id", &ids)
 	if !function.IsEmptyArray(ids) {
 		db.Exec(`UPDATE ims_site SET container_info = CONCAT('{"Id": "', container_info, '"}') WHERE id IN (?)`, ids)
 	}
 
+	db.Table("ims_site").Select("id").Where("LENGTH(container_info) = ?", 0).Pluck("id", &ids)
+	if !function.IsEmptyArray(ids) {
+		db.Exec(`UPDATE ims_site SET container_info = '{}' WHERE id IN (?)`, ids)
+	}
 	return nil
 }

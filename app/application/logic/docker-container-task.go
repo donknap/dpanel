@@ -90,7 +90,8 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		}
 		return false
 	})
-	// 如果没有开启加入 bridge 网络，在创建时添加网络参数
+	// 如果没有开启加入 bridge 网络，在创建时添加网络参数，否则只能在创建之后再加入网络
+	// 如果一开始加入网络，会覆盖掉 bridge 网络
 	if !useBridgeNetwork && !function.IsEmptyArray(task.BuildParams.Network) {
 		options = append(options, builder.WithNetwork(task.BuildParams.Network...))
 	}
