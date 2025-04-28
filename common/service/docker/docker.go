@@ -24,18 +24,24 @@ var (
 )
 
 type Client struct {
-	Name              string            `json:"name,omitempty"`
-	Title             string            `json:"title,omitempty"`
-	Address           string            `json:"address,omitempty"` // docker api 地址
-	Default           bool              `json:"default,omitempty"`
+	Name              string            `json:"name,omitempty" binding:"required"`
+	Title             string            `json:"title,omitempty" binding:"required"`
+	Address           string            `json:"address,omitempty" binding:"required"` // docker api 地址
+	Default           bool              `json:"default,omitempty"`                    // 是否是默认客户端
+	DockerInfo        *ClientDockerInfo `json:"dockerInfo,omitempty"`
+	ServerUrl         string            `json:"serverUrl,omitempty"`
+	EnableTLS         bool              `json:"enableTLS,omitempty"`
 	TlsCa             string            `json:"tlsCa,omitempty"`
 	TlsCert           string            `json:"tlsCert,omitempty"`
 	TlsKey            string            `json:"tlsKey,omitempty"`
-	EnableTLS         bool              `json:"enableTLS,omitempty"`
 	EnableComposePath bool              `json:"enableComposePath,omitempty"` // 启用 compose 独享目录
 	ComposePath       string            `json:"composePath,omitempty"`
-	DockerInfo        *ClientDockerInfo `json:"dockerInfo,omitempty"`
-	ServerUrl         string            `json:"serverUrl,omitempty"`
+	EnableSSH         bool              `json:"enableSSH"`
+	SshUsername       string            `json:"sshUsername"`
+	SshPassword       string            `json:"sshPassword"`
+	SshPort           int               `json:"sshPort"`
+	SshKey            string            `json:"sshKey"`
+	SshType           string            `json:"sshType"`
 }
 
 type ClientDockerInfo struct {

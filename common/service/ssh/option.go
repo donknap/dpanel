@@ -1,0 +1,56 @@
+package ssh
+
+import (
+	"fmt"
+	"golang.org/x/crypto/ssh"
+	"strings"
+)
+
+func WithAuthBasic(username, password string) Option {
+	return func(self *Client) error {
+		self.sshClientConfig.User = username
+		self.sshClientConfig.Auth = []ssh.AuthMethod{
+			ssh.Password(password),
+		}
+		return nil
+	}
+}
+
+func WithAuthPem(username string, privateKeyPem string, password string) Option {
+	return func(self *Client) error {
+		var signer ssh.Signer
+		var err error
+		self.sshClientConfig.User = username
+		if password != "" {
+			signer, err = ssh.ParsePrivateKeyWithPassphrase([]byte(privateKeyPem), []byte(password))
+		} else {
+			signer, err = ssh.ParsePrivateKey([]byte(privateKeyPem))
+		}
+		if err != nil {
+			return err
+		}
+		self.sshClientConfig.Auth = []ssh.AuthMethod{
+			ssh.PublicKeys(signer),
+		}
+		return nil
+	}
+}
+
+func WithAddress(address string, port int) Option {
+	return func(self *Client) error {
+		self.address = fmt.Sprintf("%s:%d", address, port)
+		if strings.Contains(address, ":") {
+			self.protocol = "tcp6"
+		} else {
+			self.protocol = "tcp"
+		}
+		return nil
+	}
+}
+
+func WithKnownHosts(host string) Option {
+	return func(self *Client) error {
+
+		return nil
+	}
+}

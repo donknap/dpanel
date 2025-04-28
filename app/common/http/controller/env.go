@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
@@ -52,19 +53,7 @@ func (self Env) GetList(http *gin.Context) {
 }
 
 func (self Env) Create(http *gin.Context) {
-	type ParamsValidate struct {
-		Name              string `json:"name" binding:"required"`
-		Title             string `json:"title" binding:"required"`
-		Address           string `json:"address" binding:"required"`
-		ServerUrl         string `json:"serverUrl"`
-		TlsCa             string `json:"tlsCa"`
-		TlsCert           string `json:"tlsCert"`
-		TlsKey            string `json:"tlsKey"`
-		EnableTLS         bool   `json:"enableTLS"`
-		EnableComposePath bool   `json:"enableComposePath"`
-		ComposePath       string `json:"composePath"`
-	}
-	params := ParamsValidate{}
+	params := docker.Client{}
 	if !self.Validate(http, &params) {
 		return
 	}
@@ -72,6 +61,36 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("开启 TLS 时需要上传证书"), 500)
 		return
 	}
+
+	if params.EnableSSH {
+		option := make([]ssh.Option, 0)
+		urls, err := url.Parse(params.Address)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		host := urls.Hostname()
+		if urls.Scheme == "unix" {
+			host = "127.0.0.1"
+		}
+		if host == "172.16.1.13" {
+			host = "172.16.1.148"
+		}
+		option = append(option, ssh.WithAddress(host, params.SshPort))
+		if params.SshType == "key" {
+			option = append(option, ssh.WithAuthPem(params.SshUsername, params.SshKey, params.SshPassword))
+		} else {
+			option = append(option, ssh.WithAuthBasic(params.SshUsername, params.SshPassword))
+		}
+		sshClient, err := ssh.NewClient(option...)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
+		sshClient.Run("")
+	}
+
 	defaultEnv := false
 	if params.Name == "local" {
 		defaultEnv = true
@@ -99,6 +118,12 @@ func (self Env) Create(http *gin.Context) {
 		Default:           defaultEnv,
 		EnableComposePath: params.EnableComposePath,
 		ComposePath:       params.ComposePath,
+		EnableSSH:         params.EnableSSH,
+		SshPassword:       params.SshPassword,
+		SshUsername:       params.SshUsername,
+		SshPort:           params.SshPort,
+		SshKey:            params.SshKey,
+		SshType:           params.SshType,
 	}
 
 	if params.EnableTLS {
@@ -177,6 +202,7 @@ func (self Env) Create(http *gin.Context) {
 			}
 		}
 	}
+
 	logic.DockerEnv{}.UpdateEnv(client)
 	// 如果修改的是当前客户端的连接地址，则更新 docker sdk
 	if docker.Sdk.Name == params.Name && docker.Sdk.Client.DaemonHost() != params.Address {

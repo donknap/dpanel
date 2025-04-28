@@ -42,6 +42,10 @@ func (self Local) GetLicenseFilePath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "dpanel.lic")
 }
 
+func (self Local) GetSshKnownHostsPath() string {
+	return filepath.Join(self.GetStorageLocalPath(), "known_hosts")
+}
+
 func (self Local) GetScriptTemplatePath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "script")
 }
