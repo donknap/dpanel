@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -53,7 +54,14 @@ func (self Env) GetList(http *gin.Context) {
 }
 
 func (self Env) Create(http *gin.Context) {
-	params := docker.Client{}
+	type ParamsValidate struct {
+		docker.Client
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
 	if !self.Validate(http, &params) {
 		return
 	}
@@ -61,34 +69,32 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("开启 TLS 时需要上传证书"), 500)
 		return
 	}
-
 	if params.EnableSSH {
-		option := make([]ssh.Option, 0)
 		urls, err := url.Parse(params.Address)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		host := urls.Hostname()
 		if urls.Scheme == "unix" {
-			host = "127.0.0.1"
+			params.SshServerInfo.Host = "127.0.0.1"
 		}
-		if host == "172.16.1.13" {
-			host = "172.16.1.148"
+		if urls.Hostname() == "172.16.1.13" {
+			params.SshServerInfo.Host = "172.16.1.148"
 		}
-		option = append(option, ssh.WithAddress(host, params.SshPort))
-		if params.SshType == "key" {
-			option = append(option, ssh.WithAuthPem(params.SshUsername, params.SshKey, params.SshPassword))
-		} else {
-			option = append(option, ssh.WithAuthBasic(params.SshUsername, params.SshPassword))
-		}
-		sshClient, err := ssh.NewClient(option...)
+		sshClient, err := ssh.NewClient(ssh.WithServerInfo(params.SshServerInfo)...)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-
-		sshClient.Run("")
+		defer func() {
+			sshClient.Close()
+		}()
+		result, err := sshClient.Run("pwd")
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		slog.Debug("docker env", "ssh home", result)
 	}
 
 	defaultEnv := false
@@ -119,11 +125,7 @@ func (self Env) Create(http *gin.Context) {
 		EnableComposePath: params.EnableComposePath,
 		ComposePath:       params.ComposePath,
 		EnableSSH:         params.EnableSSH,
-		SshPassword:       params.SshPassword,
-		SshUsername:       params.SshUsername,
-		SshPort:           params.SshPort,
-		SshKey:            params.SshKey,
-		SshType:           params.SshType,
+		SshServerInfo:     params.SshServerInfo,
 	}
 
 	if params.EnableTLS {

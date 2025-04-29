@@ -79,7 +79,7 @@ func (self *Collection) sendMessage(message *RespMessage) {
 		}
 		err := c.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
 		if err != nil {
-			slog.Error("ws broadcast error", "fd", c.Fd, "error", err.Error())
+			slog.Debug("ws broadcast error", "fd", c.Fd, "error", err.Error())
 		}
 		return true
 	})

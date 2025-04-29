@@ -18,6 +18,7 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/registry"
+	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -29,7 +30,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -175,7 +175,6 @@ func (self Home) WsConsole(http *gin.Context) {
 		return
 	}
 
-	lock := sync.RWMutex{}
 	go client.ReadMessage()
 	go func() {
 		out := make([]byte, 2028)
@@ -184,18 +183,123 @@ func (self Home) WsConsole(http *gin.Context) {
 			if err != nil {
 				return
 			}
-			processedOutput := string(out[:n])
-			lock.Lock()
-			err = client.Conn.WriteMessage(websocket.TextMessage, ws.RespMessage{
+			err = client.SendMessage(&ws.RespMessage{
 				Type: messageType,
-				Data: processedOutput,
-			}.ToJson())
-			lock.Unlock()
+				Data: string(out[:n]),
+			})
 			if err != nil {
 				slog.Error("websocket", "shell write", err.Error())
+				return
 			}
 		}
 	}()
+}
+
+func (self Home) WsHostConsole(http *gin.Context) {
+	if !websocket.IsWebSocketUpgrade(http.Request) {
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonUseWsConnect"), 500)
+		return
+	}
+	type ParamsValidate struct {
+		Name   string `uri:"name" binding:"required"`
+		Width  int    `form:"width"`
+		Height int    `form:"height"`
+		Cmd    string `form:"cmd,default=/bin/sh"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if params.Name == "" {
+		params.Name = docker.DefaultClientName
+	}
+	var err error
+	var sshClient *ssh.Client
+	var read io.Reader
+	var write io.WriteCloser
+
+	type command struct {
+		Type    string `json:"type"`
+		Content struct {
+			Command string `json:"command"`
+		} `json:"content"`
+	}
+
+	messageType := fmt.Sprintf(ws.MessageTypeConsoleHost, params.Name)
+	client, err := ws.NewClient(http,
+		ws.WithMessageRecvHandler(messageType, func(recvMessage *ws.RecvMessage) {
+			var cmd command
+			err = json.Unmarshal(recvMessage.Message, &cmd)
+			if err != nil {
+				slog.Error("console", "json unmarshal", err.Error())
+			}
+			_, err = write.Write([]byte(cmd.Content.Command))
+			if err != nil {
+				slog.Error("console", "json unmarshal", err.Error())
+			}
+		}),
+	)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	err = func() error {
+		dockerEnv, err := logic.Setting{}.GetDockerClient(params.Name)
+		if err != nil {
+			return err
+		}
+		if !dockerEnv.EnableSSH {
+			return function.ErrorMessage(".homeWsHostConsoleSshNotSetting")
+		}
+		sshClient, err = ssh.NewClient(ssh.WithServerInfo(dockerEnv.SshServerInfo)...)
+		if err != nil {
+			return err
+		}
+		read, write, err = sshClient.NewPtySession(params.Height, params.Width)
+		if err != nil {
+			return err
+		}
+		return nil
+	}()
+
+	if err != nil {
+		_ = client.SendMessage(&ws.RespMessage{
+			Type: messageType,
+			Data: err.Error(),
+		})
+		return
+	}
+
+	go func() {
+		out := make([]byte, 2028)
+		for {
+			n, err := read.Read(out)
+			if err != nil {
+				return
+			}
+			err = client.SendMessage(&ws.RespMessage{
+				Type: messageType,
+				Data: string(out[:n]),
+			})
+			if err != nil {
+				slog.Error("websocket", "shell write", err.Error())
+				return
+			}
+		}
+	}()
+
+	go func() {
+		select {
+		case <-client.CtxContext.Done():
+			if sshClient != nil {
+				sshClient.Close()
+			}
+			return
+		}
+	}()
+
+	go client.ReadMessage()
 }
 
 func (self Home) Info(http *gin.Context) {

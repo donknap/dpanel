@@ -48,9 +48,13 @@ func WithAddress(address string, port int) Option {
 	}
 }
 
-func WithKnownHosts(host string) Option {
-	return func(self *Client) error {
-
-		return nil
+func WithServerInfo(info *ServerInfo) []Option {
+	option := make([]Option, 0)
+	option = append(option, WithAddress(info.Host, info.Port))
+	if info.AuthType == SshAuthTypePem {
+		option = append(option, WithAuthPem(info.Username, info.PrivateKey, info.Password))
+	} else if info.AuthType == SshAuthTypeBasic {
+		option = append(option, WithAuthBasic(info.Username, info.Password))
 	}
+	return option
 }

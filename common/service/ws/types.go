@@ -12,6 +12,7 @@ const (
 	MessageTypeCompose         = "compose:%s"
 	MessageTypeComposeLog      = "compose:log:%s"
 	MessageTypeConsole         = "console:%s"
+	MessageTypeConsoleHost     = "console:host:%s"
 	MessageTypeContainerLog    = "container:log:%s"
 	MessageTypeContainerStat   = "container:stat"
 	MessageTypeContainerBackup = "container:backup:%d"

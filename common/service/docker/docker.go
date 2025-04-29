@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/docker/docker/client"
+	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"log/slog"
 	"os"
@@ -36,12 +37,8 @@ type Client struct {
 	TlsKey            string            `json:"tlsKey,omitempty"`
 	EnableComposePath bool              `json:"enableComposePath,omitempty"` // 启用 compose 独享目录
 	ComposePath       string            `json:"composePath,omitempty"`
-	EnableSSH         bool              `json:"enableSSH"`
-	SshUsername       string            `json:"sshUsername"`
-	SshPassword       string            `json:"sshPassword"`
-	SshPort           int               `json:"sshPort"`
-	SshKey            string            `json:"sshKey"`
-	SshType           string            `json:"sshType"`
+	EnableSSH         bool              `json:"enableSSH,omitempty"`
+	SshServerInfo     *ssh.ServerInfo   `json:"sshServerInfo,omitempty"`
 }
 
 type ClientDockerInfo struct {

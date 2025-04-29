@@ -191,7 +191,7 @@ func (self SiteCert) Apply(http *gin.Context) {
 			success = true
 		}
 		if strings.Contains(p, "Error adding TXT record to domain") {
-			errMessage = notice.Message{}.Error(".domainCertAddTxtFailed")
+			errMessage = function.ErrorMessage(".domainCertAddTxtFailed")
 		}
 		return nil
 	}

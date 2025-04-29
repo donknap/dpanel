@@ -103,6 +103,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 		wsCors.GET("/common/notice", controller.Home{}.WsNotice)
 		wsCors.GET("/common/console/:id", controller.Home{}.WsConsole)
+		wsCors.GET("/common/console/host/:name", controller.Home{}.WsHostConsole)
 	})
 
 	// 当前如果有连接，则添加一条docker环境数据
