@@ -77,10 +77,12 @@ func (self Env) Create(http *gin.Context) {
 		}
 		if urls.Scheme == "unix" {
 			params.SshServerInfo.Host = "127.0.0.1"
+		} else {
+			params.SshServerInfo.Host = urls.Hostname()
 		}
-		if urls.Hostname() == "172.16.1.13" {
-			params.SshServerInfo.Host = "172.16.1.148"
-		}
+		//if urls.Hostname() == "172.16.1.13" {
+		//	params.SshServerInfo.Host = "172.16.1.148"
+		//}
 		sshClient, err := ssh.NewClient(ssh.WithServerInfo(params.SshServerInfo)...)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)

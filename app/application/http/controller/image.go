@@ -650,17 +650,16 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 			slog.Debug("image check upgrade", "err", err.Error())
 		}
 	}
-
-	if err != nil {
-		self.JsonResponseWithError(http, errors.Join(errors.New("检测容器更新失败，请确保仓库或加速地址可以正常访问"), err), 500)
-		return
-	}
-
-	self.JsonResponseWithoutError(http, gin.H{
+	result := gin.H{
 		"upgrade":     upgrade,
 		"digest":      digest,
 		"digestLocal": imageInfo.RepoDigests,
-	})
+		"error":       "",
+	}
+	if err != nil {
+		result["error"] = err.Error()
+	}
+	self.JsonResponseWithoutError(http, result)
 	return
 }
 

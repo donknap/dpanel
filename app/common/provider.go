@@ -92,17 +92,19 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/cron/template", controller.Cron{}.Template)
 
 		// 标签及分组
-		cors.POST("/app/tag/create", controller.Tag{}.Create)
-		cors.POST("/app/tag/get-list", controller.Tag{}.GetList)
-		cors.POST("/app/tag/delete", controller.Tag{}.Delete)
+		cors.POST("/common/tag/create", controller.Tag{}.Create)
+		cors.POST("/common/tag/get-list", controller.Tag{}.GetList)
+		cors.POST("/common/tag/delete", controller.Tag{}.Delete)
 
+		// 文件相关
+		cors.POST("/common/explorer/get-path-list", controller.Explorer{}.GetPathList)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		wsCors := engine.Group("/ws/", common.CorsMiddleware{}.Process)
 
 		wsCors.GET("/common/notice", controller.Home{}.WsNotice)
-		wsCors.GET("/common/console/:id", controller.Home{}.WsConsole)
+		wsCors.GET("/common/console/container/:id", controller.Home{}.WsContainerConsole)
 		wsCors.GET("/common/console/host/:name", controller.Home{}.WsHostConsole)
 	})
 

@@ -65,7 +65,7 @@ func (self Home) WsNotice(http *gin.Context) {
 	}
 }
 
-func (self Home) WsConsole(http *gin.Context) {
+func (self Home) WsContainerConsole(http *gin.Context) {
 	if !websocket.IsWebSocketUpgrade(http.Request) {
 		self.JsonResponseWithError(http, errors.New("please connect using websocket"), 500)
 		return

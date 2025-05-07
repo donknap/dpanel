@@ -28,7 +28,7 @@ type Explorer struct {
 
 func (self Explorer) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5      string   `json:"md5" binding:"required"`
+		Name     string   `json:"name" binding:"required"`
 		FileList []string `json:"fileList" binding:"required"`
 	}
 	params := ParamsValidate{}
@@ -52,7 +52,7 @@ func (self Explorer) Export(http *gin.Context) {
 	zipWriter := zip.NewWriter(tempFile)
 	// 需要先将每个目录导出，然后再合并起来。直接导出整个容器效率太低
 	for _, path := range params.FileList {
-		out, info, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Md5, path)
+		out, info, err := docker.Sdk.Client.CopyFromContainer(docker.Sdk.Ctx, params.Name, path)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -105,7 +105,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 	type ParamsValidate struct {
 		File     string `json:"file" binding:"required"`
 		Content  string `json:"content"`
-		Md5      string `json:"md5" binding:"required"`
+		Name     string `json:"name" binding:"required"`
 		DestPath string `json:"destPath" binding:"required"`
 	}
 	params := ParamsValidate{}
@@ -122,7 +122,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.ContainerImport(params.Md5, importFile)
+	err = docker.Sdk.ContainerImport(params.Name, importFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -132,7 +132,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 
 func (self Explorer) Import(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5      string `json:"md5" binding:"required"`
+		Name     string `json:"name" binding:"required"`
 		FileList []struct {
 			Name string `json:"name"`
 			Path string `json:"path"`
@@ -149,7 +149,7 @@ func (self Explorer) Import(http *gin.Context) {
 			_ = os.Remove(realPath)
 		}
 	}()
-	_, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	_, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -164,7 +164,7 @@ func (self Explorer) Import(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.ContainerImport(params.Md5, importFile)
+	err = docker.Sdk.ContainerImport(params.Name, importFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -175,7 +175,7 @@ func (self Explorer) Import(http *gin.Context) {
 
 func (self Explorer) Unzip(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5  string   `json:"md5" binding:"required"`
+		Name string   `json:"name" binding:"required"`
 		File []string `json:"file" binding:"required"`
 		Path string   `json:"path" binding:"required"`
 	}
@@ -190,7 +190,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			_ = targetFile.Close()
 			_ = os.Remove(targetFile.Name())
 		}()
-		_, err := docker.Sdk.ContainerReadFile(params.Md5, path, targetFile)
+		_, err := docker.Sdk.ContainerReadFile(params.Name, path, targetFile)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -216,7 +216,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.ContainerImport(params.Md5, importFile)
+	err = docker.Sdk.ContainerImport(params.Name, importFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -227,7 +227,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 
 func (self Explorer) Delete(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5      string   `json:"md5" binding:"required"`
+		Name     string   `json:"name" binding:"required"`
 		FileList []string `json:"fileList" binding:"required"`
 	}
 	params := ParamsValidate{}
@@ -244,7 +244,7 @@ func (self Explorer) Delete(http *gin.Context) {
 			return
 		}
 	}
-	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Md5))
+	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Name))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -260,19 +260,19 @@ func (self Explorer) Delete(http *gin.Context) {
 
 func (self Explorer) GetPathList(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5  string `json:"md5" binding:"required"`
+		Name string `json:"name" binding:"required"`
 		Path string `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Md5))
+	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Name))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -289,7 +289,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		return
 	}
 	var tempChangeFileList = make(map[string]container.FilesystemChange)
-	changeFileList, err := docker.Sdk.Client.ContainerDiff(docker.Sdk.Ctx, params.Md5)
+	changeFileList, err := docker.Sdk.Client.ContainerDiff(docker.Sdk.Ctx, params.Name)
 	if !function.IsEmptyArray(changeFileList) {
 		for _, change := range changeFileList {
 			tempChangeFileList[change.Path] = change
@@ -329,14 +329,14 @@ func (self Explorer) GetPathList(http *gin.Context) {
 
 func (self Explorer) GetContent(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5  string `json:"md5" binding:"required"`
+		Name string `json:"name" binding:"required"`
 		File string `json:"file" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Md5, params.File)
+	pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Name, params.File)
 	if pathStat.Size >= 1024*1024 {
 		self.JsonResponseWithError(http, errors.New("超过1M的文件请通过导入&导出修改文件"), 500)
 		return
@@ -349,7 +349,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 		_ = os.Remove(tempFile.Name())
 	}()
 
-	_, err = docker.Sdk.ContainerReadFile(params.Md5, params.File, tempFile)
+	_, err = docker.Sdk.ContainerReadFile(params.Name, params.File, tempFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -379,7 +379,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 
 func (self Explorer) Chmod(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5         string   `json:"md5" binding:"required"`
+		Name        string   `json:"name" binding:"required"`
 		FileList    []string `json:"fileList" binding:"required"`
 		Mod         int      `json:"mod" binding:"required"`
 		HasChildren bool     `json:"hasChildren"`
@@ -389,7 +389,7 @@ func (self Explorer) Chmod(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Md5))
+	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Name))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -400,7 +400,7 @@ func (self Explorer) Chmod(http *gin.Context) {
 		return
 	}
 	if params.Owner != "" {
-		err = builder.Chown(params.Md5, params.FileList, params.Owner, params.HasChildren)
+		err = builder.Chown(params.Name, params.FileList, params.Owner, params.HasChildren)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -413,7 +413,7 @@ func (self Explorer) Chmod(http *gin.Context) {
 
 func (self Explorer) GetFileStat(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5  string `json:"md5" binding:"required"`
+		Name string `json:"name" binding:"required"`
 		Path string `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
@@ -425,7 +425,7 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 	var target = params.Path
 	// 循环查找当前目录的链接最终对象
 	for i := 0; i < 10; i++ {
-		pathStat, err = docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Md5, target)
+		pathStat, err = docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Name, target)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -449,7 +449,7 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 
 func (self Explorer) GetUserList(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 string `json:"md5" binding:"required"`
+		Name string `json:"name" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -465,7 +465,7 @@ func (self Explorer) GetUserList(http *gin.Context) {
 	}()
 
 	var result []byte
-	if _, err = docker.Sdk.ContainerReadFile(params.Md5, "/etc/passwd", tempFile); err == nil {
+	if _, err = docker.Sdk.ContainerReadFile(params.Name, "/etc/passwd", tempFile); err == nil {
 		_, err = tempFile.Seek(0, io.SeekStart)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
