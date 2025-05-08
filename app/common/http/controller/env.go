@@ -190,7 +190,7 @@ func (self Env) Create(http *gin.Context) {
 	}
 	if defaultEnv {
 		// 获取面板信息
-		if info, err := dockerClient.ContainerInfo(facade.GetConfig().GetString("app.name")); err == nil {
+		if info, err := dockerClient.Client.ContainerInspect(dockerClient.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
 			_ = logic.Setting{}.Save(&entity.Setting{
 				GroupName: logic.SettingGroupSetting,
 				Name:      logic.SettingGroupSettingDPanelInfo,

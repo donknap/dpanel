@@ -247,7 +247,7 @@ func (self Network) Connect(http *gin.Context) {
 	for _, item := range params.ContainerAlise {
 		alise = append(alise, strings.TrimPrefix(item, "/"))
 	}
-	err := docker.Sdk.NetworkConnect(docker.NetworkItem{
+	err := docker.Sdk.NetworkConnect(docker.Sdk.Ctx, docker.NetworkItem{
 		Name:  params.Name,
 		Alise: alise,
 		IpV4:  params.IpV4,

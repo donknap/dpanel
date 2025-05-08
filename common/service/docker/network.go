@@ -1,26 +1,27 @@
 package docker
 
 import (
+	"context"
 	"fmt"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
 	"strings"
 )
 
-func (self Builder) NetworkRemove(networkName string) error {
-	if networkRow, err := self.Client.NetworkInspect(self.Ctx, networkName, network.InspectOptions{}); err == nil {
+func (self Builder) NetworkRemove(ctx context.Context, networkName string) error {
+	if networkRow, err := self.Client.NetworkInspect(ctx, networkName, network.InspectOptions{}); err == nil {
 		for _, item := range networkRow.Containers {
-			err = self.Client.NetworkDisconnect(self.Ctx, networkName, item.Name, true)
+			err = self.Client.NetworkDisconnect(ctx, networkName, item.Name, true)
 		}
 		if err != nil {
 			return err
 		}
-		return self.Client.NetworkRemove(self.Ctx, networkName)
+		return self.Client.NetworkRemove(ctx, networkName)
 	}
 	return nil
 }
 
-func (self Builder) NetworkCreate(networkName string, ipV4, ipV6 *NetworkCreateItem) (string, error) {
+func (self Builder) NetworkCreate(ctx context.Context, networkName string, ipV4, ipV6 *NetworkCreateItem) (string, error) {
 	option := network.CreateOptions{
 		Driver: "bridge",
 		Options: map[string]string{
@@ -46,16 +47,16 @@ func (self Builder) NetworkCreate(networkName string, ipV4, ipV6 *NetworkCreateI
 			Gateway: ipV6.Gateway,
 		})
 	}
-	response, err := self.Client.NetworkCreate(self.Ctx, networkName, option)
+	response, err := self.Client.NetworkCreate(ctx, networkName, option)
 	if err != nil {
 		return "", err
 	}
 	return response.ID, nil
 }
 
-func (self Builder) NetworkConnect(networkRow NetworkItem, containerName string) error {
+func (self Builder) NetworkConnect(ctx context.Context, networkRow NetworkItem, containerName string) error {
 	// 关联网络时，重新退出加入
-	_ = self.Client.NetworkDisconnect(self.Ctx, networkRow.Name, containerName, true)
+	_ = self.Client.NetworkDisconnect(ctx, networkRow.Name, containerName, true)
 
 	if networkRow.Alise == nil {
 		networkRow.Alise = make([]string, 0)
@@ -81,5 +82,5 @@ func (self Builder) NetworkConnect(networkRow NetworkItem, containerName string)
 	if networkRow.MacAddress != "" {
 		endpointSetting.MacAddress = networkRow.MacAddress
 	}
-	return self.Client.NetworkConnect(self.Ctx, networkRow.Name, containerName, endpointSetting)
+	return self.Client.NetworkConnect(ctx, networkRow.Name, containerName, endpointSetting)
 }

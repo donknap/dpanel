@@ -282,7 +282,7 @@ func (self SiteDomain) Delete(http *gin.Context) {
 		count, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(list[0].ContainerID)).Count()
 		if count == 0 {
 			// 如果只有dpanel-local一个网络则保留
-			containerInfo, err := docker.Sdk.ContainerInfo(list[0].ContainerID)
+			containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, list[0].ContainerID)
 			if err == nil && len(containerInfo.NetworkSettings.Networks) > 1 {
 				err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, defaultNetworkName, list[0].ContainerID, false)
 				if err != nil {

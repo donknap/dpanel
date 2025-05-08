@@ -155,7 +155,7 @@ func (self plugin) Create() (string, error) {
 		return "", err
 	}
 	for {
-		if _, err := docker.Sdk.ContainerInfo(response.ID); err == nil {
+		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, response.ID); err == nil {
 			return service.ContainerName, nil
 		} else {
 			time.Sleep(time.Second)

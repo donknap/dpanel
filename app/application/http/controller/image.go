@@ -680,7 +680,7 @@ func (self Image) GetRootfs(http *gin.Context) {
 	if item, ok := storage.Cache.Get(cacheKey); ok {
 		pathInfoList = item.([]*docker.FileItemResult)
 	} else {
-		pathInfoList, _, err = docker.Sdk.ImageInspectFileList(params.Md5)
+		pathInfoList, _, err = docker.Sdk.ImageInspectFileList(docker.Sdk.Ctx, params.Md5)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

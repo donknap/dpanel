@@ -493,7 +493,7 @@ func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
 
 func (self Compose) FilterContainer(taskName string) []*compose.ContainerResult {
 	result := make([]*compose.ContainerResult, 0)
-	if containerList, err := docker.Sdk.ContainerByField("label", "com.docker.compose.project="+taskName); err == nil {
+	if containerList, err := docker.Sdk.ContainerByField(docker.Sdk.Ctx, "label", "com.docker.compose.project="+taskName); err == nil {
 		result = function.PluckMapWalkArray(containerList, func(key string, item *container.Summary) (*compose.ContainerResult, bool) {
 			return &compose.ContainerResult{
 				Name:    item.Names[0],

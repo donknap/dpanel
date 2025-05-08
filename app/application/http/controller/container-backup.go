@@ -396,7 +396,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			gzReader, _ := gzip.NewReader(reader)
 			tarReader := tar.NewReader(gzReader)
 			if options, err := docker.NewFileImport(destPath, docker.WithImportTar(tarReader)); err == nil {
-				err = docker.Sdk.ContainerImport(newContainerName, options)
+				err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, newContainerName, options)
 				if err != nil {
 					slog.Warn("container backup restore", "error", err)
 				}

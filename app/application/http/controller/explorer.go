@@ -122,7 +122,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.ContainerImport(params.Name, importFile)
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -164,7 +164,7 @@ func (self Explorer) Import(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.ContainerImport(params.Name, importFile)
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -190,7 +190,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			_ = targetFile.Close()
 			_ = os.Remove(targetFile.Name())
 		}()
-		_, err := docker.Sdk.ContainerReadFile(params.Name, path, targetFile)
+		_, err := docker.Sdk.ContainerReadFile(docker.Sdk.Ctx, params.Name, path, targetFile)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -216,7 +216,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.ContainerImport(params.Name, importFile)
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -244,7 +244,7 @@ func (self Explorer) Delete(http *gin.Context) {
 			return
 		}
 	}
-	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Name))
+	builder, err := explorer.NewExplorer(explorer.WithProxyContainerRunner(), explorer.WithRootPathFromContainer(params.Name))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -272,7 +272,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Name))
+	builder, err := explorer.NewExplorer(explorer.WithProxyContainerRunner(), explorer.WithRootPathFromContainer(params.Name))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -349,7 +349,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 		_ = os.Remove(tempFile.Name())
 	}()
 
-	_, err = docker.Sdk.ContainerReadFile(params.Name, params.File, tempFile)
+	_, err = docker.Sdk.ContainerReadFile(docker.Sdk.Ctx, params.Name, params.File, tempFile)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -389,7 +389,7 @@ func (self Explorer) Chmod(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	builder, err := explorer.NewExplorer(explorer.WithProxyPlugin(), explorer.WithRootPathFromContainer(params.Name))
+	builder, err := explorer.NewExplorer(explorer.WithProxyContainerRunner(), explorer.WithRootPathFromContainer(params.Name))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -465,7 +465,7 @@ func (self Explorer) GetUserList(http *gin.Context) {
 	}()
 
 	var result []byte
-	if _, err = docker.Sdk.ContainerReadFile(params.Name, "/etc/passwd", tempFile); err == nil {
+	if _, err = docker.Sdk.ContainerReadFile(docker.Sdk.Ctx, params.Name, "/etc/passwd", tempFile); err == nil {
 		_, err = tempFile.Seek(0, io.SeekStart)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)

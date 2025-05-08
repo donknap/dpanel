@@ -35,7 +35,7 @@ func (self Container) Upgrade(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	containerInfo, err := docker.Sdk.ContainerCopyInspect(params.Md5)
+	containerInfo, err := docker.Sdk.ContainerCopyInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

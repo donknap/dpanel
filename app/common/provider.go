@@ -145,7 +145,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		}
 		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
 		// 获取面板信息
-		if info, err := docker.Sdk.ContainerInfo(facade.GetConfig().GetString("app.name")); err == nil {
+		if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
 			_ = logic.Setting{}.Save(&entity.Setting{
 				GroupName: logic.SettingGroupSetting,
 				Name:      logic.SettingGroupSettingDPanelInfo,

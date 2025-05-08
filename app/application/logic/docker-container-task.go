@@ -22,11 +22,11 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		!function.IsEmptyArray(task.BuildParams.Links) ||
 		task.BuildParams.IpV4 != nil || task.BuildParams.IpV6 != nil {
 		// 删除掉的网络
-		err = docker.Sdk.NetworkRemove(task.SiteName)
+		err = docker.Sdk.NetworkRemove(docker.Sdk.Ctx, task.SiteName)
 		if err != nil {
 			return "", err
 		}
-		containerOwnerNetwork, err = docker.Sdk.NetworkCreate(task.SiteName, task.BuildParams.IpV4, task.BuildParams.IpV6)
+		containerOwnerNetwork, err = docker.Sdk.NetworkCreate(docker.Sdk.Ctx, task.SiteName, task.BuildParams.IpV4, task.BuildParams.IpV6)
 		if err != nil {
 			return "", err
 		}
@@ -124,7 +124,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		if task.BuildParams.IpV4 != nil {
 			o.IpV4 = task.BuildParams.IpV4.Address
 		}
-		err = docker.Sdk.NetworkConnect(o, task.SiteName)
+		err = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, o, task.SiteName)
 		if err != nil {
 			return "", err
 		}
@@ -138,7 +138,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 			if value.Alise == "" {
 				value.Alise = value.Name
 			}
-			err = docker.Sdk.NetworkConnect(docker.NetworkItem{
+			err = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, docker.NetworkItem{
 				Name: containerOwnerNetwork,
 				Alise: []string{
 					value.Alise,
@@ -163,7 +163,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 			}, value.Name) {
 				continue
 			}
-			err = docker.Sdk.NetworkConnect(value, task.SiteName)
+			err = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, value, task.SiteName)
 			if err != nil {
 				return "", err
 			}
@@ -171,7 +171,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	}
 
 	if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
-		_, err := docker.Sdk.ExecResult(response.ID, task.BuildParams.Hook.ContainerCreate)
+		_, err := docker.Sdk.ExecResult(docker.Sdk.Ctx, response.ID, task.BuildParams.Hook.ContainerCreate)
 		if err != nil {
 			slog.Debug("container create run hook", "hook", "container create", "error", err.Error())
 		}

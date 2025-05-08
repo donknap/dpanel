@@ -3,6 +3,7 @@ package docker
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/function"
@@ -15,12 +16,12 @@ import (
 	"strings"
 )
 
-func (self Builder) ImageInspectFileList(imageID string) (pathInfo []*FileItemResult, path []string, err error) {
-	imageInfo, err := self.Client.ImageInspect(self.Ctx, imageID)
+func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*FileItemResult, path []string, err error) {
+	imageInfo, err := self.Client.ImageInspect(ctx, imageID)
 	if err != nil {
 		return nil, nil, err
 	}
-	dockerVersion, _ := self.Client.ServerVersion(self.Ctx)
+	dockerVersion, _ := self.Client.ServerVersion(ctx)
 	// 如果当前 docker 版本大于 25 则获取 rootfs 否则直接查找 tar 的文件
 	layers := function.PluckArrayWalk(imageInfo.RootFS.Layers, func(i string) (string, bool) {
 		if _, after, ok := strings.Cut(i, "sha256:"); ok {
@@ -28,7 +29,7 @@ func (self Builder) ImageInspectFileList(imageID string) (pathInfo []*FileItemRe
 		}
 		return "", false
 	})
-	out, err := self.Client.ImageSave(self.Ctx, []string{
+	out, err := self.Client.ImageSave(ctx, []string{
 		imageID,
 	})
 

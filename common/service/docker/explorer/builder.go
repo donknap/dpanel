@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/common/function"
@@ -21,6 +22,8 @@ const (
 
 func NewExplorer(opts ...Option) (*explorer, error) {
 	o := &explorer{}
+	o.ctx, o.ctxCancel = context.WithCancel(context.Background())
+
 	for _, opt := range opts {
 		err := opt(o)
 		if err != nil {
@@ -34,8 +37,10 @@ func NewExplorer(opts ...Option) (*explorer, error) {
 }
 
 type explorer struct {
-	runContainer string
-	rootPath     string
+	runner    func(cmd string) (string, error)
+	rootPath  string
+	ctx       context.Context
+	ctxCancel context.CancelFunc
 }
 
 func (self explorer) GetListByPath(path string) (fileList []*docker.FileItemResult, err error) {
@@ -43,8 +48,8 @@ func (self explorer) GetListByPath(path string) (fileList []*docker.FileItemResu
 	if err != nil {
 		return fileList, err
 	}
-	if path == self.rootPath {
-		// 根目录是一个软链接，要明确指定目录才会读取内容
+	if path != "/" && path == self.rootPath {
+		// 根目录是一个软链接，要明确在最后增加 / 明确是一个目录才会正确
 		path += "/"
 	}
 	cmd := fmt.Sprintf("ls -AlhX --full-time %s", path)
@@ -198,13 +203,20 @@ func (self explorer) Chown(containerName string, fileList []string, owner string
 }
 
 func (self explorer) Result(cmd string) (string, error) {
-	return docker.Sdk.ExecResult(self.runContainer, cmd)
+	return self.runner(cmd)
+}
+
+func (self explorer) Close() {
+	self.ctxCancel()
 }
 
 func (self explorer) getSafePath(path string) (string, error) {
 	// 目录必须是以 / 开头
 	if !strings.HasPrefix(path, "/") {
 		return "", errors.New("please use absolute address")
+	}
+	if path == "/" {
+		return filepath.Join(self.rootPath), nil
 	}
 	return filepath.Join(self.rootPath, path), nil
 }

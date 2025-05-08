@@ -106,7 +106,7 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 			defer func() {
 				dockerClient.Close()
 			}()
-			response, err := dockerClient.ContainerExec(containerName, container.ExecOptions{
+			response, err := dockerClient.ContainerExec(dockerClient.Ctx, containerName, container.ExecOptions{
 				Privileged:   true,
 				Tty:          true,
 				AttachStdin:  false,

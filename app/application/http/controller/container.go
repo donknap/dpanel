@@ -318,7 +318,7 @@ func (self Container) Delete(http *gin.Context) {
 		return
 	}
 	var err error
-	containerInfo, err := docker.Sdk.ContainerInfo(params.Md5)
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

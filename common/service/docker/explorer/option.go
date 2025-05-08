@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -8,6 +9,13 @@ import (
 )
 
 type Option func(self *explorer) error
+
+func WithRootPath(path string) Option {
+	return func(self *explorer) error {
+		self.rootPath = path
+		return nil
+	}
+}
 
 func WithRootPathFromContainer(md5 string) Option {
 	return func(self *explorer) error {
@@ -18,19 +26,11 @@ func WithRootPathFromContainer(md5 string) Option {
 		if containerInfo.State.Pid == 0 {
 			return errors.New("please start the container" + md5)
 		}
-		self.rootPath = fmt.Sprintf("/proc/%d/root", containerInfo.State.Pid)
-		return nil
+		return WithRootPath(fmt.Sprintf("/proc/%d/root", containerInfo.State.Pid))(self)
 	}
 }
 
-func WithRootPath(path string) Option {
-	return func(self *explorer) error {
-		self.rootPath = path
-		return nil
-	}
-}
-
-func WithProxyPlugin() Option {
+func WithProxyContainerRunner() Option {
 	return func(self *explorer) error {
 		explorerPlugin, err := plugin.NewPlugin(plugin.PluginExplorer, nil)
 		if err != nil {
@@ -40,14 +40,19 @@ func WithProxyPlugin() Option {
 		if err != nil {
 			return err
 		}
-		self.runContainer = pluginName
-		return nil
+		return WithRunContainer(pluginName)(self)
 	}
 }
 
 func WithRunContainer(name string) Option {
 	return func(self *explorer) error {
-		self.runContainer = name
+		self.runner = func(cmd string) (string, error) {
+			ctx, cancel := context.WithCancel(docker.Sdk.Ctx)
+			defer func() {
+				cancel()
+			}()
+			return docker.Sdk.ExecResult(ctx, name, cmd)
+		}
 		return nil
 	}
 }
