@@ -98,6 +98,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 
 		// 文件相关
 		cors.POST("/common/explorer/get-path-list", controller.Explorer{}.GetPathList)
+		cors.POST("/common/explorer/get-user-list", controller.Explorer{}.GetUserList)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

@@ -100,7 +100,7 @@ func (self Builder) ContainerInspectCompat(info container.InspectResponse) (cont
 }
 
 // ExecResult 在容器中执行一条命令，返回结果
-func (self Builder) ExecResult(ctx context.Context, containerName string, cmd string) (string, error) {
+func (self Builder) ContainerExecResult(ctx context.Context, containerName string, cmd string) (string, error) {
 	execConfig := container.ExecOptions{
 		Privileged:   true,
 		Tty:          false,
@@ -150,7 +150,7 @@ func (self Builder) ContainerExec(ctx context.Context, containerName string, opt
 }
 
 // ContainerReadFile 读取容器内的一个文件内容，传入 targetFile 则写入文件 否则返回一个 reader
-func (self Builder) ContainerReadFile(ctx context.Context, containerName string, inContainerPath string, targetFile *os.File) (io.Reader, error) {
+func (self Builder) ContainerReadFile(ctx context.Context, containerName string, inContainerPath string, targetFile *os.File) (io.ReadCloser, error) {
 	pathStat, err := self.Client.ContainerStatPath(ctx, containerName, inContainerPath)
 	if err != nil {
 		return nil, err
@@ -162,27 +162,24 @@ func (self Builder) ContainerReadFile(ctx context.Context, containerName string,
 	if err != nil {
 		return nil, err
 	}
+	// 返回的数据是外部是一个 tar 真正的文件 reader 需要先读一次
 	tarReader := tar.NewReader(out)
-	defer func() {
-		_ = out.Close()
-	}()
-
 	_, err = tarReader.Next()
 	if err != nil {
 		return nil, err
 	}
-	if targetFile != nil {
-		_, err = io.Copy(targetFile, tarReader)
-		if err != nil {
-			return nil, err
-		}
-		return targetFile, nil
-	} else {
-		buffer := new(bytes.Buffer)
-		_, err = io.Copy(buffer, tarReader)
-		if err != nil {
-			return nil, err
-		}
-		return buffer, nil
+
+	if targetFile == nil {
+		return out, nil
 	}
+
+	defer func() {
+		_ = out.Close()
+	}()
+
+	_, err = io.Copy(targetFile, tarReader)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
 }

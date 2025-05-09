@@ -89,7 +89,11 @@ func (self Local) CreateTempDir(name string) (string, error) {
 	if name == "" {
 		return os.MkdirTemp(self.GetSaveRootPath(), "dpanel-temp-")
 	}
-	path := filepath.Dir(filepath.Join(self.GetSaveRootPath(), name))
+	name = fmt.Sprintf("dpanel-temp-%s", name)
+	path := filepath.Join(self.GetSaveRootPath(), name)
+	if _, err := os.Stat(path); err == nil {
+		_ = os.RemoveAll(path)
+	}
 	err := os.MkdirAll(path, os.ModePerm)
 	return path, err
 }

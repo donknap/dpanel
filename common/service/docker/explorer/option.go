@@ -51,7 +51,7 @@ func WithRunContainer(name string) Option {
 			defer func() {
 				cancel()
 			}()
-			return docker.Sdk.ExecResult(ctx, name, cmd)
+			return docker.Sdk.ContainerExecResult(ctx, name, cmd)
 		}
 		return nil
 	}

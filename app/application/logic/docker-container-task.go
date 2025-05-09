@@ -171,11 +171,10 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	}
 
 	if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
-		_, err := docker.Sdk.ExecResult(docker.Sdk.Ctx, response.ID, task.BuildParams.Hook.ContainerCreate)
+		_, err := docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, response.ID, task.BuildParams.Hook.ContainerCreate)
 		if err != nil {
 			slog.Debug("container create run hook", "hook", "container create", "error", err.Error())
 		}
 	}
-
 	return response.ID, err
 }
