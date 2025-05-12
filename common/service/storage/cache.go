@@ -6,7 +6,8 @@ import (
 )
 
 var (
-	CacheKeyImageRemoteList = "image:remoteTag:%s"
+	CacheKeyImageRemoteList  = "image:remoteTag:%s"
+	CacheKeyExplorerUsername = "explorer:%s:uid:%d"
 )
 
 var (

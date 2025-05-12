@@ -276,6 +276,8 @@ func (self Fs) readDirFromContainer(path string) ([]os.FileInfo, error) {
 						fileData.Name = name
 					}
 				}
+				fileData.IsDir = fileData.Mod.IsDir()
+				fileData.IsSymlink = fileData.CheckIsSymlink()
 				fileList = append(fileList, explorer.NewFileInfo(fileData))
 			}
 		}

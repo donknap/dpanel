@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"io"
 	"strings"
@@ -33,6 +34,15 @@ func NewClient(opt ...Option) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if c.SftpConn != nil {
+		c.SftpConn, err = c.NewSftpSession()
+		if err != nil {
+			c.Close()
+			return nil, err
+		}
+	}
+
 	return c, nil
 }
 
@@ -114,6 +124,20 @@ func (self *Client) NewPtySession(height, width int) (read io.Reader, write io.W
 		return nil, nil, err
 	}
 	return read, write, nil
+}
+
+func (self *Client) NewSftpSession() (*sftp.Client, error) {
+	sftpClient, err := sftp.NewClient(self.Conn)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		select {
+		case <-self.ctx.Done():
+			_ = sftpClient.Close()
+		}
+	}()
+	return sftpClient, nil
 }
 
 func (self *Client) Close() {

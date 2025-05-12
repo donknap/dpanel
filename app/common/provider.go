@@ -99,6 +99,15 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		// 文件相关
 		cors.POST("/common/explorer/get-path-list", controller.Explorer{}.GetPathList)
 		cors.POST("/common/explorer/get-user-list", controller.Explorer{}.GetUserList)
+		cors.POST("/common/explorer/get-content", controller.Explorer{}.GetContent)
+		cors.POST("/common/explorer/get-file-stat", controller.Explorer{}.GetFileStat)
+		cors.POST("/common/explorer/import", controller.Explorer{}.Import)
+		cors.POST("/common/explorer/export", controller.Explorer{}.Export)
+		cors.POST("/common/explorer/import-file-content", controller.Explorer{}.ImportFileContent)
+		//cors.POST("/common/explorer/unzip", controller.Explorer{}.Unzip)
+		cors.POST("/common/explorer/delete", controller.Explorer{}.Delete)
+		cors.POST("/common/explorer/chmod", controller.Explorer{}.Chmod)
+		cors.POST("/common/explorer/mkdir", controller.Explorer{}.MkDir)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

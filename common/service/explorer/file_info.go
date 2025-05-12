@@ -24,21 +24,24 @@ func NewFileInfo(data *FileData) os.FileInfo {
 }
 
 type FileData struct {
-	Name     string      `json:"name"`
-	Mod      os.FileMode `json:"mod"`
-	ModTime  time.Time   `json:"modTime"`
-	Change   ChangeType  `json:"change"`
-	Size     int64       `json:"size"`
-	Owner    string      `json:"owner"`
-	Group    string      `json:"group"`
-	LinkName string      `json:"linkName"`
+	Path      string      `json:"path"` // 完整的目录地址
+	Name      string      `json:"name"` // 目录名
+	Mod       os.FileMode `json:"mod"`
+	ModTime   time.Time   `json:"modTime"`
+	Change    ChangeType  `json:"change"`
+	Size      int64       `json:"size"`
+	Owner     string      `json:"owner"`
+	Group     string      `json:"group"`
+	LinkName  string      `json:"linkName"`
+	IsDir     bool        `json:"isDir"`
+	IsSymlink bool        `json:"isSymlink"`
 }
 
-func (self *FileData) IsSymlink() bool {
+func (self *FileData) CheckIsSymlink() bool {
 	return self.Mod&os.ModeSymlink != 0
 }
 
-func (self *FileData) IsBlockDevice() bool {
+func (self *FileData) CheckIsBlockDevice() bool {
 	return self.Mod&os.ModeDevice != 0 && self.Mod&os.ModeCharDevice == 0
 }
 

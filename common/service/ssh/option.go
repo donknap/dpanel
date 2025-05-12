@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"fmt"
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"strings"
 )
@@ -57,4 +58,11 @@ func WithServerInfo(info *ServerInfo) []Option {
 		option = append(option, WithAuthBasic(info.Username, info.Password))
 	}
 	return option
+}
+
+func WithSftpClient() Option {
+	return func(self *Client) error {
+		self.SftpConn = &sftp.Client{}
+		return nil
+	}
 }

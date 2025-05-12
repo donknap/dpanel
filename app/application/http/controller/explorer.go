@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"encoding/json"
-	"errors"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -113,7 +112,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		return
 	}
 	if !strings.HasPrefix(params.File, "/") || !strings.HasPrefix(params.DestPath, "/") {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerUseAbsolutePath"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerInvalidFilename"), 500)
 		return
 	}
 
@@ -240,7 +239,7 @@ func (self Explorer) Delete(http *gin.Context) {
 			path == "./" ||
 			path == "." ||
 			strings.Contains(path, "*") {
-			self.JsonResponseWithError(http, errors.New("只可以删除指定的文件或是目录"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerEditDeleteUnsafe"), 500)
 			return
 		}
 	}
@@ -338,7 +337,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 	}
 	pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Name, params.File)
 	if pathStat.Size >= 1024*1024 {
-		self.JsonResponseWithError(http, errors.New("超过1M的文件请通过导入&导出修改文件"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerEditFileMaxSize"), 500)
 		return
 	}
 	tempFile, err := storage.Local{}.CreateTempFile("")
