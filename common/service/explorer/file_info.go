@@ -1,7 +1,6 @@
 package explorer
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"time"
@@ -27,10 +26,11 @@ type FileData struct {
 	Path      string      `json:"path"` // 完整的目录地址
 	Name      string      `json:"name"` // 目录名
 	Mod       os.FileMode `json:"mod"`
+	ModStr    string      `json:"modStr"` // 权限字符形式
 	ModTime   time.Time   `json:"modTime"`
 	Change    ChangeType  `json:"change"`
 	Size      int64       `json:"size"`
-	Owner     string      `json:"owner"`
+	User      string      `json:"user"`
 	Group     string      `json:"group"`
 	LinkName  string      `json:"linkName"`
 	IsDir     bool        `json:"isDir"`
@@ -72,23 +72,4 @@ func (self *FileInfo) IsDir() bool {
 
 func (self *FileInfo) Sys() any {
 	return self.stat
-}
-
-func (self *FileInfo) LinkName() string {
-	return self.stat.LinkName
-}
-
-func (self *FileInfo) Owner() string {
-	return self.stat.Owner
-}
-
-func (self *FileInfo) Group() string {
-	return self.stat.Group
-}
-
-func (self *FileInfo) ShowName() string {
-	if self.stat.LinkName == "" {
-		return self.stat.Name
-	}
-	return fmt.Sprintf("%s -> %s", self.stat.Name, self.stat.LinkName)
 }

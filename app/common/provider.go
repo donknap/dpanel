@@ -104,7 +104,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/explorer/import", controller.Explorer{}.Import)
 		cors.POST("/common/explorer/export", controller.Explorer{}.Export)
 		cors.POST("/common/explorer/import-file-content", controller.Explorer{}.ImportFileContent)
-		//cors.POST("/common/explorer/unzip", controller.Explorer{}.Unzip)
+		cors.POST("/common/explorer/unzip", controller.Explorer{}.Unzip)
 		cors.POST("/common/explorer/delete", controller.Explorer{}.Delete)
 		cors.POST("/common/explorer/chmod", controller.Explorer{}.Chmod)
 		cors.POST("/common/explorer/mkdir", controller.Explorer{}.MkDir)

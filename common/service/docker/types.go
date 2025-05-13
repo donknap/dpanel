@@ -149,9 +149,9 @@ type ImagePlatform struct {
 }
 
 type ImportFile struct {
-	Reader            io.Reader
-	containerRootPath string
-	tar               *tar.Writer
+	targetRootPath string
+	tarWrite       *tar.Writer
+	reader         io.ReadSeeker
 }
 
 func (self ImportFile) Test(path string) {
@@ -160,8 +160,18 @@ func (self ImportFile) Test(path string) {
 		defer func() {
 			_ = file.Close()
 		}()
-		_, _ = io.Copy(file, self.Reader)
+		_, _ = io.Copy(file, self.reader)
 	}
+}
+
+func (self ImportFile) Reader() io.Reader {
+	_, _ = self.reader.Seek(0, io.SeekStart)
+	return self.reader
+}
+
+func (self ImportFile) TarReader() *tar.Reader {
+	_, _ = self.reader.Seek(0, io.SeekStart)
+	return tar.NewReader(self.reader)
 }
 
 type ImportFileOption func(self *ImportFile) (err error)

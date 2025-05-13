@@ -65,7 +65,7 @@ func (self Builder) ContainerImport(ctx context.Context, containerName string, f
 	if err := self.Client.CopyToContainer(ctx,
 		containerName,
 		"/",
-		file.Reader,
+		file.Reader(),
 		container.CopyToContainerOptions{},
 	); err != nil {
 		return err

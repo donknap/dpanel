@@ -7,11 +7,13 @@ import (
 	"github.com/docker/docker/api/types/container"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/explorer"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
+	"github.com/h2non/filetype/matchers"
 	"github.com/pkg/sftp"
 	"github.com/spf13/afero"
 	"github.com/spf13/afero/sftpfs"
@@ -142,10 +144,11 @@ func (self Explorer) GetPathList(http *gin.Context) {
 			Path:     filepath.Join(params.Path, item.Name()),
 			Name:     item.Name(),
 			Mod:      item.Mode(),
+			ModStr:   item.Mode().String(),
 			ModTime:  item.ModTime(),
 			Change:   explorer.ChangeDefault,
 			Size:     item.Size(),
-			Owner:    "",
+			User:     "",
 			Group:    "",
 			LinkName: "",
 			IsDir:    item.Mode().IsDir(),
@@ -153,14 +156,14 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		if v, ok := item.Sys().(*sftp.FileStat); ok {
 			cacheKey := fmt.Sprintf(storage.CacheKeyExplorerUsername, params.Name, v.UID)
 			if username, ok := storage.Cache.Get(cacheKey); ok {
-				fileData.Owner = username.(string)
+				fileData.User = username.(string)
 			}
-			if fileData.Owner == "" {
+			if fileData.User == "" {
 				if username, err := sshClient.Run(fmt.Sprintf("id -un %d", v.UID)); err == nil {
-					fileData.Owner = strings.TrimSpace(username)
+					fileData.User = strings.TrimSpace(username)
 					_ = storage.Cache.Add(cacheKey, username, time.Hour)
 				} else {
-					fileData.Owner = strconv.Itoa(int(v.UID))
+					fileData.User = strconv.Itoa(int(v.UID))
 				}
 			}
 			fileData.Group = strconv.Itoa(int(v.GID))
@@ -417,9 +420,31 @@ func (self Explorer) Delete(http *gin.Context) {
 	defer func() {
 		sshClient.Close()
 	}()
+	var deleteAll func(path string) error
+	deleteAll = func(path string) error {
+		file, err := afs.Open(path)
+		if err != nil {
+			return err
+		}
+		fileInfo, _ := file.Stat()
+		if fileInfo.IsDir() {
+			files, err := afs.ReadDir(path)
+			if err != nil {
+				return err
+			}
+			for _, item := range files {
+				err = deleteAll(filepath.Join(path, item.Name()))
+				if err != nil {
+					return err
+				}
+			}
+		}
+		_ = afs.Remove(path)
+		return nil
+	}
 
-	for _, item := range params.FileList {
-		err := afs.Remove(item)
+	for _, path := range params.FileList {
+		err = deleteAll(path)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -502,9 +527,46 @@ func (self Explorer) Chmod(http *gin.Context) {
 	type ParamsValidate struct {
 		Name        string   `json:"name" binding:"required"`
 		FileList    []string `json:"fileList" binding:"required"`
-		Mod         int      `json:"mod" binding:"required"`
+		Mod         string   `json:"mod" binding:"required"`
+		User        string   `json:"user"`
+		Group       string   `json:"group"`
 		HasChildren bool     `json:"hasChildren"`
-		Owner       string   `json:"owner"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	sshClient, afs, err := self.getClient(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		sshClient.Close()
+	}()
+	mode, err := strconv.ParseUint(params.Mod, 8, 32)
+	for _, path := range params.FileList {
+
+		err = afs.Chmod(path, os.FileMode(mode))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
+		if params.User != "" && params.Group != "" {
+			//afs.Chown(path, params.User, params.Group)
+		}
+	}
+
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Explorer) Unzip(http *gin.Context) {
+	type ParamsValidate struct {
+		Name string   `json:"name" binding:"required"`
+		File []string `json:"file" binding:"required"`
+		Path string   `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -519,18 +581,57 @@ func (self Explorer) Chmod(http *gin.Context) {
 		sshClient.Close()
 	}()
 
-	for _, path := range params.FileList {
-		err = afs.Chmod(path, os.FileMode(params.Mod))
+	tempFile, err := storage.Local{}.CreateTempFile("")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		_ = tempFile.Close()
+		_ = os.Remove(tempFile.Name())
+	}()
+
+	options := make([]docker.ImportFileOption, 0)
+	options = append(options, docker.WithImportTargetTarFile(tempFile))
+	for _, path := range params.File {
+		file, err := afs.OpenFile(path, os.O_RDONLY, 0o644)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-
-		if params.Owner != "" {
-			//afs.Chown(path, params.Owner, params.Owner)
+		fileType, _ := filetype.MatchFile(file.Name())
+		switch fileType {
+		case matchers.TypeZip:
+			options = append(options, docker.WithImportZipFile(file.Name()))
+			break
+		case matchers.TypeTar:
+			options = append(options, docker.WithImportTarFile(file.Name()))
+			break
+		case matchers.TypeGz:
+			options = append(options, docker.WithImportTarGzFile(file.Name()))
+			break
+		default:
+			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerUnzipTargetUnsupportedType"), 500)
+			return
 		}
 	}
-
+	importFile, err := docker.NewFileImport(params.Path, options...)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	tarReader := importFile.TarReader()
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			break
+		}
+		err = afs.WriteReader(header.Name, tarReader)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
 	self.JsonSuccessResponse(http)
 	return
 }

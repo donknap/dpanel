@@ -5,18 +5,19 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/explorer"
 	"github.com/mcuadros/go-version"
 	"io"
 	"log/slog"
+	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 )
 
-func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*FileItemResult, path []string, err error) {
+func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*explorer.FileData, path []string, err error) {
 	imageInfo, err := self.Client.ImageInspect(ctx, imageID)
 	if err != nil {
 		return nil, nil, err
@@ -39,7 +40,7 @@ func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (p
 		if err != nil {
 			break
 		}
-		var tarFileList []*FileItemResult
+		var tarFileList []*explorer.FileData
 		if version.Compare(dockerVersion.Version, "25", ">=") && function.InArray(layers, header.Name) {
 			tarFileList, err = getFileListFromTar(tar.NewReader(tarReader))
 			if err != nil {
@@ -77,7 +78,7 @@ func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (p
 	})
 
 	path = make([]string, 0)
-	pathInfo = function.PluckArrayWalk(pathInfo, func(i *FileItemResult) (*FileItemResult, bool) {
+	pathInfo = function.PluckArrayWalk(pathInfo, func(i *explorer.FileData) (*explorer.FileData, bool) {
 		if function.InArray(path, i.Name) {
 			return nil, false
 		} else {
@@ -88,7 +89,7 @@ func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (p
 	return pathInfo, path, nil
 }
 
-func getFileListFromTar(tarReader *tar.Reader) (files []*FileItemResult, err error) {
+func getFileListFromTar(tarReader *tar.Reader) (files []*explorer.FileData, err error) {
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -109,17 +110,19 @@ func getFileListFromTar(tarReader *tar.Reader) (files []*FileItemResult, err err
 		case tar.TypeXHeader:
 			return nil, fmt.Errorf("unexptected tar file (XHeader): type=%v name=%s", header.Typeflag, name)
 		default:
-			files = append(files, &FileItemResult{
-				ShowName: filepath.Base(header.Name),
-				Name:     filepath.Join("/", header.Name),
-				LinkName: header.Linkname,
-				Size:     units.BytesSize(float64(header.Size)),
-				Mode:     fmt.Sprintf("%d", header.Mode),
-				IsDir:    header.Typeflag == tar.TypeDir,
-				ModTime:  header.ModTime.String(),
-				Change:   0,
-				Group:    fmt.Sprintf("%d", header.Gid),
-				Owner:    fmt.Sprintf("%d", header.Uid),
+			files = append(files, &explorer.FileData{
+				Path:      filepath.Join("/", header.Name),
+				Name:      filepath.Join("/", header.Name),
+				Mod:       os.FileMode(header.Mode),
+				ModStr:    os.FileMode(header.Mode).String(),
+				ModTime:   header.ModTime,
+				Change:    explorer.ChangeDefault,
+				Size:      header.Size,
+				User:      fmt.Sprintf("%d", header.Uid),
+				Group:     fmt.Sprintf("%d", header.Gid),
+				LinkName:  header.Linkname,
+				IsDir:     header.Typeflag == tar.TypeDir,
+				IsSymlink: false,
 			})
 		}
 	}
