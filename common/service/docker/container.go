@@ -61,13 +61,17 @@ func (self Builder) ContainerByField(ctx context.Context, field string, name ...
 	return result, nil
 }
 
-func (self Builder) ContainerImport(ctx context.Context, containerName string, file *ImportFile) error {
-	if err := self.Client.CopyToContainer(ctx,
+func (self Builder) ContainerImport(ctx context.Context, containerName string, importFile *ImportFile) error {
+	err := self.Client.CopyToContainer(ctx,
 		containerName,
 		"/",
-		file.Reader(),
+		importFile.Reader(),
 		container.CopyToContainerOptions{},
-	); err != nil {
+	)
+	defer func() {
+		importFile.Close()
+	}()
+	if err != nil {
 		return err
 	}
 	return nil

@@ -4,11 +4,13 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"encoding/json"
+	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/docker/explorer"
+	"github.com/donknap/dpanel/common/service/fs"
 	"github.com/donknap/dpanel/common/service/storage"
+	fs2 "github.com/donknap/dpanel/common/types/fs"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
@@ -17,6 +19,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -27,16 +31,16 @@ type Explorer struct {
 
 func (self Explorer) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Name     string   `json:"name" binding:"required"`
-		FileList []string `json:"fileList" binding:"required"`
+		Name             string   `json:"name" binding:"required"`
+		FileList         []string `json:"fileList" binding:"required"`
+		EnableExportHost bool     `json:"enableExportHost"`
+		HostPath         string   `json:"hostPath" binding:"required_if=EnableExportHost true"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
 	var err error
-
 	tempFile, err := storage.Local{}.CreateTempFile("")
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -94,10 +98,29 @@ func (self Explorer) Export(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	http.Header("Content-Type", "application/zip")
-	http.Header("Content-Disposition", "attachment; filename=export.zip")
-	http.File(tempFile.Name())
-	return
+	if params.EnableExportHost {
+		_, afs, err := fs.NewSshExplorer(docker.Sdk.Name)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		hostFilePath := filepath.Join(params.HostPath, fmt.Sprintf("export-%s.zip", time.Now().Format(function.YmdHis)))
+		file, err := afs.Create(hostFilePath)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_, _ = tempFile.Seek(0, io.SeekStart)
+		_, _ = io.Copy(file, tempFile)
+		self.JsonSuccessResponse(http)
+		return
+	} else {
+		http.Header("Content-Type", "application/zip")
+		http.Header("Content-Disposition", "attachment; filename=export.zip")
+		http.File(tempFile.Name())
+		return
+	}
+
 }
 
 func (self Explorer) ImportFileContent(http *gin.Context) {
@@ -111,7 +134,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	if !strings.HasPrefix(params.File, "/") || !strings.HasPrefix(params.DestPath, "/") {
+	if strings.HasPrefix(params.File, "/") {
 		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerInvalidFilename"), 500)
 		return
 	}
@@ -153,7 +176,7 @@ func (self Explorer) Import(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	options := make([]docker.ImportFileOption, 0)
+	var options []docker.ImportFileOption
 	for _, item := range params.FileList {
 		realPath := storage.Local{}.GetRealPath(item.Path)
 		options = append(options, docker.WithImportFilePath(realPath, item.Name))
@@ -182,7 +205,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	options := make([]docker.ImportFileOption, 0)
+	var options []docker.ImportFileOption
 	for _, path := range params.File {
 		targetFile, _ := storage.Local{}.CreateTempFile("")
 		defer func() {
@@ -243,16 +266,20 @@ func (self Explorer) Delete(http *gin.Context) {
 			return
 		}
 	}
-	builder, err := explorer.NewExplorer(explorer.WithProxyContainerRunner(), explorer.WithRootPathFromContainer(params.Name))
+	afs, err := fs.NewContainerExplorer(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = builder.DeleteFileList(params.FileList)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+
+	for _, path := range params.FileList {
+		err = afs.RemoveAll(path)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
+
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -260,7 +287,7 @@ func (self Explorer) Delete(http *gin.Context) {
 func (self Explorer) GetPathList(http *gin.Context) {
 	type ParamsValidate struct {
 		Name string `json:"name" binding:"required"`
-		Path string `json:"path" binding:"required"`
+		Path string `json:"path"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -271,22 +298,30 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	builder, err := explorer.NewExplorer(explorer.WithProxyContainerRunner(), explorer.WithRootPathFromContainer(params.Name))
+	if params.Path == "" && containerInfo.Config != nil {
+		params.Path = containerInfo.Config.WorkingDir
+	}
+	afs, err := fs.NewContainerExplorer(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	result, err := builder.GetListByPath(params.Path)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	list, err := afs.ReadDir(params.Path)
+	result := make([]*fs2.FileData, 0)
+	for _, info := range list {
+		result = append(result, info.Sys().(*fs2.FileData))
 	}
-	if function.IsEmptyArray(result) {
-		self.JsonResponseWithoutError(http, gin.H{
-			"list": result,
-		})
-		return
-	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].IsDir && !result[j].IsDir
+	})
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].IsDir != result[j].IsDir {
+			return result[i].IsDir
+		}
+		return result[i].Name < result[j].Name
+	})
+
 	var tempChangeFileList = make(map[string]container.FilesystemChange)
 	changeFileList, err := docker.Sdk.Client.ContainerDiff(docker.Sdk.Ctx, params.Name)
 	if !function.IsEmptyArray(changeFileList) {
@@ -300,13 +335,13 @@ func (self Explorer) GetPathList(http *gin.Context) {
 			if change, ok := tempChangeFileList[item.Name]; ok {
 				switch int(change.Kind) {
 				case 0:
-					item.Change = explorer.FileItemChangeModified
+					item.Change = fs2.ChangeModified
 					break
 				case 1:
-					item.Change = explorer.FileItemChangeAdd
+					item.Change = fs2.ChangeAdd
 					break
 				case 2:
-					item.Change = explorer.FileItemChangeDeleted
+					item.Change = fs2.ChangeDeleted
 					break
 				}
 			}
@@ -314,14 +349,15 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		if !function.IsEmptyArray(containerInfo.Mounts) {
 			for _, mount := range containerInfo.Mounts {
 				if strings.HasPrefix(item.Name, mount.Destination) {
-					item.Change = explorer.FileItemChangeVolume
+					item.Change = fs2.ChangeVolume
 					break
 				}
 			}
 		}
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": result,
+		"currentPath": params.Path,
+		"list":        result,
 	})
 	return
 }
@@ -380,29 +416,30 @@ func (self Explorer) Chmod(http *gin.Context) {
 	type ParamsValidate struct {
 		Name        string   `json:"name" binding:"required"`
 		FileList    []string `json:"fileList" binding:"required"`
-		Mod         int      `json:"mod" binding:"required"`
+		Mod         string   `json:"mod" binding:"required"`
+		User        string   `json:"user"`
+		Group       string   `json:"group"`
 		HasChildren bool     `json:"hasChildren"`
-		Owner       string   `json:"owner"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	builder, err := explorer.NewExplorer(explorer.WithProxyContainerRunner(), explorer.WithRootPathFromContainer(params.Name))
+	afs, err := fs.NewContainerExplorer(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = builder.Chmod(params.FileList, params.Mod, params.HasChildren)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if params.Owner != "" {
-		err = builder.Chown(params.Name, params.FileList, params.Owner, params.HasChildren)
+	mode, err := strconv.ParseUint(params.Mod, 10, 32)
+	for _, path := range params.FileList {
+		err = afs.Chmod(path, os.FileMode(mode))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
+		}
+
+		if params.User != "" && params.Group != "" {
+			//afs.Chown(path, params.User, params.Group)
 		}
 	}
 
@@ -455,29 +492,69 @@ func (self Explorer) GetUserList(http *gin.Context) {
 		return
 	}
 
-	tempFile, err := storage.Local{}.CreateTempFile("")
+	afs, err := fs.NewContainerExplorer(params.Name)
 	if err != nil {
-		slog.Error("explorer", "get content", err)
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
-	defer func() {
-		_ = os.Remove(tempFile.Name())
-	}()
+	groups := make([]map[string]any, 0)
+	users := make([]map[string]any, 0)
 
-	var result []byte
-	if _, err = docker.Sdk.ContainerReadFile(docker.Sdk.Ctx, params.Name, "/etc/passwd", tempFile); err == nil {
-		_, err = tempFile.Seek(0, io.SeekStart)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		result, err = io.ReadAll(tempFile)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
+	if passwd, err := afs.ReadFile("/etc/passwd"); err == nil && string(passwd) != "" {
+		users = function.PluckArrayWalk(strings.Split(string(passwd), "\n"), func(line string) (map[string]any, bool) {
+			items := strings.Split(line, ":")
+			if len(items) < 7 {
+				return nil, false
+			}
+			return map[string]any{
+				"name":        items[0],
+				"gid":         items[3],
+				"uid":         items[2],
+				"description": items[4],
+			}, true
+		})
+	} else {
+		slog.Debug("explorer get user list", "err", err)
 	}
+
+	if group, err := afs.ReadFile("/etc/group"); err == nil && string(group) != "" {
+		groups = function.PluckArrayWalk(strings.Split(string(group), "\n"), func(line string) (map[string]any, bool) {
+			items := strings.Split(line, ":")
+			if len(items) < 3 {
+				return nil, false
+			}
+			return map[string]any{
+				"name": items[0],
+				"gid":  items[2],
+			}, true
+		})
+	}
+
 	self.JsonResponseWithoutError(http, gin.H{
-		"content": string(result),
+		"group": groups,
+		"user":  users,
 	})
 	return
+}
+
+func (self Explorer) MkDir(http *gin.Context) {
+	type ParamsValidate struct {
+		Name     string `json:"name" binding:"required"`
+		DestPath string `json:"destPath" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	afs, err := fs.NewContainerExplorer(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = afs.MkdirAll(params.DestPath, os.ModePerm)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
 }

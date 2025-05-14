@@ -70,7 +70,7 @@ func (self *Client) RunContext(ctx context.Context, name string, args ...string)
 			}
 		}
 	}()
-	return string(result), nil
+	return strings.TrimSuffix(string(result), "\n"), nil
 }
 
 func (self *Client) Run(name string, args ...string) (string, error) {

@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/explorer"
+	"github.com/donknap/dpanel/common/types/fs"
 	"github.com/mcuadros/go-version"
 	"io"
 	"log/slog"
@@ -17,7 +17,7 @@ import (
 	"strings"
 )
 
-func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*explorer.FileData, path []string, err error) {
+func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*fs.FileData, path []string, err error) {
 	imageInfo, err := self.Client.ImageInspect(ctx, imageID)
 	if err != nil {
 		return nil, nil, err
@@ -40,7 +40,7 @@ func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (p
 		if err != nil {
 			break
 		}
-		var tarFileList []*explorer.FileData
+		var tarFileList []*fs.FileData
 		if version.Compare(dockerVersion.Version, "25", ">=") && function.InArray(layers, header.Name) {
 			tarFileList, err = getFileListFromTar(tar.NewReader(tarReader))
 			if err != nil {
@@ -78,7 +78,7 @@ func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (p
 	})
 
 	path = make([]string, 0)
-	pathInfo = function.PluckArrayWalk(pathInfo, func(i *explorer.FileData) (*explorer.FileData, bool) {
+	pathInfo = function.PluckArrayWalk(pathInfo, func(i *fs.FileData) (*fs.FileData, bool) {
 		if function.InArray(path, i.Name) {
 			return nil, false
 		} else {
@@ -89,7 +89,7 @@ func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (p
 	return pathInfo, path, nil
 }
 
-func getFileListFromTar(tarReader *tar.Reader) (files []*explorer.FileData, err error) {
+func getFileListFromTar(tarReader *tar.Reader) (files []*fs.FileData, err error) {
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -110,13 +110,13 @@ func getFileListFromTar(tarReader *tar.Reader) (files []*explorer.FileData, err 
 		case tar.TypeXHeader:
 			return nil, fmt.Errorf("unexptected tar file (XHeader): type=%v name=%s", header.Typeflag, name)
 		default:
-			files = append(files, &explorer.FileData{
+			files = append(files, &fs.FileData{
 				Path:      filepath.Join("/", header.Name),
 				Name:      filepath.Join("/", header.Name),
 				Mod:       os.FileMode(header.Mode),
 				ModStr:    os.FileMode(header.Mode).String(),
 				ModTime:   header.ModTime,
-				Change:    explorer.ChangeDefault,
+				Change:    fs.ChangeDefault,
 				Size:      header.Size,
 				User:      fmt.Sprintf("%d", header.Uid),
 				Group:     fmt.Sprintf("%d", header.Gid),

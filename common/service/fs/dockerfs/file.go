@@ -2,12 +2,13 @@ package dockerfs
 
 import (
 	"errors"
+	"github.com/spf13/afero/mem"
 	"os"
 )
 
 type File struct {
 	info os.FileInfo
-	fd   *os.File
+	fd   *mem.File
 	fs   *Fs
 }
 
@@ -15,7 +16,7 @@ func (self *File) Close() error {
 	if self.fd == nil {
 		return nil
 	}
-	return self.fs.commit(self.info.Name(), self.fd)
+	return self.fd.Close()
 }
 
 func (self *File) Read(p []byte) (n int, err error) {

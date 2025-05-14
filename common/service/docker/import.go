@@ -3,9 +3,9 @@ package docker
 import (
 	"archive/tar"
 	"archive/zip"
-	"bytes"
 	"compress/gzip"
 	"errors"
+	"github.com/donknap/dpanel/common/service/storage"
 	"io"
 	"log/slog"
 	"os"
@@ -14,12 +14,15 @@ import (
 )
 
 func NewFileImport(targetRootPath string, opts ...ImportFileOption) (*ImportFile, error) {
-	buffer := new(bytes.Buffer)
+	var err error
 	o := &ImportFile{
-		tarWrite:       tar.NewWriter(buffer),
 		targetRootPath: targetRootPath,
-		reader:         bytes.NewReader(buffer.Bytes()),
 	}
+	o.reader, err = storage.Local{}.CreateTempFile("")
+	if err != nil {
+		return nil, err
+	}
+	o.tarWrite = tar.NewWriter(o.reader)
 	for _, opt := range opts {
 		err := opt(o)
 		if err != nil {
@@ -27,14 +30,6 @@ func NewFileImport(targetRootPath string, opts ...ImportFileOption) (*ImportFile
 		}
 	}
 	return o, nil
-}
-
-func WithImportTargetTarFile(file *os.File) ImportFileOption {
-	return func(self *ImportFile) (err error) {
-		self.tarWrite = tar.NewWriter(file)
-		self.reader = file
-		return nil
-	}
 }
 
 func WithImportFilePath(sourcePath string, fileName string) ImportFileOption {

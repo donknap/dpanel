@@ -5,18 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
-	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/explorer"
-	"github.com/donknap/dpanel/common/service/ssh"
+	"github.com/donknap/dpanel/common/service/fs"
 	"github.com/donknap/dpanel/common/service/storage"
+	fsType "github.com/donknap/dpanel/common/types/fs"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
 	"github.com/h2non/filetype/matchers"
 	"github.com/pkg/sftp"
-	"github.com/spf13/afero"
-	"github.com/spf13/afero/sftpfs"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
 	"log/slog"
@@ -54,7 +51,7 @@ func (self Explorer) Export(http *gin.Context) {
 		_ = os.Remove(tempFile.Name())
 	}()
 
-	sshClient, afs, err := self.getClient(params.Name)
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -114,16 +111,23 @@ func (self Explorer) Export(http *gin.Context) {
 	return
 }
 
-func (self Explorer) GetPathList(http *gin.Context) {
+func (self Explorer) ImportFileContent(http *gin.Context) {
 	type ParamsValidate struct {
-		Name string `json:"name" binding:"required"`
-		Path string `json:"path" binding:"required"`
+		Name     string `json:"name" binding:"required"`
+		File     string `json:"file" binding:"required"`
+		Content  string `json:"content"`
+		DestPath string `json:"destPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	sshClient, afs, err := self.getClient(params.Name)
+	if strings.HasPrefix(params.File, "/") {
+		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerInvalidFilename"), 500)
+		return
+	}
+
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -132,21 +136,236 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		sshClient.Close()
 	}()
 
+	file, err := afs.OpenFile(filepath.Join(params.DestPath, params.File), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o644)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	defer func() {
+		_ = file.Close()
+	}()
+	_, err = file.WriteString(params.Content)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
+}
+
+func (self Explorer) Import(http *gin.Context) {
+	type ParamsValidate struct {
+		Name     string `json:"name" binding:"required"`
+		FileList []struct {
+			Name string `json:"name"`
+			Path string `json:"path"`
+		} `json:"fileList" binding:"required"`
+		DestPath string `json:"destPath" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	defer func() {
+		for _, s := range params.FileList {
+			realPath := storage.Local{}.GetRealPath(s.Path)
+			_ = os.Remove(realPath)
+		}
+	}()
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		sshClient.Close()
+	}()
+
+	for _, item := range params.FileList {
+		err = func() error {
+			realPath, err := os.Open(storage.Local{}.GetRealPath(item.Path))
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = realPath.Close()
+			}()
+			err = afs.WriteReader(filepath.Join(params.DestPath, item.Name), realPath)
+			if err != nil {
+				return err
+			}
+			return nil
+		}()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Explorer) Unzip(http *gin.Context) {
+	type ParamsValidate struct {
+		Name string   `json:"name" binding:"required"`
+		File []string `json:"file" binding:"required"`
+		Path string   `json:"path" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		sshClient.Close()
+	}()
+	options := make([]docker.ImportFileOption, 0)
+	for _, path := range params.File {
+		file, err := afs.OpenFile(path, os.O_RDONLY, 0o644)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		fileType, _ := filetype.MatchFile(file.Name())
+		switch fileType {
+		case matchers.TypeZip:
+			options = append(options, docker.WithImportZipFile(file.Name()))
+			break
+		case matchers.TypeTar:
+			options = append(options, docker.WithImportTarFile(file.Name()))
+			break
+		case matchers.TypeGz:
+			options = append(options, docker.WithImportTarGzFile(file.Name()))
+			break
+		default:
+			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerUnzipTargetUnsupportedType"), 500)
+			return
+		}
+	}
+	importFile, err := docker.NewFileImport(params.Path, options...)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	tarReader := importFile.TarReader()
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			break
+		}
+		err = afs.WriteReader(header.Name, tarReader)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Explorer) Delete(http *gin.Context) {
+	type ParamsValidate struct {
+		Name     string   `json:"name" binding:"required"`
+		FileList []string `json:"fileList" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	for _, path := range params.FileList {
+		if path == "/" ||
+			path == "./" ||
+			path == "." ||
+			strings.Contains(path, "*") {
+			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerEditDeleteUnsafe"), 500)
+			return
+		}
+	}
+
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		sshClient.Close()
+	}()
+	var deleteAll func(path string) error
+	deleteAll = func(path string) error {
+		file, err := afs.Open(path)
+		if err != nil {
+			return err
+		}
+		fileInfo, _ := file.Stat()
+		if fileInfo.IsDir() {
+			files, err := afs.ReadDir(path)
+			if err != nil {
+				return err
+			}
+			for _, item := range files {
+				err = deleteAll(filepath.Join(path, item.Name()))
+				if err != nil {
+					return err
+				}
+			}
+		}
+		_ = afs.Remove(path)
+		return nil
+	}
+
+	for _, path := range params.FileList {
+		err = deleteAll(path)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Explorer) GetPathList(http *gin.Context) {
+	type ParamsValidate struct {
+		Name string `json:"name" binding:"required"`
+		Path string `json:"path"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		sshClient.Close()
+	}()
+	if params.Path == "" {
+		if defaultPath, err := sshClient.Run("pwd"); err == nil {
+			params.Path = defaultPath
+		}
+	}
 	list, err := afs.ReadDir(params.Path)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
-	result := make([]*explorer.FileData, 0)
+	result := make([]*fsType.FileData, 0)
 	for _, item := range list {
-		fileData := &explorer.FileData{
+		fileData := &fsType.FileData{
 			Path:     filepath.Join(params.Path, item.Name()),
 			Name:     item.Name(),
 			Mod:      item.Mode(),
 			ModStr:   item.Mode().String(),
 			ModTime:  item.ModTime(),
-			Change:   explorer.ChangeDefault,
+			Change:   fsType.ChangeDefault,
 			Size:     item.Size(),
 			User:     "",
 			Group:    "",
@@ -186,7 +405,138 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		return result[i].Name < result[j].Name
 	})
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": result,
+		"currentPath": params.Path,
+		"list":        result,
+	})
+	return
+}
+
+func (self Explorer) GetContent(http *gin.Context) {
+	type ParamsValidate struct {
+		Name string `json:"name" binding:"required"`
+		File string `json:"file" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		sshClient.Close()
+	}()
+	file, err := afs.OpenFile(params.File, os.O_RDONLY, 0o644)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+	fileInfo, err := file.Stat()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if fileInfo.Size() >= 1024*1024 {
+		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerEditFileMaxSize"), 500)
+		return
+	}
+	fileType, _ := filetype.MatchFile(file.Name())
+	if fileType == filetype.Unknown {
+		content, err := io.ReadAll(file)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		self.JsonResponseWithoutError(http, gin.H{
+			"content": string(content),
+		})
+		return
+	} else {
+		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerContentUnsupportedType"), 500)
+		return
+	}
+}
+
+func (self Explorer) Chmod(http *gin.Context) {
+	type ParamsValidate struct {
+		Name        string   `json:"name" binding:"required"`
+		FileList    []string `json:"fileList" binding:"required"`
+		Mod         string   `json:"mod" binding:"required"`
+		User        string   `json:"user"`
+		Group       string   `json:"group"`
+		HasChildren bool     `json:"hasChildren"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		sshClient.Close()
+	}()
+	mode, err := strconv.ParseUint(params.Mod, 8, 32)
+	for _, path := range params.FileList {
+		err = afs.Chmod(path, os.FileMode(mode))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
+		if params.User != "" && params.Group != "" {
+			//afs.Chown(path, params.User, params.Group)
+		}
+	}
+
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Explorer) GetFileStat(http *gin.Context) {
+	type ParamsValidate struct {
+		Name string `json:"name" binding:"required"`
+		Path string `json:"path" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		sshClient.Close()
+	}()
+	var fileInfo os.FileInfo
+	file, err := afs.OpenFile(params.Path, os.O_RDONLY, 0o644)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+	fileInfo, err = file.Stat()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"info": gin.H{
+			"isDir":  fileInfo.Mode().IsDir(),
+			"target": params.Path,
+			"name":   filepath.Base(params.Path),
+		},
 	})
 	return
 }
@@ -199,7 +549,7 @@ func (self Explorer) GetUserList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	sshClient, afs, err := self.getClient(params.Name)
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -248,254 +598,6 @@ func (self Explorer) GetUserList(http *gin.Context) {
 	return
 }
 
-func (self Explorer) GetContent(http *gin.Context) {
-	type ParamsValidate struct {
-		Name string `json:"name" binding:"required"`
-		File string `json:"file" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	sshClient, afs, err := self.getClient(params.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		sshClient.Close()
-	}()
-	file, err := afs.OpenFile(params.File, os.O_RDONLY, 0o644)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-	fileInfo, err := file.Stat()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if fileInfo.Size() >= 1024*1024 {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerEditFileMaxSize"), 500)
-		return
-	}
-	fileType, _ := filetype.MatchFile(file.Name())
-	if fileType == filetype.Unknown {
-		content, err := io.ReadAll(file)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		self.JsonResponseWithoutError(http, gin.H{
-			"content": string(content),
-		})
-		return
-	} else {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerContentUnsupportedType"), 500)
-		return
-	}
-}
-
-func (self Explorer) GetFileStat(http *gin.Context) {
-	type ParamsValidate struct {
-		Name string `json:"name" binding:"required"`
-		Path string `json:"path" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	sshClient, afs, err := self.getClient(params.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		sshClient.Close()
-	}()
-	var fileInfo os.FileInfo
-	file, err := afs.OpenFile(params.Path, os.O_RDONLY, 0o644)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-	fileInfo, err = file.Stat()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"info": gin.H{
-			"isDir":  fileInfo.Mode().IsDir(),
-			"target": params.Path,
-			"name":   filepath.Base(params.Path),
-		},
-	})
-	return
-}
-
-func (self Explorer) Import(http *gin.Context) {
-	type ParamsValidate struct {
-		Name     string `json:"name" binding:"required"`
-		FileList []struct {
-			Name string `json:"name"`
-			Path string `json:"path"`
-		} `json:"fileList" binding:"required"`
-		DestPath string `json:"destPath" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	defer func() {
-		for _, s := range params.FileList {
-			realPath := storage.Local{}.GetRealPath(s.Path)
-			_ = os.Remove(realPath)
-		}
-	}()
-	sshClient, afs, err := self.getClient(params.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		sshClient.Close()
-	}()
-
-	for _, item := range params.FileList {
-		err = func() error {
-			realPath, err := os.Open(storage.Local{}.GetRealPath(item.Path))
-			if err != nil {
-				return err
-			}
-			defer func() {
-				_ = realPath.Close()
-			}()
-			err = afs.WriteReader(filepath.Join(params.DestPath, item.Name), realPath)
-			if err != nil {
-				return err
-			}
-			return nil
-		}()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Explorer) Delete(http *gin.Context) {
-	type ParamsValidate struct {
-		Name     string   `json:"name" binding:"required"`
-		FileList []string `json:"fileList" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-
-	for _, path := range params.FileList {
-		if path == "/" ||
-			path == "./" ||
-			path == "." ||
-			strings.Contains(path, "*") {
-			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerEditDeleteUnsafe"), 500)
-			return
-		}
-	}
-
-	sshClient, afs, err := self.getClient(params.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		sshClient.Close()
-	}()
-	var deleteAll func(path string) error
-	deleteAll = func(path string) error {
-		file, err := afs.Open(path)
-		if err != nil {
-			return err
-		}
-		fileInfo, _ := file.Stat()
-		if fileInfo.IsDir() {
-			files, err := afs.ReadDir(path)
-			if err != nil {
-				return err
-			}
-			for _, item := range files {
-				err = deleteAll(filepath.Join(path, item.Name()))
-				if err != nil {
-					return err
-				}
-			}
-		}
-		_ = afs.Remove(path)
-		return nil
-	}
-
-	for _, path := range params.FileList {
-		err = deleteAll(path)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Explorer) ImportFileContent(http *gin.Context) {
-	type ParamsValidate struct {
-		Name     string `json:"name" binding:"required"`
-		File     string `json:"file" binding:"required"`
-		Content  string `json:"content"`
-		DestPath string `json:"destPath" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	if strings.HasPrefix(params.File, "/") {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerInvalidFilename"), 500)
-		return
-	}
-
-	sshClient, afs, err := self.getClient(params.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		sshClient.Close()
-	}()
-
-	file, err := afs.OpenFile(filepath.Join(params.DestPath, params.File), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o644)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	defer func() {
-		_ = file.Close()
-	}()
-	_, err = file.WriteString(params.Content)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
-}
-
 func (self Explorer) MkDir(http *gin.Context) {
 	type ParamsValidate struct {
 		Name     string `json:"name" binding:"required"`
@@ -506,7 +608,7 @@ func (self Explorer) MkDir(http *gin.Context) {
 		return
 	}
 
-	sshClient, afs, err := self.getClient(params.Name)
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -521,139 +623,4 @@ func (self Explorer) MkDir(http *gin.Context) {
 		return
 	}
 	self.JsonSuccessResponse(http)
-}
-
-func (self Explorer) Chmod(http *gin.Context) {
-	type ParamsValidate struct {
-		Name        string   `json:"name" binding:"required"`
-		FileList    []string `json:"fileList" binding:"required"`
-		Mod         string   `json:"mod" binding:"required"`
-		User        string   `json:"user"`
-		Group       string   `json:"group"`
-		HasChildren bool     `json:"hasChildren"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	sshClient, afs, err := self.getClient(params.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		sshClient.Close()
-	}()
-	mode, err := strconv.ParseUint(params.Mod, 8, 32)
-	for _, path := range params.FileList {
-
-		err = afs.Chmod(path, os.FileMode(mode))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-
-		if params.User != "" && params.Group != "" {
-			//afs.Chown(path, params.User, params.Group)
-		}
-	}
-
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Explorer) Unzip(http *gin.Context) {
-	type ParamsValidate struct {
-		Name string   `json:"name" binding:"required"`
-		File []string `json:"file" binding:"required"`
-		Path string   `json:"path" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	sshClient, afs, err := self.getClient(params.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		sshClient.Close()
-	}()
-
-	tempFile, err := storage.Local{}.CreateTempFile("")
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		_ = tempFile.Close()
-		_ = os.Remove(tempFile.Name())
-	}()
-
-	options := make([]docker.ImportFileOption, 0)
-	options = append(options, docker.WithImportTargetTarFile(tempFile))
-	for _, path := range params.File {
-		file, err := afs.OpenFile(path, os.O_RDONLY, 0o644)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		fileType, _ := filetype.MatchFile(file.Name())
-		switch fileType {
-		case matchers.TypeZip:
-			options = append(options, docker.WithImportZipFile(file.Name()))
-			break
-		case matchers.TypeTar:
-			options = append(options, docker.WithImportTarFile(file.Name()))
-			break
-		case matchers.TypeGz:
-			options = append(options, docker.WithImportTarGzFile(file.Name()))
-			break
-		default:
-			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerUnzipTargetUnsupportedType"), 500)
-			return
-		}
-	}
-	importFile, err := docker.NewFileImport(params.Path, options...)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	tarReader := importFile.TarReader()
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			break
-		}
-		err = afs.WriteReader(header.Name, tarReader)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Explorer) getClient(name string) (*ssh.Client, *afero.Afero, error) {
-	dockerEnv, err := logic2.DockerEnv{}.GetEnvByName(name)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !dockerEnv.EnableSSH || dockerEnv.SshServerInfo == nil {
-		return nil, nil, function.ErrorMessage(".commonDataNotFoundOrDeleted")
-	}
-	option := []ssh.Option{
-		ssh.WithSftpClient(),
-	}
-	option = append(option, ssh.WithServerInfo(dockerEnv.SshServerInfo)...)
-	sshClient, err := ssh.NewClient(option...)
-	if err != nil {
-		return nil, nil, err
-	}
-	afs := &afero.Afero{
-		Fs: sftpfs.New(sshClient.SftpConn),
-	}
-	return sshClient, afs, nil
 }

@@ -2,7 +2,6 @@ package docker
 
 import (
 	"archive/tar"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -151,17 +150,8 @@ type ImagePlatform struct {
 type ImportFile struct {
 	targetRootPath string
 	tarWrite       *tar.Writer
-	reader         io.ReadSeeker
-}
-
-func (self ImportFile) Test(path string) {
-	if file, err := os.Create(path); err == nil {
-		fmt.Printf("%v \n", file.Name())
-		defer func() {
-			_ = file.Close()
-		}()
-		_, _ = io.Copy(file, self.reader)
-	}
+	reader         *os.File
+	io.Closer
 }
 
 func (self ImportFile) Reader() io.Reader {
@@ -172,6 +162,11 @@ func (self ImportFile) Reader() io.Reader {
 func (self ImportFile) TarReader() *tar.Reader {
 	_, _ = self.reader.Seek(0, io.SeekStart)
 	return tar.NewReader(self.reader)
+}
+
+func (self ImportFile) Close() {
+	_ = self.reader.Close()
+	_ = os.Remove(self.reader.Name())
 }
 
 type ImportFileOption func(self *ImportFile) (err error)

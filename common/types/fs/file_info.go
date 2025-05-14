@@ -1,4 +1,4 @@
-package explorer
+package fs
 
 import (
 	"io/fs"
@@ -38,7 +38,7 @@ type FileData struct {
 }
 
 func (self *FileData) CheckIsSymlink() bool {
-	return self.Mod&os.ModeSymlink != 0
+	return (self.Mod & os.ModeSymlink) != 0
 }
 
 func (self *FileData) CheckIsBlockDevice() bool {
