@@ -119,7 +119,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 			envOption.Volumes = append(envOption.Volumes, item)
 		}
 	}
-
+	envOption.DockerEnvName = docker.Sdk.Name
 	envOption.ImageName = info.Config.Image
 	envOption.ImageId = info.Image
 	envOption.Privileged = info.HostConfig.Privileged

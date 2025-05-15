@@ -39,7 +39,7 @@ func (self Env) GetList(http *gin.Context) {
 	}
 	currentName := "local"
 	for _, item := range result {
-		if item.Address == docker.Sdk.Client.DaemonHost() {
+		if item.Address == docker.Sdk.Client.DaemonHost() || strings.HasSuffix(docker.Sdk.Client.DaemonHost(), fmt.Sprintf("/sock/%s.sock", item.Name)) {
 			currentName = item.Name
 			break
 		}
@@ -85,9 +85,6 @@ func (self Env) Create(http *gin.Context) {
 		if params.SshServerInfo.Host == "" {
 			params.SshServerInfo.Host = params.Address
 		}
-		//if urls.Hostname() == "172.16.1.13" {
-		//	params.SshServerInfo.Host = "172.16.1.148"
-		//}
 		sshClient, err := ssh.NewClient(ssh.WithServerInfo(params.SshServerInfo)...)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -193,13 +190,12 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	info, err := dockerClient.Client.Info(dockerClient.Ctx)
+	_, err = dockerClient.Client.Info(dockerClient.Ctx)
 	if err != nil {
 		dockerClient.Close()
 		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，错误信息："+err.Error()), 500)
 		return
 	}
-	fmt.Printf("%v \n", info.Name)
 	if defaultEnv {
 		// 获取面板信息
 		if info, err := dockerClient.Client.ContainerInspect(dockerClient.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
@@ -351,7 +347,9 @@ func (self Env) GetDetail(http *gin.Context) {
 	}
 	if dockerEnv.ServerUrl == "" {
 		if d, err := url.Parse(dockerEnv.Address); err == nil {
-			if b, _, exists := strings.Cut(d.Host, ":"); exists {
+			if d.Host == "" && d.Scheme == "" {
+				dockerEnv.ServerUrl = d.Path
+			} else if b, _, exists := strings.Cut(d.Host, ":"); d.Host != "" && exists {
 				dockerEnv.ServerUrl = b
 			}
 		}

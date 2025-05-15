@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -15,7 +16,6 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
-	"gorm.io/gorm"
 	"strconv"
 	"strings"
 )
@@ -66,20 +66,25 @@ func (self Site) CreateByImage(http *gin.Context) {
 		}
 	}
 
-	oldBindPort := make([]string, 0)
-	oldContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName)
-	if err == nil {
-		for _, item := range oldContainerInfo.HostConfig.PortBindings {
-			for _, value := range item {
-				oldBindPort = append(oldBindPort, value.HostPort)
-			}
-		}
+	var siteRow *entity.Site
+
+	// 重新部署，先删掉之前的容器数据
+	// 删除数据时应该查找对应的Id 和 名称都相同的，避免多环境下名称一致导致删除错误
+	// 删除容器时，先把记录设置为软删除，部署失败后在回收站中可以查看
+	if params.ContainerId != "" {
+		_, _ = dao.Site.
+			Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.ContainerId, "Id"))...).
+			Delete()
 	}
 
-	// 重新部署，先删掉之前的容器
-	if params.ContainerId != "" {
-		// 删除容器时，先把记录设置为软删除，部署失败后在回收站中可以查看
-		_, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
+	// 创建前先查找一下当前环境下是否有容器
+	// 如果有，则查询数据中是否有记录，有就表示是更新，否则是创建
+	if containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); err == nil {
+		siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "Id"))...).First()
+		if siteRow != nil || params.ContainerId == "" {
+			self.JsonResponseWithError(http, errors.New("容器已经存在，请更换标识名称"), 500)
+			return
+		}
 	}
 
 	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.ImageName)
@@ -98,35 +103,19 @@ func (self Site) CreateByImage(http *gin.Context) {
 		}
 	}
 
-	_, err = dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
+	buildParams.DockerEnvName = docker.Sdk.Name
+
+	siteRow = &entity.Site{
+		SiteName:      params.SiteName,
+		SiteTitle:     params.SiteTitle,
+		Env:           &buildParams,
+		Status:        docker.ImageBuildStatusStop,
+		ContainerInfo: &accessor.SiteContainerInfoOption{},
+	}
+	err = dao.Site.Create(siteRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
-	}
-	var siteRow *entity.Site
-	siteRow, _ = dao.Site.Where(dao.Site.SiteName.Eq(params.SiteName)).First()
-	if siteRow == nil {
-		siteRow = &entity.Site{
-			SiteName:      params.SiteName,
-			SiteTitle:     params.SiteTitle,
-			Env:           &buildParams,
-			Status:        docker.ImageBuildStatusStop,
-			ContainerInfo: &accessor.SiteContainerInfoOption{},
-		}
-		err := dao.Site.Create(siteRow)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	} else {
-		_, _ = dao.Site.Select(dao.Site.ALL).Where(dao.Site.SiteName.Eq(params.SiteName)).Updates(&entity.Site{
-			SiteTitle:     params.SiteTitle,
-			Env:           &buildParams,
-			Status:        docker.ImageBuildStatusStop,
-			Message:       "",
-			ContainerInfo: &accessor.SiteContainerInfoOption{},
-			DeletedAt:     gorm.DeletedAt{},
-		})
 	}
 	runTaskRow := &logic.CreateContainerOption{
 		SiteName:    siteRow.SiteName,
@@ -233,7 +222,6 @@ func (self Site) GetDetail(http *gin.Context) {
 		return
 	}
 
-	var containerName string
 	var siteRow *entity.Site
 	var runOption accessor.SiteEnvOption
 
@@ -243,20 +231,18 @@ func (self Site) GetDetail(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		containerName = siteRow.SiteName
 	} else {
 		containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Id)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		containerName = params.Id
+		siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "Id"))...).First()
 		// 先使用容器名称查询，查询不到时通过 md5 再次查询
-		siteRow, _ = dao.Site.Where(dao.Site.SiteName.Eq(strings.TrimLeft(containerInfo.Name, "/"))).First()
-		if siteRow == nil {
-			siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.Id, "Id"))...).First()
-		}
-		runOption, err = logic.Site{}.GetEnvOptionByContainer(containerName)
+		//if siteRow == nil {
+		//	siteRow, _ = dao.Site.Where(dao.Site.SiteName.Eq(strings.TrimLeft(containerInfo.Name, "/"))).First()
+		//}
+		runOption, err = logic.Site{}.GetEnvOptionByContainer(params.Id)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -274,18 +260,24 @@ func (self Site) GetDetail(http *gin.Context) {
 			runOption.Command = ""
 			runOption.Entrypoint = ""
 			runOption.WorkDir = ""
+
 			siteRow.Env = &runOption
 			_ = dao.Site.Save(siteRow)
-		} else if siteRow.ContainerInfo == nil || siteRow.ContainerInfo.Info.ContainerJSONBase == nil {
+		}
+		if siteRow.ContainerInfo == nil || siteRow.ContainerInfo.Info.ContainerJSONBase == nil {
 			siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
 				Id:   params.Id,
 				Info: containerInfo,
 			}
 			_ = dao.Site.Save(siteRow)
 		}
+		if siteRow.Env.DockerEnvName == "" && siteRow.Env != nil {
+			siteRow.Env.DockerEnvName = docker.Sdk.Name
+			_ = dao.Site.Save(siteRow)
+		}
 	}
 
-	// 站点有些数据需要从容器信息上获取，这里是否可以直接使用 containerInfo ?
+	// todo 站点有些数据需要从容器信息上获取，这里是否可以直接使用 containerInfo ?
 	if !function.IsEmptyArray(runOption.Network) {
 		siteRow.Env.Network = runOption.Network
 	}

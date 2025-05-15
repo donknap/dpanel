@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -197,44 +198,18 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 					slog.Warn("docker proxy sock local close", "err", err)
 					return
 				}
-				go func(lc net.Conn) {
-					remoteConn, err = sshClient.Conn.Dial("unix", "/var/run/docker.sock")
-					if err != nil {
-						slog.Warn("docker proxy sock create remote", "err", err)
-						return
-					}
-					go func() {
-						defer remoteConn.Close()
-						for {
-							buf := make([]byte, 64*1024)
-							n, err := lc.Read(buf)
-							if err != nil {
-								slog.Warn("docker proxy sock local read", "err", err)
-								return
-							}
-							_, err = remoteConn.Write(buf[:n])
-							if err != nil {
-								slog.Warn("docker proxy sock local to remote", "err", err)
-								return
-							}
-						}
-					}()
-					go func() {
-						for {
-							buf := make([]byte, 64*1024)
-							n, err := remoteConn.Read(buf)
-							if err != nil {
-								slog.Warn("docker proxy sock remote read", "err", err)
-								return
-							}
-							_, err = lc.Write(buf[:n])
-							if err != nil {
-								slog.Warn("docker proxy sock remote to local", "err", err)
-								return
-							}
-						}
-					}()
-				}(localConn)
+				remoteConn, err := sshClient.Conn.Dial("unix", "/var/run/docker.sock")
+				if err != nil {
+					slog.Warn("docker proxy sock create remote", "err", err)
+					return
+				}
+				go func() {
+					_, _ = io.Copy(remoteConn, localConn)
+					_ = remoteConn.Close()
+				}()
+				go func() {
+					_, _ = io.Copy(localConn, remoteConn)
+				}()
 			}
 		}()
 		// 清空掉之前的配置

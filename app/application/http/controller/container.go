@@ -241,10 +241,21 @@ func (self Container) Update(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		if siteRow, err := dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.Md5, "Id"))...).First(); err == nil {
-			siteRow.SiteName = strings.TrimLeft(params.Name, "/")
-			_ = dao.Site.Save(siteRow)
+	}
+
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	if siteRow, err := dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.Md5, "Id"))...).First(); err == nil {
+		siteRow.SiteName = strings.TrimLeft(params.Name, "/")
+		siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
+			Id:   params.Md5,
+			Info: containerInfo,
 		}
+		_ = dao.Site.Save(siteRow)
 	}
 	self.JsonSuccessResponse(http)
 	return
@@ -331,10 +342,9 @@ func (self Container) Delete(http *gin.Context) {
 	runOption.Entrypoint = ""
 	runOption.WorkDir = ""
 
-	siteRow, _ := dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(strings.TrimLeft(containerInfo.Name, "/"))).First()
+	siteRow, _ := dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "Id"))...).First()
 	// 创建回收站数据
 	if siteRow == nil {
-
 		siteRow = &entity.Site{
 			SiteName: strings.TrimLeft(containerInfo.Name, "/"),
 			Env:      &runOption,
