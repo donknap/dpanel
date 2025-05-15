@@ -203,3 +203,8 @@ const (
 const (
 	ContainerBackupTypeSnapshot = "snapshot"
 )
+
+const (
+	RemoteTypeDocker = "docker"
+	RemoteTypeSSH    = "ssh"
+)

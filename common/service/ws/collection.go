@@ -58,6 +58,7 @@ func (self *Collection) Leave(c *Client) {
 		})
 		// 没有任何用户时，中断 docker 的所有请求
 		slog.Debug("docker client cancel")
+
 		//docker.Sdk.CtxCancelFunc()
 		//docker.Sdk.Client.Close()
 		//ctx, cancelFunc := context.WithCancel(context.Background())

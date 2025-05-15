@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -69,6 +70,7 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("开启 TLS 时需要上传证书"), 500)
 		return
 	}
+
 	if params.EnableSSH {
 		urls, err := url.Parse(params.Address)
 		if err != nil {
@@ -79,6 +81,9 @@ func (self Env) Create(http *gin.Context) {
 			params.SshServerInfo.Host = "127.0.0.1"
 		} else {
 			params.SshServerInfo.Host = urls.Hostname()
+		}
+		if params.SshServerInfo.Host == "" {
+			params.SshServerInfo.Host = params.Address
 		}
 		//if urls.Hostname() == "172.16.1.13" {
 		//	params.SshServerInfo.Host = "172.16.1.148"
@@ -114,20 +119,25 @@ func (self Env) Create(http *gin.Context) {
 	}
 	_ = os.MkdirAll(filepath.Join(storage.Local{}.GetStorageLocalPath(), params.ComposePath), 0755)
 
+	if params.RemoteType == "ssh" {
+		options = append(options, docker.WithSSH(params.SshServerInfo))
+	}
+
 	client := &docker.Client{
 		Name:              params.Name,
 		Title:             params.Title,
 		Address:           params.Address,
+		Default:           defaultEnv,
 		ServerUrl:         params.ServerUrl,
+		EnableTLS:         params.EnableTLS,
 		TlsCa:             params.TlsCa,
 		TlsCert:           params.TlsCert,
 		TlsKey:            params.TlsKey,
-		EnableTLS:         params.EnableTLS,
-		Default:           defaultEnv,
 		EnableComposePath: params.EnableComposePath,
 		ComposePath:       params.ComposePath,
 		EnableSSH:         params.EnableSSH,
 		SshServerInfo:     params.SshServerInfo,
+		RemoteType:        params.RemoteType,
 	}
 
 	if params.EnableTLS {
@@ -183,11 +193,13 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_, err = dockerClient.Client.Info(dockerClient.Ctx)
+	info, err := dockerClient.Client.Info(dockerClient.Ctx)
 	if err != nil {
+		dockerClient.Close()
 		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，错误信息："+err.Error()), 500)
 		return
 	}
+	fmt.Printf("%v \n", info.Name)
 	if defaultEnv {
 		// 获取面板信息
 		if info, err := dockerClient.Client.ContainerInspect(dockerClient.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
@@ -228,25 +240,23 @@ func (self Env) Switch(http *gin.Context) {
 		return
 	}
 
-	setting, err := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDocker)
+	dockerEnv, err := logic.DockerEnv{}.GetEnvByName(params.Name)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	options := make([]docker.Option, 0)
-	if row, ok := setting.Value.Docker[params.Name]; !ok {
-		self.JsonResponseWithError(http, errors.New("Docker 客户端不存在，请先添加"), 500)
+	if docker.Sdk.Client.DaemonHost() == dockerEnv.Address {
+		self.JsonSuccessResponse(http)
 		return
-	} else {
-		if docker.Sdk.Client.DaemonHost() == row.Address {
-			self.JsonSuccessResponse(http)
-			return
-		}
-		options = append(options, docker.WithAddress(row.Address))
-		options = append(options, docker.WithName(row.Name))
-		if row.EnableTLS {
-			options = append(options, docker.WithTLS(row.TlsCa, row.TlsCert, row.TlsKey))
-		}
+	}
+	options = append(options, docker.WithAddress(dockerEnv.Address))
+	options = append(options, docker.WithName(dockerEnv.Name))
+	if dockerEnv.EnableTLS {
+		options = append(options, docker.WithTLS(dockerEnv.TlsCa, dockerEnv.TlsCert, dockerEnv.TlsKey))
+	}
+	if dockerEnv.RemoteType == docker.RemoteTypeSSH {
+		options = append(options, docker.WithSSH(dockerEnv.SshServerInfo))
 	}
 	oldDockerClient := docker.Sdk
 
@@ -264,7 +274,9 @@ func (self Env) Switch(http *gin.Context) {
 	_ = oldDockerClient.Client.Close()
 
 	docker.Sdk = dockerClient
-	go logic.EventLogic{}.MonitorLoop()
+	if dockerEnv.RemoteType == docker.RemoteTypeDocker {
+		go logic.EventLogic{}.MonitorLoop()
+	}
 
 	// 清除掉统计数据
 	_ = logic.Setting{}.Save(&entity.Setting{
@@ -277,6 +289,7 @@ func (self Env) Switch(http *gin.Context) {
 			},
 		},
 	})
+
 	self.JsonSuccessResponse(http)
 	return
 }

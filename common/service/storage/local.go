@@ -54,6 +54,14 @@ func (self Local) GetBackupPath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "backup")
 }
 
+func (self Local) GetLocalProxySockPath() string {
+	path := filepath.Join(self.GetStorageLocalPath(), "sock")
+	if _, err := os.Stat(path); err != nil {
+		_ = os.MkdirAll(path, os.ModePerm)
+	}
+	return path
+}
+
 func (self Local) GetStorageLocalPath() string {
 	if facade.GetConfig() == nil {
 		slog.Debug("storage local path empty")
