@@ -72,19 +72,6 @@ func (self Env) Create(http *gin.Context) {
 	}
 
 	if params.EnableSSH {
-		urls, err := url.Parse(params.Address)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		if urls.Scheme == "unix" {
-			params.SshServerInfo.Host = "127.0.0.1"
-		} else {
-			params.SshServerInfo.Host = urls.Hostname()
-		}
-		if params.SshServerInfo.Host == "" {
-			params.SshServerInfo.Host = params.Address
-		}
 		sshClient, err := ssh.NewClient(ssh.WithServerInfo(params.SshServerInfo)...)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -307,12 +294,12 @@ func (self Env) Delete(http *gin.Context) {
 
 	for _, name := range params.Name {
 		if row, ok := setting.Value.Docker[name]; !ok {
-			self.JsonResponseWithError(http, errors.New("Docker 客户端不存在，请先添加"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 			return
 		} else {
 			if docker.Sdk.Client.DaemonHost() == row.Address {
-				docker.Sdk.CtxCancelFunc()
-				_ = docker.Sdk.Client.Close()
+				self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvCurrentCanNotDelete"), 500)
+				return
 			}
 			delete(setting.Value.Docker, name)
 

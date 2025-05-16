@@ -26,7 +26,7 @@ type ServerInfo struct {
 	Username   string `json:"username,omitempty"`
 	Password   string `json:"password,omitempty"`
 	PrivateKey string `json:"privateKey,omitempty"`
-	Host       string `json:"host,omitempty"`
+	Address    string `json:"address,omitempty"`
 	Port       int    `json:"port,omitempty"`
 	AuthType   string `json:"authType,omitempty"`
 }

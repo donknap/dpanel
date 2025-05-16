@@ -51,7 +51,7 @@ func WithAddress(address string, port int) Option {
 
 func WithServerInfo(info *ServerInfo) []Option {
 	option := make([]Option, 0)
-	option = append(option, WithAddress(info.Host, info.Port))
+	option = append(option, WithAddress(info.Address, info.Port))
 	if info.AuthType == SshAuthTypePem {
 		option = append(option, WithAuthPem(info.Username, info.PrivateKey, info.Password))
 	} else if info.AuthType == SshAuthTypeBasic {
