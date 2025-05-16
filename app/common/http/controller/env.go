@@ -180,6 +180,10 @@ func (self Env) Create(http *gin.Context) {
 	_, err = dockerClient.Client.Info(dockerClient.Ctx)
 	if err != nil {
 		dockerClient.Close()
+		if function.ErrorHasKeyword(err, "Maximum supported") {
+			self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvApiTooOld", "err", err.Error()), 500)
+			return
+		}
 		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，错误信息："+err.Error()), 500)
 		return
 	}
