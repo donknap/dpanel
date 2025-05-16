@@ -209,6 +209,7 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 				}()
 				go func() {
 					_, _ = io.Copy(localConn, remoteConn)
+					_ = localConn.Close()
 				}()
 			}
 		}()
