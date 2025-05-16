@@ -167,7 +167,7 @@ func (self Compose) Create(http *gin.Context) {
 	}
 
 	if yamlRow.ID > 0 {
-		_, _ = dao.Compose.Updates(yamlRow)
+		_ = dao.Compose.Save(yamlRow)
 	} else if yamlRow.Setting.Type != accessor.ComposeTypeOutPath {
 		_ = dao.Compose.Create(yamlRow)
 
