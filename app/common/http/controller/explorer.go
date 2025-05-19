@@ -347,8 +347,10 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		sshClient.Close()
 	}()
 	if params.Path == "" {
-		if defaultPath, err := sshClient.Run("pwd"); err == nil {
+		if defaultPath, message, err := sshClient.Run("pwd"); err == nil && !strings.Contains(message, "Could not chdir") {
 			params.Path = defaultPath
+		} else {
+			params.Path = "/"
 		}
 	}
 	list, err := afs.ReadDir(params.Path)
@@ -378,7 +380,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 				fileData.User = username.(string)
 			}
 			if fileData.User == "" {
-				if username, err := sshClient.Run(fmt.Sprintf("id -un %d", v.UID)); err == nil {
+				if username, _, err := sshClient.Run(fmt.Sprintf("id -un %d", v.UID)); err == nil {
 					fileData.User = strings.TrimSpace(username)
 					_ = storage.Cache.Add(cacheKey, username, time.Hour)
 				} else {

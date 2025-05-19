@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -46,20 +47,22 @@ func NewClient(opt ...Option) (*Client, error) {
 	return c, nil
 }
 
-func (self *Client) RunContext(ctx context.Context, name string, args ...string) (string, error) {
+func (self *Client) RunContext(ctx context.Context, name string, args ...string) (string, string, error) {
 	session, err := self.Conn.NewSession()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	sessionCtx, sessionCtxCancel := context.WithCancel(ctx)
 	defer func() {
 		sessionCtxCancel()
 	}()
+	errBuffer := new(bytes.Buffer)
+	session.Stderr = errBuffer
 
 	cmd := fmt.Sprintf("%s %s", name, strings.Join(args, " "))
-	result, err := session.CombinedOutput(cmd)
+	out, err := session.Output(cmd)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	go func() {
 		select {
@@ -70,10 +73,11 @@ func (self *Client) RunContext(ctx context.Context, name string, args ...string)
 			}
 		}
 	}()
-	return strings.TrimSuffix(string(result), "\n"), nil
+
+	return strings.TrimSuffix(string(out), "\n"), errBuffer.String(), nil
 }
 
-func (self *Client) Run(name string, args ...string) (string, error) {
+func (self *Client) Run(name string, args ...string) (string, string, error) {
 	return self.RunContext(context.Background(), name, args...)
 }
 

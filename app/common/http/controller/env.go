@@ -80,7 +80,7 @@ func (self Env) Create(http *gin.Context) {
 		defer func() {
 			sshClient.Close()
 		}()
-		result, err := sshClient.Run("pwd")
+		result, _, err := sshClient.Run("pwd")
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
