@@ -25,6 +25,7 @@ import (
 	"github.com/mcuadros/go-version"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	ssh2 "golang.org/x/crypto/ssh"
 	"io"
 	"log/slog"
 	"sort"
@@ -32,6 +33,17 @@ import (
 	"strings"
 	"time"
 )
+
+type command struct {
+	Type string `json:"type"`
+	Size struct {
+		Width  int `json:"width"`
+		Height int `json:"height"`
+	} `json:"size"`
+	Content struct {
+		Command string `json:"command"`
+	} `json:"content"`
+}
 
 type Home struct {
 	controller.Abstract
@@ -95,13 +107,8 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	}
 	var err error
 	var shell types.HijackedResponse
+	var out container.ExecCreateResponse
 
-	type command struct {
-		Type    string `json:"type"`
-		Content struct {
-			Command string `json:"command"`
-		} `json:"content"`
-	}
 	messageType := fmt.Sprintf(ws.MessageTypeConsole, params.Id)
 	client, err := ws.NewClient(http,
 		ws.WithMessageRecvHandler(messageType, func(recvMessage *ws.RecvMessage) {
@@ -114,9 +121,20 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 				slog.Debug("console", "shell is nil", err.Error())
 				return
 			}
-			_, err = shell.Conn.Write([]byte(cmd.Content.Command))
-			if err != nil {
-				slog.Error("console", "shell read", err.Error())
+			if cmd.Content.Command != "" {
+				_, err = shell.Conn.Write([]byte(cmd.Content.Command))
+				if err != nil {
+					slog.Error("console", "shell read", err.Error())
+				}
+			}
+			if cmd.Size.Height > 0 && cmd.Size.Width > 0 {
+				err = docker.Sdk.Client.ContainerExecResize(docker.Sdk.Ctx, out.ID, container.ResizeOptions{
+					Height: uint(cmd.Size.Height),
+					Width:  uint(cmd.Size.Width),
+				})
+				if err != nil {
+					slog.Warn("console", "container tty resize", cmd.Size, "err", err)
+				}
 			}
 		}),
 	)
@@ -127,17 +145,6 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	go func() {
 		select {
 		case <-client.CtxContext.Done():
-			if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
-				_ = notice.Message{}.Info(".consoleDestroyPlugin", pluginName)
-
-				if webShellPlugin, err := plugin.NewPlugin(plugin.PluginWebShell, map[string]*plugin.TemplateParser{
-					"webshell": {
-						ContainerName: pluginName,
-					},
-				}); err == nil {
-					_ = webShellPlugin.Destroy()
-				}
-			}
 			if shell.Conn != nil {
 				shell.Close()
 			}
@@ -145,7 +152,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 		}
 	}()
 
-	out, err := docker.Sdk.Client.ContainerExecCreate(client.CtxContext, containerName, container.ExecOptions{
+	out, err = docker.Sdk.Client.ContainerExecCreate(client.CtxContext, containerName, container.ExecOptions{
 		Privileged:   true,
 		Tty:          true,
 		AttachStdin:  true,
@@ -166,10 +173,8 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	}
 	shell, err = docker.Sdk.Client.ContainerExecAttach(client.CtxContext, out.ID, container.ExecStartOptions{
 		Tty: true,
-		ConsoleSize: &[2]uint{
-			params.Height, params.Width,
-		},
 	})
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -217,13 +222,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 	var sshClient *ssh.Client
 	var read io.Reader
 	var write io.WriteCloser
-
-	type command struct {
-		Type    string `json:"type"`
-		Content struct {
-			Command string `json:"command"`
-		} `json:"content"`
-	}
+	var session *ssh2.Session
 
 	messageType := fmt.Sprintf(ws.MessageTypeConsoleHost, params.Name)
 	client, err := ws.NewClient(http,
@@ -233,9 +232,17 @@ func (self Home) WsHostConsole(http *gin.Context) {
 			if err != nil {
 				slog.Error("console", "json unmarshal", err.Error())
 			}
-			_, err = write.Write([]byte(cmd.Content.Command))
-			if err != nil {
-				slog.Error("console", "json unmarshal", err.Error())
+			if cmd.Content.Command != "" {
+				_, err = write.Write([]byte(cmd.Content.Command))
+				if err != nil {
+					slog.Error("console", "json unmarshal", err.Error())
+				}
+			}
+			if cmd.Size.Width > 0 && cmd.Size.Height > 0 {
+				err = session.WindowChange(cmd.Size.Height, cmd.Size.Width)
+				if err != nil {
+					slog.Warn("console", "change size", cmd.Size, "err", err)
+				}
 			}
 		}),
 	)
@@ -256,7 +263,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 		if err != nil {
 			return err
 		}
-		read, write, err = sshClient.NewPtySession(params.Height, params.Width)
+		session, read, write, err = sshClient.NewPtySession(params.Height, params.Width)
 		if err != nil {
 			return err
 		}

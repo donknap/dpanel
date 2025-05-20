@@ -21,7 +21,6 @@ import (
 
 const PluginExplorer = "explorer"
 const PluginBackup = "backup"
-const PluginWebShell = "webshell"
 
 const (
 	LabelContainerAutoRemove = "com.dpanel.container.auto_remove"

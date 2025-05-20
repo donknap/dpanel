@@ -85,9 +85,7 @@ func (self *Client) NewSession() (*ssh.Session, error) {
 	return self.Conn.NewSession()
 }
 
-func (self *Client) NewPtySession(height, width int) (read io.Reader, write io.WriteCloser, err error) {
-	var session *ssh.Session
-
+func (self *Client) NewPtySession(height, width int) (session *ssh.Session, read io.Reader, write io.WriteCloser, err error) {
 	go func() {
 		select {
 		case <-self.ctx.Done():
@@ -103,31 +101,30 @@ func (self *Client) NewPtySession(height, width int) (read io.Reader, write io.W
 
 	session, err = self.NewSession()
 	if err != nil {
-		return nil, nil, err
+		return session, nil, nil, err
 	}
-
 	if err = session.RequestPty("xterm", height, width, ssh.TerminalModes{
 		ssh.ECHO:          1,
 		ssh.TTY_OP_ISPEED: 14400,
 		ssh.TTY_OP_OSPEED: 14400,
 	}); err != nil {
-		return nil, nil, err
+		return session, nil, nil, err
 	}
 	write, err = session.StdinPipe()
 	if err != nil {
-		return nil, nil, err
+		return session, nil, nil, err
 	}
 	read, err = session.StdoutPipe()
 	if err != nil {
-		return nil, nil, err
+		return session, nil, nil, err
 	}
 	if stderr, err1 := session.StderrPipe(); err1 == nil {
 		read = io.MultiReader(read, stderr)
 	}
 	if err = session.Shell(); err != nil {
-		return nil, nil, err
+		return session, nil, nil, err
 	}
-	return read, write, nil
+	return session, read, write, nil
 }
 
 func (self *Client) NewSftpSession() (*sftp.Client, error) {
