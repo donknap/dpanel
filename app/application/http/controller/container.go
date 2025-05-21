@@ -197,7 +197,7 @@ func (self Container) GetDetail(http *gin.Context) {
 		return
 	}
 
-	ignore := accessor.IgnoreCheckUpgrade{}
+	ignore := accessor.ContainerCheckIgnoreUpgrade{}
 	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore, &ignore)
 
 	domain, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(detail.Name)).Find()

@@ -6,8 +6,8 @@ import (
 )
 
 type ContainerDetailResult struct {
-	Info   container.InspectResponse   `json:"info"`
-	Ignore accessor.IgnoreCheckUpgrade `json:"ignore"`
+	Info   container.InspectResponse            `json:"info"`
+	Ignore accessor.ContainerCheckIgnoreUpgrade `json:"ignore"`
 }
 
 type ContainerUpgradeOption struct {

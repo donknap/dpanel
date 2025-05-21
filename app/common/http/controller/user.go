@@ -152,26 +152,6 @@ func (self User) LoginInfo(http *gin.Context) {
 	return
 }
 
-func (self User) SaveThemeConfig(http *gin.Context) {
-	params := accessor.ThemeConfig{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	err := logic.Setting{}.Save(&entity.Setting{
-		GroupName: logic.SettingGroupSetting,
-		Name:      logic.SettingGroupSettingThemeConfig,
-		Value: &accessor.SettingValueOption{
-			ThemeConfig: &params,
-		},
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
 func (self User) CreateFounder(http *gin.Context) {
 	type ParamsValidate struct {
 		Username        string `json:"username" binding:"required"`

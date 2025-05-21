@@ -199,7 +199,7 @@ func (self Container) Ignore(http *gin.Context) {
 		return
 	}
 
-	checkIgnore := accessor.IgnoreCheckUpgrade{}
+	checkIgnore := accessor.ContainerCheckIgnoreUpgrade{}
 	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore, &checkIgnore)
 
 	ignore := fmt.Sprintf("%s@%s", params.Md5, params.ImageId)
@@ -223,7 +223,7 @@ func (self Container) Ignore(http *gin.Context) {
 		GroupName: logic2.SettingGroupSetting,
 		Name:      logic2.SettingGroupSettingCheckContainerIgnore,
 		Value: &accessor.SettingValueOption{
-			IgnoreCheckUpgrade: checkIgnore,
+			ContainerCheckIgnoreUpgrade: checkIgnore,
 		},
 	})
 

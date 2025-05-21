@@ -8,26 +8,27 @@ import (
 )
 
 type SettingValueOption struct {
-	Username                 string                     `json:"username,omitempty"`
-	Password                 string                     `json:"password,omitempty"`
-	Email                    string                     `json:"email,omitempty"`
-	UserStatus               uint8                      `json:"userStatus,omitempty"`
-	UserRemark               string                     `json:"userRemark,omitempty"`
-	RegisterAt               *time.Time                 `json:"registerAt,omitempty"`
-	Docker                   map[string]*docker.Client  `json:"docker,omitempty"`
-	DiskUsage                *DiskUsage                 `json:"diskUsage,omitempty"`
-	TwoFa                    *TwoFa                     `json:"twoFa,omitempty"`
-	IgnoreCheckUpgrade       IgnoreCheckUpgrade         `json:"ignoreCheckUpgrade,omitempty"`
-	ContainerCheckAllUpgrade *ContainerCheckAllUpgrade  `json:"containerCheckAllUpgrade,omitempty"`
-	DPanelInfo               *container.InspectResponse `json:"DPanelInfo,omitempty"`
-	ThemeConfig              *ThemeConfig               `json:"theme,omitempty"`
-	ThemeUserConfig          *ThemeUserConfig           `json:"themeUser,omitempty"`
-	DnsApi                   []DnsApi                   `json:"dnsApi,omitempty"`
-	EmailServer              *EmailServer               `json:"emailServer,omitempty"`
-	Tag                      []Tag                      `json:"tag,omitempty"`
+	Username                    string                      `json:"username,omitempty"`
+	Password                    string                      `json:"password,omitempty"`
+	Email                       string                      `json:"email,omitempty"`
+	UserStatus                  uint8                       `json:"userStatus,omitempty"`
+	UserRemark                  string                      `json:"userRemark,omitempty"`
+	RegisterAt                  *time.Time                  `json:"registerAt,omitempty"`
+	Docker                      map[string]*docker.Client   `json:"docker,omitempty"`
+	DiskUsage                   *DiskUsage                  `json:"diskUsage,omitempty"`
+	TwoFa                       *TwoFa                      `json:"twoFa,omitempty"`
+	ContainerCheckIgnoreUpgrade ContainerCheckIgnoreUpgrade `json:"containerCheckIgnoreUpgrade,omitempty"`
+	ContainerCheckAllUpgrade    *ContainerCheckAllUpgrade   `json:"containerCheckAllUpgrade,omitempty"`
+	DPanelInfo                  *container.InspectResponse  `json:"DPanelInfo,omitempty"`
+	ThemeConfig                 *ThemeConfig                `json:"themeConfig,omitempty"`
+	ThemeUserConfig             *ThemeUserConfig            `json:"themeUserConfig,omitempty"`
+	ThemeConsoleConfig          *ThemeConsoleConfig         `json:"themeConsoleConfig,omitempty"`
+	DnsApi                      []DnsApi                    `json:"dnsApi,omitempty"`
+	EmailServer                 *EmailServer                `json:"emailServer,omitempty"`
+	Tag                         []Tag                       `json:"tag,omitempty"`
 }
 
-type IgnoreCheckUpgrade []string
+type ContainerCheckIgnoreUpgrade []string
 
 type DiskUsage struct {
 	Usage     *types.DiskUsage `json:"usage,omitempty"`
@@ -41,15 +42,8 @@ type TwoFa struct {
 	QrCode string `json:"qrCode,omitempty"`
 }
 
-type ThemeConfig struct {
-	MainMenu        string `json:"mainMenu,omitempty"`
-	Algorithm       string `json:"algorithm,omitempty"`
-	Compact         string `json:"compact,omitempty"`
-	FontSizeConsole int    `json:"fontSizeConsole,omitempty"`
-	FontSize        int    `json:"fontSize,omitempty"`
-	SideMenu        string `json:"sideMenu,omitempty"`
-	TablePageSize   string `json:"tablePageSize,omitempty"`
-}
+type ThemeConfig map[string]any
+type ThemeConsoleConfig map[string]any
 
 type ThemeUserConfig struct {
 	Token   map[string]interface{} `json:"token"`
@@ -62,16 +56,11 @@ type ThemeUserConfig struct {
 		Right  int    `json:"right,omitempty"`
 		Bottom int    `json:"bottom,omitempty"`
 	} `json:"bgImage,omitempty"`
-	SiteLink      []ThemeUserConfigSiteLink `json:"siteLink,omitempty"`
-	SiteCopyright string                    `json:"siteCopyright,omitempty"`
-	SiteTitle     string                    `json:"siteTitle"`
-	SiteLogo      string                    `json:"siteLogo,omitempty"`
-	LoginLogo     string                    `json:"loginLogo,omitempty"`
-}
-
-type ThemeUserConfigSiteLink struct {
-	Href  string `json:"href,omitempty"`
-	Title string `json:"title,omitempty"`
+	SiteLink      []map[string]string `json:"siteLink,omitempty"`
+	SiteCopyright string              `json:"siteCopyright,omitempty"`
+	SiteTitle     string              `json:"siteTitle"`
+	SiteLogo      string              `json:"siteLogo,omitempty"`
+	LoginLogo     string              `json:"loginLogo,omitempty"`
 }
 
 type DnsApi struct {

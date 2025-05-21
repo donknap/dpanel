@@ -17,14 +17,15 @@ var (
 	SettingGroupSettingDocker               = "docker" // docker env
 	SettingGroupSettingTwoFa                = "twoFa"  // 双因素
 	SettingGroupSettingDiskUsage            = "diskUsage"
-	SettingGroupSettingCheckContainerIgnore = "checkContainerIgnore"
-	SettingGroupSettingCheckContainerAll    = "checkContainerAllUpgrade"
+	SettingGroupSettingCheckContainerIgnore = "containerCheckIgnoreUpgrade"
+	SettingGroupSettingCheckContainerAll    = "containerCheckAllUpgrade"
 	SettingGroupSettingDPanelInfo           = "DPanelInfo"
 	SettingGroupSettingThemeConfig          = "themeConfig"
 	SettingGroupSettingThemeUserConfig      = "themeUserConfig"
+	SettingGroupSettingThemeConsoleConfig   = "themeConsoleConfig"
 	SettingGroupSettingDnsApi               = "dnsApi"
 	SettingGroupSettingEmailServer          = "emailServer"
-	SettingGroupSettingTag                  = "Tag"
+	SettingGroupSettingTag                  = "tag"
 )
 
 // 用户相关数据
@@ -130,25 +131,30 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 				exists = true
 				*v = *setting.Value.TwoFa
 			}
-		case *accessor.IgnoreCheckUpgrade:
-			if setting.Value.IgnoreCheckUpgrade != nil {
+		case *accessor.ContainerCheckIgnoreUpgrade:
+			if setting.Value.ContainerCheckIgnoreUpgrade != nil {
 				exists = true
-				*v = setting.Value.IgnoreCheckUpgrade
+				*v = setting.Value.ContainerCheckIgnoreUpgrade
 			}
 		case *container.InspectResponse:
 			if setting.Value.DPanelInfo != nil {
 				exists = true
 				*v = *setting.Value.DPanelInfo
 			}
-		case *accessor.ThemeUserConfig:
-			if setting.Value.ThemeUserConfig != nil {
-				exists = true
-				*v = *setting.Value.ThemeUserConfig
-			}
 		case *accessor.ThemeConfig:
 			if setting.Value.ThemeConfig != nil {
 				exists = true
 				*v = *setting.Value.ThemeConfig
+			}
+		case *accessor.ThemeConsoleConfig:
+			if setting.Value.ThemeConfig != nil {
+				exists = true
+				*v = *setting.Value.ThemeConsoleConfig
+			}
+		case *accessor.ThemeUserConfig:
+			if setting.Value.ThemeUserConfig != nil {
+				exists = true
+				*v = *setting.Value.ThemeUserConfig
 			}
 		case *[]accessor.DnsApi:
 			if setting.Value.DnsApi != nil {

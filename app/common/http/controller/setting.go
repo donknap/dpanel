@@ -8,6 +8,8 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"reflect"
+	"strings"
 )
 
 type Setting struct {
@@ -55,48 +57,6 @@ func (self Setting) Founder(http *gin.Context) {
 	return
 }
 
-func (self Setting) Email(http *gin.Context) {
-	params := accessor.EmailServer{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	err := logic.Setting{}.Save(&entity.Setting{
-		GroupName: logic.SettingGroupSetting,
-		Name:      logic.SettingGroupSettingEmailServer,
-		Value: &accessor.SettingValueOption{
-			EmailServer: &params,
-		},
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Setting) EmailTest(http *gin.Context) {
-	type ParamsValidate struct {
-		Subject string `json:"subject" binding:"required"`
-		Content string `json:"content" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	emailServer := accessor.EmailServer{}
-	if ok := (logic.Setting{}).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingEmailServer, &emailServer); !ok {
-		self.JsonResponseWithError(http, function.ErrorMessage(".settingBasicEmailInvalid"), 500)
-		return
-	}
-	err := logic.Notice{}.Send(emailServer, emailServer.Email, params.Subject, params.Content)
-	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".settingBasicEmailInvalid", err.Error()), 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
-}
-
 func (self Setting) GetSetting(http *gin.Context) {
 	type ParamsValidate struct {
 		GroupName string `json:"groupName" binding:"required"`
@@ -109,17 +69,74 @@ func (self Setting) GetSetting(http *gin.Context) {
 	row, err := logic.Setting{}.GetValue(params.GroupName, params.Name)
 	if err != nil {
 		self.JsonResponseWithoutError(http, gin.H{
-			"setting": &entity.Setting{
-				GroupName: params.GroupName,
-				Name:      params.Name,
-				Value:     &accessor.SettingValueOption{},
-			},
+			params.Name: gin.H{},
 		})
 		return
 	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"setting": row,
-	})
+	refValue := reflect.ValueOf(row.Value).Elem()
+	name := strings.ToUpper(string(params.Name[0])) + params.Name[1:]
+	if refValue.FieldByName(name).IsValid() {
+		self.JsonResponseWithoutError(http, refValue.FieldByName(name).Interface())
+	} else {
+		self.JsonResponseWithoutError(http, gin.H{
+			params.Name: gin.H{},
+		})
+	}
 	return
+}
 
+func (self Setting) SaveConfig(http *gin.Context) {
+	type ParamsValidate struct {
+		Theme       *accessor.ThemeConfig        `json:"theme"`
+		Console     *accessor.ThemeConsoleConfig `json:"console"`
+		EmailServer *accessor.EmailServer        `json:"emailServer"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if params.Theme != nil {
+		err := logic.Setting{}.Save(&entity.Setting{
+			GroupName: logic.SettingGroupSetting,
+			Name:      logic.SettingGroupSettingThemeConfig,
+			Value: &accessor.SettingValueOption{
+				ThemeConfig: params.Theme,
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	if params.Console != nil {
+		err := logic.Setting{}.Save(&entity.Setting{
+			GroupName: logic.SettingGroupSetting,
+			Name:      logic.SettingGroupSettingThemeConsoleConfig,
+			Value: &accessor.SettingValueOption{
+				ThemeConsoleConfig: params.Console,
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	if params.EmailServer != nil {
+		err := logic.Setting{}.Save(&entity.Setting{
+			GroupName: logic.SettingGroupSetting,
+			Name:      logic.SettingGroupSettingEmailServer,
+			Value: &accessor.SettingValueOption{
+				EmailServer: params.EmailServer,
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	self.JsonSuccessResponse(http)
+	return
 }

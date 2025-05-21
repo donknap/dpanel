@@ -51,19 +51,19 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/user/create-founder", controller.User{}.CreateFounder)
 		cors.POST("/common/user/login-info", controller.User{}.LoginInfo)
 		cors.POST("/common/user/get-user-info", controller.User{}.GetUserInfo)
-		cors.POST("/common/user/save-theme-config", controller.User{}.SaveThemeConfig)
+
 
 		// 配置
 		cors.POST("/common/setting/founder", controller.Setting{}.Founder)
-		cors.POST("/common/setting/email", controller.Setting{}.Email)
-		cors.POST("/common/setting/email-test", controller.Setting{}.EmailTest)
 		cors.POST("/common/setting/get-setting", controller.Setting{}.GetSetting)
+		cors.POST("/common/setting/save-config", controller.Setting{}.SaveConfig)
 
 		cors.POST("/common/home/info", controller.Home{}.Info)
 		cors.POST("/common/home/check-new-version", controller.Home{}.CheckNewVersion)
 		cors.POST("/common/home/usage", controller.Home{}.Usage)
 		cors.POST("/common/home/upgrade-script", controller.Home{}.UpgradeScript)
 		cors.POST("/common/home/get-stat-list", controller.Home{}.GetStatList)
+		cors.POST("/common/home/email-test", controller.Home{}.EmailTest)
 
 		// 环境管理
 		cors.POST("/common/env/get-list", controller.Env{}.GetList)
