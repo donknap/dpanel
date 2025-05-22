@@ -68,9 +68,7 @@ func (self Setting) GetSetting(http *gin.Context) {
 	}
 	row, err := logic.Setting{}.GetValue(params.GroupName, params.Name)
 	if err != nil {
-		self.JsonResponseWithoutError(http, gin.H{
-			params.Name: gin.H{},
-		})
+		self.JsonResponseWithoutError(http, gin.H{})
 		return
 	}
 	refValue := reflect.ValueOf(row.Value).Elem()
@@ -78,9 +76,7 @@ func (self Setting) GetSetting(http *gin.Context) {
 	if refValue.FieldByName(name).IsValid() {
 		self.JsonResponseWithoutError(http, refValue.FieldByName(name).Interface())
 	} else {
-		self.JsonResponseWithoutError(http, gin.H{
-			params.Name: gin.H{},
-		})
+		self.JsonResponseWithoutError(http, gin.H{})
 	}
 	return
 }

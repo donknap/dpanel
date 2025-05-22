@@ -332,7 +332,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 
 	for _, item := range result {
 		if tempChangeFileList != nil {
-			if change, ok := tempChangeFileList[item.Name]; ok {
+			if change, ok := tempChangeFileList[item.Path]; ok {
 				switch int(change.Kind) {
 				case 0:
 					item.Change = fs2.ChangeModified
@@ -348,7 +348,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		}
 		if !function.IsEmptyArray(containerInfo.Mounts) {
 			for _, mount := range containerInfo.Mounts {
-				if strings.HasPrefix(item.Name, mount.Destination) {
+				if strings.HasPrefix(item.Path, mount.Destination) {
 					item.Change = fs2.ChangeVolume
 					break
 				}
