@@ -52,7 +52,6 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/user/login-info", controller.User{}.LoginInfo)
 		cors.POST("/common/user/get-user-info", controller.User{}.GetUserInfo)
 
-
 		// 配置
 		cors.POST("/common/setting/founder", controller.Setting{}.Founder)
 		cors.POST("/common/setting/get-setting", controller.Setting{}.GetSetting)
@@ -156,6 +155,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
 		// 获取面板信息
 		if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
+			info.ExecIDs = make([]string, 0)
 			_ = logic.Setting{}.Save(&entity.Setting{
 				GroupName: logic.SettingGroupSetting,
 				Name:      logic.SettingGroupSettingDPanelInfo,

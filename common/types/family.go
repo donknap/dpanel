@@ -1,15 +1,12 @@
 package types
 
 const (
-	FeatureEnableTwoFa        = "canSeeEnableTwoFa"
-	FeatureEnableThemeUser    = "canSeeEnableThemeUser"
-	FeatureEnableSystemUser   = "canSeeEnableSystemUser"
-	FeatureEnableHomeTag      = "canSeeEnableHomeTag"
-	FeatureContainerDomain    = "canSeeEnableContainerDomain"
 	FeatureFamilyPe           = "canSeeEnablePe"
 	FeatureFamilyEe           = "canSeeEnableEe"
 	FeatureFamilyCe           = "canSeeEnableCe"
+	FeatureFamilyXk           = "canSeeEnableXk"
 	FeatureVersionEnvLite     = "canSeeEnableVersionEnvLite"
 	FeatureVersionEnvStandard = "canSeeEnableVersionEnvStandard"
 	FeatureDockerEnvLocal     = "canSeeEnableDockerEnvLocal"
+	FeatureInDPanel           = "canSeeEnableInDPanel"
 )

@@ -39,10 +39,12 @@ func WithAuthPem(username string, privateKeyPem string, password string) Option 
 
 func WithAddress(address string, port int) Option {
 	return func(self *Client) error {
-		self.address = fmt.Sprintf("%s:%d", address, port)
 		if strings.Contains(address, ":") {
+			address = strings.Trim(strings.Trim(address, "["), "]")
+			self.address = fmt.Sprintf("[%s]:%d", address, port)
 			self.protocol = "tcp6"
 		} else {
+			self.address = fmt.Sprintf("%s:%d", address, port)
 			self.protocol = "tcp"
 		}
 		return nil

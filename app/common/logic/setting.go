@@ -176,6 +176,8 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 				exists = true
 				*v = setting.Value.Tag
 			}
+		case *entity.Setting:
+			*v = *setting
 		}
 	}
 	return exists

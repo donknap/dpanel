@@ -124,7 +124,7 @@ func (self Local) SaveUploadImage(uploadFileName, newFileNamePrefix string, appe
 	newBgFile := filepath.Join(rootPath, newFileName)
 	_ = os.MkdirAll(filepath.Dir(newBgFile), 0777)
 	_ = os.Rename(
-		filepath.Join(self.GetSaveRootPath(), uploadFileName),
+		uploadFileName,
 		newBgFile,
 	)
 	return "/dpanel/static/image/" + newFileName
