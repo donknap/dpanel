@@ -1,12 +1,12 @@
 package controller
 
 import (
-	"bytes"
+	"fmt"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"io"
-	"log/slog"
-	http2 "net/http"
+	"time"
 )
 
 func (self Container) GetStatInfo(http *gin.Context) {
@@ -17,26 +17,29 @@ func (self Container) GetStatInfo(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	out, err := docker.Sdk.Client.ContainerStats(docker.Sdk.Ctx, params.Id, false)
+	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerStat, params.Id))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if out.Body.Close() != nil {
-			slog.Error("container", "stat close", err)
-		}
-	}()
-	buffer := new(bytes.Buffer)
-	_, err = io.Copy(buffer, out.Body)
+	response, err := docker.Sdk.Client.ContainerStats(progress.Context(), params.Id, true)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	http.Header("Content-type", "application/json;charset=utf-8")
-	http.String(http2.StatusOK, buffer.String())
-	return
+	lastSendTime := time.Now()
 
+	progress.OnWrite = func(p string) error {
+		if time.Now().Sub(lastSendTime) < time.Second*2 {
+			return nil
+		}
+		lastSendTime = time.Now()
+		progress.BroadcastMessage(p)
+		return nil
+	}
+	_, err = io.Copy(progress, response.Body)
+	self.JsonSuccessResponse(http)
+	return
 }
 
 func (self Container) GetProcessInfo(http *gin.Context) {
