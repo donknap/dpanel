@@ -109,3 +109,15 @@ func Kill() error {
 func (self Command) Cmd() *exec.Cmd {
 	return self.cmd
 }
+
+func (self Command) Close() {
+	var err error
+	slog.Debug("run command kill self cmd", "cmd", self.cmd)
+	if self.cmd != nil && self.cmd.Process != nil && self.cmd.Process.Pid > 0 {
+		err = self.cmd.Process.Kill()
+		if err == nil {
+			_, _ = self.cmd.Process.Wait()
+		}
+		slog.Debug("run command kill self cmd", "pid", self.cmd.Process.Pid, "name", self.cmd.String(), "error", err)
+	}
+}

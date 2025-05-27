@@ -30,7 +30,7 @@ func (self Container) GetStatInfo(http *gin.Context) {
 	lastSendTime := time.Now()
 
 	progress.OnWrite = func(p string) error {
-		if time.Now().Sub(lastSendTime) < time.Second*2 {
+		if time.Now().Sub(lastSendTime) < time.Second*1 {
 			return nil
 		}
 		lastSendTime = time.Now()

@@ -592,14 +592,18 @@ func (self Home) GetStatList(http *gin.Context) {
 		}
 		return nil
 	}
-
+	ctx, _ := context.WithTimeout(progress.Context(), time.Hour*1)
 	option = append(option, docker.Sdk.GetRunCmd(command...)...)
-	option = append(option, exec.WithCtx(progress.Context()))
+	option = append(option, exec.WithCtx(ctx))
 	cmd, err := exec.New(option...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	go func() {
+		<-progress.Done()
+		cmd.Close()
+	}()
 	out, err := cmd.RunInPip()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
