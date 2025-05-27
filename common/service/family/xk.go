@@ -5,7 +5,6 @@ package family
 import (
 	"github.com/donknap/dpanel/app/pro/xk"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/console"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 	"log/slog"
 )
@@ -13,7 +12,7 @@ import (
 type Provider struct {
 }
 
-func (self *Provider) Register(httpServer *server.Server, consoleServer console.Console) {
+func (self *Provider) Register(httpServer *server.Server) {
 	slog.Debug("provider load xk edition")
 	new(xk.Provider).Register(httpServer)
 }

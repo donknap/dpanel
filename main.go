@@ -107,7 +107,7 @@ func main() {
 			},
 		)
 
-		new(family.Provider).Register(httpServer, facade.GetConsole())
+		new(family.Provider).Register(httpServer)
 		new(common.Provider).Register(httpServer)
 		new(application.Provider).Register(httpServer)
 	}

@@ -142,6 +142,9 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		options = append(options, docker.WithTLS(defaultDockerEnv.TlsCa, defaultDockerEnv.TlsCert, defaultDockerEnv.TlsKey))
 	}
 	docker.Sdk, err = docker.NewBuilder(options...)
+	if err != nil {
+		panic(err)
+	}
 
 	// 使用超时上下文，避免 docker 连接地址时间过长卡死程序
 	ctx, _ := context.WithTimeout(context.Background(), docker.ConnectDockerServerTimeout)
