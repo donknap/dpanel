@@ -7,21 +7,22 @@ import (
 )
 
 const (
-	MessageTypeEvent           = "event"
-	MessageTypeEventFd         = "event:fd"
-	MessageTypeCompose         = "compose:%s"
-	MessageTypeComposeLog      = "compose:log:%s"
-	MessageTypeConsole         = "/console/container/%s"
-	MessageTypeConsoleHost     = "/console/host/%s"
-	MessageTypeContainerLog    = "container:log:%s"
-	MessageTypeContainerStat   = "container:stat"
-	MessageTypeContainerBackup = "container:backup:%d"
-	MessageTypeImagePull       = "image:pull:%s"
-	MessageTypeImageBuild      = "image:build:%d"
-	MessageTypeImageImport     = "image:import"
-	MessageTypeProgressClose   = "progress:close"
-	MessageTypeDomainApply     = "domain:apply"
-	MessageTypeUserPermission  = "user:permission:%s"
+	MessageTypeEvent            = "event"
+	MessageTypeEventFd          = "event:fd"
+	MessageTypeCompose          = "compose:%s"
+	MessageTypeComposeLog       = "compose:log:%s"
+	MessageTypeConsole          = "/console/container/%s"
+	MessageTypeConsoleHost      = "/console/host/%s"
+	MessageTypeContainerLog     = "container:log:%s"
+	MessageTypeContainerAllStat = "container:stat"
+	MessageTypeContainerStat    = "container:stat:%s"
+	MessageTypeContainerBackup  = "container:backup:%d"
+	MessageTypeImagePull        = "image:pull:%s"
+	MessageTypeImageBuild       = "image:build:%d"
+	MessageTypeImageImport      = "image:import"
+	MessageTypeProgressClose    = "progress:close"
+	MessageTypeDomainApply      = "domain:apply"
+	MessageTypeUserPermission   = "user:permission:%s"
 )
 
 type RespMessage struct {

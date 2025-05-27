@@ -146,6 +146,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 		select {
 		case <-client.CtxContext.Done():
 			if shell.Conn != nil {
+				_ = shell.CloseWrite()
 				shell.Close()
 			}
 			return
@@ -557,7 +558,7 @@ func (self Home) GetStatList(http *gin.Context) {
 		return
 	}
 
-	progress, err := ws.NewFdProgressPip(http, ws.MessageTypeContainerStat)
+	progress, err := ws.NewFdProgressPip(http, ws.MessageTypeContainerAllStat)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
