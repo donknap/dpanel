@@ -601,6 +601,7 @@ func (self Home) GetStatList(http *gin.Context) {
 		return
 	}
 	go func() {
+		slog.Debug("home get stat list progress close")
 		<-progress.Done()
 		cmd.Close()
 	}()
@@ -609,6 +610,7 @@ func (self Home) GetStatList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	slog.Debug("home get stat list cmd start", "cmd", cmd, "pid", cmd.Cmd().Process.Pid)
 	_, err = io.Copy(progress, out)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
