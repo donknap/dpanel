@@ -197,11 +197,13 @@ func (self Store) Sync(http *gin.Context) {
 		}
 	}
 
-	if params.Id > 0 && len(appList) > 0 {
+	if params.Id > 0 {
 		if storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(params.Id)).First(); storeRow != nil {
-			storeRow.Setting.Apps = appList
+			if len(appList) > 0 {
+				storeRow.Setting.Apps = appList
+			}
 			storeRow.Setting.UpdatedAt = time.Now().Unix()
-			_, _ = dao.Store.Updates(storeRow)
+			_ = dao.Store.Save(storeRow)
 		}
 	}
 
