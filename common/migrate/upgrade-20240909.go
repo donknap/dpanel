@@ -17,7 +17,7 @@ func (self Upgrade20240909) Upgrade() error {
 			continue
 		}
 		compose.Setting.Status = ""
-		_, err := dao.Compose.Updates(compose)
+		err := dao.Compose.Save(compose)
 		if err != nil {
 			return err
 		}

@@ -307,11 +307,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	if err != nil {
 		imageRow.Status = docker.ImageBuildStatusError
 		imageRow.Message = log + "\n" + err.Error()
-		if imageRow.ID > 0 {
-			_, _ = dao.Image.Updates(imageRow)
-		} else {
-			_ = dao.Image.Create(imageRow)
-		}
+		_ = dao.Image.Save(imageRow)
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -320,11 +316,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	imageRow.ImageInfo = &accessor.ImageInfoOption{
 		Id: imageNameDetail.Uri(),
 	}
-	if imageRow.ID == 0 {
-		_ = dao.Image.Create(imageNew)
-	} else {
-		_, _ = dao.Image.Updates(imageRow)
-	}
+	_ = dao.Image.Save(imageRow)
 	self.JsonResponseWithoutError(http, gin.H{
 		"imageId": imageRow.ID,
 	})

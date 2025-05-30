@@ -97,7 +97,7 @@ func (self Cron) Create(http *gin.Context) {
 			taskRow.Setting.JobIds = jobIds
 		}
 	}
-	_, _ = dao.Cron.Updates(taskRow)
+	_ = dao.Cron.Save(taskRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

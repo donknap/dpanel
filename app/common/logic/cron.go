@@ -167,7 +167,7 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 
 	option = append(option, crontab.WithRunFunc(func() error {
 		task.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(task.Setting.JobIds...)
-		_, err := dao.Cron.Updates(task)
+		err := dao.Cron.Save(task)
 		return err
 	}))
 

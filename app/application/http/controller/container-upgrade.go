@@ -168,7 +168,7 @@ func (self Container) Upgrade(http *gin.Context) {
 			Id:   out.ID,
 			Info: newContainerInfo,
 		}
-		_, _ = dao.Site.Updates(siteRow)
+		_ = dao.Site.Save(siteRow)
 	}
 
 	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, containerInfo.Name, container.StartOptions{})

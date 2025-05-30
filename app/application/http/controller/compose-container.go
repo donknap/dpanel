@@ -102,7 +102,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		composeRow.Setting.Status = ""
 	}
 	if composeRow.ID > 0 {
-		_, _ = dao.Compose.Updates(composeRow)
+		_ = dao.Compose.Save(composeRow)
 	}
 
 	if err != nil {
@@ -179,7 +179,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		composeRow.Setting.Status = ""
 		composeRow.Setting.CreatedAt = ""
 		composeRow.Setting.UpdatedAt = ""
-		_, _ = dao.Compose.Updates(composeRow)
+		_ = dao.Compose.Save(composeRow)
 	}
 
 	if params.DeletePath {

@@ -21,7 +21,7 @@ func (self Upgrade20250106) Upgrade() error {
 			continue
 		}
 		compose.Setting.DockerEnvName = docker.DefaultClientName
-		_, err := dao.Compose.Updates(compose)
+		err := dao.Compose.Save(compose)
 		if err != nil {
 			return err
 		}
