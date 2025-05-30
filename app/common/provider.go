@@ -8,9 +8,12 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/family"
+	"github.com/donknap/dpanel/common/types"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -47,7 +50,9 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/notice/delete", controller.Notice{}.Delete)
 
 		// 用户
-		cors.POST("/common/user/login", controller.User{}.Login)
+		if !function.InArrayArray(new(family.Provider).Feature(), types.FeatureFamilyXk) {
+			cors.POST("/common/user/login", controller.User{}.Login)
+		}
 		cors.POST("/common/user/create-founder", controller.User{}.CreateFounder)
 		cors.POST("/common/user/login-info", controller.User{}.LoginInfo)
 		cors.POST("/common/user/get-user-info", controller.User{}.GetUserInfo)

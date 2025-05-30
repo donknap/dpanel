@@ -2,11 +2,15 @@ package ws
 
 import (
 	"context"
+	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gorilla/websocket"
 	"log/slog"
+	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -45,6 +49,28 @@ func (self *Collection) Leave(c *Client) {
 			v.CloseFd(c.Fd)
 		}
 		return true
+	})
+
+	// ws 断开之后检测当前用户是否全部断开连接，则把缓存中的用户数据清除掉（主动退出）
+	time.AfterFunc(10*time.Second, func() {
+		for key, item := range storage.Cache.Items() {
+			if strings.HasPrefix(key, "user:") {
+				if v, ok := item.Object.(logic.UserInfo); ok && !v.AutoLogin {
+					hasConnect := false
+					self.clients.Range(func(key, value any) bool {
+						if c, ok := value.(*Client); ok && c.UserId == v.UserId {
+							hasConnect = true
+							return true
+						}
+						return true
+					})
+					if !hasConnect {
+						storage.Cache.Delete(key)
+						slog.Debug("ws leave delete cache userinfo", "key", key, "user", v)
+					}
+				}
+			}
+		}
 	})
 
 	// 所有客户端都退出时，销毁所有通道

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"log/slog"
@@ -58,12 +59,16 @@ func NewClient(ctx *gin.Context, options ...Option) (*Client, error) {
 			return nil, err
 		}
 	}
+	if v, ok := ctx.Get("userInfo"); ok {
+		client.UserId = v.(logic.UserInfo).UserId
+	}
 	collect.Join(client)
 	slog.Info("ws connect", "fd", client.Fd, "goroutine", runtime.NumGoroutine(), "client total", collect.Total(), "progress total", collect.ProgressTotal())
 	return client, nil
 }
 
 type Client struct {
+	UserId             int32
 	Fd                 string          // 业务系统中用户唯一标识
 	Conn               *websocket.Conn // 当前 ws 连接
 	CtxCancelFunc      context.CancelFunc

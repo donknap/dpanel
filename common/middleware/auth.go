@@ -2,7 +2,9 @@ package common
 
 import (
 	"errors"
+	"fmt"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
@@ -19,18 +21,19 @@ var (
 )
 
 func (self AuthMiddleware) Process(http *gin.Context) {
-	if strings.Contains(http.Request.URL.Path, "/api/common/user/login") ||
-		strings.Contains(http.Request.URL.Path, "/pro/home/login-info") ||
-		strings.Contains(http.Request.URL.Path, "/api/common/user/create-founder") ||
-		strings.Contains(http.Request.URL.Path, "/pro/user/reset-info") ||
-		strings.Contains(http.Request.URL.Path, "/xk/user/oauth/callback") ||
-		!strings.Contains(http.Request.URL.Path, "/api") {
+	currentUrlPath := http.Request.URL.Path
+	if strings.Contains(currentUrlPath, "/api/common/user/login") ||
+		strings.Contains(currentUrlPath, "/pro/home/login-info") ||
+		strings.Contains(currentUrlPath, "/api/common/user/create-founder") ||
+		strings.Contains(currentUrlPath, "/pro/user/reset-info") ||
+		strings.Contains(currentUrlPath, "/xk/user/oauth/callback") ||
+		(!strings.HasPrefix(currentUrlPath, "/api") && !strings.HasPrefix(currentUrlPath, "/ws")) {
 		http.Next()
 		return
 	}
 
 	var authToken = ""
-	if strings.Contains(http.Request.URL.Path, "/common/ws") {
+	if strings.HasPrefix(currentUrlPath, "/ws/") {
 		authToken = "Bearer " + http.Query("token")
 	} else {
 		authToken = http.GetHeader("Authorization")
@@ -59,16 +62,26 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		return
 	}
 	if token.Valid {
-		_, err := logic.Setting{}.GetValueById(myUserInfo.UserId)
-		if err != nil {
-			slog.Debug("auth get user", "error", err.Error())
-			self.JsonResponseWithError(http, ErrLogin, 401)
-			http.AbortWithStatus(401)
-			return
+		if myUserInfo.AutoLogin {
+			if _, err := new(logic.Setting).GetValueById(myUserInfo.UserId); err == nil {
+				myUserInfo.Fd = http.GetHeader("AuthorizationFd")
+				http.Set("userInfo", myUserInfo)
+				http.Next()
+				return
+			}
+		} else {
+			if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyCommonUserInfo, myUserInfo.UserId)); ok {
+				if _, ok := v.(logic.UserInfo); ok {
+					myUserInfo.Fd = http.GetHeader("AuthorizationFd")
+					http.Set("userInfo", myUserInfo)
+					http.Next()
+					return
+				}
+			}
 		}
-		myUserInfo.Fd = http.GetHeader("AuthorizationFd")
-		http.Set("userInfo", myUserInfo)
-		http.Next()
+		slog.Debug("auth get cache user error", "jwt", authToken, "userInfo", myUserInfo)
+		self.JsonResponseWithError(http, ErrLogin, 401)
+		http.AbortWithStatus(401)
 		return
 	}
 	self.JsonResponseWithError(http, ErrLogin, 401)
