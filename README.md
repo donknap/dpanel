@@ -75,8 +75,6 @@ curl -sSL https://dpanel.cc/quick.sh -o quick.sh && sudo bash quick.sh
 
 #### 为爱发电
 
-DPanel 是一个开源软件。
-
 如果此项目对你所有帮助，并希望我继续下去，请考虑赞助我为爱发电！感谢所有的爱和支持。
 
 https://afdian.com/a/dpanel
