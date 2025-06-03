@@ -301,6 +301,9 @@ func (self Explorer) GetPathList(http *gin.Context) {
 	if params.Path == "" && containerInfo.Config != nil {
 		params.Path = containerInfo.Config.WorkingDir
 	}
+	if params.Path == "" {
+		params.Path = "/"
+	}
 	afs, err := fs.NewContainerExplorer(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
