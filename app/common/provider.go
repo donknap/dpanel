@@ -186,9 +186,6 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	if cronList, err := dao.Cron.Order(dao.Cron.ID.Desc()).Find(); err == nil {
 		for _, task := range cronList {
 			if task.Setting.Disable {
-				task.Setting.NextRunTime = make([]time.Time, 0)
-				task.Setting.JobIds = make([]cron.EntryID, 0)
-				_ = dao.Cron.Save(task)
 				continue
 			}
 			jobIds, err := logic.Cron{}.AddJob(task)
