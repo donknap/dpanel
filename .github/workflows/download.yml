@@ -1,6 +1,8 @@
 name: Download toolchains 
+
 on:
   workflow_dispatch:  # 仅手动触发
+
 jobs:
   gnu:
     runs-on: ubuntu-latest
@@ -11,12 +13,21 @@ jobs:
           cd toolchains
           curl -Lo arm64.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
           curl -Lo arm.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-      - name: Upload to Artifacts
+
+      - name: Upload ARM64 Toolchain
         uses: actions/upload-artifact@v4
         with:
-          name: my-artifact
-          path: toolchains/ 
+          name: rm64.tar.xz
+          path: toolchains/arm64.tar.xz
           retention-days: 90
+
+      - name: Upload ARM Toolchain
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm.tar.xz
+          path: toolchains/arm.tar.xz
+          retention-days: 90
+
   musl:
     runs-on: ubuntu-latest
     steps:
@@ -27,12 +38,28 @@ jobs:
           curl -Lo amd64-musl.tgz https://musl.cc/x86_64-linux-musl-cross.tgz
           curl -Lo arm64-musl.tgz https://musl.cc/aarch64-linux-musl-cross.tgz
           curl -Lo arm-musl.tgz https://musl.cc/arm-linux-musleabihf-cross.tgz
-      - name: Upload to Artifacts
+
+      - name: Upload AMD64 Musl Toolchain
         uses: actions/upload-artifact@v4
         with:
-          name: my-artifact
-          path: toolchains/ 
-          retention-days: 90  
+          name: amd64-musl.tgz
+          path: toolchains/amd64-musl.tgz
+          retention-days: 90
+
+      - name: Upload ARM64 Musl Toolchain
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-musl.tgz
+          path: toolchains/arm64-musl.tgz
+          retention-days: 90
+
+      - name: Upload ARM Musl Toolchain
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm-musl.tgz
+          path: toolchains/arm-musl.tgz
+          retention-days: 90
+
   synology:
     runs-on: ubuntu-latest
     steps:
@@ -42,10 +69,17 @@ jobs:
           cd toolchains
           curl -Lo armv8-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz 
           curl -Lo amd64-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
-      - name: Upload to Artifacts
+
+      - name: Upload ARMv8 Synology Toolchain
         uses: actions/upload-artifact@v4
         with:
-          name: my-artifact
-          path: toolchains/ 
-          retention-days: 90  
+          name: armv8-synology.txz
+          path: toolchains/armv8-synology.txz
+          retention-days: 90
 
+      - name: Upload AMD64 Synology Toolchain
+        uses: actions/upload-artifact@v4
+        with:
+          name: amd64-synology.txz
+          path: toolchains/amd64-synology.txz
+          retention-days: 90
