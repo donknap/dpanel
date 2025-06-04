@@ -25,18 +25,12 @@ jobs:
           curl -Lo armv8-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz 
           curl -Lo amd64-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        if: always()
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: toolchains-v1
           name: "Toolchains Collection"
-          body: "Pre-built toolchains for ARM, ARM64, AMD64 and Synology platforms"
-          files: |
-            toolchains/arm64.tar.xz
-            toolchains/arm.tar.xz
-            toolchains/amd64-musl.tgz
-            toolchains/arm64-musl.tgz
-            toolchains/arm-musl.tgz
-            toolchains/armv8-synology.txz
-            toolchains/amd64-synology.txz
+          body: "Pre-built toolchains for ARM, ARM64, AMD64，MUSL and Synology platforms"
+          files: toolchains/*
           draft: false
           prerelease: false
