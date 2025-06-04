@@ -52,21 +52,21 @@ jobs:
           make build PROJECT_NAME=dpanel-amd64 CGO_ENABLED=1 VERSION=${VERSION_TAG}
           
           # arm64
-          curl -Lo arm64.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
+          curl -Lo arm64.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64.tar.xz
           tar -xf arm64.tar.xz
           make build PROJECT_NAME=dpanel-arm64 CGO_ENABLED=1 VERSION=${VERSION_TAG} GOARM=7 GOARCH=arm64 GOOS=linux \
           CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc \
           CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-g++
 
           # armv7
-          curl -Lo arm.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
+          curl -Lo arm.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm.tar.xz
           tar -xf arm.tar.xz
           make build PROJECT_NAME=dpanel-arm CGO_ENABLED=1 VERSION=${VERSION_TAG} GOARM=7 GOARCH=arm GOOS=linux \
           CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc \
           CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-g++
           
           # amd64-musl
-          curl -Lo amd64-musl.tgz https://musl.cc/x86_64-linux-musl-cross.tgz
+          curl -Lo amd64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-musl.tgz
           tar xzf amd64-musl.tgz
           make build PROJECT_NAME=dpanel-ce-musl-amd64 CGO_ENABLED=1 VERSION=${VERSION_TAG}  \
           CC=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc \
@@ -77,7 +77,7 @@ jobs:
           CXX=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-g++
           
           # arm64-musl
-          curl -Lo arm64-musl.tgz https://musl.cc/aarch64-linux-musl-cross.tgz
+          curl -Lo arm64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64-musl.tgz
           tar xzf arm64-musl.tgz
           make build PROJECT_NAME=dpanel-ce-musl-arm64 CGO_ENABLED=1 VERSION=${VERSION_TAG}  GOARM=7 GOARCH=arm64 GOOS=linux  \
           CC=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
@@ -88,7 +88,7 @@ jobs:
           CXX=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-g++
           
           # arm-musl 
-          curl -Lo arm-musl.tgz https://musl.cc/arm-linux-musleabihf-cross.tgz
+          curl -Lo arm-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm-musl.tgz
           tar zxf arm-musl.tgz
           make build PROJECT_NAME=dpanel-ce-musl-arm CGO_ENABLED=1 VERSION=${VERSION_TAG}  GOARM=7 GOARCH=arm GOOS=linux \
           CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc \
@@ -99,14 +99,14 @@ jobs:
           CXX=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-g++
           
           # 群辉 arm
-          curl -Lo armv8-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz 
+          curl -Lo armv8-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/armv8-synology.txz
           tar -Jvxf armv8-synology.txz
           make build PROJECT_NAME=dpanel-synology-arm64 CGO_ENABLED=1 VERSION=${VERSION_TAG}  GOARM=7 GOARCH=arm64 GOOS=linux \
           CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc \
           CXX=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-g++
           
           # 群辉 amd64
-          curl -Lo amd64-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
+          curl -Lo amd64-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-synology.txz
           tar -Jvxf amd64-synology.txz
           make build PROJECT_NAME=dpanel-synology-amd64 CGO_ENABLED=1 VERSION=${VERSION_TAG} \
           CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc \
