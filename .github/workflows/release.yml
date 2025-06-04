@@ -268,14 +268,9 @@ jobs:
       - name: Build
         run: |
           VERSION_TAG=${GITHUB_REF_NAME#v}
-          
-          make -C app/pro/tests/xk_open libxkopen.so
-          sudo cp app/pro/tests/xk_open/libxkopen.so /usr/local/lib/libxkopen.so
-          sudo cp app/pro/tests/xk_open/xk_open.h app/pro/tests/xk_open/cJSON.h /usr/local/include/
-          
+          make -C app/pro/tests/xk_open clean libxkopen.so
           make clean-source 
           make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 VERSION=${VERSION_TAG}
-
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
