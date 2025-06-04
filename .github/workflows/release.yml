@@ -241,3 +241,44 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: runtime/*
           prerelease: false
+  xk-build:
+    strategy:
+      matrix:
+        platform: [ 'ubuntu-latest' ]
+        go-version: [ '1.23' ]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Test Env
+        run: |
+          echo "Tag name from GITHUB_REF_NAME: $GITHUB_REF_NAME"
+          echo "Tag name from github.ref_name: ${{  github.ref_name }}"
+          echo "Tag name from github.ref: ${{  github.ref }}"
+          echo "Runs name: ${{runner.os}}"
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Install dependencies
+        run: |
+          go get .
+      - name: Build
+        run: |
+          VERSION_TAG=${GITHUB_REF_NAME#v}
+          
+          make -C app/pro/tests/xk_open libxkopen.so
+          cp app/pro/tests/xk_open/libxkopen.so /usr/local/lib/libxkopen.so
+          cp app/pro/tests/xk_open/xk_open.h app/pro/tests/xk_open/cJSON.h /usr/local/include/
+          
+          make clean-source 
+          make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 VERSION=${VERSION_TAG}
+
+      - name: upload artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: runtime/*
+          prerelease: false
