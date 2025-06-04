@@ -1,0 +1,26 @@
+name: Manual Upload to Artifacts
+on:
+  workflow_dispatch:  # 仅手动触发
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download toolchains
+        run: |
+          mkdir -p toolchains
+          cd toolchains
+          curl -Lo arm64.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
+          curl -Lo arm.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
+          curl -Lo amd64-musl.tgz https://musl.cc/x86_64-linux-musl-cross.tgz
+          curl -Lo arm64-musl.tgz https://musl.cc/aarch64-linux-musl-cross.tgz
+          curl -Lo arm-musl.tgz https://musl.cc/arm-linux-musleabihf-cross.tgz
+          curl -Lo armv8-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz 
+          curl -Lo amd64-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
+      - name: Upload to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-artifact
+          path: toolchains/ 
+          retention-days: 90  
