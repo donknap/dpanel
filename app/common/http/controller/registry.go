@@ -76,6 +76,15 @@ func (self Registry) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+	} else {
+		response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, registry.AuthConfig{
+			ServerAddress: params.ServerAddress,
+			Email:         params.Email,
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 
 	registryNew := &entity.Registry{
