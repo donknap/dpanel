@@ -358,9 +358,22 @@ func (self Explorer) GetPathList(http *gin.Context) {
 			}
 		}
 	}
+	var rootDirs []string
+	if containerInfo.Config != nil && containerInfo.Config.WorkingDir != "" {
+		rootDirs = append(rootDirs, containerInfo.Config.WorkingDir)
+	}
+	if containerInfo.Mounts != nil {
+		rootDirs = append(rootDirs, function.PluckArrayWalk(containerInfo.Mounts, func(item container.MountPoint) (string, bool) {
+			if pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, containerInfo.ID, item.Destination); err == nil && pathStat.Mode.IsDir() {
+				return item.Destination, true
+			}
+			return "", false
+		})...)
+	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"currentPath": params.Path,
 		"list":        result,
+		"rootDirs":    rootDirs,
 	})
 	return
 }

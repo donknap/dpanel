@@ -28,6 +28,7 @@ import (
 	ssh2 "golang.org/x/crypto/ssh"
 	"io"
 	"log/slog"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -629,12 +630,11 @@ func (self Home) GetStatList(http *gin.Context) {
 
 func (self Home) UpgradeScript(http *gin.Context) {
 	dpanelContainerInfo := container.InspectResponse{}
-	if exists := new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo); !exists {
-		self.JsonResponseWithError(http, notice.Message{}.New(".systemUpgradeDPanelNotFound"), 500)
-		return
-	}
+	new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo)
+	execPath, _ := os.Executable()
 	self.JsonResponseWithoutError(http, gin.H{
-		"info": dpanelContainerInfo,
+		"info":     dpanelContainerInfo,
+		"execPath": execPath,
 	})
 	return
 }

@@ -3,6 +3,7 @@ package logic
 import (
 	"encoding/json"
 	"github.com/docker/go-units"
+	"github.com/donknap/dpanel/common/function"
 	"strconv"
 	"strings"
 )
@@ -56,6 +57,16 @@ func (self Stat) GetStat(response string) ([]*statItemResult, error) {
 		r := &statItemResult{
 			Name:      statJsonItem.Name,
 			Container: statJsonItem.Container,
+		}
+		// 可能是状态数据量过少，部分系统会将同一容器的数据输出两次，这里去一下重
+		if ok, _ := function.IndexArrayWalk(result, func(item *statItemResult) bool {
+			if item.Name == r.Name {
+				return true
+			} else {
+				return false
+			}
+		}); ok {
+			continue
 		}
 		cpu, _ := strconv.ParseFloat(strings.TrimSuffix(statJsonItem.CPUPerc, "%"), 64)
 		// 使用率超过100%时，代表该容器使用超过1核。需要将占用转换成100%之内的占用
