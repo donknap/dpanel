@@ -98,6 +98,7 @@ func (self *Client) token() (string, error) {
 		UserId:       currentUser.ID,
 		Username:     currentUser.Value.Username,
 		RoleIdentity: currentUser.Name,
+		AutoLogin:    true,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(self.tokenExpire)),
 		},
