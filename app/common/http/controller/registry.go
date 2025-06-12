@@ -64,6 +64,7 @@ func (self Registry) Create(http *gin.Context) {
 	}
 
 	var response registry.AuthenticateOKBody
+	var loginErr error
 
 	if params.Username != "" && params.Password != "" {
 		response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, registry.AuthConfig{
@@ -77,13 +78,15 @@ func (self Registry) Create(http *gin.Context) {
 			return
 		}
 	} else {
-		response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, registry.AuthConfig{
-			ServerAddress: params.ServerAddress,
-			Email:         params.Email,
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
+		if !function.InArray([]string{
+			"docker.io",
+			"quay.io",
+			"ghcr.io",
+		}, params.ServerAddress) {
+			response, loginErr = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, registry.AuthConfig{
+				ServerAddress: params.ServerAddress,
+				Email:         params.Email,
+			})
 		}
 	}
 
@@ -113,6 +116,11 @@ func (self Registry) Create(http *gin.Context) {
 
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	if loginErr != nil {
+		self.JsonResponseWithError(http, loginErr, 500)
 		return
 	}
 
