@@ -20,13 +20,18 @@ import (
 func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
 	_ = notice.Message{}.Info(".imageBuild", "tag", task.Tag)
 
+	wsBuffer := ws.NewProgressPip(task.MessageId)
+	defer wsBuffer.Close()
+
 	b, err := builder.New(
-		builder.WithZipFilePath(task.ZipPath),
-		builder.WithDockerFileContent(task.DockerFileContent),
-		builder.WithDockerFilePath(task.Context),
-		builder.WithGitUrl(task.GitUrl),
+		builder.WithContext(wsBuffer.Context()),
+		builder.WithDockerFilePath(task.BuildDockerfileRoot, task.BuildDockerfileName),
+		builder.WithDockerFileContent([]byte(task.BuildDockerfileContent)),
+		builder.WithGitUrl(task.BuildGit),
+		builder.WithZipFilePath(task.BuildZip),
 		builder.WithPlatform(task.Platform),
 		builder.WithTag(task.Tag),
+		builder.WithArgs(task.BuildArgs...),
 	)
 	if err != nil {
 		return "", err
@@ -40,9 +45,6 @@ func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
 			slog.Error("image", "build", err.Error())
 		}
 	}()
-
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImageBuild, task.ImageId))
-	defer wsBuffer.Close()
 
 	log := new(bytes.Buffer)
 	buffer := new(bytes.Buffer)

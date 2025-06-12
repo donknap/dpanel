@@ -4,11 +4,13 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"context"
 	"errors"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -17,7 +19,7 @@ type Option func(builder *Builder) error
 
 func WithDockerFileContent(content []byte) Option {
 	return func(self *Builder) error {
-		if content == nil {
+		if content == nil || len(content) == 0 {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -47,16 +49,20 @@ func WithGitUrl(url string) Option {
 			return nil
 		}
 		self.imageBuildOption.RemoteContext = url
+		self.imageBuildOption.Dockerfile = filepath.Base(self.imageBuildOption.Dockerfile)
 		return nil
 	}
 }
 
-func WithDockerFilePath(path string) Option {
+func WithDockerFilePath(root, name string) Option {
 	return func(self *Builder) error {
-		if path == "" {
-			return nil
+		if root == "" {
+			root = "/"
 		}
-		self.imageBuildOption.Dockerfile = path
+		if name == "" {
+			name = "Dockerfile"
+		}
+		self.imageBuildOption.Dockerfile = filepath.Join(root, name)
 		return nil
 	}
 }
@@ -71,9 +77,9 @@ func WithTag(name ...string) Option {
 	}
 }
 
-func WithPlatform(item *docker.ImagePlatform) Option {
+func WithPlatform(item docker.ImagePlatform) Option {
 	return func(self *Builder) error {
-		if item == nil {
+		if item.Arch == "" || item.Type == "" {
 			return nil
 		}
 		self.imageBuildOption.Platform = item.Type
@@ -101,13 +107,14 @@ func WithZipFilePath(path string) Option {
 		defer func() {
 			_ = tarWriter.Close()
 		}()
-
+		trimPath := filepath.Dir(self.imageBuildOption.Dockerfile)
+		self.imageBuildOption.Dockerfile = filepath.Base(self.imageBuildOption.Dockerfile)
 		for _, zipFile := range zipArchive.File {
 			if strings.HasPrefix(zipFile.Name, "__MACOSX") {
 				continue
 			}
 			fileInfoHeader, err := tar.FileInfoHeader(zipFile.FileInfo(), "")
-			fileInfoHeader.Name = zipFile.Name
+			fileInfoHeader.Name = strings.TrimPrefix(zipFile.Name, trimPath)
 
 			if err != nil {
 				return err
@@ -123,6 +130,23 @@ func WithZipFilePath(path string) Option {
 			}
 		}
 		self.buildContext = buf
+		return nil
+	}
+}
+
+func WithContext(ctx context.Context) Option {
+	return func(self *Builder) error {
+		self.ctx = ctx
+		return nil
+	}
+}
+
+func WithArgs(args ...docker.EnvItem) Option {
+	return func(self *Builder) error {
+		self.imageBuildOption.BuildArgs = make(map[string]*string)
+		for _, arg := range args {
+			self.imageBuildOption.BuildArgs[arg.Name] = &arg.Value
+		}
 		return nil
 	}
 }

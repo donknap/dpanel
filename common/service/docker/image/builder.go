@@ -1,6 +1,7 @@
 package image
 
 import (
+	"context"
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
@@ -34,11 +35,12 @@ func New(opts ...Option) (*Builder, error) {
 type Builder struct {
 	imageBuildOption types.ImageBuildOptions
 	buildContext     io.Reader
+	ctx              context.Context
 }
 
 func (self *Builder) Execute() (response types.ImageBuildResponse, err error) {
 	response, err = docker.Sdk.Client.ImageBuild(
-		docker.Sdk.Ctx,
+		self.ctx,
 		self.buildContext,
 		self.imageBuildOption,
 	)

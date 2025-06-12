@@ -14,14 +14,19 @@ type CreateContainerOption struct {
 }
 
 type BuildImageOption struct {
-	ZipPath           string // 构建包
-	DockerFileContent []byte // 自定义Dockerfile
-	DockerFileInPath  string // Dockerfile 所在路径
-	GitUrl            string
-	Tag               string // 镜像Tag
-	ImageId           int32
-	Context           string // Dockerfile 所在的目录
-	Platform          *docker.ImagePlatform
+	Id                     int32 `json:"id"`
+	MessageId              string
+	Registry               string               `json:"registry"`
+	Tag                    string               `json:"tag" binding:"required"`
+	Title                  string               `json:"title"`
+	BuildType              string               `json:"buildType" binding:"required"`
+	BuildDockerfileContent string               `json:"buildDockerfileContent" binding:"omitempty"`
+	BuildDockerfileName    string               `json:"buildDockerfileName"`
+	BuildDockerfileRoot    string               `json:"buildDockerfileRoot"`
+	BuildGit               string               `json:"buildGit" binding:"omitempty"`
+	BuildZip               string               `json:"buildZip" binding:"omitempty"`
+	BuildArgs              []docker.EnvItem     `json:"buildArgs"`
+	Platform               docker.ImagePlatform `json:"platform"`
 }
 
 type ImageRemoteOption struct {

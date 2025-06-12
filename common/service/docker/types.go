@@ -143,8 +143,8 @@ type NetworkCreateItem struct {
 }
 
 type ImagePlatform struct {
-	Type string
-	Arch string
+	Type string `json:"type"`
+	Arch string `json:"arch"`
 }
 
 type ImportFile struct {

@@ -213,24 +213,11 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 }
 
 func (self Image) CreateByDockerfile(http *gin.Context) {
-	type ParamsValidate struct {
-		Id              int32  `json:"id"`
-		Registry        string `json:"registry"`
-		Tag             string `json:"tag" binding:"required"`
-		Title           string `json:"title"`
-		BuildType       string `json:"buildType" binding:"required"`
-		BuildDockerfile string `json:"buildDockerfile" binding:"omitempty"`
-		BuildGit        string `json:"buildGit" binding:"omitempty"`
-		BuildZip        string `json:"buildZip" binding:"omitempty"`
-		BuildRoot       string `json:"buildRoot" binding:"omitempty"`
-		Platform        string `json:"platform"`
-		PlatformArch    string `json:"platformArch"`
-	}
-	params := ParamsValidate{}
+	params := logic.BuildImageOption{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if params.BuildDockerfile == "" && params.BuildZip == "" && params.BuildGit == "" {
+	if params.BuildDockerfileContent == "" && params.BuildZip == "" && params.BuildGit == "" {
 		self.JsonResponseWithError(http, errors.New("至少需要指定 Dockerfile、Zip 包或是 Git 地址"), 500)
 		return
 	}
@@ -242,13 +229,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	if params.Registry != "" {
 		imageNameDetail.Registry = params.Registry
 	}
-	buildImageTask := &logic.BuildImageOption{
-		Tag: imageNameDetail.Uri(),
-	}
-
-	if params.BuildRoot != "" {
-		buildImageTask.Context = "./" + strings.Trim(strings.Trim(strings.Trim(params.BuildRoot, ""), "./"), "/")
-	}
+	params.Tag = imageNameDetail.Uri()
 
 	if params.BuildZip != "" {
 		path := storage.Local{}.GetRealPath(params.BuildZip)
@@ -257,68 +238,47 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 			self.JsonResponseWithError(http, errors.New("请先上传压缩包"), 500)
 			return
 		}
-		buildImageTask.ZipPath = path
+		params.BuildZip = path
 	}
-	if params.BuildDockerfile != "" {
-		buildImageTask.DockerFileContent = []byte(params.BuildDockerfile)
-	}
-	if params.BuildGit != "" {
-		buildImageTask.GitUrl = params.BuildGit
-	}
+
 	imageNew := &entity.Image{
 		Tag:   imageNameDetail.Uri(),
 		Title: params.Title,
 		Setting: &accessor.ImageSettingOption{
-			Registry:        params.Registry,
-			BuildGit:        params.BuildGit,
-			BuildDockerfile: params.BuildDockerfile,
-			BuildRoot:       params.BuildRoot,
-			Platform:        params.Platform,
+			Registry:            params.Registry,
+			BuildGit:            params.BuildGit,
+			BuildDockerfile:     params.BuildDockerfileContent,
+			BuildRoot:           params.BuildDockerfileRoot,
+			BuildDockerfileName: params.BuildDockerfileName,
+			BuildArgs:           params.BuildArgs,
+			Platform:            &params.Platform,
 		},
 		BuildType: params.BuildType,
 		Status:    docker.ImageBuildStatusStop,
 		Message:   "",
 	}
-	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
-	if imageRow == nil {
-		imageRow = imageNew
-
-	} else {
-		// 如果已经构建过，先查找一下旧镜像，新加一个标签，避免变成 none 标签
-		_, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, imageNameDetail.Uri())
-		if err == nil {
-			_ = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, imageNameDetail.Uri(), imageNameDetail.Uri()+"-deprecated-"+function.GetRandomString(6))
-		}
-		dao.Image.Select(
-			dao.Image.Status,
-			dao.Image.Message,
-			dao.Image.Tag,
-			dao.Image.Setting,
-		).Where(dao.Image.ID.Eq(imageRow.ID)).Updates(imageNew)
+	if imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First(); imageRow != nil {
+		imageNew.ID = imageRow.ID
 	}
-	buildImageTask.ImageId = imageRow.ID
+	_ = dao.Image.Save(imageNew)
 
-	buildImageTask.Platform = &docker.ImagePlatform{
-		Type: params.Platform,
-		Arch: params.PlatformArch,
-	}
-
-	log, err := logic.DockerTask{}.ImageBuild(buildImageTask)
+	params.MessageId = fmt.Sprintf(ws.MessageTypeImageBuild, imageNew.ID)
+	log, err := logic.DockerTask{}.ImageBuild(&params)
 	if err != nil {
-		imageRow.Status = docker.ImageBuildStatusError
-		imageRow.Message = log + "\n" + err.Error()
-		_ = dao.Image.Save(imageRow)
+		imageNew.Status = docker.ImageBuildStatusError
+		imageNew.Message = log + "\n" + err.Error()
+		_ = dao.Image.Save(imageNew)
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	imageRow.Status = docker.ImageBuildStatusSuccess
-	imageRow.Message = log
-	imageRow.ImageInfo = &accessor.ImageInfoOption{
+	imageNew.Status = docker.ImageBuildStatusSuccess
+	imageNew.Message = log
+	imageNew.ImageInfo = &accessor.ImageInfoOption{
 		Id: imageNameDetail.Uri(),
 	}
-	_ = dao.Image.Save(imageRow)
+	_ = dao.Image.Save(imageNew)
 	self.JsonResponseWithoutError(http, gin.H{
-		"imageId": imageRow.ID,
+		"imageId": imageNew.ID,
 	})
 	return
 }
