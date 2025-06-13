@@ -231,6 +231,11 @@ func (self Site) GetDetail(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		runOption, err = logic.Site{}.GetEnvOptionByContainer(siteRow.SiteName)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	} else {
 		containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Id)
 		if err != nil {
@@ -263,6 +268,8 @@ func (self Site) GetDetail(http *gin.Context) {
 
 			siteRow.Env = &runOption
 			_ = dao.Site.Save(siteRow)
+		} else if siteRow.SiteName == "" {
+			siteRow.SiteName = strings.TrimPrefix(containerInfo.Name, "/")
 		}
 		if siteRow.ContainerInfo == nil || siteRow.ContainerInfo.Info.ContainerJSONBase == nil {
 			siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
@@ -278,6 +285,9 @@ func (self Site) GetDetail(http *gin.Context) {
 	}
 
 	// todo 站点有些数据需要从容器信息上获取，这里是否可以直接使用 containerInfo ?
+	// 外部可以更改 restart 参数据，这里再获取一下
+	siteRow.Env.Restart = runOption.Restart
+
 	if !function.IsEmptyArray(runOption.Network) {
 		siteRow.Env.Network = runOption.Network
 	}
