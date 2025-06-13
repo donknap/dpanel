@@ -256,7 +256,7 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 						},
 					}
 					envItem.Rule = self.ParseSettingField(field, func(item *docker.ValueRuleItem) {
-						if (item.Kind & docker.EnvValueTypeSelect) != 0 {
+						if (item.Kind&docker.EnvValueTypeSelect) != 0 || (item.Kind&docker.EnvValueTypeSelectMultiple) != 0 {
 							item.Option = function.PluckArrayWalk(
 								yamlData.GetSliceStringMapString(fmt.Sprintf("additionalProperties.formFields.%d.values", index)),
 								func(i map[string]string) (docker.ValueItem, bool) {
@@ -404,7 +404,11 @@ func (self Store) ParseSettingField(field map[string]string, call func(item *doc
 		valueRule.Kind |= docker.EnvValueTypeNumber
 		break
 	case "select":
-		valueRule.Kind |= docker.EnvValueTypeSelect
+		if field["multiple"] == "true" {
+			valueRule.Kind |= docker.EnvValueTypeSelectMultiple
+		} else {
+			valueRule.Kind |= docker.EnvValueTypeSelect
+		}
 	}
 
 	if call != nil {

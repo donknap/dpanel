@@ -68,6 +68,7 @@ const (
 	EnvValueTypeNumber
 	EnvValueTypeText
 	EnvValueTypeSelect
+	EnvValueTypeSelectMultiple
 )
 
 type ValueRuleItem struct {

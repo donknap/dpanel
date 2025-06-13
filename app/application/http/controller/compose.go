@@ -279,9 +279,25 @@ func (self Compose) GetTask(http *gin.Context) {
 	}
 	yamlRow, err := logic.Compose{}.Get(params.Id)
 	if err != nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
+	// 搜索一下该项目是否有子任务
+	subTask := make([]*entity.Compose, 0)
+	if strings.HasPrefix(yamlRow.Setting.Store, accessor.StoreTypeOnePanel) || strings.HasPrefix(yamlRow.Setting.Store, accessor.StoreTypeOnePanelLocal) {
+		subTask = function.PluckMapWalkArray((logic.Compose{}).FindPathTask(filepath.Dir(yamlRow.Setting.GetUriFilePath())), func(item string, v *entity.Compose) (*entity.Compose, bool) {
+			if function.IsEmptyArray(v.Setting.Uri) {
+				return nil, false
+			}
+			v.Name = fmt.Sprintf("%s@%s", yamlRow.Name, v.Name)
+			// 目录需要添加上父级目录
+			v.Setting.Uri = function.PluckArrayWalk(v.Setting.Uri, func(item string) (string, bool) {
+				return filepath.Join(yamlRow.Name, item), true
+			})
+			return v, true
+		})
+	}
+
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
 		// 如果获取任务失败，可能是没有文件或是Yaml文件错误，直接返回内容待用户修改
@@ -294,6 +310,7 @@ func (self Compose) GetTask(http *gin.Context) {
 			"detail":        yamlRow,
 			"yaml":          yaml,
 			"containerList": logic.Compose{}.FilterContainer(yamlRow.Name),
+			"task":          subTask,
 		}
 		self.JsonResponseWithoutError(http, data)
 		return
@@ -311,6 +328,7 @@ func (self Compose) GetTask(http *gin.Context) {
 		"project":       tasker.Project(),
 		"yaml":          yaml,
 		"containerList": make([]interface{}, 0),
+		"task":          subTask,
 	}
 
 	if yamlRow.Setting.Status != accessor.ComposeStatusWaiting {

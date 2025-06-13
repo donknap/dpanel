@@ -28,6 +28,8 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		DeployServiceName []string         `json:"deployServiceName"`
 		CreatePath        bool             `json:"createPath"`
 		RemoveOrphans     bool             `json:"removeOrphans"`
+		PullImage         bool             `json:"pullImage"`
+		AutoRemove        bool             `json:"autoRemove"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -37,7 +39,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	if !function.IsEmptyArray(params.Environment) {
@@ -72,7 +74,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
 
-	response, err := tasker.Deploy(params.DeployServiceName, params.RemoveOrphans)
+	response, err := tasker.Deploy(params.DeployServiceName, params.RemoveOrphans, params.PullImage)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -115,6 +117,16 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	if params.AutoRemove {
+		response1, err := tasker.Destroy(false, true)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_, err = io.Copy(wsBuffer, response1)
+		self.JsonSuccessResponse(http)
+		return
+	}
 	taskContainerList := tasker.Ps()
 	if function.IsEmptyArray(taskContainerList) {
 		self.JsonResponseWithError(http, errors.New(lastMessage), 500)
@@ -147,7 +159,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	}
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	tasker, err := logic.Compose{}.GetTasker(composeRow)
@@ -210,7 +222,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 	}
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	tasker, err := logic.Compose{}.GetTasker(composeRow)

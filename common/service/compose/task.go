@@ -24,12 +24,14 @@ type Task struct {
 	Status   string
 }
 
-func (self Task) Deploy(serviceName []string, removeOrphans bool) (io.Reader, error) {
+func (self Task) Deploy(serviceName []string, removeOrphans bool, pullImage bool) (io.Reader, error) {
 	cmd := []string{
 		//"--progress", "tty",
-		"up", "-d",
+		"up", "-d", "--build",
 	}
-
+	if pullImage {
+		cmd = append(cmd, "--pull", "always")
+	}
 	if removeOrphans {
 		cmd = append(cmd, "--remove-orphans")
 	}

@@ -79,9 +79,22 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 		}
 		if item, ok := runTaskList[key]; ok {
 			return item, nil
-		} else {
-			return nil, errors.New("run compose not found")
 		}
+		// 尝试再查询一下子任务
+		if name, task, ok := strings.Cut(key, "@"); ok {
+			if composeRow, err := self.Get(name); err == nil {
+				taskList := self.FindPathTask(filepath.Dir(composeRow.Setting.GetUriFilePath()))
+				if v, ok := taskList[task]; ok {
+					// 目录需要添加上父级目录
+					v.Name = fmt.Sprintf("%s@%s", name, v.Name)
+					v.Setting.Uri = function.PluckArrayWalk(v.Setting.Uri, func(item string) (string, bool) {
+						return filepath.Join(name, item), true
+					})
+					return v, nil
+				}
+			}
+		}
+		return nil, errors.New("run compose not found")
 	}
 }
 
@@ -450,7 +463,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		options = append(options, cli.WithDotEnv)
 	}
 
-	projectName := fmt.Sprintf(ComposeProjectName, entity.Name)
+	projectName := fmt.Sprintf(ComposeProjectName, strings.ReplaceAll(entity.Name, "@", "-"))
 	if entity.Setting.Type == accessor.ComposeTypeOutPath {
 		// compose 项止名称不允许有大小写，但是compose的目录名可以包含特殊字符，这里统一用id进行区分
 		// 如果是外部任务，则保持原有名称
