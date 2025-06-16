@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -18,6 +19,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -117,6 +119,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	if params.AutoRemove {
 		response1, err := tasker.Destroy(false, true)
 		if err != nil {
@@ -127,6 +130,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonSuccessResponse(http)
 		return
 	}
+
 	taskContainerList := tasker.Ps()
 	if function.IsEmptyArray(taskContainerList) {
 		self.JsonResponseWithError(http, errors.New(lastMessage), 500)
@@ -136,6 +140,40 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	for _, item := range taskContainerList {
 		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.Name); err != nil {
 			self.JsonResponseWithError(http, errors.New(lastMessage), 500)
+			return
+		}
+	}
+
+	// 这里需要单独适配一下 php 环境的相关扩展安装
+	// 目前只有 php 需要这样处理，暂时先直接进行判断
+	if strings.HasPrefix(composeRow.Setting.Store, accessor.StoreTypeOnePanel) && strings.HasSuffix(composeRow.Setting.Store, "@php") {
+		out, err := docker.Sdk.ContainerExec(docker.Sdk.Ctx, taskContainerList[0].Name, container.ExecOptions{
+			Privileged:   true,
+			Tty:          false,
+			AttachStdin:  false,
+			AttachStdout: true,
+			AttachStderr: false,
+			Cmd: []string{
+				"install-ext",
+				strings.Join(function.PluckArrayWalk(params.Environment, func(item docker.EnvItem) (string, bool) {
+					if item.Name == "PHP_EXTENSIONS" {
+						return item.Value, true
+					} else {
+						return "", false
+					}
+				}), " "),
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer func() {
+			out.Close()
+		}()
+		_, err = io.Copy(wsBuffer, out.Reader)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 	}
