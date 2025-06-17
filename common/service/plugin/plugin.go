@@ -186,6 +186,17 @@ func (self plugin) Destroy() error {
 	return nil
 }
 
+func (self plugin) Exists() bool {
+	service, _, err := self.compose.GetService(self.name)
+	if err != nil {
+		return false
+	}
+	if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, service.ContainerName); err == nil {
+		return true
+	}
+	return false
+}
+
 func (self plugin) importImage(imageName string, imagePath string) error {
 	_, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, imageName)
 	if err == nil {

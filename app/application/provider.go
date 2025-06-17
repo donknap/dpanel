@@ -96,6 +96,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/explorer/get-file-stat", controller.Explorer{}.GetFileStat)
 			cors.POST("/app/explorer/get-user-list", controller.Explorer{}.GetUserList)
 			cors.POST("/app/explorer/mkdir", controller.Explorer{}.MkDir)
+			cors.POST("/app/explorer/attach-volume", controller.Explorer{}.AttachVolume)
 
 			// 日志相关
 			cors.POST("/app/log/run", controller.RunLog{}.Run)

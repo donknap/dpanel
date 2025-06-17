@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/fs"
+	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
 	fs2 "github.com/donknap/dpanel/common/types/fs"
 	"github.com/gin-gonic/gin"
@@ -573,4 +576,48 @@ func (self Explorer) MkDir(http *gin.Context) {
 		return
 	}
 	self.JsonSuccessResponse(http)
+}
+
+func (self Explorer) AttachVolume(http *gin.Context) {
+	type ParamsValidate struct {
+		Name string `json:"name" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	_, err := docker.Sdk.Client.VolumeInspect(docker.Sdk.Ctx, params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	_ = notice.Message{}.Info(".volumeMountSomeVolume")
+	path := fmt.Sprintf("/%s", function.GetMd5(params.Name))
+	explorerPlugin, err := plugin.NewPlugin(plugin.PluginExplorer, map[string]*plugin.TemplateParser{
+		plugin.PluginExplorer: &plugin.TemplateParser{
+			ExtService: compose.ExtService{
+				External: compose.ExternalItem{
+					Volumes: []string{
+						fmt.Sprintf("%s:%s", params.Name, path),
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if explorerPlugin.Exists() {
+		_ = explorerPlugin.Destroy()
+	}
+	pluginName, err := explorerPlugin.Create()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"containerName": pluginName,
+		"path":          path,
+	})
 }
