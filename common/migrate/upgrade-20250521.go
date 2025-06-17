@@ -58,7 +58,7 @@ func (self Upgrade20250521) Upgrade() error {
 
 	for _, item := range replaceFieldName {
 		var ids []int32
-		db.Table("ims_setting").Where("group_name = ? AND name = ?", "setting", item["new"]).Pluck("id", &ids)
+		db.Table("ims_setting").Where("group_name = ? AND name = ? AND value NOT LIKE ?;", "setting", item["new"], "%\""+item["new"]+"\"%").Pluck("id", &ids)
 		if !function.IsEmptyArray(ids) {
 			db.Exec(`UPDATE ims_setting SET value = REPLACE(value, ?, ?) WHERE id IN (?)`, item["old"], item["new"], ids)
 		}
