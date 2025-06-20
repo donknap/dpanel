@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -45,7 +46,7 @@ func (self Cron) Create(http *gin.Context) {
 	}
 	err := crontab.Wrapper.CheckExpression(allExpression)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".containerCronExpressionInCorrect", "message", err.Error()), 500)
 		return
 	}
 
@@ -53,7 +54,7 @@ func (self Cron) Create(http *gin.Context) {
 	if params.Id > 0 {
 		taskRow, _ = dao.Cron.Where(dao.Cron.ID.Eq(params.Id)).First()
 		if taskRow == nil {
-			self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 			return
 		}
 		crontab.Wrapper.RemoveJob(taskRow.Setting.JobIds...)

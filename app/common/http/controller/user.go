@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/service/notice"
@@ -38,11 +39,11 @@ func (self User) Login(http *gin.Context) {
 		exists := logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa, &twoFa)
 		if exists && twoFa.Enable {
 			if params.Code == "" {
-				self.JsonResponseWithError(http, errors.New("请输入双因素验证码"), 500)
+				self.JsonResponseWithError(http, function.ErrorMessage(".userTwoFaEmpty"), 500)
 				return
 			}
 			if !totp.Validate(params.Code, twoFa.Secret) {
-				self.JsonResponseWithError(http, errors.New("验证码错误"), 500)
+				self.JsonResponseWithError(http, function.ErrorMessage(".userTwoFaNotCorrect"), 500)
 				return
 			}
 		}
