@@ -22,7 +22,7 @@
 
 ### Pro Edition
 
-The Pro Edition is only an enhancement and supplement to the Community Edition. General and extensive functional requirements will not be included in the Pro Edition. Strengthen, upgrade or meet some extremely personalized requirements for some functions in the community version.
+The Pro Edition is merely an enhancement and supplement to the Community Edition, serving to intensify, upgrade, or provide highly personalized features for certain functionalities in the Community Edition.
 
 Thank you for your support and love. 
 
