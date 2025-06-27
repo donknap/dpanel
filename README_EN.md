@@ -60,8 +60,7 @@ curl -sSL https://dpanel.cc/quick.sh -o quick.sh && sudo bash quick.sh
 
 https://t.me/dpanel666
 
-![telegram.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/telegram.png)
-
+<img src="https://github.com/donknap/dpanel-docs/blob/master/storage/image/telegram.png?raw=true" width="300" />
 
 #### Thanks Contributors
 
