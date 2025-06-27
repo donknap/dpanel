@@ -20,31 +20,35 @@
 
 </div>
 
-### Getting started
+### Pro Edition
 
-> If you need i18n support please contact us to purchase Pro Edition
+The Pro Edition is only an enhancement and supplement to the Community Edition. General and extensive functional requirements will not be included in the Pro Edition. Strengthen, upgrade or meet some extremely personalized requirements for some functions in the community version.
+
+Thank you for your support and love. 
+
+🚀🚀🚀 [Feature](https://dpanel.cc/#/zh-cn/manual/pro?id=%e4%bb%b7%e6%a0%bc%e5%8f%8a%e5%8a%9f%e8%83%bd) 🚀🚀🚀
 
 #### Standard Version
 
 ```
 docker run -it -d --name dpanel --restart=always \
  -p 80:80 -p 443:443 -p 8807:8080 -e APP_NAME=dpanel \
- -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
+ -v /var/run/docker.sock:/var/run/docker.sock -v /home/dpanel:/dpanel \
  dpanel/dpanel:latest 
 ```
 
 #### Lite Version
 
-The lite version removes domain forwarding-related features, no need to bind ports 80 and 443.
+The lite version removes nginx proxy features, no need to bind ports 80 and 443.
 
 ```
 docker run -it -d --name dpanel --restart=always \
  -p 8807:8080 -e APP_NAME=dpanel \
- -v /var/run/docker.sock:/var/run/docker.sock -v dpanel:/dpanel \
+ -v /var/run/docker.sock:/var/run/docker.sock -v /home/dpanel:/dpanel \
  dpanel/dpanel:lite
 ```
 
-#### Install Script 
+#### Install By Script 
 
 > Tested on Debian and Alpine.
 
