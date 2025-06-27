@@ -56,6 +56,13 @@ docker run -it -d --name dpanel --restart=always \
 curl -sSL https://dpanel.cc/quick.sh -o quick.sh && sudo bash quick.sh
 ```
 
+#### Telegram 
+
+https://t.me/dpanel666
+
+![telegram.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/telegram.png)
+
+
 #### Thanks Contributors
 
 [![Contributors](https://contrib.rocks/image?repo=donknap/dpanel)](https://github.com/donknap/dpanel/graphs/contributors)
@@ -64,21 +71,21 @@ curl -sSL https://dpanel.cc/quick.sh -o quick.sh && sudo bash quick.sh
 #### Preview
 
 ###### overview
-![home.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/home.png)
+![home.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/home-en.png)
 ###### container
-![app-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/app-list.png)
+![app-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/app-list-en.png)
 ###### file explorer in container
-![app-file.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/app-file.png)
+![app-file.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/app-file-en.png)
 ###### image
-![image-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/image-list.png)
+![image-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/image-list-en.png)
 ###### build image
-![image-create.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/image-create.png)
+![image-create.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/image-create-en.png)
 ###### create compose task
-![compose-create.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/compose-create.png)
+![compose-create.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/compose-create-en.png)
 ###### deploy compose task
-![compose-deploy.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/compose-deploy.png)
+![compose-deploy.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/compose-deploy-en.png)
 ###### system
-![system-basic.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/system-basic.png)
+![system-basic.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/system-basic-en.png)
 
 #### Star History
 [![Star History Chart](https://api.star-history.com/svg?repos=donknap/dpanel&type=Timeline)](https://star-history.com/#donknap/dpanel&Timeline)
