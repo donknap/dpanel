@@ -14,7 +14,7 @@
 
 [**Home**](https://dpanel.cc/) &nbsp; |
 &nbsp; [**Demo**](https://dpanel.park1991.com/) &nbsp; |
-&nbsp; [**Docs**](https://dpanel.cc/#/zh-cn/install/docker) &nbsp; |
+&nbsp; [**Docs**](https://dpanel.cc/#/en-us/install/docker) &nbsp; |
 &nbsp; [**Pro Edition**](https://dpanel.cc/#/zh-cn/manual/pro) &nbsp; |
 &nbsp; [**Sponsor**](https://afdian.com/a/dpanel) &nbsp;
 
