@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
@@ -52,7 +53,7 @@ func (self Store) Create(http *gin.Context) {
 	} else {
 		storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(params.Id)).First()
 		if storeRow == nil {
-			self.JsonResponseWithError(http, errors.New("应用商店不存在"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 			return
 		}
 	}
@@ -96,7 +97,7 @@ func (self Store) Delete(http *gin.Context) {
 	for _, id := range params.Id {
 		storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(id)).First()
 		if storeRow == nil {
-			self.JsonResponseWithError(http, errors.New("应用商店不存在"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 			return
 		}
 		err := os.RemoveAll(filepath.Join(storage.Local{}.GetStorePath(), storeRow.Name))
@@ -140,6 +141,17 @@ func (self Store) GetList(http *gin.Context) {
 		query = query.Where(dao.Store.Name.Like("%" + params.Name + "%"))
 	}
 	list, _ = query.Find()
+
+	// 如果是本地商店，同步一遍数据
+	for _, item := range list {
+		if item.Setting.Type == accessor.StoreTypeOnePanelLocal {
+			if appList, err := (logic.Store{}).GetAppByOnePanel(item.Name); err == nil {
+				item.Setting.Apps = appList
+				_ = dao.Store.Save(item)
+			}
+		}
+	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": list,
 	})
@@ -242,26 +254,28 @@ func (self Store) Deploy(http *gin.Context) {
 		}
 	}
 
-	envReplaceTable := compose.NewReplaceTable(map[string]compose.ReplaceFunc{
-		compose.CurrentUsername: func(placeholder string) (string, error) {
+	envReplaceTable := compose.NewReplaceTable(
+		func(item *docker.EnvItem) error {
+			if !strings.Contains(item.Value, compose.CurrentUsername) {
+				return nil
+			}
 			if data, ok := http.Get("userInfo"); ok {
 				if userInfo, ok := data.(logic.UserInfo); ok {
-					return userInfo.Username, nil
+					item.Value = userInfo.Username
+					return nil
 				}
 			}
-			return "", errors.New("not found userinfo")
+			return errors.New("not found userinfo")
 		},
-		compose.TaskIndex: func(placeholder string) (string, error) {
-			if total, err := dao.Compose.Where(dao.Compose.Name.Like(params.AppName + "-%")).Count(); err == nil {
-				return fmt.Sprintf("%d", total+1), nil
-			} else {
-				return fmt.Sprintf("%d", 1), nil
-			}
-		},
-	})
+	)
 
 	if strings.Contains(params.Name, compose.CurrentDate) {
-		_ = envReplaceTable.Replace(&params.Name)
+		temp := docker.EnvItem{
+			Value: params.Name,
+		}
+		if err = envReplaceTable.Replace(&temp); err == nil {
+			params.Name = temp.Value
+		}
 	}
 
 	params.Name = strings.ToLower(params.Name)
@@ -272,9 +286,8 @@ func (self Store) Deploy(http *gin.Context) {
 	}
 
 	for i, item := range params.Environment {
-		v := item.Value
-		if err := envReplaceTable.Replace(&v); err == nil {
-			params.Environment[i].Value = v
+		if err := envReplaceTable.Replace(&item); err == nil {
+			params.Environment[i] = item
 		} else {
 			slog.Debug("store replace env", "error", err)
 		}

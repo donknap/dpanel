@@ -54,6 +54,10 @@ func (self YamlGetter) GetSliceStringMapString(path string) []map[string]string 
 //	age: 1
 func (self YamlGetter) GetStringMapString(path string) map[string]string {
 	result := make(map[string]string)
+	v := self.getValueInterface(path)
+	if v == nil {
+		return make(map[string]string)
+	}
 	for key, value := range self.getValueInterface(path).(YamlGetter) {
 		result[key] = cast.ToString(value)
 	}

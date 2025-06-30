@@ -10,14 +10,16 @@ var (
 )
 
 type StoreAppItem struct {
-	Title       string                         `json:"title"`
-	Name        string                         `json:"name"`
-	Logo        string                         `json:"logo"`
-	Content     string                         `json:"content"`
-	Description string                         `json:"description"`
-	Tag         []string                       `json:"tag"`
-	Website     string                         `json:"website"`
-	Version     map[string]StoreAppVersionItem `json:"version"`
+	Title        string                         `json:"title"`
+	Name         string                         `json:"name"`
+	Logo         string                         `json:"logo"`
+	Content      string                         `json:"content"`
+	Contents     map[string]string              `json:"contents,omitempty"`
+	Description  string                         `json:"description"`
+	Descriptions map[string]string              `json:"descriptions,omitempty"`
+	Tag          []string                       `json:"tag"`
+	Website      string                         `json:"website"`
+	Version      map[string]StoreAppVersionItem `json:"version"`
 }
 
 type StoreAppVersionScriptItem struct {

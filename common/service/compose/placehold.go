@@ -1,8 +1,10 @@
 package compose
 
 import (
-	"errors"
+	types2 "github.com/donknap/dpanel/app/pro/xk/types"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/storage"
 	"strings"
 	"time"
 )
@@ -11,39 +13,58 @@ import (
 const (
 	ContainerDefaultName = "%CONTAINER_DEFAULT_NAME%"
 	CurrentUsername      = "%CURRENT_USERNAME%"
-	TaskIndex            = "%TASK_INDEX%"
 	CurrentDate          = "%CURRENT_DATE%"
+	XkStoragePath        = "%XK_STORAGE_INFO%"
 )
 
-type ReplaceFunc func(placeholder string) (string, error)
-type ReplaceTable map[string]ReplaceFunc
+type ReplaceFunc func(item *docker.EnvItem) error
+type ReplaceTable []ReplaceFunc
 
-func NewReplaceTable(rt ...ReplaceTable) ReplaceTable {
+func NewReplaceTable(rt ...ReplaceFunc) ReplaceTable {
 	defaultTable := ReplaceTable{
-		ContainerDefaultName: func(placeholder string) (string, error) {
-			return "", nil
+		func(item *docker.EnvItem) error {
+			if !strings.Contains(item.Value, ContainerDefaultName) {
+				return nil
+			}
+			item.Value = strings.ReplaceAll(item.Value, ContainerDefaultName, "")
+			return nil
 		},
-		CurrentUsername: func(placeholder string) (string, error) {
-			return "", errors.New("not implemented")
+		func(item *docker.EnvItem) error {
+			if !strings.Contains(item.Value, CurrentDate) {
+				return nil
+			}
+			item.Value = strings.ReplaceAll(item.Value, CurrentDate, time.Now().Format(function.YmdHis))
+			return nil
 		},
-		CurrentDate: func(placeholder string) (string, error) {
-			return time.Now().Format(function.YmdHis), nil
+		func(item *docker.EnvItem) error {
+			if !strings.Contains(item.Value, XkStoragePath) {
+				return nil
+			}
+			item.Value = ""
+			if v, ok := storage.Cache.Get(storage.CacheKeyXkStorageInfo); ok {
+				item.Rule.Option = function.PluckArrayWalk(v.(*types2.StorageInfo).Data, func(item types2.StorageInfoItem) (docker.ValueItem, bool) {
+					return docker.ValueItem{
+						Name:  item.MountPath,
+						Value: item.MountPath,
+					}, true
+				})
+			}
+			return nil
 		},
 	}
 	for _, item := range rt {
-		for k, v := range item {
-			defaultTable[k] = v
-		}
+		defaultTable = append(defaultTable, item)
 	}
 
 	return defaultTable
 }
 
-func (self ReplaceTable) Replace(replace *string) error {
+func (self ReplaceTable) Replace(item *docker.EnvItem) error {
 	var err error
-	for key, replaceFunc := range self {
-		if v, err := replaceFunc(key); err == nil {
-			*replace = strings.Replace(*replace, key, v, -1)
+	for _, replaceFunc := range self {
+		err = replaceFunc(item)
+		if err != nil {
+			return err
 		}
 	}
 	return err

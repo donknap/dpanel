@@ -169,7 +169,8 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 	result := make([]accessor.StoreAppItem, 0)
 
 	storeItem := accessor.StoreAppItem{
-		Version: make(map[string]accessor.StoreAppVersionItem),
+		Version:  make(map[string]accessor.StoreAppVersionItem),
+		Contents: make(map[string]string),
 	}
 
 	err := filepath.Walk(storePath, func(path string, info fs.FileInfo, err error) error {
@@ -192,8 +193,9 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 			result = append(result, storeItem)
 
 			storeItem = accessor.StoreAppItem{
-				Name:    segments[0],
-				Version: make(map[string]accessor.StoreAppVersionItem),
+				Name:     segments[0],
+				Version:  make(map[string]accessor.StoreAppVersionItem),
+				Contents: make(map[string]string),
 			}
 		}
 
@@ -231,6 +233,7 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 			// 应用介绍信息 data.yaml
 			if len(segments) == 2 {
 				storeItem.Description = yamlData.GetString("additionalProperties.shortDescZh")
+				storeItem.Descriptions = yamlData.GetStringMapString("additionalProperties.description")
 				storeItem.Tag = yamlData.GetStringSlice("additionalProperties.tags")
 				storeItem.Website = yamlData.GetString("additionalProperties.website")
 				storeItem.Title = yamlData.GetString("additionalProperties.name")
@@ -242,14 +245,15 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 				env := make([]docker.EnvItem, 0)
 				env = append(env, docker.EnvItem{
 					Name:  "CONTAINER_NAME",
-					Label: "容器名称",
+					Label: "",
 					Value: compose.ContainerDefaultName,
 				})
 				for index, field := range fields {
 					envItem := docker.EnvItem{
-						Label: field["labelZh"],
-						Name:  field["envKey"],
-						Value: field["default"],
+						Label:  field["labelZh"],
+						Labels: yamlData.GetStringMapString(fmt.Sprintf("additionalProperties.formFields.%d.label", index)),
+						Name:   field["envKey"],
+						Value:  field["default"],
 						Rule: &docker.ValueRuleItem{
 							Kind:   0,
 							Option: make([]docker.ValueItem, 0),
@@ -299,8 +303,12 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 		if strings.HasSuffix(relPath, "README.md") {
 			readmePath, _ := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), path)
 			storeItem.Content = fmt.Sprintf("markdown-file://%s?r=%d", readmePath, r)
+			storeItem.Contents["zh"] = fmt.Sprintf("markdown-file://%s?r=%d", readmePath, r)
 		}
-
+		if strings.HasSuffix(relPath, "README_en.md") {
+			readmePath, _ := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), path)
+			storeItem.Contents["en"] = fmt.Sprintf("markdown-file://%s?r=%d", readmePath, r)
+		}
 		return nil
 	})
 

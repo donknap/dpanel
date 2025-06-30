@@ -77,10 +77,11 @@ type ValueRuleItem struct {
 }
 
 type EnvItem struct {
-	Label string         `json:"label,omitempty" yaml:"label,omitempty"`
-	Name  string         `json:"name"`
-	Value string         `json:"value"`
-	Rule  *ValueRuleItem `json:"rule,omitempty"`
+	Label  string            `json:"label,omitempty" yaml:"label,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
+	Name   string            `json:"name"`
+	Value  string            `json:"value"`
+	Rule   *ValueRuleItem    `json:"rule,omitempty"`
 }
 
 type ValueItem struct {
