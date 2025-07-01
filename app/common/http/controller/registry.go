@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -47,13 +46,13 @@ func (self Registry) Create(http *gin.Context) {
 	if params.Id <= 0 {
 		registryRow, _ = dao.Registry.Where(dao.Registry.ServerAddress.Eq(params.ServerAddress)).First()
 		if registryRow != nil {
-			self.JsonResponseWithError(http, errors.New("仓库已经存在"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.ServerAddress), 500)
 			return
 		}
 	} else {
 		registryRow, _ = dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).First()
 		if registryRow == nil {
-			self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 			return
 		}
 		// 如果提交上来密码为空，则使用默认密码
@@ -183,7 +182,7 @@ func (self Registry) GetDetail(http *gin.Context) {
 	}
 	registryItem, _ := dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).First()
 	if registryItem == nil {
-		self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	if registryItem.Setting != nil && registryItem.Setting.Password != "" {
@@ -211,7 +210,7 @@ func (self Registry) Update(http *gin.Context) {
 	}
 	row, _ := dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).First()
 	if row == nil {
-		self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	password := row.Setting.Password
@@ -248,7 +247,7 @@ func (self Registry) Delete(http *gin.Context) {
 
 	rows, _ := dao.Registry.Where(dao.Registry.ID.In(params.Id...)).Find()
 	if rows == nil || len(rows) == 0 {
-		self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 

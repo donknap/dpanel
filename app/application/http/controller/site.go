@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -82,7 +81,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); err == nil {
 		siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "Id"))...).First()
 		if siteRow != nil || params.ContainerId == "" {
-			self.JsonResponseWithError(http, errors.New("容器已经存在，请更换标识名称"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.SiteName), 500)
 			return
 		}
 	}

@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
@@ -28,11 +27,11 @@ func (self Setting) Founder(http *gin.Context) {
 	}
 	oldUser, err := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
 	if err != nil {
-		self.JsonResponseWithError(http, errors.New("创始人配置不存在，请重新安装"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	if oldUser.Value.Password != function.GetMd5(params.Password+oldUser.Value.Username) {
-		self.JsonResponseWithError(http, errors.New("旧密码不正确"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".usernameOrPasswordError"), 500)
 		return
 	}
 

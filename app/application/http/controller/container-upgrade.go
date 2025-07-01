@@ -41,7 +41,7 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 	if containerInfo.Name == "/"+facade.GetConfig().GetString("APP_NAME") {
-		self.JsonResponseWithError(http, errors.New("面板无法升级自身，请通过【系统更新】查看面板升级脚本"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".containerUpgradeDPanel"), 500)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (self Container) Upgrade(http *gin.Context) {
 
 	// 未备份旧容器，需要先删除，否则名称会冲突
 	if params.EnableBak {
-		_ = notice.Message{}.Info(".containerUpgradeBackup", "name", containerInfo.Name)
+		_ = notice.Message{}.Info(".containerBackup", "name", containerInfo.Name)
 
 		if !containerInfo.HostConfig.AutoRemove {
 			// 备份旧容器

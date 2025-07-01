@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -105,7 +104,7 @@ func (self User) GetUserInfo(http *gin.Context) {
 
 	data, exists := http.Get("userInfo")
 	if !exists {
-		self.JsonResponseWithError(http, errors.New("请先登录"), 401)
+		self.JsonResponseWithError(http, function.ErrorMessage(".login"), 401)
 		http.AbortWithStatus(401)
 		return
 	}

@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -18,7 +18,7 @@ type Attach struct {
 func (self Attach) Upload(http *gin.Context) {
 	fileUploader, fileHeader, _ := http.Request.FormFile("file")
 	if fileHeader == nil {
-		self.JsonResponseWithError(http, errors.New("请指定上传文件"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonUploadFileEmpty"), 500)
 		return
 	}
 	defer func() {

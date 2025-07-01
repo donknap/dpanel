@@ -1,9 +1,9 @@
 package common
 
 import (
-	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -17,7 +17,7 @@ type AuthMiddleware struct {
 }
 
 var (
-	ErrLogin = errors.New("请先登录")
+	ErrLogin = function.ErrorMessage(".login")
 )
 
 func (self AuthMiddleware) Process(http *gin.Context) {

@@ -203,7 +203,7 @@ func (self Fs) readDirFromContainer(path string) ([]os.FileInfo, error) {
 		}
 		if len(row) < 8 {
 			slog.Debug("explorer", "get-path-list", i, "line", string(line))
-			return nil, errors.New("目录解析错误, 请反馈: " + string(line))
+			return nil, function.ErrorMessage(".unknow", "error", string(line))
 		}
 
 		modStr := strings.Trim(row[0], "`")

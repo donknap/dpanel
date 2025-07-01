@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -71,7 +70,7 @@ func (self Cron) Create(http *gin.Context) {
 		taskRow.Setting.DockerEnvName = docker.Sdk.Name
 	} else {
 		if _, err := dao.Cron.Where(dao.Cron.Title.Like(params.Title)).First(); err == nil {
-			self.JsonResponseWithError(http, errors.New("任务名称已经存在"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.Title), 500)
 			return
 		}
 		taskRow = &entity.Cron{
@@ -157,11 +156,11 @@ func (self Cron) RunOnce(http *gin.Context) {
 	}
 	cronRow, _ := dao.Cron.Where(dao.Cron.ID.In(params.Id)).First()
 	if cronRow == nil {
-		self.JsonResponseWithError(http, errors.New("计划任务不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	if cronRow.Setting.JobIds == nil || len(cronRow.Setting.Expression) == 0 {
-		self.JsonResponseWithError(http, errors.New("没有可执行的计划任务"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".containerCronTaskEmpty"), 500)
 		return
 	}
 	crontab.Wrapper.Cron.Entry(cronRow.Setting.JobIds[0]).Job.Run()
@@ -179,7 +178,7 @@ func (self Cron) GetDetail(http *gin.Context) {
 	}
 	cronRow, _ := dao.Cron.Where(dao.Cron.ID.In(params.Id)).First()
 	if cronRow == nil {
-		self.JsonResponseWithError(http, errors.New("计划任务不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{

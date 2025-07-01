@@ -3,10 +3,10 @@ package plugin
 import (
 	"bytes"
 	"embed"
-	"errors"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
@@ -211,7 +211,7 @@ func (self plugin) importImage(imageName string, imagePath string) error {
 	}
 	imageFile, err := self.asset.Open(imagePath)
 	if os.IsNotExist(err) {
-		return errors.New("插件暂不支持该平台，请提交 issues ")
+		return function.ErrorMessage(".unknow", "error", err.Error())
 	}
 	reader, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageFile, client.ImageLoadWithQuiet(false))
 	if err != nil {

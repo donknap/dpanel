@@ -34,7 +34,7 @@ func (self Upgrade20250106) Upgrade() error {
 		for _, compose := range list {
 			ids = append(ids, compose.ID)
 		}
-		slog.Debug("清理 outPath 数据", "ids", ids)
+		slog.Debug("clear outPath db record", "ids", ids)
 		_, err := dao.Compose.Where(dao.Compose.ID.In(ids...)).Delete()
 		if err != nil {
 			return err

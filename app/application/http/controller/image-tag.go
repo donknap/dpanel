@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -182,7 +181,7 @@ func (self Image) TagAdd(http *gin.Context) {
 		return
 	}
 	if function.InArray[string](imageDetail.RepoTags, params.Tag) {
-		self.JsonResponseWithError(http, errors.New("该标签已经存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.Tag), 500)
 		return
 	}
 
@@ -207,15 +206,11 @@ func (self Image) TagSync(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	if function.IsEmptyArray(params.Md5) {
-		self.JsonResponseWithError(http, errors.New("请选择要推送的镜像"), 500)
-		return
-	}
 
 	for _, id := range params.RegistryId {
 		registry, _ := dao.Registry.Where(dao.Registry.ID.Eq(id)).First()
 		if registry == nil {
-			self.JsonResponseWithError(http, errors.New("仓库不存在"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 			return
 		}
 		password := ""

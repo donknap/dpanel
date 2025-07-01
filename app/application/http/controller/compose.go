@@ -3,7 +3,6 @@ package controller
 import (
 	"archive/zip"
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -68,7 +67,7 @@ func (self Compose) Create(http *gin.Context) {
 	if params.Id != "" {
 		yamlRow, _ = logic.Compose{}.Get(params.Id)
 		if yamlRow == nil {
-			self.JsonResponseWithError(http, errors.New("站点不存在"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 			return
 		}
 		if params.Title != "" {
@@ -76,16 +75,16 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	} else {
 		if params.Type == accessor.ComposeTypeStoragePath {
-			self.JsonResponseWithError(http, errors.New("存储路径类型不能手动添加，请挂载 /dpanel/compose 目录自动发现。"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".composeDisableStorageType"), 500)
 			return
 		}
 		if params.Type == accessor.ComposeTypeStore {
-			self.JsonResponseWithError(http, errors.New("请先添加应用商店后，在商店中完成安装"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".composeDisableStore"), 500)
 			return
 		}
 		yamlExist, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
 		if yamlExist != nil {
-			self.JsonResponseWithError(http, errors.New("站点标识已经存在，请更换"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.Name), 500)
 			return
 		}
 		yamlRow = &entity.Compose{
@@ -358,7 +357,7 @@ func (self Compose) Delete(http *gin.Context) {
 		}
 		for _, runItem := range composeRunList {
 			if fmt.Sprintf(logic.ComposeProjectName, row.Name) == runItem.Name {
-				self.JsonResponseWithError(http, errors.New("请先销毁容器"), 500)
+				self.JsonResponseWithError(http, function.ErrorMessage(".composeDeleteMustDestroyContainer"), 500)
 				return
 			}
 		}
@@ -438,7 +437,7 @@ func (self Compose) Parse(http *gin.Context) {
 	if params.Id != "" {
 		composeRow, err := logic.Compose{}.Get(params.Id)
 		if err != nil {
-			self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 			return
 		}
 		tasker, err := logic.Compose{}.GetTasker(composeRow)
@@ -480,7 +479,7 @@ func (self Compose) Download(http *gin.Context) {
 	}
 	yamlRow, err := logic.Compose{}.Get(params.Id)
 	if err != nil {
-		self.JsonResponseWithError(http, errors.New("任务不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 

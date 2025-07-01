@@ -67,18 +67,18 @@ func GetRootPath() string {
 func IpInSubnet(ipAddress, subnetAddress string) (bool, error) {
 	ip := net.ParseIP(ipAddress)
 	if ip == nil {
-		return false, errors.New("错误的 ip 地址: " + ipAddress)
+		return false, errors.New("ip address incorrect: " + ipAddress)
 	}
 	_, subnet, err := net.ParseCIDR(subnetAddress)
 	if err != nil {
-		return false, errors.New("错误的子网 CIDR 地址: " + subnetAddress)
+		return false, errors.New("CIDR address incorrect: " + subnetAddress)
 	}
 
 	if subnetAddress != subnet.String() {
-		return false, errors.New("错误的子网 CIDR 地址, 应为: " + subnet.String())
+		return false, errors.New("CIDR address incorrect, like: " + subnet.String())
 	}
 	if !subnet.Contains(ip) {
-		return false, errors.New("ip 地址与子网地址不匹配")
+		return false, errors.New("ip address does not match the subnet address")
 	}
 	return true, nil
 }

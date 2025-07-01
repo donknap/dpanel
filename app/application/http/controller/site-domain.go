@@ -240,7 +240,7 @@ func (self SiteDomain) GetDetail(http *gin.Context) {
 
 	domainRow, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(params.Id)).First()
 	if domainRow == nil {
-		self.JsonResponseWithError(http, errors.New("域名不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	vhost, err := os.ReadFile(filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(logic.VhostFileName, domainRow.ServerName)))

@@ -234,7 +234,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 
 	if params.DeletePath {
 		if !params.DeleteData {
-			self.JsonResponseWithError(http, errors.New("删除数据文件时必须同时删除任务数据"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".composeDeleteFileMustDeleteTask"), 500)
 			return
 		}
 		err = os.Remove(filepath.Join(filepath.Dir(composeRow.Setting.GetUriFilePath()), logic.ComposeProjectEnvFileName))

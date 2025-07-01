@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -277,7 +276,7 @@ func (self Container) Copy(http *gin.Context) {
 		return
 	}
 	if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.CopyName); err == nil {
-		self.JsonResponseWithError(http, errors.New("指定的名称重复"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.CopyName), 500)
 		return
 	}
 	if params.EnableRandomPort && !function.IsEmptyMap(containerInfo.HostConfig.PortBindings) {

@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -281,7 +280,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					return
 				}
 				if _, err = docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, containerInfo.Config.Image); err != nil {
-					self.JsonResponseWithError(http, errors.New("导入失败，请检测硬盘是否有空间或是重新生成快照"), 500)
+					self.JsonResponseWithError(http, function.ErrorMessage(".containerBackupRestoreImportImageFailed"), 500)
 					return
 				}
 			} else {

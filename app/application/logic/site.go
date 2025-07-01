@@ -198,7 +198,7 @@ func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error 
 	nginxConfPath := filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(VhostFileName, setting.ServerName))
 	vhostFile, err := os.OpenFile(nginxConfPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
-		return errors.New("nginx 配置目录不存在")
+		return errors.New("the Nginx configuration directory does not exist")
 	}
 	defer func() {
 		_ = vhostFile.Close()

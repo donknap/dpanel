@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/app/common/logic"
@@ -67,7 +66,7 @@ func (self Env) Create(http *gin.Context) {
 		return
 	}
 	if params.EnableTLS && (params.TlsCa == "" || params.TlsCert == "" || params.TlsKey == "") {
-		self.JsonResponseWithError(http, errors.New("开启 TLS 时需要上传证书"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvTlsInvalidCert"), 500)
 		return
 	}
 
@@ -184,7 +183,7 @@ func (self Env) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvApiTooOld", "err", err.Error()), 500)
 			return
 		}
-		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，错误信息："+err.Error()), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvDockerApiFailed", "error", err.Error()), 500)
 		return
 	}
 	if defaultEnv {
@@ -254,7 +253,7 @@ func (self Env) Switch(http *gin.Context) {
 	}
 	_, err = dockerClient.Client.Info(dockerClient.Ctx)
 	if err != nil {
-		self.JsonResponseWithError(http, errors.New("Docker 客户端连接失败，请检查地址"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvDockerApiFailed", "error", err.Error()), 500)
 		return
 	}
 	oldDockerClient.CtxCancelFunc()

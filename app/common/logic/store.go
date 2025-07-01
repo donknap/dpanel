@@ -3,7 +3,6 @@ package logic
 import (
 	"archive/zip"
 	"context"
-	"errors"
 	"fmt"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
@@ -37,7 +36,7 @@ type Store struct {
 
 func (self Store) SyncByGit(path, gitUrl string) error {
 	if _, err := exec2.LookPath("git"); err != nil {
-		return errors.New("同步商店仓库需要使用 git 命令，请先安装")
+		return function.ErrorMessage(".systemStoreNotFoundGit")
 	}
 	// 先创建一个临时目录，下载完成后再同步数据，否则失败时原先的数据会被删除
 	tempDownloadPath, _ := storage.Local{}.CreateTempDir("")
@@ -93,7 +92,7 @@ func (self Store) SyncByZip(path, zipUrl string, root string) error {
 		_ = response.Body.Close()
 	}()
 	if response.StatusCode != http.StatusOK {
-		return errors.New("下载 zip 失败" + response.Status)
+		return function.ErrorMessage(".systemStoreDownloadFailed", "url", zipUrl, "error", response.Status)
 	}
 	_, err = io.Copy(zipTempFile, response.Body)
 	if err != nil {
@@ -152,7 +151,7 @@ func (self Store) SyncByJson(path, jsonUrl string) error {
 	}()
 
 	if response.StatusCode != http.StatusOK {
-		return errors.New("下载 json 失败" + response.Status)
+		return function.ErrorMessage(".systemStoreDownloadFailed", "url", jsonUrl, "error", response.Status)
 	}
 	_, err = io.Copy(file, response.Body)
 	if err != nil {

@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"errors"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/function"
 	registry2 "github.com/donknap/dpanel/common/service/registry"
 	"github.com/gin-gonic/gin"
 )
@@ -17,7 +17,7 @@ func (self Image) GetBuildTask(http *gin.Context) {
 	}
 	imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
 	if imageRow == nil {
-		self.JsonResponseWithError(http, errors.New("构建任务不存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
 	tagDetail := registry2.GetImageTagDetail(imageRow.Tag)

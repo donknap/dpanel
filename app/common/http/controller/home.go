@@ -95,10 +95,6 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 		return
 	}
 
-	if params.Id == "" {
-		self.JsonResponseWithError(http, errors.New("请指定容器Id"), 500)
-		return
-	}
 	containerName := params.Id
 	if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
 		containerName = pluginName

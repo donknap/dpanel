@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/image"
 	"github.com/donknap/dpanel/common/service/notice"
@@ -62,7 +63,7 @@ func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
 					buffer.WriteString(msg.ErrorDetail.Message)
 					wsBuffer.BroadcastMessage(buffer.String())
 					if strings.Contains(msg.ErrorDetail.Message, "ADD failed") || strings.Contains(msg.ErrorDetail.Message, "COPY failed") {
-						return errors.New("dockerfile 中包含添加文件操作，请使用 Zip 包或是 Git 源码仓库方式创建镜像")
+						return function.ErrorMessage(".imageBuildAddFileTypeError")
 					}
 					return errors.New(msg.ErrorDetail.Message)
 				} else if msg.PullMessage.Id != "" {

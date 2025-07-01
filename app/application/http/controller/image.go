@@ -57,7 +57,7 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 	}
 	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, imageNameDetail.Uri())
 	if err == nil && imageInfo.ID != "" {
-		self.JsonResponseWithError(http, errors.New("镜像名称已经存在"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", imageNameDetail.Uri()), 500)
 		return
 	}
 	containerTar, err := os.Open(storage.Local{}.GetRealPath(params.Tar))
@@ -218,11 +218,11 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		return
 	}
 	if params.BuildDockerfileContent == "" && params.BuildZip == "" && params.BuildGit == "" {
-		self.JsonResponseWithError(http, errors.New("至少需要指定 Dockerfile、Zip 包或是 Git 地址"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".imageBuildTypeEmpty"), 500)
 		return
 	}
 	if params.BuildZip != "" && params.BuildGit != "" {
-		self.JsonResponseWithError(http, errors.New("zip 包和 git 地址只需要只定一项"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(".imageBuildTypeConflict"), 500)
 		return
 	}
 	imageNameDetail := registry.GetImageTagDetail(params.Tag)
@@ -235,7 +235,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		path := storage.Local{}.GetRealPath(params.BuildZip)
 		_, err := os.Stat(path)
 		if os.IsNotExist(err) {
-			self.JsonResponseWithError(http, errors.New("请先上传压缩包"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonUploadFileEmpty"), 500)
 			return
 		}
 		params.BuildZip = path

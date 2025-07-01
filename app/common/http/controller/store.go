@@ -47,7 +47,7 @@ func (self Store) Create(http *gin.Context) {
 	if params.Id <= 0 {
 		storeRow, _ := dao.Store.Where(dao.Store.Name.Eq(params.Name)).First()
 		if storeRow != nil {
-			self.JsonResponseWithError(http, errors.New("应用商店已经存在"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.Name), 500)
 			return
 		}
 	} else {
