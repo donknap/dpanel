@@ -27,6 +27,7 @@ var (
 	SettingGroupSettingDnsApi               = "dnsApi"
 	SettingGroupSettingEmailServer          = "emailServer"
 	SettingGroupSettingTag                  = "tag"
+	SettingGroupSettingLogin                = "login"
 )
 
 // 用户相关数据
@@ -176,6 +177,11 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 			if setting.Value.Tag != nil {
 				exists = true
 				*v = setting.Value.Tag
+			}
+		case *accessor.Login:
+			if setting.Value.Login != nil {
+				exists = true
+				*v = *setting.Value.Login
 			}
 		case *entity.Setting:
 			*v = *setting

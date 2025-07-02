@@ -2,6 +2,7 @@ package logic
 
 import (
 	"fmt"
+	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -17,8 +18,11 @@ import (
 )
 
 var (
-	maxFailedCount = 5
-	lockTime       = 15 * time.Minute
+	loginSetting = accessor.Login{
+		FailedEnable:   true,
+		FailedTotal:    5,
+		FailedLockTime: 900,
+	}
 )
 
 type UserInfo struct {
@@ -48,23 +52,42 @@ func (self User) GetMd5Password(password string, key string) string {
 	return function.GetMd5(password + key)
 }
 
-func (self User) CheckLock(username string) bool {
-	if item, ok := storage.Cache.Get(username); ok {
-		if v, ok := item.(int); ok && v >= maxFailedCount {
-			return true
+func (self User) CheckLock(username string) error {
+	Setting{}.GetByKey(SettingGroupSetting, SettingGroupSettingLogin, &loginSetting)
+	if !loginSetting.FailedEnable {
+		return nil
+	}
+	cacheKey := fmt.Sprintf(storage.CacheKeyLoginFailed, username)
+	if item, ok := storage.Cache.Get(cacheKey); ok {
+		if v, ok := item.(int); ok && v >= loginSetting.FailedTotal {
+			if loginSetting.FailedLockTime == -1 {
+				return function.ErrorMessage(".userFailedLockForever")
+			}
+			return function.ErrorMessage(".userFailedLock", "time", units.HumanDuration(time.Duration(loginSetting.FailedLockTime)*time.Second))
 		}
 	}
-	return false
+	return nil
 }
 
 func (self User) Lock(username string, failed bool) {
+	Setting{}.GetByKey(SettingGroupSetting, SettingGroupSettingLogin, &loginSetting)
+	if !loginSetting.FailedEnable {
+		return
+	}
+	var lockTime time.Duration
+	if loginSetting.FailedLockTime == -1 {
+		lockTime = cache.DefaultExpiration
+	} else {
+		lockTime = time.Duration(loginSetting.FailedLockTime) * time.Second
+	}
+	cacheKey := fmt.Sprintf(storage.CacheKeyLoginFailed, username)
 	if failed {
 		var err error
-		if _, err = storage.Cache.IncrementInt(username, 1); err != nil {
-			storage.Cache.Set(username, 1, lockTime)
+		if _, err = storage.Cache.IncrementInt(cacheKey, 1); err != nil {
+			storage.Cache.Set(cacheKey, 1, lockTime)
 		}
 	} else {
-		storage.Cache.Delete(username)
+		storage.Cache.Delete(cacheKey)
 	}
 }
 

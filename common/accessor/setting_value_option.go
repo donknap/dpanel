@@ -26,6 +26,7 @@ type SettingValueOption struct {
 	DnsApi                      []DnsApi                    `json:"dnsApi,omitempty"`
 	EmailServer                 *EmailServer                `json:"emailServer,omitempty"`
 	Tag                         []Tag                       `json:"tag,omitempty"`
+	Login                       *Login                      `json:"login,omitempty"`
 }
 
 type ContainerCheckIgnoreUpgrade []string
@@ -98,4 +99,10 @@ type Tag struct {
 	Tag             string    `json:"tag,omitempty" binding:"required"` // 为分组显示时，tag 为分组标题
 	TagColor        string    `json:"tagColor,omitempty"`
 	Item            []TagItem `json:"item,omitempty"`
+}
+
+type Login struct {
+	FailedEnable   bool `json:"failedEnable"`
+	FailedTotal    int  `json:"failedTotal"`
+	FailedLockTime int  `json:"failedLockTime"`
 }

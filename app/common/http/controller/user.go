@@ -50,8 +50,8 @@ func (self User) Login(http *gin.Context) {
 	var code string
 	var err error
 
-	if new(logic.User).CheckLock(params.Username) {
-		self.JsonResponseWithError(http, notice.Message{}.New(".userFailedLock", "time", "15"), 500)
+	if err = new(logic.User).CheckLock(params.Username); err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 

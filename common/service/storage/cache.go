@@ -10,6 +10,7 @@ var (
 	CacheKeyExplorerUsername = "explorer:%s:uid:%d"
 	CacheKeyCommonUserInfo   = "user:%d"
 	CacheKeyXkStorageInfo    = "xk:storageInfo"
+	CacheKeyLoginFailed      = "login:failed:%s"
 )
 
 var (

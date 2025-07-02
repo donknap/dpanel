@@ -71,6 +71,11 @@ func (self Env) Create(http *gin.Context) {
 	}
 
 	if params.EnableSSH {
+		knownHostsCallback := ssh.NewDefaultKnownHostCallback()
+		if params.SshServerInfo != nil && params.SshServerInfo.Address != "" {
+			_ = knownHostsCallback.Delete(params.SshServerInfo.Address)
+		}
+
 		sshClient, err := ssh.NewClient(ssh.WithServerInfo(params.SshServerInfo)...)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)

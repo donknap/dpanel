@@ -383,36 +383,26 @@ func (self Compose) Delete(http *gin.Context) {
 
 func (self Compose) GetFromUri(http *gin.Context) {
 	type ParamsValidate struct {
-		Uri string `json:"uri" binding:"required,uri"`
+		Uri string `json:"uri" binding:"required,url"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	content := make([]byte, 0)
 	var err error
-
-	if strings.HasPrefix(params.Uri, "http") {
-		response, err := http2.Get(params.Uri)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer func() {
-			_ = response.Body.Close()
-		}()
-		content, err = io.ReadAll(response.Body)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	} else {
-		content, err = os.ReadFile(params.Uri)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
+	content := make([]byte, 0)
+	response, err := http2.Get(params.Uri)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		_ = response.Body.Close()
+	}()
+	content, err = io.ReadAll(response.Body)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"content": string(content),

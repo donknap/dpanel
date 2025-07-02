@@ -5,6 +5,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"reflect"
@@ -85,6 +86,7 @@ func (self Setting) SaveConfig(http *gin.Context) {
 		Theme       *accessor.ThemeConfig        `json:"theme"`
 		Console     *accessor.ThemeConsoleConfig `json:"console"`
 		EmailServer *accessor.EmailServer        `json:"emailServer"`
+		Login       *accessor.Login              `json:"login"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -129,6 +131,26 @@ func (self Setting) SaveConfig(http *gin.Context) {
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
+		}
+	}
+
+	if params.Login != nil {
+		err := logic.Setting{}.Save(&entity.Setting{
+			GroupName: logic.SettingGroupSetting,
+			Name:      logic.SettingGroupSettingLogin,
+			Value: &accessor.SettingValueOption{
+				Login: params.Login,
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		// 清空登录缓存
+		for key, _ := range storage.Cache.Items() {
+			if strings.HasPrefix(key, "login:failed") {
+				storage.Cache.Delete(key)
+			}
 		}
 	}
 
