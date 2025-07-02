@@ -1,7 +1,6 @@
 package compose
 
 import (
-	types2 "github.com/donknap/dpanel/app/pro/xk/types"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -42,10 +41,10 @@ func NewReplaceTable(rt ...ReplaceFunc) ReplaceTable {
 			}
 			item.Value = ""
 			if v, ok := storage.Cache.Get(storage.CacheKeyXkStorageInfo); ok {
-				item.Rule.Option = function.PluckArrayWalk(v.(*types2.StorageInfo).Data, func(item types2.StorageInfoItem) (docker.ValueItem, bool) {
+				item.Rule.Option = function.PluckArrayWalk(v.([]string), func(item string) (docker.ValueItem, bool) {
 					return docker.ValueItem{
-						Name:  item.MountPath,
-						Value: item.MountPath,
+						Name:  item,
+						Value: item,
 					}, true
 				})
 			}
