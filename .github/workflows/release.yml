@@ -268,7 +268,7 @@ jobs:
       - name: Build
         run: |
           VERSION_TAG=${GITHUB_REF_NAME#v}
-          make -C app/pro/tests/xk_open clean libxkopen.so
+          make -C app/pro/tests/xk_open clean libxksssopen.so
           make clean-source 
           make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 VERSION=${VERSION_TAG}
       - name: upload artifact

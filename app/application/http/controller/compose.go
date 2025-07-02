@@ -25,6 +25,7 @@ import (
 	http2 "net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -120,13 +121,15 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
+	overrideYamlFileName := "dpanel-override.yaml"
+	if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
+		// 外部 compose 的覆盖文件采用同名
+		overrideYamlFileName = fmt.Sprintf("dpanel-%s-override.yaml", yamlRow.Name)
+	}
+	overrideYamlFilePath := filepath.Join(filepath.Dir(yamlRow.Setting.GetUriFilePath()), overrideYamlFileName)
+	overrideRelPath, _ := filepath.Rel(yamlRow.Setting.GetWorkingDir(), overrideYamlFilePath)
+
 	if params.YamlOverride != "" {
-		overrideYamlFileName := "dpanel-override.yaml"
-		if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
-			// 外部 compose 的覆盖文件采用同名
-			overrideYamlFileName = fmt.Sprintf("dpanel-%s-override.yaml", yamlRow.Name)
-		}
-		overrideYamlFilePath := filepath.Join(filepath.Dir(yamlRow.Setting.GetUriFilePath()), overrideYamlFileName)
 		err := os.MkdirAll(filepath.Dir(overrideYamlFilePath), os.ModePerm)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -137,11 +140,18 @@ func (self Compose) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-
-		rel, _ := filepath.Rel(yamlRow.Setting.GetWorkingDir(), overrideYamlFilePath)
-		if !function.InArray(yamlRow.Setting.Uri, rel) {
-			yamlRow.Setting.Uri = append(yamlRow.Setting.Uri, rel)
+		if !function.InArray(yamlRow.Setting.Uri, overrideRelPath) {
+			yamlRow.Setting.Uri = append(yamlRow.Setting.Uri, overrideRelPath)
 		}
+	} else {
+		err = os.Remove(overrideYamlFilePath)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		yamlRow.Setting.Uri = slices.DeleteFunc(yamlRow.Setting.Uri, func(s string) bool {
+			return s == overrideRelPath
+		})
 	}
 
 	if !function.IsEmptyArray(params.Environment) {
