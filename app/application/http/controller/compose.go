@@ -144,14 +144,11 @@ func (self Compose) Create(http *gin.Context) {
 			yamlRow.Setting.Uri = append(yamlRow.Setting.Uri, overrideRelPath)
 		}
 	} else {
-		err = os.Remove(overrideYamlFilePath)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
+		if err = os.Remove(overrideYamlFilePath); err == nil {
+			yamlRow.Setting.Uri = slices.DeleteFunc(yamlRow.Setting.Uri, func(s string) bool {
+				return s == overrideRelPath
+			})
 		}
-		yamlRow.Setting.Uri = slices.DeleteFunc(yamlRow.Setting.Uri, func(s string) bool {
-			return s == overrideRelPath
-		})
 	}
 
 	if !function.IsEmptyArray(params.Environment) {

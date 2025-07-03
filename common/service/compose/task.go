@@ -119,6 +119,7 @@ type ContainerResult struct {
 	Publishers []ContainerPublishersResult `json:"publishers"`
 	State      string                      `json:"state"`
 	Status     string                      `json:"status"`
+	Health     string
 }
 
 type ContainerPublishersResult struct {
@@ -169,8 +170,10 @@ func (self Task) Ps() []*ContainerResult {
 				continue
 			}
 			temp := ContainerResult{}
-			err = json.Unmarshal(line, &temp)
-			if err == nil {
+			if err = json.Unmarshal(line, &temp); err == nil {
+				if temp.Health != "" {
+					temp.State = temp.Health
+				}
 				result = append(result, &temp)
 			}
 			line = make([]byte, 0)
