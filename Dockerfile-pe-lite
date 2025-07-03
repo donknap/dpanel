@@ -1,0 +1,11 @@
+FROM dpanel/dpanel:lite
+
+ARG APP_VERSION
+ARG TARGETARCH
+ARG APP_FAMILY
+
+ENV APP_VERSION=$APP_VERSION
+ENV APP_FAMILY=$APP_FAMILY
+
+COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
+COPY ./runtime/config.yaml /app/server/config.yaml
