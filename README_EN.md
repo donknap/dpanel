@@ -14,7 +14,7 @@
 
 [**Home**](https://dpanel.cc/) &nbsp; |
 &nbsp; [**Demo**](https://dpanel.park1991.com/) &nbsp; |
-&nbsp; [**Docs**](https://dpanel.cc/#/en-us/install/docker) &nbsp; |
+&nbsp; [**Docs**](https://dpanel.cc/#/en-us/README) &nbsp; |
 &nbsp; [**Pro Edition**](https://dpanel.cc/#/zh-cn/manual/pro) &nbsp; |
 &nbsp; [**Sponsor**](https://afdian.com/a/dpanel) &nbsp;
 
@@ -26,7 +26,7 @@ The Pro Edition is merely an enhancement and supplement to the Community Edition
 
 Thank you for your support and love. 
 
-🚀🚀🚀 [Feature](https://dpanel.cc/#/zh-cn/manual/pro?id=%e4%bb%b7%e6%a0%bc%e5%8f%8a%e5%8a%9f%e8%83%bd) 🚀🚀🚀
+🚀🚀🚀 [More Feature](https://dpanel.cc/#/zh-cn/manual/pro?id=%e4%bb%b7%e6%a0%bc%e5%8f%8a%e5%8a%9f%e8%83%bd) 🚀🚀🚀
 
 #### Standard Version
 
@@ -62,10 +62,15 @@ https://t.me/dpanel666
 
 <img src="https://github.com/donknap/dpanel-docs/blob/master/storage/image/telegram.png?raw=true" width="300" />
 
+#### Buy me coffee
+
+If this project has helped you and you want me to keep going, please sponsor me and buy me a coffee! Thanks for all the love and support.
+
+[https://afdian.com/a/dpanel](https://afdian.com/a/dpanel)
+
 #### Thanks Contributors
 
 [![Contributors](https://contrib.rocks/image?repo=donknap/dpanel)](https://github.com/donknap/dpanel/graphs/contributors)
-
 
 #### Preview
 
