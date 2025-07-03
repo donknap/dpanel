@@ -12,6 +12,13 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/dpanel/dpanel)](https://hub.docker.com/r/dpanel/dpanel/tags) &nbsp;
 <a href="https://hellogithub.com/repository/c69089b776704985b989f98626de977a" target="_blank"><img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=c69089b776704985b989f98626de977a&claim_uid=ekhLfDOxR5U0mVw&theme=small" alt="Featured｜HelloGitHub" /></a>
 
+<p align="center">
+  <a href="/README_EN.md"><img alt="English" src="https://img.shields.io/badge/English-d9d9d9"></a>
+  <a href="/README.md"><img alt="中文(简体)" src="https://img.shields.io/badge/中文(简体)-d9d9d9"></a>
+</p>
+
+------------------------------
+
 [**Home**](https://dpanel.cc/) &nbsp; |
 &nbsp; [**Demo**](https://dpanel.park1991.com/) &nbsp; |
 &nbsp; [**Docs**](https://dpanel.cc/#/en-us/README) &nbsp; |
@@ -62,7 +69,7 @@ https://t.me/dpanel666
 
 <img src="https://github.com/donknap/dpanel-docs/blob/master/storage/image/telegram.png?raw=true" width="300" />
 
-#### Buy me coffee
+#### Sponsor
 
 If this project has helped you and you want me to keep going, please sponsor me and buy me a coffee! Thanks for all the love and support.
 
