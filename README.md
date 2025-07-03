@@ -12,6 +12,14 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/dpanel/dpanel)](https://hub.docker.com/r/dpanel/dpanel/tags) &nbsp;
 <a href="https://hellogithub.com/repository/c69089b776704985b989f98626de977a" target="_blank"><img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=c69089b776704985b989f98626de977a&claim_uid=ekhLfDOxR5U0mVw&theme=small" alt="Featured｜HelloGitHub" /></a>
 
+
+<p align="center">
+  <a href="/README_EN.md"><img alt="English" src="https://img.shields.io/badge/English-d9d9d9"></a>
+  <a href="/README.md"><img alt="中文(简体)" src="https://img.shields.io/badge/中文(简体)-d9d9d9"></a>
+</p>
+
+------------------------------
+
 [**官网**](https://dpanel.cc/) &nbsp; |
 &nbsp; [**演示**](https://dpanel.park1991.com) &nbsp; |
 &nbsp; [**文档**](https://dpanel.cc/#/zh-cn/install/docker) &nbsp; |
@@ -20,10 +28,6 @@
 &nbsp; [**赞助**](https://afdian.com/a/dpanel) &nbsp;
 
 </div>
-
-<p>
-   <a href="README_EN.md"> English </a> | 中文
-</p>
 
 ### Pro 版
 
