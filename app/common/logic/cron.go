@@ -108,16 +108,12 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 			}()
 			response, err := dockerClient.ContainerExec(dockerClient.Ctx, containerName, container.ExecOptions{
 				Privileged:   true,
-				Tty:          true,
+				Tty:          false,
 				AttachStdin:  false,
 				AttachStdout: true,
-				AttachStderr: false,
-				Cmd: []string{
-					"/bin/sh",
-					"-c",
-					task.Setting.Script,
-				},
-				Env: globalEnv,
+				AttachStderr: true,
+				Cmd:          docker.CommandSplit(task.Setting.Script),
+				Env:          globalEnv,
 			})
 			if err != nil {
 				_ = dao.CronLog.Create(&entity.CronLog{
