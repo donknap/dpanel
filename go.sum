@@ -244,8 +244,8 @@ github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65E
 github.com/ugorji/go/codec v1.2.12/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
 github.com/we7coreteam/gorm-gen-yaml v1.0.10 h1:K3QfHfv5uEZOfg/Z/x4eZpuReyLw50FeHCqib7RtYPE=
 github.com/we7coreteam/gorm-gen-yaml v1.0.10/go.mod h1:tNGeJOZuMo3sNFW24WMRXm6Eydx1wRlA8Z5PCT2Gd8c=
-github.com/we7coreteam/w7-rangine-go/v2 v2.0.3 h1:GniLdbtOh69m7POm7jutCX/wZVHUkkKZl6MFGzXahzw=
-github.com/we7coreteam/w7-rangine-go/v2 v2.0.3/go.mod h1:zgZuzT5l7+i9IGtbr/3RIqwmRJp+BS7SExH/ymNSxs0=
+github.com/we7coreteam/w7-rangine-go/v2 v2.0.5 h1:tFhk5mQuCr5mhMiIlh2Vj2WDWDYgn3lJqmzX9cg697I=
+github.com/we7coreteam/w7-rangine-go/v2 v2.0.5/go.mod h1:zgZuzT5l7+i9IGtbr/3RIqwmRJp+BS7SExH/ymNSxs0=
 github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=
 github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb h1:zGWFAtiMcyryUHoUjUJX0/lt1H2+i2Ka2n+D3DImSNo=
 github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=

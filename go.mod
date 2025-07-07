@@ -30,7 +30,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
-	github.com/we7coreteam/w7-rangine-go/v2 v2.0.3
+	github.com/we7coreteam/w7-rangine-go/v2 v2.0.5
 	go.uber.org/zap v1.27.0
 	go.uber.org/zap/exp v0.3.0
 	golang.org/x/crypto v0.38.0

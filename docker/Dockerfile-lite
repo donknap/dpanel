@@ -16,12 +16,12 @@ ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
 ENV TZ=Asia/Shanghai
 ENV ACME_OVERRIDE_CONFIG_HOME=/dpanel/acme
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-  apk add --no-cache --update musl docker-compose tzdata git
-
 COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
+  apk add --no-cache --update musl docker-compose tzdata git
 
 WORKDIR /app/server
 VOLUME [ "/dpanel" ]

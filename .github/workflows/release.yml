@@ -127,7 +127,7 @@ jobs:
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${VERSION_TAG} \
           --build-arg APP_FAMILY=ce \
-          -f Dockerfile-lite \
+          -f ./docker/Dockerfile-lite \
           . --push
 
           docker buildx build \
@@ -140,6 +140,7 @@ jobs:
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${VERSION_TAG} \
           --build-arg APP_FAMILY=ce \
+          -f ./docker/Dockerfile
           . --push
           
           # pe
@@ -156,7 +157,7 @@ jobs:
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${VERSION_TAG} \
           --build-arg APP_FAMILY=pe \
-          -f Dockerfile-lite \
+          -f ./docker/Dockerfile-pe-lite \
           . --push
 
           docker buildx build \
@@ -171,6 +172,7 @@ jobs:
           --platform linux/arm64,linux/amd64,linux/arm/v7 \
           --build-arg APP_VERSION=${VERSION_TAG} \
           --build-arg APP_FAMILY=pe \
+          -f ./docker/Dockerfile-pe
           . --push
 
       - name: upload artifact

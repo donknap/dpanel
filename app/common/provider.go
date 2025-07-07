@@ -127,8 +127,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	if e := os.Getenv(client.EnvOverrideHost); e != "" {
 		defaultDockerHost = e
 	}
-
-	defaultDockerEnv, err := logic.DockerEnv{}.GetEnvByName(docker.DefaultClientName)
+	defaultDockerEnv, err := logic.DockerEnv{}.GetDefaultEnv()
 	if err != nil {
 		defaultDockerEnv = &docker.Client{
 			Name:    docker.DefaultClientName,
