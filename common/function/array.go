@@ -67,6 +67,16 @@ func PluckArrayWalk[T interface{}, R interface{}](v []T, walk func(i T) (R, bool
 	return result
 }
 
+func PluckArrayMapWalk[T interface{}, K comparable, V interface{}](v []T, walk func(item T) (K, V, bool)) map[K]V {
+	result := make(map[K]V)
+	for _, item := range v {
+		if key, value, ok := walk(item); ok {
+			result[key] = value
+		}
+	}
+	return result
+}
+
 func FindArrayValueIndex(items interface{}, value ...interface{}) (exists bool, pos []int) {
 	pos = make([]int, 0)
 	some := reflect.ValueOf(items)
