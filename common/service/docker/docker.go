@@ -80,6 +80,19 @@ func (self Builder) Close() {
 	}
 }
 
+func NewBuilderWithDockerEnv(dockerEnv *Client) (*Builder, error) {
+	options := make([]Option, 0)
+	options = append(options, WithAddress(dockerEnv.Address))
+	options = append(options, WithName(dockerEnv.Name))
+	if dockerEnv.EnableTLS {
+		options = append(options, WithTLS(dockerEnv.TlsCa, dockerEnv.TlsCert, dockerEnv.TlsKey))
+	}
+	if dockerEnv.RemoteType == RemoteTypeSSH {
+		options = append(options, WithSSH(dockerEnv.SshServerInfo))
+	}
+	return NewBuilder(options...)
+}
+
 type Option func(builder *Builder) error
 
 func NewBuilder(opts ...Option) (*Builder, error) {

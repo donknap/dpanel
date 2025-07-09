@@ -236,22 +236,12 @@ func (self Env) Switch(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
 		return
 	}
-	options := make([]docker.Option, 0)
 	if docker.Sdk.Client.DaemonHost() == dockerEnv.Address {
 		self.JsonSuccessResponse(http)
 		return
 	}
-	options = append(options, docker.WithAddress(dockerEnv.Address))
-	options = append(options, docker.WithName(dockerEnv.Name))
-	if dockerEnv.EnableTLS {
-		options = append(options, docker.WithTLS(dockerEnv.TlsCa, dockerEnv.TlsCert, dockerEnv.TlsKey))
-	}
-	if dockerEnv.RemoteType == docker.RemoteTypeSSH {
-		options = append(options, docker.WithSSH(dockerEnv.SshServerInfo))
-	}
 	oldDockerClient := docker.Sdk
-
-	dockerClient, err := docker.NewBuilder(options...)
+	dockerClient, err := docker.NewBuilderWithDockerEnv(dockerEnv)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

@@ -137,15 +137,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		}
 		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
 	}
-
-	options := []docker.Option{
-		docker.WithName(defaultDockerEnv.Name),
-		docker.WithAddress(defaultDockerEnv.Address),
-	}
-	if defaultDockerEnv.EnableTLS {
-		options = append(options, docker.WithTLS(defaultDockerEnv.TlsCa, defaultDockerEnv.TlsCert, defaultDockerEnv.TlsKey))
-	}
-	docker.Sdk, err = docker.NewBuilder(options...)
+	docker.Sdk, err = docker.NewBuilderWithDockerEnv(defaultDockerEnv)
 	if err != nil {
 		panic(err)
 	}

@@ -95,14 +95,7 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 			}
 			out = buffer.String()
 		} else {
-			options := []docker.Option{
-				docker.WithName(defaultDockerEnv.Name),
-				docker.WithAddress(defaultDockerEnv.Address),
-			}
-			if defaultDockerEnv.EnableTLS {
-				options = append(options, docker.WithTLS(defaultDockerEnv.TlsCa, defaultDockerEnv.TlsCert, defaultDockerEnv.TlsKey))
-			}
-			dockerClient, err := docker.NewBuilder(options...)
+			dockerClient, err := docker.NewBuilderWithDockerEnv(defaultDockerEnv)
 			defer func() {
 				dockerClient.Close()
 			}()
@@ -126,7 +119,7 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 				return err
 			}
 			defer response.Close()
-			buffer := new(bytes.Buffer)
+			buffer, err := docker.GetContentFromStdFormat(response.Reader)
 			_, err = io.Copy(buffer, response.Reader)
 			if err != nil {
 				_ = dao.CronLog.Create(&entity.CronLog{

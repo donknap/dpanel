@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
@@ -10,6 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"net"
+	"strconv"
+	"time"
 )
 
 type Swarm struct {
@@ -53,44 +56,58 @@ func (self Swarm) Info(http *gin.Context) {
 
 func (self Swarm) Init(http *gin.Context) {
 	type ParamsValidate struct {
-		AdvertiseAddr    string `json:"advertiseAddr" binding:"required"`
-		ListenAddr       string `json:"listenAddr"`
+		AdvertiseAddr    string `json:"advertiseAddr" binding:"ip|hostname|hostname_port"`
+		ListenAddr       string `json:"listenAddr" binding:"ip|hostname|hostname_port"`
+		DataPathAddr     string `json:"dataPathAddr" binding:"omitempty,ip|hostname|hostname_port"`
 		ForceNewCluster  bool   `json:"forceNewCluster"`
 		AutoLockManagers bool   `json:"autoLockManagers"`
-		Port             int    `json:"port"`
 		Subnet           string `json:"subnet"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if params.Port == 0 {
-		params.Port = 2377
+	initRequest := swarm.InitRequest{
+		ForceNewCluster:  false,
+		AutoLockManagers: params.AutoLockManagers,
 	}
-	if params.ListenAddr == "" {
-		params.ListenAddr = "0.0.0.0"
+
+	if addr, port, err := net.SplitHostPort(params.AdvertiseAddr); err == nil {
+		initRequest.AdvertiseAddr = fmt.Sprintf("%s:%s", addr, port)
+	} else {
+		initRequest.AdvertiseAddr = fmt.Sprintf("%s:2377", params.AdvertiseAddr)
 	}
+
+	if addr, port, err := net.SplitHostPort(params.ListenAddr); err == nil {
+		initRequest.ListenAddr = fmt.Sprintf("%s:%s", addr, port)
+	} else {
+		initRequest.ListenAddr = fmt.Sprintf("%s:2377", params.ListenAddr)
+	}
+
+	if params.DataPathAddr != "" {
+		if addr, port, err := net.SplitHostPort(params.DataPathAddr); err == nil {
+			initRequest.DataPathAddr = addr
+			p, _ := strconv.Atoi(port)
+			initRequest.DataPathPort = uint32(p)
+		} else {
+			initRequest.DataPathAddr = params.DataPathAddr
+			initRequest.DataPathPort = 4789
+		}
+	}
+
 	_, ipNet, err := net.ParseCIDR(params.Subnet)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	var subnet string
-	var subnetSize int
 
-	subnetSize, _ = ipNet.Mask.Size()
-	subnet = ipNet.String()
+	initRequest.DefaultAddrPool = []string{
+		ipNet.String(),
+	}
+	subnetSize, _ := ipNet.Mask.Size()
+	initRequest.SubnetSize = uint32(subnetSize)
 
-	id, err := docker.Sdk.Client.SwarmInit(docker.Sdk.Ctx, swarm.InitRequest{
-		ListenAddr:       fmt.Sprintf("%s:%d", params.ListenAddr, params.Port),
-		AdvertiseAddr:    fmt.Sprintf("%s:%d", params.AdvertiseAddr, params.Port),
-		ForceNewCluster:  false,
-		AutoLockManagers: params.AutoLockManagers,
-		DefaultAddrPool: []string{
-			subnet,
-		},
-		SubnetSize: uint32(subnetSize),
-	})
+	id, err := docker.Sdk.Client.SwarmInit(docker.Sdk.Ctx, initRequest)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -168,14 +185,7 @@ func (self Swarm) NodeJoin(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	options := []docker.Option{
-		docker.WithName(dockerEnv.Name),
-		docker.WithAddress(dockerEnv.Address),
-	}
-	if dockerEnv.EnableTLS {
-		options = append(options, docker.WithTLS(dockerEnv.TlsCa, dockerEnv.TlsCert, dockerEnv.TlsKey))
-	}
-	dockerClient, err := docker.NewBuilder(options...)
+	dockerClient, err := docker.NewBuilderWithDockerEnv(dockerEnv)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -227,6 +237,10 @@ func (self Swarm) NodeJoin(http *gin.Context) {
 			return item.Addr, true
 		}),
 	}
+	if ip, _, err := net.SplitHostPort(joinRequest.AdvertiseAddr); err == nil {
+		joinRequest.DataPathAddr = ip
+	}
+
 	if params.Role == swarm.NodeRoleManager {
 		joinRequest.JoinToken = swarmInfo.JoinTokens.Manager
 	} else {
@@ -238,36 +252,39 @@ func (self Swarm) NodeJoin(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	//subnet := make([]network.IPAMConfig, 0)
-	//if !function.IsEmptyArray(swarmInfo.DefaultAddrPool) {
-	//	subnet = function.PluckArrayWalk(swarmInfo.DefaultAddrPool, func(value string) (network.IPAMConfig, bool) {
-	//		ip, _, _ := net.ParseCIDR(value)
-	//		return network.IPAMConfig{
-	//			Subnet:  value,
-	//			Gateway: fmt.Sprintf("%d.%d.%d.1", ip.To4()[0], ip.To4()[1], ip.To4()[2]),
-	//		}, true
-	//	})
-	//} else {
-	//	subnet = append(subnet, network.IPAMConfig{
-	//		Subnet:  fmt.Sprintf("10.0.0.1/%d", swarmInfo.SubnetSize),
-	//		Gateway: "10.0.0.1",
-	//	})
-	//}
-	//_, err = clientDockerClient.Client.NetworkCreate(dockerClient.Ctx, "ingress", network.CreateOptions{
-	//	Driver:     "overlay",
-	//	Scope:      "swarm",
-	//	EnableIPv4: function.PtrBool(true),
-	//	IPAM: &network.IPAM{
-	//		Driver: "default",
-	//		Config: subnet,
-	//	},
-	//	Ingress: true,
-	//})
-	//if err != nil {
-	//	self.JsonResponseWithError(http, err, 500)
-	//	return
-	//}
-	self.JsonSuccessResponse(http)
+
+	leave := func(nodeId string) {
+		_ = clientDockerClient.Client.SwarmLeave(clientDockerClient.Ctx, true)
+		if nodeId != "" {
+			_ = swarmDockerClient.Client.NodeRemove(swarmDockerClient.Ctx, nodeId, types.NodeRemoveOptions{})
+		}
+	}
+
+	clientDockerInfo, err := clientDockerClient.Client.Info(clientDockerClient.Ctx)
+	if err != nil {
+		leave("")
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	for i := 0; i < 5; i++ {
+		if _, err := clientDockerClient.Client.NetworkInspect(clientDockerClient.Ctx, "ingress", network.InspectOptions{
+			Scope: "swarm",
+		}); err == nil {
+			self.JsonResponseWithoutError(http, gin.H{
+				"id": clientDockerInfo.Swarm.NodeID,
+			})
+			return
+		}
+		time.Sleep(time.Second)
+	}
+
+	leave(clientDockerInfo.Swarm.NodeID)
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"id":  "",
+		"cmd": fmt.Sprintf("docker swarm join --token %s %s", joinRequest.JoinToken, joinRequest.AdvertiseAddr),
+	})
 	return
 }
 
@@ -298,6 +315,18 @@ func (self Swarm) NodeRemove(http *gin.Context) {
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
+		}
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Swarm) NodePrune(http *gin.Context) {
+	if nodeList, err := docker.Sdk.Client.NodeList(docker.Sdk.Ctx, types.NodeListOptions{}); err == nil {
+		for _, node := range nodeList {
+			if node.Status.State == swarm.NodeStateDown {
+				_ = docker.Sdk.Client.NodeRemove(docker.Sdk.Ctx, node.ID, types.NodeRemoveOptions{})
+			}
 		}
 	}
 	self.JsonSuccessResponse(http)
