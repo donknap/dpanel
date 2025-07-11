@@ -99,13 +99,14 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 			defer func() {
 				dockerClient.Close()
 			}()
+			cmd := docker.CommandSplit(task.Setting.Script)
 			response, err := dockerClient.ContainerExec(dockerClient.Ctx, containerName, container.ExecOptions{
 				Privileged:   true,
 				Tty:          false,
 				AttachStdin:  false,
 				AttachStdout: true,
 				AttachStderr: true,
-				Cmd:          docker.CommandSplit(task.Setting.Script),
+				Cmd:          cmd,
 				Env:          globalEnv,
 			})
 			if err != nil {

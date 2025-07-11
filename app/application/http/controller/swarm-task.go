@@ -7,19 +7,24 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
+	"sort"
 )
 
 func (self Swarm) TaskList(http *gin.Context) {
 	type ParamsValidate struct {
-		NodeName string `json:"nodeName"`
+		ServiceName string `json:"serviceName"`
+		Status      string `json:"status"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 	filter := filters.NewArgs()
-	if params.NodeName != "" {
-		filter.Add("node", params.NodeName)
+	if params.ServiceName != "" {
+		filter.Add("service", params.ServiceName)
+	}
+	if params.Status != "" {
+		filter.Add("desired-state", params.Status)
 	}
 	list, err := docker.Sdk.Client.TaskList(docker.Sdk.Ctx, types.TaskListOptions{
 		Filters: filter,
@@ -28,6 +33,9 @@ func (self Swarm) TaskList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].CreatedAt.After(list[j].CreatedAt)
+	})
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": list,
 	})
@@ -44,7 +52,7 @@ func (self Swarm) TaskListInNode(http *gin.Context) {
 	}
 	type resultItem struct {
 		swarm.Service
-		Children []swarm.Task `json:"Children"`
+		Task []swarm.Task `json:"Task"`
 	}
 	result := make([]resultItem, 0)
 
@@ -70,10 +78,13 @@ func (self Swarm) TaskListInNode(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	sort.Slice(serviceList, func(i, j int) bool {
+		return serviceList[i].Spec.Name < serviceList[j].Spec.Name
+	})
 	for _, service := range serviceList {
 		item := resultItem{
 			Service: service,
-			Children: function.PluckArrayWalk(taskList, func(item swarm.Task) (swarm.Task, bool) {
+			Task: function.PluckArrayWalk(taskList, func(item swarm.Task) (swarm.Task, bool) {
 				if item.ServiceID == service.ID {
 					return item, true
 				} else {
@@ -81,6 +92,9 @@ func (self Swarm) TaskListInNode(http *gin.Context) {
 				}
 			}),
 		}
+		sort.Slice(item.Task, func(i, j int) bool {
+			return item.Task[i].CreatedAt.After(item.Task[j].CreatedAt)
+		})
 		result = append(result, item)
 	}
 	self.JsonResponseWithoutError(http, gin.H{

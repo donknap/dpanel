@@ -122,6 +122,10 @@ func (self User) GetUserInfo(http *gin.Context) {
 		feature = append(feature, types.FeatureDockerEnvLocal)
 	}
 
+	if info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx); err == nil && info.Swarm.ControlAvailable {
+		feature = append(feature, types.FeatureSwarmManage)
+	}
+
 	result["feature"] = append(feature, family.Provider{}.Feature()...)
 
 	themeConfig := accessor.ThemeConfig{}

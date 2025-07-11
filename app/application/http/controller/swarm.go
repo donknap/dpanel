@@ -1,18 +1,19 @@
 package controller
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/swarm"
-	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/function"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"io"
+	"log/slog"
 	"net"
 	"strconv"
-	"time"
 )
 
 type Swarm struct {
@@ -119,216 +120,83 @@ func (self Swarm) Init(http *gin.Context) {
 	return
 }
 
-func (self Swarm) NodeList(http *gin.Context) {
-	list, err := docker.Sdk.Client.NodeList(docker.Sdk.Ctx, types.NodeListOptions{})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"list": list,
-	})
-	return
-}
-
-func (self Swarm) NodeUpdate(http *gin.Context) {
+func (self Swarm) Log(http *gin.Context) {
 	type ParamsValidate struct {
-		NodeId       string                 `json:"nodeId" binding:"required"`
-		Availability swarm.NodeAvailability `json:"availability" binding:"omitempty,oneof=active pause drain"`
-		Role         swarm.NodeRole         `json:"role" binding:"omitempty,oneof=worker manager"`
-		Labels       []docker.ValueItem     `json:"labels"`
+		Id        string `json:"id" binding:"required"`
+		Type      string `json:"type" binding:"required,oneof=service node"`
+		LineTotal int    `json:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000 5000 -1"`
+		Download  bool   `json:"download"`
+		ShowTime  bool   `json:"showTime"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	node, _, err := docker.Sdk.Client.NodeInspectWithRaw(docker.Sdk.Ctx, params.NodeId)
+	option := container.LogsOptions{
+		ShowStderr: true,
+		ShowStdout: true,
+		Follow:     !params.Download,
+		Timestamps: params.ShowTime,
+	}
+	if params.LineTotal > 0 {
+		option.Tail = strconv.Itoa(params.LineTotal)
+	}
+	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.Availability != "" {
-		node.Spec.Availability = params.Availability
-	}
-	if params.Role != "" {
-		node.Spec.Role = params.Role
-	}
-	if !function.IsEmptyArray(params.Labels) {
-		node.Spec.Labels = function.PluckArrayMapWalk(params.Labels, func(item docker.ValueItem) (string, string, bool) {
-			return item.Name, item.Value, true
-		})
-	}
-	err = docker.Sdk.Client.NodeUpdate(docker.Sdk.Ctx, params.NodeId, node.Version, node.Spec)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"detail": node,
-	})
-	return
-}
 
-func (self Swarm) NodeJoin(http *gin.Context) {
-	type ParamsValidate struct {
-		DockerEnvName string         `json:"dockerEnvName" binding:"required"`
-		Type          string         `json:"type" binding:"required,oneof=add join"`
-		Role          swarm.NodeRole `json:"role" binding:"omitempty,oneof=worker manager"`
-		ListenAddr    string         `json:"listenAddr" binding:"required"`
+	if progress.IsShadow() {
+		option.Follow = false
 	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
+	var response io.ReadCloser
+	if params.Type == "service" {
+		response, err = docker.Sdk.Client.ServiceLogs(docker.Sdk.Ctx, params.Id, option)
+	} else {
+		response, err = docker.Sdk.Client.TaskLogs(docker.Sdk.Ctx, params.Id, option)
 	}
-	dockerEnv, err := logic.DockerEnv{}.GetEnvByName(params.DockerEnvName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	dockerClient, err := docker.NewBuilderWithDockerEnv(dockerEnv)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	if params.Download {
+		buffer, err := docker.GetContentFromStdFormat(response)
+		_ = response.Close()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		http.Header("Content-Type", "text/plain")
+		http.Header("Content-Disposition", "attachment; filename="+params.Id+".log")
+		http.Data(200, "text/plain", buffer.Bytes())
 		return
 	}
-	defer func() {
-		dockerClient.Close()
+
+	progress.OnWrite = func(p string) error {
+		newReader := bytes.NewReader([]byte(p))
+		stdout := new(bytes.Buffer)
+		_, err = stdcopy.StdCopy(stdout, stdout, newReader)
+		if err != nil {
+			progress.BroadcastMessage(p)
+		} else {
+			progress.BroadcastMessage(stdout.String())
+		}
+		return nil
+	}
+
+	go func() {
+		if progress.IsShadow() {
+			return
+		}
+		select {
+		case <-progress.Done():
+			slog.Debug("service run log response close", "err", fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id))
+			_ = response.Close()
+		}
 	}()
-
-	var swarmDockerClient *docker.Builder
-	var clientDockerClient *docker.Builder
-
-	if params.Type == "join" {
-		// join 是将当前环境添加到目标集群节点
-		swarmDockerClient = dockerClient
-		clientDockerClient = docker.Sdk
-	} else {
-		swarmDockerClient = docker.Sdk
-		clientDockerClient = dockerClient
-	}
-	swarmDockerInfo, err := swarmDockerClient.Client.Info(swarmDockerClient.Ctx)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if swarmDockerInfo.Swarm.LocalNodeState == swarm.LocalNodeStateInactive {
-		self.JsonResponseWithError(http, function.ErrorMessage(".swarmNotInit"), 500)
-		return
-	}
-	if !swarmDockerInfo.Swarm.ControlAvailable {
-		self.JsonResponseWithError(http, function.ErrorMessage(".swarmNotManager"), 500)
-		return
-	}
-	swarmInfo, err := swarmDockerClient.Client.SwarmInspect(swarmDockerClient.Ctx)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	swarmManageNode, _, err := swarmDockerClient.Client.NodeInspectWithRaw(swarmDockerClient.Ctx, swarmDockerInfo.Swarm.NodeID)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	joinRequest := swarm.JoinRequest{
-		ListenAddr:    params.ListenAddr,
-		AdvertiseAddr: swarmManageNode.ManagerStatus.Addr,
-		Availability:  swarm.NodeAvailabilityActive,
-		RemoteAddrs: function.PluckArrayWalk(swarmDockerInfo.Swarm.RemoteManagers, func(item swarm.Peer) (string, bool) {
-			return item.Addr, true
-		}),
-	}
-	if ip, _, err := net.SplitHostPort(joinRequest.AdvertiseAddr); err == nil {
-		joinRequest.DataPathAddr = ip
-	}
-
-	if params.Role == swarm.NodeRoleManager {
-		joinRequest.JoinToken = swarmInfo.JoinTokens.Manager
-	} else {
-		joinRequest.JoinToken = swarmInfo.JoinTokens.Worker
-	}
-
-	err = clientDockerClient.Client.SwarmJoin(clientDockerClient.Ctx, joinRequest)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	leave := func(nodeId string) {
-		_ = clientDockerClient.Client.SwarmLeave(clientDockerClient.Ctx, true)
-		if nodeId != "" {
-			_ = swarmDockerClient.Client.NodeRemove(swarmDockerClient.Ctx, nodeId, types.NodeRemoveOptions{})
-		}
-	}
-
-	clientDockerInfo, err := clientDockerClient.Client.Info(clientDockerClient.Ctx)
-	if err != nil {
-		leave("")
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	for i := 0; i < 5; i++ {
-		if _, err := clientDockerClient.Client.NetworkInspect(clientDockerClient.Ctx, "ingress", network.InspectOptions{
-			Scope: "swarm",
-		}); err == nil {
-			self.JsonResponseWithoutError(http, gin.H{
-				"id": clientDockerInfo.Swarm.NodeID,
-			})
-			return
-		}
-		time.Sleep(time.Second)
-	}
-
-	leave(clientDockerInfo.Swarm.NodeID)
-
+	_, err = io.Copy(progress, response)
 	self.JsonResponseWithoutError(http, gin.H{
-		"id":  "",
-		"cmd": fmt.Sprintf("docker swarm join --token %s %s", joinRequest.JoinToken, joinRequest.AdvertiseAddr),
+		"log": "",
 	})
-	return
-}
-
-func (self Swarm) NodeRemove(http *gin.Context) {
-	type ParamsValidate struct {
-		NodeId string `json:"nodeId"`
-		Force  bool   `json:"force"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if info.Swarm.ControlAvailable && params.NodeId != "" {
-		err := docker.Sdk.Client.NodeRemove(docker.Sdk.Ctx, params.NodeId, types.NodeRemoveOptions{
-			Force: params.Force,
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	} else {
-		err := docker.Sdk.Client.SwarmLeave(docker.Sdk.Ctx, params.Force)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Swarm) NodePrune(http *gin.Context) {
-	if nodeList, err := docker.Sdk.Client.NodeList(docker.Sdk.Ctx, types.NodeListOptions{}); err == nil {
-		for _, node := range nodeList {
-			if node.Status.State == swarm.NodeStateDown {
-				_ = docker.Sdk.Client.NodeRemove(docker.Sdk.Ctx, node.ID, types.NodeRemoveOptions{})
-			}
-		}
-	}
-	self.JsonSuccessResponse(http)
-	return
 }

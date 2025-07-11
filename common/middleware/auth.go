@@ -46,6 +46,7 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 	}
 	authCode := strings.Split(authToken, "Bearer ")
 	if len(authCode) != 2 {
+		slog.Debug("auth middleware", "url", currentUrlPath, "code", authCode)
 		self.JsonResponseWithError(http, ErrLogin, 401)
 		http.AbortWithStatus(401)
 		return
@@ -57,6 +58,7 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		return jwtSecret, nil
 	}, jwt.WithValidMethods([]string{"HS256"}))
 	if err != nil {
+		slog.Debug("auth middleware", "url", currentUrlPath, "code", authCode)
 		self.JsonResponseWithError(http, ErrLogin, 401)
 		http.AbortWithStatus(401)
 		return
@@ -79,11 +81,12 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 				}
 			}
 		}
-		slog.Debug("auth get cache user error", "jwt", authToken, "userInfo", myUserInfo)
+		slog.Debug("auth get cache user error", "url", currentUrlPath, "jwt", authToken, "userInfo", myUserInfo)
 		self.JsonResponseWithError(http, ErrLogin, 401)
 		http.AbortWithStatus(401)
 		return
 	}
+	slog.Debug("auth middleware", "url", currentUrlPath, "code", authCode)
 	self.JsonResponseWithError(http, ErrLogin, 401)
 	http.AbortWithStatus(401)
 	return

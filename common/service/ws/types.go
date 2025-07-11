@@ -23,6 +23,7 @@ const (
 	MessageTypeProgressClose    = "progress:close"
 	MessageTypeDomainApply      = "domain:apply"
 	MessageTypeUserPermission   = "user:permission:%s"
+	MessageTypeSwarmLog         = "swarm:log:%s:%s"
 )
 
 type RespMessage struct {

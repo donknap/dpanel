@@ -306,6 +306,7 @@ func (self Compose) GetTask(http *gin.Context) {
 
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
+		slog.Debug("compose get task", "err", err)
 		// 如果获取任务失败，可能是没有文件或是Yaml文件错误，直接返回内容待用户修改
 		yaml, err := yamlRow.Setting.GetYaml()
 		if err != nil {

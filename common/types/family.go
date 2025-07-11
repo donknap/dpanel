@@ -9,4 +9,5 @@ const (
 	FeatureVersionEnvStandard = "canSeeEnableVersionEnvStandard"
 	FeatureDockerEnvLocal     = "canSeeEnableDockerEnvLocal"
 	FeatureInDPanel           = "canSeeEnableInDPanel"
+	FeatureSwarmManage        = "canSeeEnableSwarmManage"
 )
