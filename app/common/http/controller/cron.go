@@ -33,6 +33,7 @@ func (self Cron) Create(http *gin.Context) {
 		EnableRunBlock bool                             `json:"enableRunBlock"`
 		KeepLogTotal   int                              `json:"keepLogTotal"`
 		Disable        bool                             `json:"disable"`
+		EntryShell     string                           `json:"entryShell"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -68,6 +69,7 @@ func (self Cron) Create(http *gin.Context) {
 		taskRow.Setting.KeepLogTotal = params.KeepLogTotal
 		taskRow.Setting.Disable = params.Disable
 		taskRow.Setting.DockerEnvName = docker.Sdk.Name
+		taskRow.Setting.EntryShell = params.EntryShell
 	} else {
 		if _, err := dao.Cron.Where(dao.Cron.Title.Like(params.Title)).First(); err == nil {
 			self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.Title), 500)
@@ -86,6 +88,7 @@ func (self Cron) Create(http *gin.Context) {
 				KeepLogTotal:   params.KeepLogTotal,
 				Disable:        params.Disable,
 				DockerEnvName:  docker.Sdk.Name,
+				EntryShell:     params.EntryShell,
 			},
 		}
 		err = dao.Cron.Create(taskRow)

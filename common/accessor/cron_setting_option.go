@@ -65,4 +65,5 @@ type CronSettingOption struct {
 	KeepLogTotal   int                     `json:"keepLogTotal,omitempty"`
 	Disable        bool                    `json:"disable,omitempty"`
 	DockerEnvName  string                  `json:"dockerEnvName,omitempty"`
+	EntryShell     string                  `json:"entryShell,omitempty"`
 }
