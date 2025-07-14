@@ -71,14 +71,14 @@ test-pe: amd64 arm64
 	--platform linux/amd64,linux/arm64 \
 	--build-arg APP_VERSION=${VERSION} \
 	--build-arg APP_FAMILY=pe \
-	-f Dockerfile-lite \
+	-f ./docker/Dockerfile-pe-lite \
 	. --push
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:beta \
 	--platform linux/amd64,linux/arm64 \
 	--build-arg APP_VERSION=${VERSION} \
 	--build-arg APP_FAMILY=pe \
-	-f Dockerfile \
+	-f ./docker/Dockerfile-pe \
 	. --push
 test-ee: amd64
 	docker buildx build \
@@ -86,5 +86,5 @@ test-ee: amd64
 	--platform linux/amd64 \
 	--build-arg APP_VERSION=${VERSION} \
 	--build-arg APP_FAMILY=ee \
-	-f Dockerfile-lite \
+	-f ./docker/Dockerfile-pe-lite \
 	. --push
