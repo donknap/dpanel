@@ -98,7 +98,7 @@ func (self Tag) GetList(http *gin.Context) {
 func (self Tag) Delete(http *gin.Context) {
 	type ParamsValidate struct {
 		Name string `json:"name" binding:"required"`
-		Tag  string `json:"tag" binding:"required"`
+		Tag  string `json:"tag"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -107,8 +107,27 @@ func (self Tag) Delete(http *gin.Context) {
 	tagList := make([]accessor.Tag, 0)
 	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingTag, &tagList)
 
-	tagList = function.PluckArrayWalk(tagList, func(item accessor.Tag) (accessor.Tag, bool) {
-		if item.Tag == params.Tag {
+	if params.Tag != "" {
+		tagList = function.PluckArrayWalk(tagList, func(item accessor.Tag) (accessor.Tag, bool) {
+			if item.Tag == params.Tag {
+				if ok, i := function.IndexArrayWalk(item.Item, func(i accessor.TagItem) bool {
+					if i.Name == params.Name {
+						return true
+					}
+					return false
+				}); ok {
+					item.Item = append(item.Item[:i], item.Item[i+1:]...)
+				}
+				if function.IsEmptyArray(item.Item) {
+					return item, false
+				}
+				return item, true
+			} else {
+				return item, true
+			}
+		})
+	} else {
+		tagList = function.PluckArrayWalk(tagList, func(item accessor.Tag) (accessor.Tag, bool) {
 			if ok, i := function.IndexArrayWalk(item.Item, func(i accessor.TagItem) bool {
 				if i.Name == params.Name {
 					return true
@@ -121,10 +140,8 @@ func (self Tag) Delete(http *gin.Context) {
 				return item, false
 			}
 			return item, true
-		} else {
-			return item, true
-		}
-	})
+		})
+	}
 
 	_ = logic2.Setting{}.Save(&entity.Setting{
 		GroupName: logic2.SettingGroupSetting,
