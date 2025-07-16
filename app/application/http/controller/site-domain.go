@@ -111,7 +111,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 				Options: map[string]string{
 					"name": defaultNetworkName,
 				},
-				EnableIPv6: function.PtrBool(false),
+				EnableIPv6: function.Ptr(false),
 			})
 			if err != nil {
 				self.JsonResponseWithError(http, notice.Message{}.New(".siteDomainJoinDefaultNetworkFailed"), 500)

@@ -6,6 +6,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
@@ -52,6 +54,66 @@ func (self Swarm) Info(http *gin.Context) {
 		}
 	}
 	self.JsonResponseWithoutError(http, result)
+	return
+}
+
+func (self Swarm) InfoJoin(http *gin.Context) {
+	type ParamsValidate struct {
+		DockerEnvName string         `json:"dockerEnvName" binding:"required"`
+		Type          string         `json:"type" binding:"required,oneof=add join"`
+		Role          swarm.NodeRole `json:"role" binding:"omitempty,oneof=worker manager"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	dockerEnv, err := logic.DockerEnv{}.GetEnvByName(params.DockerEnvName)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	dockerClient, err := docker.NewBuilderWithDockerEnv(dockerEnv)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		dockerClient.Close()
+	}()
+	var swarmDockerClient *docker.Builder
+	if params.Type == "join" {
+		// join 是将当前环境添加到目标集群节点
+		swarmDockerClient = dockerClient
+	} else {
+		swarmDockerClient = docker.Sdk
+	}
+	swarmDockerInfo, err := swarmDockerClient.Client.Info(swarmDockerClient.Ctx)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if swarmDockerInfo.Swarm.LocalNodeState == swarm.LocalNodeStateInactive {
+		self.JsonResponseWithError(http, function.ErrorMessage(".swarmNotInit"), 500)
+		return
+	}
+	if !swarmDockerInfo.Swarm.ControlAvailable {
+		self.JsonResponseWithError(http, function.ErrorMessage(".swarmNotManager"), 500)
+		return
+	}
+	swarmInfo, err := swarmDockerClient.Client.SwarmInspect(swarmDockerClient.Ctx)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	swarmManageNode, _, err := swarmDockerClient.Client.NodeInspectWithRaw(swarmDockerClient.Ctx, swarmDockerInfo.Swarm.NodeID)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"swarm": swarmInfo,
+		"node":  swarmManageNode,
+	})
 	return
 }
 

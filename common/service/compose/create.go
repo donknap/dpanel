@@ -282,7 +282,7 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 				})
 			}
 			if siteOption.IpV6.Address != "" {
-				projectNetworkConfig.EnableIPv6 = function.PtrBool(true)
+				projectNetworkConfig.EnableIPv6 = function.Ptr(true)
 				networkConfig.Ipv6Address = siteOption.IpV6.Address
 				projectNetworkConfig.Ipam.Config = append(projectNetworkConfig.Ipam.Config, &types.IPAMPool{
 					Subnet:  siteOption.IpV6.Subnet,

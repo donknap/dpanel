@@ -27,7 +27,7 @@ func (self Builder) NetworkCreate(ctx context.Context, networkName string, ipV4,
 		Options: map[string]string{
 			"name": networkName,
 		},
-		EnableIPv6: function.PtrBool(false),
+		EnableIPv6: function.Ptr(false),
 		IPAM: &network.IPAM{
 			Driver:  "default",
 			Options: map[string]string{},
@@ -41,7 +41,7 @@ func (self Builder) NetworkCreate(ctx context.Context, networkName string, ipV4,
 		})
 	}
 	if ipV6 != nil && ipV6.Gateway != "" && ipV6.Subnet != "" {
-		option.EnableIPv6 = function.PtrBool(true)
+		option.EnableIPv6 = function.Ptr(true)
 		option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
 			Subnet:  ipV6.Subnet,
 			Gateway: ipV6.Gateway,

@@ -134,14 +134,16 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/compose/container-log", controller.Compose{}.ContainerLog)
 
 			cors.POST("/app/swarm/info", controller.Swarm{}.Info)
+			cors.POST("/app/swarm/info-join", controller.Swarm{}.InfoJoin)
 			cors.POST("/app/swarm/init", controller.Swarm{}.Init)
 			cors.POST("/app/swarm/log", controller.Swarm{}.Log)
 			cors.POST("/app/swarm/node-remove", controller.Swarm{}.NodeRemove)
 			cors.POST("/app/swarm/node-list", controller.Swarm{}.NodeList)
 			cors.POST("/app/swarm/node-update", controller.Swarm{}.NodeUpdate)
-			cors.POST("/app/swarm/node-join", controller.Swarm{}.NodeJoin)
 			cors.POST("/app/swarm/node-prune", controller.Swarm{}.NodePrune)
 			cors.POST("/app/swarm/service-list", controller.Swarm{}.ServiceList)
+			cors.POST("/app/swarm/service-scaling", controller.Swarm{}.ServiceScaling)
+			cors.POST("/app/swarm/service-delete", controller.Swarm{}.ServiceDelete)
 			cors.POST("/app/swarm/task-list", controller.Swarm{}.TaskList)
 			cors.POST("/app/swarm/task-list-in-node", controller.Swarm{}.TaskListInNode)
 		},

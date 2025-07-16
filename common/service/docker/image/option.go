@@ -83,7 +83,7 @@ func WithPlatform(item docker.ImagePlatform) Option {
 			return nil
 		}
 		self.imageBuildOption.Platform = item.Type
-		self.imageBuildOption.BuildArgs["TARGETARCH"] = function.PtrString(item.Arch)
+		self.imageBuildOption.BuildArgs["TARGETARCH"] = function.Ptr(item.Arch)
 		return nil
 	}
 }

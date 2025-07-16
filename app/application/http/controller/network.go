@@ -193,7 +193,7 @@ func (self Network) Create(http *gin.Context) {
 	}
 
 	result, err := docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, params.Name, network.CreateOptions{
-		EnableIPv6: function.PtrBool(params.EnableIpV6),
+		EnableIPv6: function.Ptr(params.EnableIpV6),
 		Driver:     params.Driver,
 		IPAM:       ipAm,
 		Internal:   params.Internal,
