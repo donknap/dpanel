@@ -339,6 +339,9 @@ func (self Env) GetDetail(http *gin.Context) {
 			}
 		}
 	}
+	if dockerEnv.EnableSSH && dockerEnv.ServerUrl == "" {
+		dockerEnv.ServerUrl = dockerEnv.SshServerInfo.Address
+	}
 	if dockerEnv.ServerUrl == "" {
 		dockerEnv.ServerUrl = "127.0.0.1"
 	}
