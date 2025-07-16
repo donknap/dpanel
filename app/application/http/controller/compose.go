@@ -14,6 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -103,7 +104,7 @@ func (self Compose) Create(http *gin.Context) {
 			accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl,
 		}, params.Type) {
 			yamlRow.Setting.Uri = []string{
-				filepath.Join(params.Name, logic.ComposeProjectDeployFileName),
+				filepath.Join(params.Name, define.ComposeProjectDeployFileName),
 			}
 		}
 	}
@@ -158,7 +159,7 @@ func (self Compose) Create(http *gin.Context) {
 			globalEnv := function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
 				return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 			})
-			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), logic.ComposeDefaultEnvFileName)
+			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), define.ComposeDefaultEnvFileName)
 			_ = os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
 			err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
 		} else {
@@ -364,7 +365,7 @@ func (self Compose) Delete(http *gin.Context) {
 			return
 		}
 		for _, runItem := range composeRunList {
-			if fmt.Sprintf(logic.ComposeProjectName, row.Name) == runItem.Name {
+			if fmt.Sprintf(define.ComposeProjectName, row.Name) == runItem.Name {
 				self.JsonResponseWithError(http, function.ErrorMessage(".composeDeleteMustDestroyContainer"), 500)
 				return
 			}

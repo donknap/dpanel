@@ -98,6 +98,7 @@ type Tag struct {
 	EnableShowGroup bool      `json:"enableShowGroup"`
 	Tag             string    `json:"tag,omitempty" binding:"required"` // 为分组显示时，tag 为分组标题
 	TagColor        string    `json:"tagColor,omitempty"`
+	Group           string    `json:"group"`
 	Item            []TagItem `json:"item,omitempty"`
 }
 

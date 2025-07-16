@@ -1,13 +1,18 @@
 package controller
 
 import (
+	"fmt"
+	"github.com/docker/docker/api/types/container"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"strings"
 )
 
 type Tag struct {
@@ -70,7 +75,8 @@ func (self Tag) Create(http *gin.Context) {
 
 func (self Tag) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Name string `json:"name"`
+		ShowCompose bool `json:"showCompose"`
+		ShowSwarm   bool `json:"showSwarm"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -79,16 +85,29 @@ func (self Tag) GetList(http *gin.Context) {
 	tagList := make([]accessor.Tag, 0)
 	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingTag, &tagList)
 
-	if params.Name != "" {
-		tagList = function.PluckArrayWalk(tagList, func(item accessor.Tag) (accessor.Tag, bool) {
-			if !function.IsEmptyArray(item.Item) && function.InArrayWalk(item.Item, func(i accessor.TagItem) bool {
-				return i.Name == params.Name
-			}) {
-				return item, true
-			}
-			return item, false
-		})
+	if params.ShowSwarm || params.ShowCompose {
+		if containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{All: true}); err == nil {
+			labels := make([]string, 0)
+			tagList = append(tagList, function.PluckArrayWalk(containerList, func(item container.Summary) (accessor.Tag, bool) {
+				if v, ok := item.Labels[define.ComposeLabelProject]; ok && params.ShowCompose && !function.InArray(labels, v) {
+					labels = append(labels, v)
+					return accessor.Tag{
+						Tag:   fmt.Sprintf("%s", strings.TrimPrefix(v, define.ComposeProjectPrefix)),
+						Group: "compose",
+					}, true
+				}
+				if v, ok := item.Labels[define.SwarmLabelService]; ok && params.ShowSwarm && !function.InArray(labels, v) {
+					labels = append(labels, v)
+					return accessor.Tag{
+						Tag:   fmt.Sprintf("%s", v),
+						Group: "swarm",
+					}, true
+				}
+				return accessor.Tag{}, false
+			})...)
+		}
 	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": tagList,
 	})

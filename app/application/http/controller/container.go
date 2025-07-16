@@ -17,7 +17,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -172,70 +171,10 @@ func (self Container) GetList(http *gin.Context) {
 		return result[i].Names[0] < result[j].Names[0]
 	})
 
-	// 对 compose 容器进行分组
-	type containerSummary struct {
-		container.Summary
-		Children []container.Summary
-	}
-	groupResult := make([]containerSummary, 0)
-
-	composeLs := logic.Compose{}.Ls()
-	for _, item := range result {
-		if composeName, ok := item.Labels[define.ComposeLabelProject]; ok {
-			projectName := strings.TrimPrefix(composeName, logic.ComposeProjectPrefix)
-			if v, ok := item.Labels[define.ComposeLabelService]; ok {
-				item.Names = []string{
-					v,
-				}
-			}
-			composeItem := &logic.ComposeLsItem{
-				Name:           composeName,
-				Status:         accessor.ComposeStatusWaiting,
-				ConfigFiles:    "",
-				ConfigFileList: []string{},
-				IsDPanel:       false,
-			}
-			if v, ok := function.PluckArrayItemWalk(composeLs, func(item *logic.ComposeLsItem) bool {
-				return item.Name == composeName
-			}); ok {
-				composeItem = v
-			}
-			if ok, i := function.IndexArrayWalk(groupResult, func(item containerSummary) bool {
-				return function.InArray(item.Names, projectName)
-			}); ok {
-				groupResult[i].Ports = append(groupResult[i].Ports, item.Ports...)
-				groupResult[i].Children = append(groupResult[i].Children, item)
-			} else {
-				ports := make([]container.Port, 0)
-				if !function.IsEmptyArray(item.Ports) {
-					ports = append(ports, item.Ports...)
-				}
-				groupResult = append(groupResult, containerSummary{
-					Summary: container.Summary{
-						ID: projectName,
-						Names: []string{
-							projectName,
-						},
-						State:  composeItem.Status,
-						Status: composeItem.Status,
-						Ports:  ports,
-					},
-					Children: []container.Summary{
-						item,
-					},
-				})
-			}
-		} else {
-			groupResult = append(groupResult, containerSummary{
-				Summary: item,
-			})
-		}
-	}
-
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(containerName...)).Find()
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"list":       groupResult,
+		"list":       result,
 		"siteList":   siteList,
 		"domainList": domainList,
 	})

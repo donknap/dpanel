@@ -18,6 +18,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	"io"
 	"log/slog"
 	"net/http"
@@ -25,14 +26,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-)
-
-const (
-	ComposeProjectPrefix         = "dpanel-c-"
-	ComposeProjectName           = ComposeProjectPrefix + "%s"
-	ComposeProjectDeployFileName = "dpanel-deploy.yaml"
-	ComposeProjectEnvFileName    = ".dpanel.env"
-	ComposeDefaultEnvFileName    = ".env"
 )
 
 var ComposeFileNameSuffix = []string{
@@ -74,7 +67,7 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 			return row, nil
 		}
 		// 尝试去掉前缀先查询一次
-		if item, ok := runTaskList[strings.ReplaceAll(key, ComposeProjectPrefix, "")]; ok {
+		if item, ok := runTaskList[strings.ReplaceAll(key, define.ComposeProjectPrefix, "")]; ok {
 			return item, nil
 		}
 		if item, ok := runTaskList[key]; ok {
@@ -98,7 +91,7 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 	}
 }
 
-type composeItem struct {
+type ComposeLsItem struct {
 	Name           string `json:"name"`
 	Status         string `json:"status"`
 	ConfigFiles    string `json:"configFiles"`
@@ -106,7 +99,7 @@ type composeItem struct {
 	IsDPanel       bool
 }
 
-func (self Compose) Ls() []*composeItem {
+func (self Compose) Ls() []*ComposeLsItem {
 	command := []string{
 		"ls",
 		"--format", "json",
@@ -117,7 +110,7 @@ func (self Compose) Ls() []*composeItem {
 		cancel()
 	}()
 
-	result := make([]*composeItem, 0)
+	result := make([]*ComposeLsItem, 0)
 	options := docker.Sdk.GetComposeCmd(command...)
 	options = append(options, exec.WithCtx(ctx))
 	cmd, err := exec.New(options...)
@@ -144,14 +137,14 @@ func (self Compose) Ls() []*composeItem {
 	return result
 }
 
-func (self Compose) LsItem(name string) *composeItem {
+func (self Compose) LsItem(name string) *ComposeLsItem {
 	ls := self.Ls()
 	for _, item := range ls {
-		if item.Name == name || item.Name == fmt.Sprintf(ComposeProjectName, name) {
+		if item.Name == name || item.Name == fmt.Sprintf(define.ComposeProjectName, name) {
 			return item
 		}
 	}
-	return &composeItem{
+	return &ComposeLsItem{
 		Name:           name,
 		Status:         accessor.ComposeStatusWaiting,
 		ConfigFiles:    "",
@@ -392,7 +385,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		options = append(options, compose.WithYamlPath(path))
 	}
 
-	defaultEnvFileName := filepath.Join(taskFileDir, ComposeDefaultEnvFileName)
+	defaultEnvFileName := filepath.Join(taskFileDir, define.ComposeDefaultEnvFileName)
 	var defaultEnvFileExists error
 
 	// 如果任务中的环境变量值为空，则使用默认 .env 中的值填充
@@ -424,7 +417,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		}
 	}
 
-	if dpanelEnvContent, err := os.ReadFile(filepath.Join(taskFileDir, ComposeProjectEnvFileName)); err == nil {
+	if dpanelEnvContent, err := os.ReadFile(filepath.Join(taskFileDir, define.ComposeProjectEnvFileName)); err == nil {
 		for _, s := range strings.Split(string(dpanelEnvContent), "\n") {
 			if name, value, exists := strings.Cut(s, "="); exists {
 				if exists, i := function.IndexArrayWalk(entity.Setting.Environment, func(i docker.EnvItem) bool {
@@ -463,7 +456,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		options = append(options, cli.WithDotEnv)
 	}
 
-	projectName := fmt.Sprintf(ComposeProjectName, strings.ReplaceAll(entity.Name, "@", "-"))
+	projectName := fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(entity.Name, "@", "-"))
 	if entity.Setting.Type == accessor.ComposeTypeOutPath {
 		// compose 项止名称不允许有大小写，但是compose的目录名可以包含特殊字符，这里统一用id进行区分
 		// 如果是外部任务，则保持原有名称
@@ -506,11 +499,11 @@ func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
 
 func (self Compose) FilterContainer(taskName string) []*compose.ContainerResult {
 	result := make([]*compose.ContainerResult, 0)
-	if containerList, err := docker.Sdk.ContainerByField(docker.Sdk.Ctx, "label", "com.docker.compose.project="+taskName); err == nil {
+	if containerList, err := docker.Sdk.ContainerByField(docker.Sdk.Ctx, "label", fmt.Sprintf("%s=%s", define.ComposeLabelProject, taskName)); err == nil {
 		result = function.PluckMapWalkArray(containerList, func(key string, item *container.Summary) (*compose.ContainerResult, bool) {
 			return &compose.ContainerResult{
 				Name:    item.Names[0],
-				Service: item.Labels["com.docker.compose.service"],
+				Service: item.Labels[define.ComposeLabelService],
 				Publishers: function.PluckArrayWalk(item.Ports, func(i container.Port) (compose.ContainerPublishersResult, bool) {
 					return compose.ContainerPublishersResult{
 						URL:           i.IP,

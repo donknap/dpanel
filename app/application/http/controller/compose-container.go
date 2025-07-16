@@ -14,6 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ws"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"io"
 	"log/slog"
@@ -237,7 +238,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(".composeDeleteFileMustDeleteTask"), 500)
 			return
 		}
-		err = os.Remove(filepath.Join(filepath.Dir(composeRow.Setting.GetUriFilePath()), logic.ComposeProjectEnvFileName))
+		err = os.Remove(filepath.Join(filepath.Dir(composeRow.Setting.GetUriFilePath()), define.ComposeProjectEnvFileName))
 		err = os.RemoveAll(filepath.Dir(composeRow.Setting.GetUriFilePath()))
 		if err != nil {
 			slog.Debug("compose", "destroy", err)
