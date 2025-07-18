@@ -59,7 +59,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		builder.WithVolume(task.BuildParams.Volumes...),
 		builder.WithPrivileged(task.BuildParams.Privileged),
 		builder.WithAutoRemove(task.BuildParams.AutoRemove),
-		builder.WithRestartPolicy(task.BuildParams.Restart),
+		builder.WithRestartPolicy(task.BuildParams.RestartPolicy),
 		builder.WithCpus(task.BuildParams.Cpus),
 		builder.WithMemory(task.BuildParams.Memory),
 		builder.WithShmSize(task.BuildParams.ShmSize),

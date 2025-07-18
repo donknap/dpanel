@@ -1,15 +1,19 @@
 package controller
 
 import (
-	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/donknap/dpanel/common/accessor"
+	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	swarm2 "github.com/donknap/dpanel/common/service/docker/swarm"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/registry"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"sort"
 	"strings"
 )
@@ -110,10 +114,8 @@ func (self Swarm) ServiceDelete(http *gin.Context) {
 
 func (self Swarm) ServiceCreate(http *gin.Context) {
 	type ParamsValidate struct {
-		SiteTitle   string `json:"siteTitle"`
-		SiteName    string `json:"siteName" binding:"required"`
-		ImageName   string `json:"imageName" binding:"required"`
-		ContainerId string `json:"containerId"`
+		SiteTitle string `json:"siteTitle"`
+		SiteName  string `json:"siteName" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -124,23 +126,45 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 		return
 	}
 
-	response, err := docker.Sdk.Client.ServiceCreate(docker.Sdk.Ctx, swarm.ServiceSpec{
-		Annotations: swarm.Annotations{
-			Name:   "",
-			Labels: make(map[string]string),
-		},
-		TaskTemplate:   swarm.TaskSpec{},
-		Mode:           swarm.ServiceMode{},
-		UpdateConfig:   nil,
-		RollbackConfig: nil,
-		EndpointSpec:   nil,
-	}, types.ServiceCreateOptions{
-		EncodedRegistryAuth: "",
-		QueryRegistry:       false,
-	})
+	options := make([]swarm2.Option, 0)
+	options = append(options, swarm2.WithContainerSpec(&buildParams))
+	options = append(options, swarm2.WithName(params.SiteName),
+		swarm2.WithLabel(docker.ValueItem{
+			Name:  define.SwarmLabelServiceDescription,
+			Value: params.SiteTitle,
+		}),
+		swarm2.WithScheduling(buildParams.Scheduling),
+		swarm2.WithConstraint(buildParams.Constraint),
+		swarm2.WithPlacement(buildParams.Placement...),
+		swarm2.WithRestart(buildParams.RestartPolicy),
+		swarm2.WithPort(buildParams.Ports...),
+		swarm2.WithVolume(buildParams.Volumes...),
+		swarm2.WithResourceLimit(buildParams.Cpus, buildParams.Memory, 0),
+	)
+
+	if buildParams.ImageRegistry > 0 {
+		if registryInfo, err := dao.Registry.Where(dao.Registry.ID.Eq(buildParams.ImageRegistry)).First(); err == nil {
+			password, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registryInfo.Setting.Password)
+			options = append(options, swarm2.WithRegistry(registry.Config{
+				Username:   registryInfo.Setting.Username,
+				Password:   password,
+				ExistsAuth: true,
+			}))
+		}
+	}
+
+	builder, err := swarm2.New(options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fmt.Printf("ServiceCreate %v \n", response.ID)
+	response, err := builder.Execute()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"id": response.ID,
+	})
+	return
 }

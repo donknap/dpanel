@@ -1,4 +1,4 @@
-package container
+package swarm
 
 import (
 	"github.com/docker/docker/api/types"
@@ -19,13 +19,13 @@ func New(opts ...Option) (*Builder, error) {
 			},
 			TaskTemplate: swarm.TaskSpec{
 				ContainerSpec: &swarm.ContainerSpec{},
-				Placement:     &swarm.Placement{},
 			},
 			Mode:           swarm.ServiceMode{},
 			UpdateConfig:   &swarm.UpdateConfig{},
 			RollbackConfig: &swarm.UpdateConfig{},
 			EndpointSpec:   &swarm.EndpointSpec{},
 		},
+		serviceCreateOptions: types.ServiceCreateOptions{},
 	}
 	for _, opt := range opts {
 		err = opt(c)

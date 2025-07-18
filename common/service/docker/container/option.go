@@ -89,13 +89,14 @@ func WithImage(imageName string, tryPullImage bool) Option {
 	}
 }
 
-func WithRestartPolicy(restartPolicy string) Option {
+func WithRestartPolicy(restartPolicy *docker.RestartPolicy) Option {
 	return func(self *Builder) error {
-		if restartPolicy == "" {
-			restartPolicy = "no"
+		if restartPolicy.Name == "" {
+			restartPolicy.Name = "no"
 		}
 		self.hostConfig.RestartPolicy = container.RestartPolicy{}
-		self.hostConfig.RestartPolicy.Name = docker.GetRestartPolicyByString(restartPolicy)
+		self.hostConfig.RestartPolicy.Name = docker.GetRestartPolicyByString(restartPolicy.Name)
+		self.hostConfig.RestartPolicy.MaximumRetryCount = restartPolicy.MaxAttempt
 		return nil
 	}
 }

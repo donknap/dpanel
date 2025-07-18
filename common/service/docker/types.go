@@ -61,7 +61,8 @@ type VolumeItem struct {
 	Host       string `json:"host"`
 	Dest       string `json:"dest"`
 	Permission string `json:"permission"` // readonly or write
-	InImage    bool   `json:"inImage"`
+	InImage    bool   `json:"inImage,omitempty"`
+	Type       string `json:"type,omitempty"`
 }
 
 type LinkItem struct {
@@ -124,6 +125,7 @@ type PortItem struct {
 	Host     string `json:"host"`
 	Dest     string `json:"dest"`
 	Protocol string `json:"protocol"`
+	Mode     string `json:"mode"`
 }
 
 func (self *PortItem) Parse() PortItem {
@@ -209,4 +211,32 @@ type FileItemResult struct {
 	Change   int    `json:"change"`
 	Group    string `json:"group"`
 	Owner    string `json:"owner"`
+}
+
+type RestartPolicy struct {
+	Name       string `json:"name"`
+	MaxAttempt int    `json:"maxAttempt"`
+	Delay      int    `json:"delay"`
+	Window     int    `json:"window"`
+}
+
+type Constraint struct {
+	Role  string   `json:"role"`
+	Node  []string `json:"node"`
+	Label []struct {
+		Name     string `json:"name"`
+		Value    string `json:"value"`
+		Operator string `json:"operator"`
+	} `json:"label"`
+}
+
+type Scheduling struct {
+	Mode     string `json:"mode"`
+	Replicas int    `json:"replicas,omitempty"`
+	Update   struct {
+		Delay         int    `json:"delay"`
+		Parallelism   int    `json:"parallelism,omitempty"`
+		FailureAction string `json:"failureAction"`
+		Order         string `json:"order"`
+	} `json:"update"`
 }

@@ -18,7 +18,7 @@ type SiteEnvOption struct {
 	ImageId         string                    `json:"imageId,omitempty"`   // 非表单提交
 	Privileged      bool                      `json:"privileged,omitempty"`
 	AutoRemove      bool                      `json:"autoRemove,omitempty"`
-	Restart         string                    `json:"restart,omitempty"`
+	RestartPolicy   *docker.RestartPolicy     `json:"restartPolicy,omitempty"`
 	Cpus            float32                   `json:"cpus,omitempty"`
 	Memory          int                       `json:"memory,omitempty"`
 	ShmSize         string                    `json:"shmsize,omitempty"`
@@ -41,4 +41,9 @@ type SiteEnvOption struct {
 	Healthcheck     *docker.HealthcheckItem   `json:"healthcheck,omitempty"`
 	HostPid         bool                      `json:"hostPid,omitempty"`
 	CapAdd          []string                  `json:"capAdd,omitempty"`
+	Constraint      *docker.Constraint        `json:"constraint,omitempty"`
+	ImageRegistry   int32                     `json:"imageRegistry,omitempty"`
+	Placement       []docker.ValueItem        `json:"placement,omitempty"`
+	Scheduling      *docker.Scheduling        `json:"scheduling,omitempty"`
+	Restart         string                    `json:"restart,omitempty"` // Deprecated: instead RestartPolicy
 }

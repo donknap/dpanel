@@ -142,6 +142,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/swarm/node-update", controller.Swarm{}.NodeUpdate)
 			cors.POST("/app/swarm/node-prune", controller.Swarm{}.NodePrune)
 			cors.POST("/app/swarm/service-list", controller.Swarm{}.ServiceList)
+			cors.POST("/app/swarm/service-create", controller.Swarm{}.ServiceCreate)
 			cors.POST("/app/swarm/service-scaling", controller.Swarm{}.ServiceScaling)
 			cors.POST("/app/swarm/service-delete", controller.Swarm{}.ServiceDelete)
 			cors.POST("/app/swarm/task-list", controller.Swarm{}.TaskList)

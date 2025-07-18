@@ -125,6 +125,10 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	envOption.Privileged = info.HostConfig.Privileged
 	envOption.AutoRemove = info.HostConfig.AutoRemove
 	envOption.Restart = string(info.HostConfig.RestartPolicy.Name)
+	envOption.RestartPolicy = &docker.RestartPolicy{
+		Name:       string(info.HostConfig.RestartPolicy.Name),
+		MaxAttempt: info.HostConfig.RestartPolicy.MaximumRetryCount,
+	}
 	envOption.Cpus = float32(info.HostConfig.NanoCPUs / 1000000000)
 	envOption.Memory = int(info.HostConfig.Memory / 1024 / 1024)
 	envOption.ShmSize = units.BytesSize(float64(info.HostConfig.ShmSize))

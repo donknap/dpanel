@@ -120,7 +120,9 @@ func (self plugin) Create() (string, error) {
 		builder.WithLabel(docker.NewValueItemFromMap(service.Labels)...),
 		builder.WithPrivileged(service.Privileged),
 		builder.WithAutoRemove(serviceExt.AutoRemove),
-		builder.WithRestartPolicy(service.Restart),
+		builder.WithRestartPolicy(&docker.RestartPolicy{
+			Name: service.Restart,
+		}),
 		builder.WithPid(service.Pid),
 		builder.WithVolumesFromContainerName(serviceExt.External.VolumesFrom...),
 		builder.WithCommand(service.Command),
