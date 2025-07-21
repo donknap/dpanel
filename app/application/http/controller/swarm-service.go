@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
@@ -14,6 +15,7 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"log/slog"
 	"sort"
 	"strings"
 )
@@ -116,6 +118,7 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 	type ParamsValidate struct {
 		SiteTitle string `json:"siteTitle"`
 		SiteName  string `json:"siteName" binding:"required"`
+		ServiceId string `json:"id"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -127,6 +130,14 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 	}
 
 	options := make([]swarm2.Option, 0)
+	if params.ServiceId != "" {
+		serviceInfo, _, err := docker.Sdk.Client.ServiceInspectWithRaw(docker.Sdk.Ctx, params.ServiceId, types.ServiceInspectOptions{})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		options = append(options, swarm2.WithServiceUpdate(serviceInfo))
+	}
 	options = append(options, swarm2.WithContainerSpec(&buildParams))
 	options = append(options, swarm2.WithName(params.SiteName),
 		swarm2.WithLabel(docker.ValueItem{
@@ -150,6 +161,10 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 				Password:   password,
 				ExistsAuth: true,
 			}))
+			options = append(options, swarm2.WithLabel(docker.ValueItem{
+				Name:  define.SwarmLabelServiceImageRegistry,
+				Value: fmt.Sprintf("%d", registryInfo.ID),
+			}))
 		}
 	}
 
@@ -158,13 +173,18 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	response, err := builder.Execute()
+	id, warning, err := builder.Execute()
+
+	if function.IsEmptyArray(warning) {
+		slog.Warn("swarm service", "warnging", warning)
+	}
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"id": response.ID,
+		"id": id,
 	})
 	return
 }

@@ -18,7 +18,7 @@ import (
 var (
 	Sdk                        = &Builder{}
 	BuilderAuthor              = "DPanel"
-	BuildDesc                  = "DPanel is a docker web management panel"
+	BuildDesc                  = "DPanel is a lightweight Docker web management panel"
 	BuildWebSite               = "https://dpanel.cc"
 	BuildVersion               = "1.0.0"
 	HostnameTemplate           = "%s.pod.dpanel.local"

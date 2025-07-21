@@ -258,6 +258,9 @@ func WithScheduling(value *docker.Scheduling) Option {
 
 func WithConstraint(value *docker.Constraint) Option {
 	return func(self *Builder) error {
+		if value == nil {
+			return nil
+		}
 		if self.serviceSpec.TaskTemplate.Placement == nil {
 			self.serviceSpec.TaskTemplate.Placement = &swarm.Placement{}
 		}
@@ -281,6 +284,9 @@ func WithConstraint(value *docker.Constraint) Option {
 
 func WithPlacement(values ...docker.ValueItem) Option {
 	return func(self *Builder) error {
+		if self.serviceSpec.TaskTemplate.Placement == nil {
+			self.serviceSpec.TaskTemplate.Placement = &swarm.Placement{}
+		}
 		self.serviceSpec.TaskTemplate.Placement.Preferences = make([]swarm.PlacementPreference, 0)
 		for _, item := range values {
 			self.serviceSpec.TaskTemplate.Placement.Preferences = append(self.serviceSpec.TaskTemplate.Placement.Preferences, swarm.PlacementPreference{
@@ -307,7 +313,7 @@ func WithRestart(value *docker.RestartPolicy) Option {
 
 func WithRegistry(value registry.Config) Option {
 	return func(self *Builder) error {
-		self.serviceCreateOptions.EncodedRegistryAuth = value.GetAuthString()
+		self.options.EncodedRegistryAuth = value.GetAuthString()
 		return nil
 	}
 }
@@ -357,6 +363,13 @@ func WithResourceLimit(cpu float32, memory, pid int) Option {
 				Pids:        int64(pid),
 			},
 		}
+		return nil
+	}
+}
+
+func WithServiceUpdate(service swarm.Service) Option {
+	return func(self *Builder) error {
+		self.Update = &service
 		return nil
 	}
 }
