@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -46,7 +47,7 @@ func (self Cron) Create(http *gin.Context) {
 	}
 	err := crontab.Wrapper.CheckExpression(allExpression)
 	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerCronExpressionInCorrect", "message", err.Error()), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerCronExpressionInCorrect, "message", err.Error()), 500)
 		return
 	}
 
@@ -54,7 +55,7 @@ func (self Cron) Create(http *gin.Context) {
 	if params.Id > 0 {
 		taskRow, _ = dao.Cron.Where(dao.Cron.ID.Eq(params.Id)).First()
 		if taskRow == nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
 		crontab.Wrapper.RemoveJob(taskRow.Setting.JobIds...)
@@ -72,7 +73,7 @@ func (self Cron) Create(http *gin.Context) {
 		taskRow.Setting.EntryShell = params.EntryShell
 	} else {
 		if _, err := dao.Cron.Where(dao.Cron.Title.Like(params.Title)).First(); err == nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.Title), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Title), 500)
 			return
 		}
 		taskRow = &entity.Cron{
@@ -159,11 +160,11 @@ func (self Cron) RunOnce(http *gin.Context) {
 	}
 	cronRow, _ := dao.Cron.Where(dao.Cron.ID.In(params.Id)).First()
 	if cronRow == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	if cronRow.Setting.JobIds == nil || len(cronRow.Setting.Expression) == 0 {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerCronTaskEmpty"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerCronTaskEmpty), 500)
 		return
 	}
 	crontab.Wrapper.Cron.Entry(cronRow.Setting.JobIds[0]).Job.Run()
@@ -181,7 +182,7 @@ func (self Cron) GetDetail(http *gin.Context) {
 	}
 	cronRow, _ := dao.Cron.Where(dao.Cron.ID.In(params.Id)).First()
 	if cronRow == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{

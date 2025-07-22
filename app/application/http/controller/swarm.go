@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/ws"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
@@ -93,11 +94,11 @@ func (self Swarm) InfoJoin(http *gin.Context) {
 		return
 	}
 	if swarmDockerInfo.Swarm.LocalNodeState == swarm.LocalNodeStateInactive {
-		self.JsonResponseWithError(http, function.ErrorMessage(".swarmNotInit"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSwarmNotInit), 500)
 		return
 	}
 	if !swarmDockerInfo.Swarm.ControlAvailable {
-		self.JsonResponseWithError(http, function.ErrorMessage(".swarmNotManager"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSwarmNotManager), 500)
 		return
 	}
 	swarmInfo, err := swarmDockerClient.Client.SwarmInspect(swarmDockerClient.Ctx)

@@ -12,8 +12,8 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec"
-	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -71,7 +71,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 			Setting:     &accessor.SiteDomainSettingOption{},
 		}
 		if _, err = dao.SiteDomain.Where(dao.SiteDomain.ServerName.Eq(params.ServerName)).First(); err == nil {
-			self.JsonResponseWithError(http, notice.Message{}.New(".siteDomainExists", "domain", params.ServerName), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSiteDomainExists, "domain", params.ServerName), 500)
 			return
 		}
 	}
@@ -81,7 +81,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 			Where(gen.Cond(datatypes.JSONQuery("setting").
 				Likes("%"+alias+"%", "serverNameAlias"))...).
 			First(); err == nil && (params.Id > 0 && params.Id != item.ID) {
-			self.JsonResponseWithError(http, notice.Message{}.New(".siteDomainExists", "domain", alias), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSiteDomainExists, "domain", alias), 500)
 			return
 		}
 	}
@@ -100,7 +100,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		// 将当前容器加入到默认 dpanel-local 网络中，并指定 Hostname 用于 Nginx 反向代理
 		dpanelContainerInfo := container.InspectResponse{}
 		if dpanelContainerInfo, err = docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, facade.GetConfig().GetString("app.name")); err != nil {
-			self.JsonResponseWithError(http, notice.Message{}.New(".siteDomainNotFoundDPanel"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSiteDomainNotFoundDPanel), 500)
 			return
 		}
 		slog.Debug("site domain dpanel container", "id", dpanelContainerInfo.ID)
@@ -114,7 +114,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 				EnableIPv6: function.Ptr(false),
 			})
 			if err != nil {
-				self.JsonResponseWithError(http, notice.Message{}.New(".siteDomainJoinDefaultNetworkFailed"), 500)
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSiteDomainJoinDefaultNetworkFailed), 500)
 				return
 			}
 		}
@@ -129,7 +129,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 					},
 				})
 				if err != nil {
-					self.JsonResponseWithError(http, notice.Message{}.New(".siteDomainJoinDefaultNetworkFailed", err.Error()), 500)
+					self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSiteDomainJoinDefaultNetworkFailed, err.Error()), 500)
 					return
 				}
 			}
@@ -240,7 +240,7 @@ func (self SiteDomain) GetDetail(http *gin.Context) {
 
 	domainRow, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.Eq(params.Id)).First()
 	if domainRow == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	vhost, err := os.ReadFile(filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(logic.VhostFileName, domainRow.ServerName)))

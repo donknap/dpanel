@@ -11,8 +11,8 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -47,13 +47,13 @@ func (self Store) Create(http *gin.Context) {
 	if params.Id <= 0 {
 		storeRow, _ := dao.Store.Where(dao.Store.Name.Eq(params.Name)).First()
 		if storeRow != nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.Name), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
 			return
 		}
 	} else {
 		storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(params.Id)).First()
 		if storeRow == nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
 	}
@@ -97,7 +97,7 @@ func (self Store) Delete(http *gin.Context) {
 	for _, id := range params.Id {
 		storeRow, _ := dao.Store.Where(dao.Store.ID.Eq(id)).First()
 		if storeRow == nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
 		err := os.RemoveAll(filepath.Join(storage.Local{}.GetStorePath(), storeRow.Name))
@@ -241,7 +241,7 @@ func (self Store) Deploy(http *gin.Context) {
 	storeRow, err := dao.Store.Where(dao.Store.ID.Eq(params.StoreId)).First()
 	if storeRow == nil {
 		slog.Debug("sto deploy get store", "error", err)
-		self.JsonResponseWithError(http, notice.Message{}.New(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 
@@ -281,7 +281,7 @@ func (self Store) Deploy(http *gin.Context) {
 	params.Name = strings.ToLower(params.Name)
 	total, err := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"))...).Count()
 	if total != 0 {
-		self.JsonResponseWithError(http, notice.Message{}.New(".storeCreateNameExists", "name", params.Name), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageStoreCreateNameExists, "name", params.Name), 500)
 		return
 	}
 

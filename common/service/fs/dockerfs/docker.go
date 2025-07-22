@@ -6,6 +6,7 @@ import (
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/fs"
 	"github.com/spf13/afero"
 	"github.com/spf13/afero/mem"
@@ -203,7 +204,7 @@ func (self Fs) readDirFromContainer(path string) ([]os.FileInfo, error) {
 		}
 		if len(row) < 8 {
 			slog.Debug("explorer", "get-path-list", i, "line", string(line))
-			return nil, function.ErrorMessage(".unknow", "error", string(line))
+			return nil, function.ErrorMessage(define.ErrorMessageUnknow, "error", string(line))
 		}
 
 		modStr := strings.Trim(row[0], "`")

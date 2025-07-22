@@ -42,7 +42,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	if !function.IsEmptyArray(params.Environment) {
@@ -198,7 +198,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	}
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	tasker, err := logic.Compose{}.GetTasker(composeRow)
@@ -235,7 +235,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 
 	if params.DeletePath {
 		if !params.DeleteData {
-			self.JsonResponseWithError(http, function.ErrorMessage(".composeDeleteFileMustDeleteTask"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeleteFileMustDeleteTask), 500)
 			return
 		}
 		err = os.Remove(filepath.Join(filepath.Dir(composeRow.Setting.GetUriFilePath()), define.ComposeProjectEnvFileName))
@@ -261,7 +261,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 	}
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	tasker, err := logic.Compose{}.GetTasker(composeRow)
@@ -311,7 +311,7 @@ func (self Compose) ContainerLog(http *gin.Context) {
 
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
-		self.JsonResponseWithError(http, notice.Message{}.New(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	tasker, err := logic.Compose{}.GetTasker(composeRow)

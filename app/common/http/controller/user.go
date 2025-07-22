@@ -8,8 +8,8 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/family"
-	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/types"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp/totp"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -38,11 +38,11 @@ func (self User) Login(http *gin.Context) {
 		exists := logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa, &twoFa)
 		if exists && twoFa.Enable {
 			if params.Code == "" {
-				self.JsonResponseWithError(http, function.ErrorMessage(".userTwoFaEmpty"), 500)
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserTwoFaEmpty), 500)
 				return
 			}
 			if !totp.Validate(params.Code, twoFa.Secret) {
-				self.JsonResponseWithError(http, function.ErrorMessage(".userTwoFaNotCorrect"), 500)
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserTwoFaNotCorrect), 500)
 				return
 			}
 		}
@@ -61,21 +61,21 @@ func (self User) Login(http *gin.Context) {
 
 	currentUser, err := logic.User{}.GetUserByUsername(params.Username)
 	if err != nil {
-		self.JsonResponseWithError(http, notice.Message{}.New(".usernameOrPasswordError"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserUsernameOrPasswordError), 500)
 		return
 	}
 	if currentUser.Value.Password == "" {
-		self.JsonResponseWithError(http, notice.Message{}.New(".usernameOrPasswordError"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserUsernameOrPasswordError), 500)
 		return
 	}
 
 	if currentUser.Value.UserStatus == logic.SettingGroupUserStatusDisable {
-		self.JsonResponseWithError(http, notice.Message{}.New(".userDisable"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserDisable), 500)
 		return
 	}
 
 	if !(family.Provider{}).Check(types.FeatureFamilyEe) && currentUser.Name != logic.SettingGroupUserFounder {
-		self.JsonResponseWithError(http, notice.Message{}.New(".userDisable"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserDisable), 500)
 		return
 	}
 
@@ -91,7 +91,7 @@ func (self User) Login(http *gin.Context) {
 		})
 		return
 	} else {
-		self.JsonResponseWithError(http, notice.Message{}.New(".usernameOrPasswordError"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserUsernameOrPasswordError), 500)
 		return
 	}
 }
@@ -104,7 +104,7 @@ func (self User) GetUserInfo(http *gin.Context) {
 
 	data, exists := http.Get("userInfo")
 	if !exists {
-		self.JsonResponseWithError(http, function.ErrorMessage(".login"), 401)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserLogin), 401)
 		http.AbortWithStatus(401)
 		return
 	}
@@ -168,16 +168,16 @@ func (self User) CreateFounder(http *gin.Context) {
 	}
 	founder, _ := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
 	if founder != nil {
-		self.JsonResponseWithError(http, notice.Message{}.New(".userFounderExists"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserFounderExists), 500)
 		return
 	}
 	if params.Password != params.ConfirmPassword {
-		self.JsonResponseWithError(http, notice.Message{}.New(".userPasswordConfirmFailed"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserPasswordConfirmFailed), 500)
 		return
 	}
 
 	if (logic.User{}.GetBuiltInPublicUsername()) == params.Username {
-		self.JsonResponseWithServerError(http, notice.Message{}.New(".userFounderExists"))
+		self.JsonResponseWithServerError(http, function.ErrorMessage(define.ErrorMessageUserFounderExists))
 		return
 	}
 

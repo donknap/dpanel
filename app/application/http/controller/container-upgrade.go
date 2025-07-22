@@ -13,6 +13,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -41,7 +42,7 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 	if containerInfo.Name == "/"+facade.GetConfig().GetString("APP_NAME") {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerUpgradeDPanel"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerUpgradeDPanel), 500)
 		return
 	}
 

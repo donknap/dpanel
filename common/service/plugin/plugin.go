@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"html/template"
 	"io"
@@ -213,7 +214,7 @@ func (self plugin) importImage(imageName string, imagePath string) error {
 	}
 	imageFile, err := self.asset.Open(imagePath)
 	if os.IsNotExist(err) {
-		return function.ErrorMessage(".unknow", "error", err.Error())
+		return function.ErrorMessage(define.ErrorMessageUnknow, "error", err.Error())
 	}
 	reader, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageFile, client.ImageLoadWithQuiet(false))
 	if err != nil {

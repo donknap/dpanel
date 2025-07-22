@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	registry2 "github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/ws"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"io"
@@ -97,11 +98,11 @@ func (self Image) TagRemote(http *gin.Context) {
 	// 可能最后循环后还包含错误
 	if err != nil {
 		if function.ErrorHasKeyword(err, "not found:", "repository does not exist") {
-			self.JsonResponseWithError(http, notice.Message{}.New(".imagePullTagNotFound", "tag", params.Tag), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImagePullTagNotFound, "tag", params.Tag), 500)
 			return
 		}
 		if function.ErrorHasKeyword(err, "server gave HTTP response to HTTPS client") {
-			self.JsonResponseWithError(http, notice.Message{}.New(".imagePullServerHttp"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImagePullServerHttp), 500)
 			return
 		}
 		self.JsonResponseWithError(http, err, 500)
@@ -181,7 +182,7 @@ func (self Image) TagAdd(http *gin.Context) {
 		return
 	}
 	if function.InArray[string](imageDetail.RepoTags, params.Tag) {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.Tag), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Tag), 500)
 		return
 	}
 
@@ -210,7 +211,7 @@ func (self Image) TagSync(http *gin.Context) {
 	for _, id := range params.RegistryId {
 		registry, _ := dao.Registry.Where(dao.Registry.ID.Eq(id)).First()
 		if registry == nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
 		password := ""

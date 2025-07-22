@@ -20,6 +20,7 @@ import (
 	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/ws"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/mcuadros/go-version"
@@ -200,7 +201,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 
 func (self Home) WsHostConsole(http *gin.Context) {
 	if !websocket.IsWebSocketUpgrade(http.Request) {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonUseWsConnect"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonUseWsConnect), 500)
 		return
 	}
 	type ParamsValidate struct {
@@ -255,7 +256,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 			return err
 		}
 		if !dockerEnv.EnableSSH {
-			return function.ErrorMessage(".homeWsHostConsoleSshNotSetting")
+			return function.ErrorMessage(define.ErrorMessageHomeWsHostConsoleSshNotSetting)
 		}
 		sshClient, err = ssh.NewClient(ssh.WithServerInfo(dockerEnv.SshServerInfo)...)
 		if err != nil {
@@ -646,12 +647,12 @@ func (self Home) EmailTest(http *gin.Context) {
 	}
 	emailServer := accessor.EmailServer{}
 	if ok := (logic.Setting{}).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingEmailServer, &emailServer); !ok {
-		self.JsonResponseWithError(http, function.ErrorMessage(".settingBasicEmailInvalid"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSettingBasicEmailInvalid), 500)
 		return
 	}
 	err := logic.Notice{}.Send(emailServer, emailServer.Email, params.Subject, params.Content)
 	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".settingBasicEmailInvalid", err.Error()), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSettingBasicEmailInvalid, err.Error()), 500)
 		return
 	}
 	self.JsonSuccessResponse(http)

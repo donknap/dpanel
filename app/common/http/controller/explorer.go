@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/fs"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	fsType "github.com/donknap/dpanel/common/types/fs"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
@@ -123,7 +124,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		return
 	}
 	if strings.HasPrefix(params.File, "/") {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerInvalidFilename"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerInvalidFilename), 500)
 		return
 	}
 
@@ -242,7 +243,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			options = append(options, docker.WithImportTarGzFile(file.Name()))
 			break
 		default:
-			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerUnzipTargetUnsupportedType"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerUnzipTargetUnsupportedType), 500)
 			return
 		}
 	}
@@ -282,7 +283,7 @@ func (self Explorer) Delete(http *gin.Context) {
 			path == "./" ||
 			path == "." ||
 			strings.Contains(path, "*") {
-			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerEditDeleteUnsafe"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerEditDeleteUnsafe), 500)
 			return
 		}
 	}
@@ -444,7 +445,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 		return
 	}
 	if fileInfo.Size() >= 1024*1024 {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerEditFileMaxSize"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerEditFileMaxSize), 500)
 		return
 	}
 	fileType, _ := filetype.MatchFile(file.Name())
@@ -459,7 +460,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 		})
 		return
 	} else {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerContentUnsupportedType"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerContentUnsupportedType), 500)
 		return
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/types/define"
 	"io"
 	"log/slog"
 	"os"
@@ -160,7 +161,7 @@ func (self Builder) ContainerReadFile(ctx context.Context, containerName string,
 		return nil, err
 	}
 	if !pathStat.Mode.IsRegular() {
-		return nil, function.ErrorMessage(".containerExplorerContentUnsupportedType")
+		return nil, function.ErrorMessage(define.ErrorMessageContainerExplorerContentUnsupportedType)
 	}
 	out, _, err := self.Client.CopyFromContainer(ctx, containerName, inContainerPath)
 	if err != nil {

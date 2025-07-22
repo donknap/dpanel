@@ -11,6 +11,7 @@ import (
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	"gopkg.in/yaml.v3"
 	"io"
 	"io/fs"
@@ -36,7 +37,7 @@ type Store struct {
 
 func (self Store) SyncByGit(path, gitUrl string) error {
 	if _, err := exec2.LookPath("git"); err != nil {
-		return function.ErrorMessage(".systemStoreNotFoundGit")
+		return function.ErrorMessage(define.ErrorMessageSystemStoreNotFoundGit)
 	}
 	// 先创建一个临时目录，下载完成后再同步数据，否则失败时原先的数据会被删除
 	tempDownloadPath, _ := storage.Local{}.CreateTempDir("")
@@ -92,7 +93,7 @@ func (self Store) SyncByZip(path, zipUrl string, root string) error {
 		_ = response.Body.Close()
 	}()
 	if response.StatusCode != http.StatusOK {
-		return function.ErrorMessage(".systemStoreDownloadFailed", "url", zipUrl, "error", response.Status)
+		return function.ErrorMessage(define.ErrorMessageSystemStoreDownloadFailed, "url", zipUrl, "error", response.Status)
 	}
 	_, err = io.Copy(zipTempFile, response.Body)
 	if err != nil {
@@ -151,7 +152,7 @@ func (self Store) SyncByJson(path, jsonUrl string) error {
 	}()
 
 	if response.StatusCode != http.StatusOK {
-		return function.ErrorMessage(".systemStoreDownloadFailed", "url", jsonUrl, "error", response.Status)
+		return function.ErrorMessage(define.ErrorMessageSystemStoreDownloadFailed, "url", jsonUrl, "error", response.Status)
 	}
 	_, err = io.Copy(file, response.Body)
 	if err != nil {

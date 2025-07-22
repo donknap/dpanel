@@ -11,6 +11,7 @@ import (
 	builder "github.com/donknap/dpanel/common/service/docker/image"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ws"
+	"github.com/donknap/dpanel/common/types/define"
 	"io"
 	"log/slog"
 	"math"
@@ -63,7 +64,7 @@ func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
 					buffer.WriteString(msg.ErrorDetail.Message)
 					wsBuffer.BroadcastMessage(buffer.String())
 					if strings.Contains(msg.ErrorDetail.Message, "ADD failed") || strings.Contains(msg.ErrorDetail.Message, "COPY failed") {
-						return function.ErrorMessage(".imageBuildAddFileTypeError")
+						return function.ErrorMessage(define.ErrorMessageImageBuildAddFileTypeError)
 					}
 					return errors.New(msg.ErrorDetail.Message)
 				} else if msg.PullMessage.Id != "" {

@@ -22,6 +22,7 @@ import (
 	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
@@ -57,7 +58,7 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 	}
 	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, imageNameDetail.Uri())
 	if err == nil && imageInfo.ID != "" {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", imageNameDetail.Uri()), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", imageNameDetail.Uri()), 500)
 		return
 	}
 	containerTar, err := os.Open(storage.Local{}.GetRealPath(params.Tar))
@@ -218,11 +219,11 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		return
 	}
 	if params.BuildDockerfileContent == "" && params.BuildZip == "" && params.BuildGit == "" {
-		self.JsonResponseWithError(http, function.ErrorMessage(".imageBuildTypeEmpty"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildTypeEmpty), 500)
 		return
 	}
 	if params.BuildZip != "" && params.BuildGit != "" {
-		self.JsonResponseWithError(http, function.ErrorMessage(".imageBuildTypeConflict"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildTypeConflict), 500)
 		return
 	}
 	imageNameDetail := registry.GetImageTagDetail(params.Tag)
@@ -235,7 +236,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 		path := storage.Local{}.GetRealPath(params.BuildZip)
 		_, err := os.Stat(path)
 		if os.IsNotExist(err) {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonUploadFileEmpty"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonUploadFileEmpty), 500)
 			return
 		}
 		params.BuildZip = path

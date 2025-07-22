@@ -13,6 +13,7 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	fs2 "github.com/donknap/dpanel/common/types/fs"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
@@ -138,7 +139,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		return
 	}
 	if strings.HasPrefix(params.File, "/") {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerInvalidFilename"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerInvalidFilename), 500)
 		return
 	}
 
@@ -232,7 +233,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			options = append(options, docker.WithImportTarGzFile(targetFile.Name()))
 			break
 		default:
-			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerUnzipTargetUnsupportedType"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerUnzipTargetUnsupportedType), 500)
 			return
 		}
 	}
@@ -265,7 +266,7 @@ func (self Explorer) Delete(http *gin.Context) {
 			path == "./" ||
 			path == "." ||
 			strings.Contains(path, "*") {
-			self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerEditDeleteUnsafe"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerEditDeleteUnsafe), 500)
 			return
 		}
 	}
@@ -392,7 +393,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 	}
 	pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Name, params.File)
 	if pathStat.Size >= 1024*1024 {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerEditFileMaxSize"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerEditFileMaxSize), 500)
 		return
 	}
 	tempFile, err := storage.Local{}.CreateTempFile("")
@@ -426,7 +427,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 		})
 		return
 	} else {
-		self.JsonResponseWithError(http, function.ErrorMessage(".containerExplorerContentUnsupportedType"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerContentUnsupportedType), 500)
 		return
 	}
 }

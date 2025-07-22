@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -28,7 +29,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		SiteTitle   string `json:"siteTitle"`
 		SiteName    string `json:"siteName" binding:"required"`
 		ImageName   string `json:"imageName" binding:"required"`
-		ContainerId string `json:"containerId"`
+		ContainerId string `json:"id"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -81,7 +82,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); err == nil {
 		siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "Id"))...).First()
 		if siteRow != nil || params.ContainerId == "" {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.SiteName), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.SiteName), 500)
 			return
 		}
 	}

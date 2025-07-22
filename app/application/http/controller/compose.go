@@ -13,7 +13,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
@@ -69,7 +68,7 @@ func (self Compose) Create(http *gin.Context) {
 	if params.Id != "" {
 		yamlRow, _ = logic.Compose{}.Get(params.Id)
 		if yamlRow == nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
 		if params.Title != "" {
@@ -77,16 +76,16 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	} else {
 		if params.Type == accessor.ComposeTypeStoragePath {
-			self.JsonResponseWithError(http, function.ErrorMessage(".composeDisableStorageType"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDisableStorageType), 500)
 			return
 		}
 		if params.Type == accessor.ComposeTypeStore {
-			self.JsonResponseWithError(http, function.ErrorMessage(".composeDisableStore"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDisableStore), 500)
 			return
 		}
 		yamlExist, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
 		if yamlExist != nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.Name), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
 			return
 		}
 		yamlRow = &entity.Compose{
@@ -286,7 +285,7 @@ func (self Compose) GetTask(http *gin.Context) {
 	}
 	yamlRow, err := logic.Compose{}.Get(params.Id)
 	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	// 搜索一下该项目是否有子任务
@@ -366,7 +365,7 @@ func (self Compose) Delete(http *gin.Context) {
 		}
 		for _, runItem := range composeRunList {
 			if fmt.Sprintf(define.ComposeProjectName, row.Name) == runItem.Name {
-				self.JsonResponseWithError(http, function.ErrorMessage(".composeDeleteMustDestroyContainer"), 500)
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeleteMustDestroyContainer), 500)
 				return
 			}
 		}
@@ -436,7 +435,7 @@ func (self Compose) Parse(http *gin.Context) {
 	if params.Id != "" {
 		composeRow, err := logic.Compose{}.Get(params.Id)
 		if err != nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
 		tasker, err := logic.Compose{}.GetTasker(composeRow)
@@ -478,13 +477,13 @@ func (self Compose) Download(http *gin.Context) {
 	}
 	yamlRow, err := logic.Compose{}.Get(params.Id)
 	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 
 	yaml, err := yamlRow.Setting.GetYaml()
 	if err != nil || yaml[0] == "" {
-		self.JsonResponseWithError(http, notice.Message{}.New(".composeNotFoundYaml"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeNotFoundYaml), 500)
 		return
 	}
 

@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/service/fs/dockerfs"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/ssh"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/spf13/afero"
 	"github.com/spf13/afero/sftpfs"
 )
@@ -52,7 +53,7 @@ func NewSshExplorer(dockerEnvName string) (*ssh.Client, *afero.Afero, error) {
 		return nil, nil, err
 	}
 	if !dockerEnv.EnableSSH || dockerEnv.SshServerInfo == nil {
-		return nil, nil, function.ErrorMessage(".commonDataNotFoundOrDeleted")
+		return nil, nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
 	}
 	option := []ssh.Option{
 		ssh.WithSftpClient(),

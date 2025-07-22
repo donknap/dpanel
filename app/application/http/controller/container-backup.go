@@ -229,7 +229,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 	var err error
 	backupRow, err := dao.Backup.Where(dao.Backup.ID.Eq(params.Id)).First()
 	if err != nil {
-		self.JsonResponseWithError(http, define.ErrorMessageCommonDataNotFoundOrDeleted, 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	tarFilePath := filepath.Join(storage.Local{}.GetBackupPath(), backupRow.Setting.BackupTar)
@@ -280,7 +280,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					return
 				}
 				if _, err = docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, containerInfo.Config.Image); err != nil {
-					self.JsonResponseWithError(http, function.ErrorMessage(".containerBackupRestoreImportImageFailed"), 500)
+					self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerBackupRestoreImportImageFailed), 500)
 					return
 				}
 			} else {
@@ -481,7 +481,7 @@ func (self ContainerBackup) GetDetail(http *gin.Context) {
 	var err error
 	backupRow, err := dao.Backup.Where(dao.Backup.ID.Eq(params.Id)).First()
 	if err != nil {
-		self.JsonResponseWithError(http, define.ErrorMessageCommonDataNotFoundOrDeleted, 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	tarFilePath := filepath.Join(storage.Local{}.GetBackupPath(), backupRow.Setting.BackupTar)

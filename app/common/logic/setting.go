@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 // 全局配置
@@ -81,7 +82,7 @@ func (self Setting) GetValue(groupName string, name string) (*entity.Setting, er
 func (self Setting) GetValueById(id int32) (*entity.Setting, error) {
 	setting, _ := dao.Setting.Where(dao.Setting.ID.Eq(id)).First()
 	if setting == nil {
-		return nil, function.ErrorMessage(".commonDataNotFoundOrDeleted")
+		return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
 	}
 	return setting, nil
 }

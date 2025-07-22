@@ -17,9 +17,9 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/acme"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
@@ -183,7 +183,7 @@ func (self SiteCert) Apply(http *gin.Context) {
 	wsBuffer := ws.NewProgressPip(ws.MessageTypeDomainApply)
 	defer wsBuffer.Close()
 
-	errMessage := notice.Message{}.New(".domainCertIssueFailed")
+	errMessage := function.ErrorMessage(define.ErrorMessageSiteDomainCertIssueFailed)
 	success := false
 	wsBuffer.OnWrite = func(p string) error {
 		wsBuffer.BroadcastMessage(p)
@@ -191,7 +191,7 @@ func (self SiteCert) Apply(http *gin.Context) {
 			success = true
 		}
 		if strings.Contains(p, "Error adding TXT record to domain") {
-			errMessage = function.ErrorMessage(".domainCertAddTxtFailed")
+			errMessage = function.ErrorMessage(define.ErrorMessageSiteDomainCertAddTxtFailed)
 		}
 		return nil
 	}
@@ -328,7 +328,7 @@ func (self SiteCert) Delete(http *gin.Context) {
 		if list, _ := dao.SiteDomain.Where(gen.Cond(
 			datatypes.JSONQuery("setting").Equals(d, "certName"),
 		)...).First(); list != nil {
-			self.JsonResponseWithError(http, notice.Message{}.New(".siteDomainCertHasBindDomain"), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSiteDomainCertHasBindDomain), 500)
 			return
 		}
 	}

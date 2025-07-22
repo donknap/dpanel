@@ -265,19 +265,34 @@ func WithConstraint(value *docker.Constraint) Option {
 			self.serviceSpec.TaskTemplate.Placement = &swarm.Placement{}
 		}
 		self.serviceSpec.TaskTemplate.Placement.Constraints = make([]string, 0)
-		if value.Role != "" && value.Role != "all" {
-			self.serviceSpec.TaskTemplate.Placement.Constraints = append(self.serviceSpec.TaskTemplate.Placement.Constraints, fmt.Sprintf("node.role==%s", value.Role))
-		}
-		if value.Node != nil {
-			for _, name := range value.Node {
-				self.serviceSpec.TaskTemplate.Placement.Constraints = append(self.serviceSpec.TaskTemplate.Placement.Constraints, fmt.Sprintf("node.lablels.node==%s", name))
-			}
-		}
+
 		if value.Label != nil {
 			for _, item := range value.Label {
-				self.serviceSpec.TaskTemplate.Placement.Constraints = append(self.serviceSpec.TaskTemplate.Placement.Constraints, fmt.Sprintf("%s%s%s", item.Name, item.Operator, item.Value))
+				label := fmt.Sprintf("%s%s%s", item.Name, item.Operator, item.Value)
+				if !function.InArray(self.serviceSpec.TaskTemplate.Placement.Constraints, label) {
+					self.serviceSpec.TaskTemplate.Placement.Constraints = append(self.serviceSpec.TaskTemplate.Placement.Constraints, label)
+				}
 			}
 		}
+
+		if value.Role != "" {
+			self.serviceSpec.TaskTemplate.Placement.Constraints = function.PluckArrayWalk(self.serviceSpec.TaskTemplate.Placement.Constraints, func(item string) (string, bool) {
+				return item, !strings.HasPrefix(item, "node.role==") && !strings.HasPrefix(item, "node.role!=")
+			})
+			if value.Role != "all" {
+				self.serviceSpec.TaskTemplate.Placement.Constraints = append(self.serviceSpec.TaskTemplate.Placement.Constraints, fmt.Sprintf("node.role==%s", value.Role))
+			}
+		}
+
+		if value.Node != nil {
+			self.serviceSpec.TaskTemplate.Placement.Constraints = function.PluckArrayWalk(self.serviceSpec.TaskTemplate.Placement.Constraints, func(item string) (string, bool) {
+				return item, !strings.HasPrefix(item, "node.labels.node==")
+			})
+			for _, name := range value.Node {
+				self.serviceSpec.TaskTemplate.Placement.Constraints = append(self.serviceSpec.TaskTemplate.Placement.Constraints, fmt.Sprintf("node.lalabelsbels.node==%s", name))
+			}
+		}
+
 		return nil
 	}
 }

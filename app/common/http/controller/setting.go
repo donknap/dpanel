@@ -6,6 +6,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"reflect"
@@ -28,11 +29,11 @@ func (self Setting) Founder(http *gin.Context) {
 	}
 	oldUser, err := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
 	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonDataNotFoundOrDeleted"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	if oldUser.Value.Password != function.GetMd5(params.Password+oldUser.Value.Username) {
-		self.JsonResponseWithError(http, function.ErrorMessage(".usernameOrPasswordError"), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserUsernameOrPasswordError), 500)
 		return
 	}
 

@@ -17,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -276,7 +277,7 @@ func (self Container) Copy(http *gin.Context) {
 		return
 	}
 	if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.CopyName); err == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(".commonIdAlreadyExists", "name", params.CopyName), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.CopyName), 500)
 		return
 	}
 	if params.EnableRandomPort && !function.IsEmptyMap(containerInfo.HostConfig.PortBindings) {

@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -61,9 +62,9 @@ func (self User) CheckLock(username string) error {
 	if item, ok := storage.Cache.Get(cacheKey); ok {
 		if v, ok := item.(int); ok && v >= loginSetting.FailedTotal {
 			if loginSetting.FailedLockTime == -1 {
-				return function.ErrorMessage(".userFailedLockForever")
+				return function.ErrorMessage(define.ErrorMessageUserFailedLockForever)
 			}
-			return function.ErrorMessage(".userFailedLock", "time", units.HumanDuration(time.Duration(loginSetting.FailedLockTime)*time.Second))
+			return function.ErrorMessage(define.ErrorMessageUserFailedLock, "time", units.HumanDuration(time.Duration(loginSetting.FailedLockTime)*time.Second))
 		}
 	}
 	return nil
