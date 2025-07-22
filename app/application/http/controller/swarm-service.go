@@ -17,7 +17,9 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"log/slog"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func (self Swarm) ServiceList(http *gin.Context) {
@@ -49,11 +51,45 @@ func (self Swarm) ServiceList(http *gin.Context) {
 	return
 }
 
+func (self Swarm) ServiceDetail(http *gin.Context) {
+	type ParamsValidate struct {
+		Id string `json:"id" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	filter := filters.NewArgs()
+	if params.Id != "" {
+		filter.Add("id", params.Id)
+	}
+	serviceList, err := docker.Sdk.Client.ServiceList(docker.Sdk.Ctx, types.ServiceListOptions{
+		Status:  true,
+		Filters: filter,
+	})
+	if err != nil || len(serviceList) == 0 {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		return
+	}
+	item, ok := function.PluckArrayItemWalk(serviceList, func(item swarm.Service) bool {
+		return item.ID == params.Id
+	})
+	if !ok {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"info": item,
+	})
+	return
+}
+
 func (self Swarm) ServiceScaling(http *gin.Context) {
 	type ParamsValidate struct {
 		Name     string `json:"name" binding:"required"`
-		Mode     string `json:"mode" binding:"oneof=global replicated none"`
+		Force    bool   `json:"force"`
 		Replicas uint64 `json:"replicas"`
+		Rollback bool   `json:"rollback"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -64,30 +100,45 @@ func (self Swarm) ServiceScaling(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.Mode == "global" {
-		serviceInfo.Spec.Mode = swarm.ServiceMode{
-			Global: &swarm.GlobalService{},
-		}
-	}
-	if params.Mode == "replicated" {
+
+	updateOptions := types.ServiceUpdateOptions{}
+
+	if params.Rollback {
+		updateOptions.Rollback = "previous"
+	} else {
 		serviceInfo.Spec.Mode = swarm.ServiceMode{
 			Replicated: &swarm.ReplicatedService{
 				Replicas: &params.Replicas,
 			},
 		}
-	}
-	if params.Mode == "none" {
-		serviceInfo.Spec.Mode = swarm.ServiceMode{
-			Replicated: &swarm.ReplicatedService{
-				Replicas: function.Ptr(uint64(0)),
-			},
+		if params.Force {
+			if serviceInfo.Spec.TaskTemplate.ContainerSpec.Labels == nil {
+				serviceInfo.Spec.TaskTemplate.ContainerSpec.Labels = make(map[string]string)
+			}
+			serviceInfo.Spec.TaskTemplate.ContainerSpec.Labels[define.SwarmLabelServiceVersion] = time.Now().String()
 		}
 	}
-	response, err := docker.Sdk.Client.ServiceUpdate(docker.Sdk.Ctx, serviceInfo.ID, serviceInfo.Version, serviceInfo.Spec, types.ServiceUpdateOptions{})
+
+	if serviceInfo.Spec.Labels != nil {
+		if v, ok := serviceInfo.Spec.Labels[define.SwarmLabelServiceImageRegistry]; ok {
+			id, _ := strconv.Atoi(v)
+			if registryInfo, err := dao.Registry.Where(dao.Registry.ID.Eq(int32(id))).First(); err == nil {
+				password, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registryInfo.Setting.Password)
+				updateOptions.EncodedRegistryAuth = registry.Config{
+					Username:   registryInfo.Setting.Username,
+					Password:   password,
+					ExistsAuth: true,
+				}.GetAuthString()
+			}
+		}
+	}
+
+	response, err := docker.Sdk.Client.ServiceUpdate(docker.Sdk.Ctx, serviceInfo.ID, serviceInfo.Version, serviceInfo.Spec, updateOptions)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	if !function.IsEmptyArray(response.Warnings) {
 		_ = notice.Message{}.Info(strings.Join(response.Warnings, ", "))
 	}
@@ -133,7 +184,7 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 	if params.ServiceId != "" {
 		serviceInfo, _, err := docker.Sdk.Client.ServiceInspectWithRaw(docker.Sdk.Ctx, params.ServiceId, types.ServiceInspectOptions{})
 		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted, err.Error()), 500)
 			return
 		}
 		options = append(options, swarm2.WithServiceUpdate(serviceInfo))
