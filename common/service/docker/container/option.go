@@ -433,12 +433,14 @@ func WithGpus(item *docker.GpusItem) Option {
 				"all",
 			}
 		}
+		if function.IsEmptyArray(item.Capabilities) {
+			item.Capabilities = []string{
+				"gpu",
+			}
+		}
 		self.hostConfig.DeviceRequests = append(self.hostConfig.DeviceRequests, container.DeviceRequest{
 			DeviceIDs: item.Device,
 			Capabilities: [][]string{
-				{
-					"gpu",
-				},
 				item.Capabilities,
 			},
 			Driver: "nvidia",

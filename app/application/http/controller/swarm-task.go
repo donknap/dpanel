@@ -44,7 +44,7 @@ func (self Swarm) TaskList(http *gin.Context) {
 
 func (self Swarm) TaskListInNode(http *gin.Context) {
 	type ParamsValidate struct {
-		NodeName string `json:"nodeName" binding:"required"`
+		NodeId string `json:"nodeId" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -57,9 +57,8 @@ func (self Swarm) TaskListInNode(http *gin.Context) {
 	result := make([]resultItem, 0)
 
 	filter := filters.NewArgs()
-	if params.NodeName != "" {
-		filter.Add("node", params.NodeName)
-	}
+	filter.Add("node", params.NodeId)
+
 	taskList, err := docker.Sdk.Client.TaskList(docker.Sdk.Ctx, types.TaskListOptions{
 		Filters: filter,
 	})
