@@ -166,7 +166,7 @@ func (self Compose) FindRunTask() map[string]*entity.Compose {
 	findComposeList := make(map[string]*entity.Compose)
 
 	for _, item := range self.Ls() {
-		if strings.HasPrefix(item.Name, "dpanel-c-") {
+		if strings.HasPrefix(item.Name, define.ComposeProjectPrefix) {
 			item.Name = item.Name[9:]
 		}
 		// 如果外部任务文件可以访问，则正常管理

@@ -450,14 +450,49 @@ func (self Image) ImageDelete(http *gin.Context) {
 }
 
 func (self Image) ImagePrune(http *gin.Context) {
-	filter := filters.NewArgs()
-	filter.Add("dangling", "0")
-	res, err := docker.Sdk.Client.ImagesPrune(docker.Sdk.Ctx, filter)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	type ParamsValidate struct {
+		EnableUnuseTag bool `json:"enableUnuseTag"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
 		return
 	}
-	_ = notice.Message{}.Info(".imagePrune", "size", units.HumanSize(float64(res.SpaceReclaimed)), "count", fmt.Sprintf("%d", len(res.ImagesDeleted)))
+	// 清理未使用的 tag 时，直接调用 Prune 处理
+	// 只清理未使用镜像时，需要手动删除，避免 tag 被删除
+	if params.EnableUnuseTag {
+		filter := filters.NewArgs()
+		filter.Add("dangling", "0")
+		res, err := docker.Sdk.Client.ImagesPrune(docker.Sdk.Ctx, filter)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_ = notice.Message{}.Info(".imagePrune", "size", units.HumanSize(float64(res.SpaceReclaimed)), "count", fmt.Sprintf("%d", len(res.ImagesDeleted)))
+	} else {
+		var deleteImageSpaceReclaimed int64 = 0
+		deleteImageTotal := 0
+		useImageList := make([]string, 0)
+		if containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{}); err == nil {
+			useImageList = function.PluckArrayWalk(containerList, func(item container.Summary) (string, bool) {
+				return item.ImageID, true
+			})
+		}
+		if imageList, err := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, image.ListOptions{
+			All:            true,
+			ContainerCount: true,
+		}); err == nil {
+			for _, item := range imageList {
+				if !function.InArray(useImageList, item.ID) {
+					deleteImageSpaceReclaimed += item.Size
+					deleteImageTotal += 1
+					_, _ = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, item.ID, image.RemoveOptions{
+						PruneChildren: true,
+					})
+				}
+			}
+		}
+		_ = notice.Message{}.Info(".imagePrune", "size", units.HumanSize(float64(deleteImageSpaceReclaimed)), "count", fmt.Sprintf("%d", deleteImageTotal))
+	}
 	self.JsonSuccessResponse(http)
 	return
 }
