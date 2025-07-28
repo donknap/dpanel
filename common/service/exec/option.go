@@ -51,6 +51,7 @@ func WithEnv(env []string) Option {
 	}
 }
 
+// WithCtx 保证最后调用
 func WithCtx(ctx context.Context) Option {
 	return func(self *Command) error {
 		if function.IsEmptyArray(self.cmd.Args) {

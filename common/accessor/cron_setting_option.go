@@ -55,15 +55,16 @@ func (self CronSettingExpression) ToString() string {
 }
 
 type CronSettingOption struct {
-	NextRunTime    []time.Time             `json:"nextRunTime,omitempty"`
-	Expression     []CronSettingExpression `json:"expression,omitempty"`
-	ContainerName  string                  `json:"containerName,omitempty"`
-	Script         string                  `json:"script,omitempty"`
-	JobIds         []cron.EntryID          `json:"jobIds,omitempty"`
-	Environment    []docker.EnvItem        `json:"environment,omitempty"`
-	EnableRunBlock bool                    `json:"enableRunBlock,omitempty"`
-	KeepLogTotal   int                     `json:"keepLogTotal,omitempty"`
-	Disable        bool                    `json:"disable,omitempty"`
-	DockerEnvName  string                  `json:"dockerEnvName,omitempty"`
-	EntryShell     string                  `json:"entryShell,omitempty"`
+	NextRunTime      []time.Time             `json:"nextRunTime,omitempty"`
+	Expression       []CronSettingExpression `json:"expression,omitempty"`
+	ContainerName    string                  `json:"containerName,omitempty"`
+	Script           string                  `json:"script,omitempty"`
+	JobIds           []cron.EntryID          `json:"jobIds,omitempty"`
+	Environment      []docker.EnvItem        `json:"environment,omitempty"`
+	EnableRunBlock   bool                    `json:"enableRunBlock,omitempty"`
+	KeepLogTotal     int                     `json:"keepLogTotal,omitempty"`
+	Disable          bool                    `json:"disable,omitempty"`
+	DockerEnvName    string                  `json:"dockerEnvName,omitempty"`
+	EntryShell       string                  `json:"entryShell,omitempty"`
+	ScriptRunTimeout int                     `json:"scriptRunTimeout,omitempty"`
 }

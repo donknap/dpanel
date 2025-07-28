@@ -2,8 +2,8 @@ package logic
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -47,6 +48,10 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 				return nil
 			}
 		}
+		var ctx context.Context
+		if task.Setting.ScriptRunTimeout > 0 {
+			ctx, _ = context.WithTimeout(context.Background(), time.Second*time.Duration(task.Setting.ScriptRunTimeout))
+		}
 		startTime := time.Now()
 		containerName := task.Setting.ContainerName
 
@@ -61,89 +66,75 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 		})...)
 
 		var out string
-		if containerName == "" {
-			// 如果没有指定容器，则直接在面板 shell 中执行
-			// 在面板容器中执行还需要把 env 注入到命令中
-			globalEnv = append(globalEnv, os.Environ()...)
-			cmd, _ := exec.New(
-				exec.WithCommandName("/bin/sh"),
-				exec.WithArgs("-c", task.Setting.Script),
-				exec.WithEnv(globalEnv),
-			)
-			response, err := cmd.Run()
-			if err != nil {
-				_ = dao.CronLog.Create(&entity.CronLog{
-					CronID: task.ID,
-					Value: &accessor.CronLogValueOption{
-						Error:   err.Error(),
-						RunTime: startTime,
-					},
-				})
-				return err
-			}
-			buffer := new(bytes.Buffer)
-			_, err = io.Copy(buffer, response)
-			if err != nil {
-				_ = dao.CronLog.Create(&entity.CronLog{
-					CronID: task.ID,
-					Value: &accessor.CronLogValueOption{
-						Error:   err.Error(),
-						RunTime: startTime,
-					},
-				})
-				return err
-			}
-			out = buffer.String()
-		} else {
+		var script string
+
+		if containerName != "" {
 			dockerClient, err := docker.NewBuilderWithDockerEnv(defaultDockerEnv)
+			if err != nil {
+				return err
+			}
+			if task.Setting.EntryShell == "" {
+				task.Setting.EntryShell = "/bin/sh"
+			}
 			defer func() {
 				dockerClient.Close()
 			}()
-			var cmd []string
-			if task.Setting.EntryShell != "" {
-				cmd = []string{
-					task.Setting.EntryShell,
-					"-c",
-					task.Setting.Script,
-				}
-			} else {
-				cmd = docker.CommandSplit(task.Setting.Script)
-			}
-
-			response, err := dockerClient.ContainerExec(dockerClient.Ctx, containerName, container.ExecOptions{
-				Privileged:   true,
-				Tty:          false,
-				AttachStdin:  false,
-				AttachStdout: true,
-				AttachStderr: true,
-				Cmd:          cmd,
-				Env:          globalEnv,
-			})
-			if err != nil {
-				_ = dao.CronLog.Create(&entity.CronLog{
-					CronID: task.ID,
-					Value: &accessor.CronLogValueOption{
-						Error:   err.Error(),
-						RunTime: startTime,
-					},
-				})
-				return err
-			}
-			defer response.Close()
-			buffer, err := docker.GetContentFromStdFormat(response.Reader)
-			_, err = io.Copy(buffer, response.Reader)
-			if err != nil {
-				_ = dao.CronLog.Create(&entity.CronLog{
-					CronID: task.ID,
-					Value: &accessor.CronLogValueOption{
-						Error:   err.Error(),
-						RunTime: startTime,
-					},
-				})
-				return err
-			}
-			out = buffer.String()
+			script = fmt.Sprintf(`docker exec %s %s -c "%s"`, containerName, task.Setting.EntryShell, task.Setting.Script)
+		} else {
+			script = task.Setting.Script
 		}
+
+		// 如果没有指定容器，则直接在面板 shell 中执行
+		// 在面板容器中执行还需要把 env 注入到命令中
+		globalEnv = append(globalEnv, os.Environ()...)
+		options := []exec.Option{
+			exec.WithCommandName("/bin/sh"),
+			exec.WithArgs("-c", script),
+			exec.WithEnv(globalEnv),
+		}
+
+		cmd, _ := exec.New(options...)
+
+		if ctx != nil {
+			cmd.Cmd().SysProcAttr = &syscall.SysProcAttr{
+				Setpgid: true,
+				Pgid:    0,
+			}
+			go func() {
+				select {
+				case <-ctx.Done():
+					slog.Debug("cron run timeout", "timeout", task.Setting.ScriptRunTimeout, "task", task)
+					cmd.Close()
+				}
+			}()
+		}
+
+		response, err := cmd.Run()
+		if err != nil {
+			_ = dao.CronLog.Create(&entity.CronLog{
+				CronID: task.ID,
+				Value: &accessor.CronLogValueOption{
+					Error:   err.Error(),
+					RunTime: startTime,
+					UseTime: time.Now().Sub(startTime).Seconds(),
+				},
+			})
+			return err
+		}
+		buffer := new(bytes.Buffer)
+		_, err = io.Copy(buffer, response)
+		if err != nil {
+			_ = dao.CronLog.Create(&entity.CronLog{
+				CronID: task.ID,
+				Value: &accessor.CronLogValueOption{
+					Error:   err.Error(),
+					RunTime: startTime,
+					UseTime: time.Now().Sub(startTime).Seconds(),
+				},
+			})
+			return err
+		}
+		out = buffer.String()
 
 		_ = dao.CronLog.Create(&entity.CronLog{
 			CronID: task.ID,

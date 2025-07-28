@@ -25,16 +25,17 @@ type Cron struct {
 
 func (self Cron) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id             int32                            `json:"id"`
-		Title          string                           `json:"title" binding:"required"`
-		Expression     []accessor.CronSettingExpression `json:"expression" binding:"required"`
-		ContainerName  string                           `json:"containerName"`
-		Script         string                           `json:"script" binding:"required"`
-		Environment    []docker.EnvItem                 `json:"environment"`
-		EnableRunBlock bool                             `json:"enableRunBlock"`
-		KeepLogTotal   int                              `json:"keepLogTotal"`
-		Disable        bool                             `json:"disable"`
-		EntryShell     string                           `json:"entryShell"`
+		Id               int32                            `json:"id"`
+		Title            string                           `json:"title" binding:"required"`
+		Expression       []accessor.CronSettingExpression `json:"expression" binding:"required"`
+		ContainerName    string                           `json:"containerName"`
+		Script           string                           `json:"script" binding:"required"`
+		Environment      []docker.EnvItem                 `json:"environment"`
+		EnableRunBlock   bool                             `json:"enableRunBlock"`
+		KeepLogTotal     int                              `json:"keepLogTotal"`
+		Disable          bool                             `json:"disable"`
+		EntryShell       string                           `json:"entryShell"`
+		ScriptRunTimeout int                              `json:"ScriptRunTimeout"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -71,6 +72,7 @@ func (self Cron) Create(http *gin.Context) {
 		taskRow.Setting.Disable = params.Disable
 		taskRow.Setting.DockerEnvName = docker.Sdk.Name
 		taskRow.Setting.EntryShell = params.EntryShell
+		taskRow.Setting.ScriptRunTimeout = params.ScriptRunTimeout
 	} else {
 		if _, err := dao.Cron.Where(dao.Cron.Title.Like(params.Title)).First(); err == nil {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Title), 500)
@@ -225,8 +227,10 @@ func (self Cron) PruneLog(http *gin.Context) {
 		return
 	}
 
-	oldRow, _ := dao.CronLog.Where(dao.CronLog.CronID.Eq(params.Id)).Last()
-	_, _ = dao.CronLog.Where(dao.CronLog.ID.Lte(oldRow.ID)).Delete()
+	if oldRow, err := dao.CronLog.Where(dao.CronLog.CronID.Eq(params.Id)).Last(); err == nil {
+		_, _ = dao.CronLog.Where(dao.CronLog.ID.Lte(oldRow.ID)).Delete()
+	}
+
 	db, err := facade.GetDbFactory().Channel("default")
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

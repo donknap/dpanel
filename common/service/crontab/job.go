@@ -41,7 +41,6 @@ func (self Job) Run() {
 			err := runFunc()
 			if err != nil {
 				slog.Debug("crontab crash ", "err", err.Error())
-				return
 			}
 		}
 	} else {

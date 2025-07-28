@@ -16,6 +16,10 @@ func (self Builder) GetRunCmd(command ...string) []exec.Option {
 	}
 }
 
+func (self Builder) GetRunParams() []string {
+	return self.runParams
+}
+
 func (self Builder) GetComposeCmd(command ...string) []exec.Option {
 	if _, err := exec2.LookPath("docker-compose"); err == nil {
 		return []exec.Option{
