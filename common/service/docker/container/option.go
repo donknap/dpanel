@@ -11,6 +11,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -375,7 +376,9 @@ func WithLog(item *docker.LogDriverItem) Option {
 
 func WithDns(ip []string) Option {
 	return func(self *Builder) error {
-		self.hostConfig.DNS = ip
+		self.hostConfig.DNS = function.PluckArrayWalk(ip, func(item string) (string, bool) {
+			return item, net.ParseIP(item) != nil
+		})
 		return nil
 	}
 }
