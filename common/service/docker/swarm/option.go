@@ -279,18 +279,16 @@ func WithConstraint(value *docker.Constraint) Option {
 			self.serviceSpec.TaskTemplate.Placement.Constraints = function.PluckArrayWalk(self.serviceSpec.TaskTemplate.Placement.Constraints, func(item string) (string, bool) {
 				return item, !strings.HasPrefix(item, "node.role==") && !strings.HasPrefix(item, "node.role!=")
 			})
-			if value.Role != "all" {
+			if value.Role != "all" && value.Role != "user" {
 				self.serviceSpec.TaskTemplate.Placement.Constraints = append(self.serviceSpec.TaskTemplate.Placement.Constraints, fmt.Sprintf("node.role==%s", value.Role))
 			}
 		}
 
-		if value.Node != nil {
+		if value.Node != "" {
 			self.serviceSpec.TaskTemplate.Placement.Constraints = function.PluckArrayWalk(self.serviceSpec.TaskTemplate.Placement.Constraints, func(item string) (string, bool) {
-				return item, !strings.HasPrefix(item, "node.labels.node==")
+				return item, !strings.HasPrefix(item, "node.id==")
 			})
-			for _, name := range value.Node {
-				self.serviceSpec.TaskTemplate.Placement.Constraints = append(self.serviceSpec.TaskTemplate.Placement.Constraints, fmt.Sprintf("node.lalabelsbels.node==%s", name))
-			}
+			self.serviceSpec.TaskTemplate.Placement.Constraints = append(self.serviceSpec.TaskTemplate.Placement.Constraints, fmt.Sprintf("node.id==%s", value.Node))
 		}
 
 		return nil

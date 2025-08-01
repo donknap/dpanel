@@ -214,15 +214,15 @@ type FileItemResult struct {
 }
 
 type RestartPolicy struct {
-	Name       string `json:"name"`
+	Name       string `json:"name" binding:"omitempty,oneof=no on-failure unless-stopped always any none"`
 	MaxAttempt int    `json:"maxAttempt"`
 	Delay      int    `json:"delay"`
 	Window     int    `json:"window"`
 }
 
 type Constraint struct {
-	Role  string   `json:"role"`
-	Node  []string `json:"node"`
+	Role  string `json:"role"`
+	Node  string `json:"node"`
 	Label []struct {
 		Name     string `json:"name"`
 		Value    string `json:"value"`

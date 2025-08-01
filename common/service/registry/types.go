@@ -41,6 +41,26 @@ func (self ImageTagDetail) Uri() string {
 	}
 }
 
+func (self ImageTagDetail) Name() string {
+	version := self.Version
+	if strings.Contains(self.Version, "@") {
+		version = strings.Split(version, "@")[0]
+	}
+	if self.Namespace == "" || self.Namespace == "library" {
+		return fmt.Sprintf("%s:%s", self.ImageName, version)
+	} else {
+		return fmt.Sprintf("%s/%s:%s", self.Namespace, self.ImageName, version)
+	}
+}
+
+func (self ImageTagDetail) FullName() string {
+	if self.Namespace == "" || self.Namespace == "library" {
+		return fmt.Sprintf("%s:%s", self.ImageName, self.Version)
+	} else {
+		return fmt.Sprintf("%s/%s:%s", self.Namespace, self.ImageName, self.Version)
+	}
+}
+
 type ImageTagListResult struct {
 	Name string   `json:"name"`
 	Tags []string `json:"tags"`

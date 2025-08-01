@@ -211,20 +211,25 @@ func (self Container) GetDetail(http *gin.Context) {
 
 func (self Container) Update(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5     string `json:"md5" binding:"required"`
-		Restart string `json:"restart" binding:"omitempty,oneof=no on-failure unless-stopped always"`
-		Name    string `json:"name"`
+		Md5     string                `json:"md5" binding:"required"`
+		Restart *docker.RestartPolicy `json:"restart"`
+		Name    string                `json:"name"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if params.Restart != "" {
-		restartPolicy := container.RestartPolicy{
-			Name: docker.GetRestartPolicyByString(params.Restart),
+	if params.Restart != nil {
+		restartPolicy := container.RestartPolicy{}
+		if params.Restart.Name != "" {
+			restartPolicy.Name = docker.GetRestartPolicyByString(params.Restart.Name)
 		}
-		if params.Restart == "on-failure" {
+		if restartPolicy.Name == container.RestartPolicyOnFailure {
 			restartPolicy.MaximumRetryCount = 5
+		}
+		if params.Restart.MaxAttempt > 0 {
+			restartPolicy.Name = container.RestartPolicyOnFailure
+			restartPolicy.MaximumRetryCount = params.Restart.MaxAttempt
 		}
 		_, err := docker.Sdk.Client.ContainerUpdate(docker.Sdk.Ctx, params.Md5, container.UpdateConfig{
 			RestartPolicy: restartPolicy,
@@ -233,7 +238,6 @@ func (self Container) Update(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-
 	}
 	if params.Name != "" {
 		err := docker.Sdk.Client.ContainerRename(docker.Sdk.Ctx, params.Md5, params.Name)
@@ -257,6 +261,7 @@ func (self Container) Update(http *gin.Context) {
 		}
 		_ = dao.Site.Save(siteRow)
 	}
+
 	self.JsonSuccessResponse(http)
 	return
 }

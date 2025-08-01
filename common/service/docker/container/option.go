@@ -97,7 +97,9 @@ func WithRestartPolicy(restartPolicy *docker.RestartPolicy) Option {
 		}
 		self.hostConfig.RestartPolicy = container.RestartPolicy{}
 		self.hostConfig.RestartPolicy.Name = docker.GetRestartPolicyByString(restartPolicy.Name)
-		self.hostConfig.RestartPolicy.MaximumRetryCount = restartPolicy.MaxAttempt
+		if self.hostConfig.RestartPolicy.Name == container.RestartPolicyOnFailure {
+			self.hostConfig.RestartPolicy.MaximumRetryCount = restartPolicy.MaxAttempt
+		}
 		return nil
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"golang.org/x/exp/maps"
+	"os"
 )
 
 type DockerEnv struct {
@@ -46,6 +47,10 @@ func (self DockerEnv) GetEnvByName(name string) (*docker.Client, error) {
 func (self DockerEnv) GetDefaultEnv() (*docker.Client, error) {
 	dockerEnvList := make(map[string]*docker.Client)
 	Setting{}.GetByKey(SettingGroupSetting, SettingGroupSettingDocker, &dockerEnvList)
+	if v, ok := dockerEnvList[os.Getenv("DP_DEFAULT_DOCKER_ENV")]; ok {
+		return v, nil
+	}
+
 	if v := function.PluckMapWalkArray(dockerEnvList, func(k string, v *docker.Client) (*docker.Client, bool) {
 		if v.Default {
 			return v, true
@@ -54,6 +59,7 @@ func (self DockerEnv) GetDefaultEnv() (*docker.Client, error) {
 	}); !function.IsEmptyArray(v) {
 		return v[0], nil
 	}
+
 	if v := function.PluckMapWalkArray(dockerEnvList, func(k string, v *docker.Client) (*docker.Client, bool) {
 		if v.Name == docker.DefaultClientName {
 			return v, true
@@ -62,5 +68,6 @@ func (self DockerEnv) GetDefaultEnv() (*docker.Client, error) {
 	}); !function.IsEmptyArray(v) {
 		return v[0], nil
 	}
+
 	return nil, errors.New("default docker env does not exist")
 }
