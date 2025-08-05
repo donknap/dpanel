@@ -114,14 +114,11 @@ func WithImportPath(rootPath string) ImportFileOption {
 	}
 }
 
-func WithImportZip(reader *zip.ReadCloser) ImportFileOption {
+func WithImportZip(reader *zip.Reader) ImportFileOption {
 	return func(self *ImportFile) (err error) {
 		if reader == nil {
 			return errors.New("zip reader is nil")
 		}
-		defer func() {
-			_ = reader.Close()
-		}()
 		for _, file := range reader.File {
 			if file.FileInfo().IsDir() {
 				err = self.tarWrite.WriteHeader(&tar.Header{
@@ -165,7 +162,8 @@ func WithImportZipFile(zipPath string) ImportFileOption {
 		defer func() {
 			_ = reader.Close()
 		}()
-		return WithImportZip(reader)(self)
+
+		return WithImportZip(&reader.Reader)(self)
 	}
 }
 

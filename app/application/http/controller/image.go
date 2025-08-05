@@ -263,7 +263,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	}
 	_ = dao.Image.Save(imageNew)
 
-	params.MessageId = fmt.Sprintf(ws.MessageTypeImageBuild, imageNew.ID)
+	params.MessageId = fmt.Sprintf(ws.MessageTypeImageBuild, params.Id)
 	log, err := logic.DockerTask{}.ImageBuild(&params)
 	if err != nil {
 		imageNew.Status = docker.ImageBuildStatusError

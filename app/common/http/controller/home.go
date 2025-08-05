@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/api"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -322,8 +323,9 @@ func (self Home) Info(http *gin.Context) {
 	slog.Debug("docker info time", "use", time.Now().Sub(startTime).String())
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"info":       info,
-		"sdkVersion": docker.Sdk.Client.ClientVersion(),
+		"info":          info,
+		"clientVersion": docker.Sdk.Client.ClientVersion(),
+		"sdkVersion":    api.DefaultVersion,
 		"dpanel": map[string]interface{}{
 			"version":       facade.GetConfig().GetString("app.version"),
 			"family":        facade.GetConfig().GetString("app.family"),

@@ -221,7 +221,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		fileType, _ := filetype.MatchFile(targetFile.Name())
+		fileType, err := filetype.MatchFile(targetFile.Name())
 		switch fileType {
 		case matchers.TypeZip:
 			options = append(options, docker.WithImportZipFile(targetFile.Name()))
@@ -233,6 +233,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			options = append(options, docker.WithImportTarGzFile(targetFile.Name()))
 			break
 		default:
+			slog.Debug("explorer unzip ", "filetype", fileType, "err", err)
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerUnzipTargetUnsupportedType), 500)
 			return
 		}

@@ -3,7 +3,7 @@ services:
     image: dpanel/explorer
     container_name: dpanel-plugin-explorer
     restart: always
-    privileged: false
+    privileged: true
     pid: host
     labels:
       - "com.dpanel.container.title=dpanel 文件管理助手"

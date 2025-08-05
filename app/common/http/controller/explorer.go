@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"archive/tar"
 	"archive/zip"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
@@ -13,7 +15,6 @@ import (
 	fsType "github.com/donknap/dpanel/common/types/fs"
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
-	"github.com/h2non/filetype/matchers"
 	"github.com/pkg/sftp"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"io"
@@ -226,24 +227,43 @@ func (self Explorer) Unzip(http *gin.Context) {
 	}()
 	options := make([]docker.ImportFileOption, 0)
 	for _, path := range params.File {
-		file, err := afs.OpenFile(path, os.O_RDONLY, 0o644)
+		err = func() error {
+			file, err := afs.OpenFile(path, os.O_RDONLY, 0o644)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = file.Close()
+			}()
+			switch filepath.Ext(file.Name()) {
+			case ".zip":
+				fileInfo, _ := file.Stat()
+				zipReader, err := zip.NewReader(file, fileInfo.Size())
+				if err != nil {
+					return err
+				}
+				options = append(options, docker.WithImportZip(zipReader))
+				break
+			case ".tar":
+				tarReader := tar.NewReader(file)
+				options = append(options, docker.WithImportTar(tarReader))
+				break
+			case ".gz":
+				gzReader, err := gzip.NewReader(file)
+				if err != nil {
+					return err
+				}
+				tarReader := tar.NewReader(gzReader)
+				options = append(options, docker.WithImportTar(tarReader))
+				break
+			default:
+				slog.Debug("explorer unzip ", "filetype", filepath.Ext(file.Name()))
+				return function.ErrorMessage(define.ErrorMessageContainerExplorerUnzipTargetUnsupportedType)
+			}
+			return nil
+		}()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		fileType, _ := filetype.MatchFile(file.Name())
-		switch fileType {
-		case matchers.TypeZip:
-			options = append(options, docker.WithImportZipFile(file.Name()))
-			break
-		case matchers.TypeTar:
-			options = append(options, docker.WithImportTarFile(file.Name()))
-			break
-		case matchers.TypeGz:
-			options = append(options, docker.WithImportTarGzFile(file.Name()))
-			break
-		default:
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerUnzipTargetUnsupportedType), 500)
 			return
 		}
 	}
@@ -257,6 +277,14 @@ func (self Explorer) Unzip(http *gin.Context) {
 		header, err := tarReader.Next()
 		if err != nil {
 			break
+		}
+		if header.FileInfo().IsDir() {
+			err = afs.MkdirAll(header.Name, os.ModePerm)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			continue
 		}
 		err = afs.WriteReader(header.Name, tarReader)
 		if err != nil {
