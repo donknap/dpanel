@@ -60,6 +60,8 @@ github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S
 github.com/fsnotify/fsnotify v1.9.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 github.com/gabriel-vasile/mimetype v1.4.9 h1:5k+WDwEsD9eTLL8Tz3L0VnmVh9QxGjRmjBvAG7U/oYY=
 github.com/gabriel-vasile/mimetype v1.4.9/go.mod h1:WnSQhFKJuBlRyLiKohA/2DtIlPFAbguNaG7QCHcyGok=
+github.com/gin-contrib/gzip v1.2.3 h1:dAhT722RuEG330ce2agAs75z7yB+NKvX/ZM1r8w0u2U=
+github.com/gin-contrib/gzip v1.2.3/go.mod h1:ad72i4Bzmaypk8M762gNXa2wkxxjbz0icRNnuLJ9a/c=
 github.com/gin-contrib/sessions v1.0.3 h1:AZ4j0AalLsGqdrKNbbrKcXx9OJZqViirvNGsJTxcQps=
 github.com/gin-contrib/sessions v1.0.3/go.mod h1:5i4XMx4KPtQihnzxEqG9u1K446lO3G19jAi2GtbfsAI=
 github.com/gin-contrib/sse v1.1.0 h1:n0w2GMuUpWDVp7qSpvze6fAu9iRxJY4Hmj6AmBOU05w=

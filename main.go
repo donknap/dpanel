@@ -15,6 +15,7 @@ import (
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -95,7 +96,8 @@ func main() {
 		httpServer.RegisterRouters(
 			func(engine *gin.Engine) {
 				subFs, _ := fs.Sub(Asset, "asset/static")
-				engine.StaticFS("/dpanel/static/asset", http2.FS(subFs))
+				gzipMiddleware := engine.Use(gzip.Gzip(gzip.DefaultCompression))
+				gzipMiddleware.StaticFS("/dpanel/static/asset", http2.FS(subFs))
 				engine.StaticFileFS("/favicon.ico", "dpanel.ico", http2.FS(subFs))
 				engine.NoRoute(func(http *gin.Context) {
 					slog.Debug("http route not found", "uri", http.Request.URL.String())
