@@ -16,7 +16,6 @@ import (
 	"log/slog"
 	"os"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -92,14 +91,12 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 			exec.WithArgs("-c", script),
 			exec.WithEnv(globalEnv),
 		}
-
-		cmd, _ := exec.New(options...)
-
+		// 如果有超时间，则需要独立进程，超时后强制终止掉
 		if ctx != nil {
-			cmd.Cmd().SysProcAttr = &syscall.SysProcAttr{
-				Setpgid: true,
-				Pgid:    0,
-			}
+			options = append(options, exec.WithIndependentProcessGroup())
+		}
+		cmd, _ := exec.New(options...)
+		if ctx != nil {
 			go func() {
 				select {
 				case <-ctx.Done():
@@ -108,7 +105,6 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 				}
 			}()
 		}
-
 		response, err := cmd.Run()
 		if err != nil {
 			_ = dao.CronLog.Create(&entity.CronLog{
