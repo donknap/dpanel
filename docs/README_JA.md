@@ -21,7 +21,7 @@
 ----------------------------------
 
 [**ホーム**](https://dpanel.cc/) &nbsp; |
-&nbsp; [**デモ**](https://dpanel.park1991.com/) &nbsp; |
+&nbsp; [**デモ**](https://demo.dpanel.cc) &nbsp; |
 &nbsp; [**ドキュメント**](https://dpanel.cc/#/en-us/README) &nbsp; |
 &nbsp; [**Proエディション**](https://dpanel.cc/#/zh-cn/manual/pro) &nbsp; |
 &nbsp; [**スポンサー**](https://afdian.com/a/dpanel) &nbsp;

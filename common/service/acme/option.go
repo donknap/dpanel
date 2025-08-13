@@ -102,3 +102,10 @@ func WithDebug() Option {
 		return nil
 	}
 }
+
+func WithReloadCommand(file string) Option {
+	return func(self *Acme) error {
+		self.argv = append(self.argv, "--reloadcmd", file)
+		return nil
+	}
+}

@@ -49,7 +49,7 @@ clean:
 	docker buildx prune -a -f
 	docker stop buildx_buildkit_dpanel-builder0 && docker rm /buildx_buildkit_dpanel-builder0
 all: clean-source js amd64 arm64 armv7
-test: amd64 arm64 armv7
+test: amd64 arm64
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta \
 	--platform linux/amd64 \
@@ -60,7 +60,7 @@ test: amd64 arm64 armv7
 	. --push
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite \
-	--platform linux/amd64,linux/arm64,linux/arm/v7 \
+	--platform linux/amd64,linux/arm64 \
 	--build-arg APP_VERSION=${VERSION} \
 	--build-arg APP_FAMILY=ce \
 	-f ./docker/Dockerfile-lite \

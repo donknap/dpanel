@@ -502,7 +502,17 @@ func (self Home) Usage(http *gin.Context) {
 	}
 
 	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, network.ListOptions{})
-	containerTask, _ := dao.Site.Where(dao.Site.DeletedAt.IsNotNull()).Unscoped().Count()
+	recycleQuery := dao.Site.Where(dao.Site.DeletedAt.IsNotNull()).Unscoped()
+	if containerList != nil {
+		names := make([]string, 0)
+		for _, summary := range containerList {
+			for _, name := range summary.Names {
+				names = append(names, strings.TrimPrefix(name, "/"))
+			}
+		}
+		recycleQuery = recycleQuery.Where(dao.Site.SiteName.NotIn(names...))
+	}
+	containerTask, _ := recycleQuery.Count()
 	imageTask, _ := dao.Image.Count()
 	backupData, _ := dao.Backup.Count()
 
