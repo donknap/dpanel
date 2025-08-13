@@ -141,6 +141,7 @@ func (self SiteCert) Apply(http *gin.Context) {
 		acme.WithCertServer(params.CertServer),
 		//acme.WithCertRootPath(storage.Local{}.GetStorageCertPath()),
 		acme.WithAutoUpgrade(params.AutoUpgrade),
+		acme.WithReloadCommand("/docker/acme-reload.sh"),
 	}
 
 	if params.Renew {
