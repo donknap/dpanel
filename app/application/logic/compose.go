@@ -497,12 +497,29 @@ func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
 	return yaml
 }
 
-func (self Compose) FilterContainer(taskName string) []*compose.ContainerResult {
+func (self Compose) GetTaskContainer(taskName string) []*compose.ContainerResult {
 	result := make([]*compose.ContainerResult, 0)
-	if containerList, err := docker.Sdk.ContainerByField(docker.Sdk.Ctx, "label", fmt.Sprintf("%s=%s", define.ComposeLabelProject, taskName)); err == nil {
-		result = function.PluckMapWalkArray(containerList, func(key string, item *container.Summary) (*compose.ContainerResult, bool) {
+	if containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+		All: true,
+	}); err == nil {
+		result = function.PluckArrayWalk(containerList, func(item container.Summary) (*compose.ContainerResult, bool) {
+			if _, ok := item.Labels[define.ComposeLabelProject]; !ok {
+				return nil, false
+			}
+			if v, ok := item.Labels[define.ComposeLabelProject]; ok && taskName != "" && !strings.HasSuffix(v, taskName) {
+				return nil, false
+			}
+			containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID)
+			if err != nil {
+				return nil, false
+			}
+			health := ""
+			if containerInfo.State.Health != nil {
+				health = containerInfo.State.Health.Status
+			}
 			return &compose.ContainerResult{
-				Name:    item.Names[0],
+				Project: item.Labels[define.ComposeLabelProject],
+				Name:    containerInfo.Name,
 				Service: item.Labels[define.ComposeLabelService],
 				Publishers: function.PluckArrayWalk(item.Ports, func(i container.Port) (compose.ContainerPublishersResult, bool) {
 					return compose.ContainerPublishersResult{
@@ -514,8 +531,13 @@ func (self Compose) FilterContainer(taskName string) []*compose.ContainerResult 
 				}),
 				State:  item.State,
 				Status: item.Status,
+				Health: health,
 			}, true
 		})
 	}
 	return result
+}
+
+func (self Compose) GetDPanelProjectName(name string) string {
+	return fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(name, "@", "-"))
 }

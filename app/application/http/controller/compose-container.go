@@ -132,7 +132,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
-	taskContainerList := tasker.Ps()
+	taskContainerList := logic.Compose{}.GetTaskContainer(composeRow.Name)
 	if function.IsEmptyArray(taskContainerList) {
 		self.JsonResponseWithError(http, errors.New(lastMessage), 500)
 		return

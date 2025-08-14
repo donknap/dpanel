@@ -115,6 +115,7 @@ func (self Task) Project() *types.Project {
 
 type ContainerResult struct {
 	Name       string                      `json:"name"`
+	Project    string                      `json:"project"`
 	Service    string                      `json:"service"`
 	Publishers []ContainerPublishersResult `json:"publishers"`
 	State      string                      `json:"state"`
@@ -129,6 +130,7 @@ type ContainerPublishersResult struct {
 	Protocol      string `json:"protocol"`
 }
 
+// Ps Deprecated /**
 func (self Task) Ps() []*ContainerResult {
 	result := make([]*ContainerResult, 0)
 	if self.Name == "" {

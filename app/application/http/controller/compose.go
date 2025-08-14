@@ -270,7 +270,8 @@ func (self Compose) GetList(http *gin.Context) {
 	})
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": composeList,
+		"list":          composeList,
+		"containerList": logic.Compose{}.GetTaskContainer(""),
 	})
 	return
 }
@@ -316,7 +317,7 @@ func (self Compose) GetTask(http *gin.Context) {
 		data := gin.H{
 			"detail":        yamlRow,
 			"yaml":          yaml,
-			"containerList": logic.Compose{}.FilterContainer(yamlRow.Name),
+			"containerList": logic.Compose{}.GetTaskContainer(yamlRow.Name),
 			"task":          subTask,
 		}
 		self.JsonResponseWithoutError(http, data)
@@ -339,9 +340,7 @@ func (self Compose) GetTask(http *gin.Context) {
 	}
 
 	if yamlRow.Setting.Status != accessor.ComposeStatusWaiting {
-		if list := tasker.Ps(); list != nil {
-			data["containerList"] = list
-		}
+		data["containerList"] = logic.Compose{}.GetTaskContainer(yamlRow.Name)
 	}
 
 	self.JsonResponseWithoutError(http, data)
