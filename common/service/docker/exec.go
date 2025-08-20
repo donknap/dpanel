@@ -1,44 +1,45 @@
 package docker
 
 import (
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	exec2 "os/exec"
 )
 
-func (self Builder) GetRunCmd(command ...string) []exec.Option {
-	return []exec.Option{
-		exec.WithCommandName("docker"),
-		exec.WithArgs(append(
-			self.runParams,
-			command...,
-		)...),
+func (self Builder) Run(command ...string) (exec.Executor, error) {
+	var cmd exec.Executor
+	var err error
+	options := make([]local.Option, 0)
+	options = append(options, local.WithCommandName("docker"), local.WithArgs(append(
+		self.DockerEnv.CommandParams(),
+		command...,
+	)...))
+	cmd, err = local.New(options...)
+	if err != nil {
+		return nil, err
 	}
+	return cmd, nil
 }
 
-func (self Builder) GetRunParams() []string {
-	return self.runParams
-}
-
-func (self Builder) GetComposeCmd(command ...string) []exec.Option {
+func (self Builder) Compose(command ...string) (exec.Executor, error) {
+	var cmd exec.Executor
+	var err error
+	options := make([]local.Option, 0)
 	if _, err := exec2.LookPath("docker-compose"); err == nil {
-		return []exec.Option{
-			exec.WithCommandName("docker-compose"),
-			exec.WithArgs(command...),
-			exec.WithEnv(self.runEnv),
-		}
+		options = append(options,
+			local.WithCommandName("docker-compose"),
+			local.WithArgs(command...),
+			local.WithEnv(self.DockerEnv.CommandEnv()),
+		)
 	} else {
-		return []exec.Option{
-			exec.WithCommandName("docker"),
-			exec.WithArgs(append(append(self.runParams, "compose"), command...)...),
-		}
+		options = append(options,
+			local.WithCommandName("docker"),
+			local.WithArgs(append(append(self.DockerEnv.CommandParams(), "compose"), command...)...),
+		)
 	}
-}
-
-func (self Builder) ExecCleanResult(str []byte) string {
-	// 执行命令时返回的结果应该以 utf8 字符返回，并过滤掉不可见字符
-	out := function.BytesCleanFunc(str, func(b byte) bool {
-		return b < 32 && b != '\n' && b != '\r' && b != '\t'
-	})
-	return string(out)
+	cmd, err = local.New(options...)
+	if err != nil {
+		return nil, err
+	}
+	return cmd, nil
 }

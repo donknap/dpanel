@@ -7,9 +7,8 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
-	"io"
-	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,6 +24,11 @@ var (
 	DefaultClientName          = "local"
 	ConnectDockerServerTimeout = time.Second * 20
 )
+
+type ClientDockerInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
 
 type Client struct {
 	Name              string            `json:"name,omitempty" binding:"required"`
@@ -44,31 +48,50 @@ type Client struct {
 	RemoteType        string            `json:"remoteType"` // 远程客户端类型，支持 docker ssh
 }
 
-type ClientDockerInfo struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-func (self Client) GetDockerEnv() []string {
-	runEnv := make([]string, 0)
+func (self Client) CommandEnv() []string {
+	result := make([]string, 0)
+	if self.RemoteType == RemoteTypeSSH {
+		result = append(result, fmt.Sprintf("DOCKER_HOST=ssh://%s@%s", self.SshServerInfo.Username, self.SshServerInfo.Address))
+		return result
+	}
+	result = append(result, fmt.Sprintf("DOCKER_HOST=%s", self.Address))
 	if self.EnableTLS {
-		runEnv = append(runEnv,
+		result = append(result,
 			"DOCKER_TLS_VERIFY=1",
 			"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetStorageCertPath(), self.TlsCa)),
 		)
 	}
-	runEnv = append(runEnv, fmt.Sprintf("DOCKER_HOST=%s", self.Address))
-	return runEnv
+	return result
+}
+
+func (self Client) CommandParams() []string {
+	result := make([]string, 0)
+	if self.RemoteType == RemoteTypeSSH {
+		result = append(result, "-H", fmt.Sprintf("ssh://%s@%s", self.SshServerInfo.Username, self.SshServerInfo.Address))
+		return result
+	}
+	result = append(result, "-H", self.Address)
+	if self.EnableTLS {
+		result = append(result, "--tlsverify",
+			"--tlscacert", self.TlsCa,
+			"--tlscert", self.TlsCert,
+			"--tlskey", self.TlsKey,
+		)
+	}
+	return result
+}
+
+func (self Client) CertRoot() string {
+	return filepath.Join("docker", self.Name)
 }
 
 type Builder struct {
 	Name          string
 	Client        *client.Client
+	clientOption  []client.Opt
 	Ctx           context.Context
 	CtxCancelFunc context.CancelFunc
-	runParams     []string
-	runEnv        []string
-	clientOption  []client.Opt
+	DockerEnv     *Client
 }
 
 func (self Builder) Close() {
@@ -82,13 +105,15 @@ func (self Builder) Close() {
 
 func NewBuilderWithDockerEnv(dockerEnv *Client) (*Builder, error) {
 	options := make([]Option, 0)
-	options = append(options, WithAddress(dockerEnv.Address))
+	options = append(options, WithDockerEnv(dockerEnv))
 	options = append(options, WithName(dockerEnv.Name))
 	if dockerEnv.EnableTLS {
 		options = append(options, WithTLS(dockerEnv.TlsCa, dockerEnv.TlsCert, dockerEnv.TlsKey))
 	}
 	if dockerEnv.RemoteType == RemoteTypeSSH {
 		options = append(options, WithSSH(dockerEnv.SshServerInfo))
+	} else {
+		options = append(options, WithAddress(dockerEnv.Address))
 	}
 	return NewBuilder(options...)
 }
@@ -97,9 +122,7 @@ type Option func(builder *Builder) error
 
 func NewBuilder(opts ...Option) (*Builder, error) {
 	c := &Builder{
-		Name:      "local",
-		runParams: make([]string, 0),
-		runEnv:    make([]string, 0),
+		Name: "local",
 		clientOption: []client.Opt{
 			client.FromEnv,
 			client.WithAPIVersionNegotiation(),
@@ -134,9 +157,14 @@ func WithName(name string) Option {
 
 func WithAddress(host string) Option {
 	return func(self *Builder) error {
-		self.runParams = append(self.runParams, "-H", host)
-		self.runEnv = append(self.runEnv, fmt.Sprintf("DOCKER_HOST=%s", host))
 		self.clientOption = append(self.clientOption, client.WithHost(host))
+		return nil
+	}
+}
+
+func WithDockerEnv(info *Client) Option {
+	return func(self *Builder) error {
+		self.DockerEnv = info
 		return nil
 	}
 }
@@ -162,21 +190,65 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 			certRealPath["cert"],
 			certRealPath["key"],
 		))
-
-		self.runParams = append(self.runParams, "--tlsverify",
-			"--tlscacert", certRealPath["ca"],
-			"--tlscert", certRealPath["cert"],
-			"--tlskey", certRealPath["key"],
-		)
-		self.runEnv = append(self.runEnv,
-			"DOCKER_TLS_VERIFY=1",
-			"DOCKER_CERT_PATH="+filepath.Dir(certRealPath["ca"]),
-		)
-
-		slog.Debug("docker connect tls", "extra params", self.runParams, "env", self.runEnv)
 		return nil
 	}
 }
+
+//func WithSSH(serverInfo *ssh.ServerInfo) Option {
+//	return func(self *Builder) error {
+//		sshClient, err := ssh.NewClient(ssh.WithServerInfo(serverInfo)...)
+//		if err != nil {
+//			return err
+//		}
+//		remoteConn, err := sshClient.Conn.Dial("unix", "/var/run/docker.sock")
+//		if err != nil {
+//			sshClient.Close()
+//			return err
+//		}
+//		_ = remoteConn.Close()
+//
+//		localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
+//		_ = os.Remove(localProxySock)
+//		listener, _ := net.ListenUnix("unix", &net.UnixAddr{Name: localProxySock})
+//
+//		go func() {
+//			select {
+//			case <-self.Ctx.Done():
+//				_ = listener.Close()
+//				_ = remoteConn.Close()
+//				sshClient.Close()
+//			}
+//		}()
+//
+//		go func() {
+//			for {
+//				localConn, err := listener.Accept()
+//				if err != nil {
+//					slog.Warn("docker proxy sock local close", "err", err)
+//					return
+//				}
+//				remoteConn, err := sshClient.Conn.Dial("unix", "/var/run/docker.sock")
+//				if err != nil {
+//					slog.Warn("docker proxy sock create remote", "err", err)
+//					return
+//				}
+//				go func() {
+//					_, _ = io.Copy(remoteConn, localConn)
+//					_ = remoteConn.Close()
+//				}()
+//				go func() {
+//					_, _ = io.Copy(localConn, remoteConn)
+//					_ = localConn.Close()
+//				}()
+//			}
+//		}()
+//		// 清空掉之前的配置
+//		self.runParams = make([]string, 0)
+//		self.runEnv = make([]string, 0)
+//		self.clientOption = make([]client.Opt, 0)
+//		return WithAddress("unix://" + localProxySock)(self)
+//	}
+//}
 
 func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
@@ -184,52 +256,16 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 		if err != nil {
 			return err
 		}
-		remoteConn, err := sshClient.Conn.Dial("unix", "/var/run/docker.sock")
-		if err != nil {
+		go func() {
+			<-self.Ctx.Done()
 			sshClient.Close()
-			return err
+		}()
+		transport := &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return sshClient.Conn.Dial("unix", "/var/run/docker.sock")
+			},
 		}
-		_ = remoteConn.Close()
-
-		localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
-		_ = os.Remove(localProxySock)
-		listener, _ := net.ListenUnix("unix", &net.UnixAddr{Name: localProxySock})
-
-		go func() {
-			select {
-			case <-self.Ctx.Done():
-				_ = listener.Close()
-				_ = remoteConn.Close()
-				sshClient.Close()
-			}
-		}()
-
-		go func() {
-			for {
-				localConn, err := listener.Accept()
-				if err != nil {
-					slog.Warn("docker proxy sock local close", "err", err)
-					return
-				}
-				remoteConn, err := sshClient.Conn.Dial("unix", "/var/run/docker.sock")
-				if err != nil {
-					slog.Warn("docker proxy sock create remote", "err", err)
-					return
-				}
-				go func() {
-					_, _ = io.Copy(remoteConn, localConn)
-					_ = remoteConn.Close()
-				}()
-				go func() {
-					_, _ = io.Copy(localConn, remoteConn)
-					_ = localConn.Close()
-				}()
-			}
-		}()
-		// 清空掉之前的配置
-		self.runParams = make([]string, 0)
-		self.runEnv = make([]string, 0)
-		self.clientOption = make([]client.Opt, 0)
-		return WithAddress("unix://" + localProxySock)(self)
+		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))
+		return nil
 	}
 }

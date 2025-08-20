@@ -1,17 +1,12 @@
 package ssh
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"github.com/donknap/dpanel/common/service/storage"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
-	"io"
 	"net"
 	"os"
-	"strings"
-	"sync"
 )
 
 var keyErr *knownhosts.KeyError
@@ -87,28 +82,6 @@ func (self DefaultKnownHostsCallback) add(hostname string, remote net.Addr, key 
 	return err
 }
 
-func (self DefaultKnownHostsCallback) Delete(hostPattern string) error {
-	lock := sync.RWMutex{}
-	lock.Lock()
-	defer lock.Unlock()
-	file, err := os.Open(self.path)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-	content := make([][]byte, 0)
-	reader := bufio.NewReader(file)
-	for {
-		line, _, err := reader.ReadLine()
-		if err == io.EOF {
-			break
-		}
-		if strings.HasPrefix(string(line), hostPattern) {
-			continue
-		}
-		content = append(content, line)
-	}
-	return os.WriteFile(self.path, bytes.Join(content, []byte("\n")), 0600)
+func (self DefaultKnownHostsCallback) Delete() error {
+	return os.Remove(self.path)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec/remote"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -15,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"io"
 	"log/slog"
 	"net/url"
 	"os"
@@ -29,26 +31,42 @@ type Env struct {
 }
 
 func (self Env) GetList(http *gin.Context) {
-	result := make([]*docker.Client, 0)
-
-	setting, err := logic.Setting{}.GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDocker)
-	if err == nil {
-		for _, item := range setting.Value.Docker {
-			result = append(result, item)
-		}
+	type ParamsValidate struct {
+		EnableCertContent bool `json:"enableCertContent"`
 	}
-	currentName := "local"
-	for _, item := range result {
-		if item.Address == docker.Sdk.Client.DaemonHost() || strings.HasSuffix(docker.Sdk.Client.DaemonHost(), fmt.Sprintf("/sock/%s.sock", item.Name)) {
-			currentName = item.Name
-			break
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	result := make([]*docker.Client, 0)
+	if setting, err := (logic.Setting{}).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDocker); err == nil {
+		for _, item := range setting.Value.Docker {
+			if params.EnableCertContent && item.EnableTLS {
+				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetStorageCertPath(), item.TlsCa)); err == nil {
+					item.TlsCa = string(content)
+				} else {
+					item.TlsCa = ""
+				}
+				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetStorageCertPath(), item.TlsCert)); err == nil {
+					item.TlsCert = string(content)
+				} else {
+					item.TlsCert = ""
+				}
+				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetStorageCertPath(), item.TlsKey)); err == nil {
+					item.TlsKey = string(content)
+				} else {
+					item.TlsKey = ""
+				}
+			}
+			result = append(result, item)
 		}
 	}
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Name < result[j].Name
 	})
 	self.JsonResponseWithoutError(http, gin.H{
-		"currentName": currentName,
+		"currentName": docker.Sdk.Name,
 		"list":        result,
 	})
 	return
@@ -74,7 +92,7 @@ func (self Env) Create(http *gin.Context) {
 	if params.EnableSSH {
 		knownHostsCallback := ssh.NewDefaultKnownHostCallback()
 		if params.SshServerInfo != nil && params.SshServerInfo.Address != "" {
-			_ = knownHostsCallback.Delete(params.SshServerInfo.Address)
+			_ = knownHostsCallback.Delete()
 		}
 
 		sshClient, err := ssh.NewClient(ssh.WithServerInfo(params.SshServerInfo)...)
@@ -85,32 +103,60 @@ func (self Env) Create(http *gin.Context) {
 		defer func() {
 			sshClient.Close()
 		}()
-		result, _, err := sshClient.Run("pwd")
+		homeDir, err := remote.QuickRun(sshClient, "echo $HOME")
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		slog.Debug("docker env", "ssh home", result)
+		slog.Debug("docker env", "ssh home", string(homeDir))
+		if params.RemoteType == docker.RemoteTypeSSH {
+			idFile := make([]string, 0)
+			if v, ok := storage.Cache.Get(storage.CacheKeyIdFile); ok {
+				idFile = v.([]string)
+			}
+			sftp, err := sshClient.NewSftpSession()
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			defer func() {
+				_ = sftp.Close()
+			}()
+			file, err := sftp.OpenFile(fmt.Sprintf("%s/.ssh/authorized_keys", string(homeDir)), os.O_CREATE|os.O_RDWR)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			defer func() {
+				_ = file.Close()
+			}()
+			content, err := io.ReadAll(file)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			if !strings.Contains(string(content), idFile[0]) {
+				_, _ = file.Seek(0, io.SeekEnd)
+				_, err = file.Write(append([]byte("\n"), []byte(idFile[0])...))
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+			}
+		}
 	}
 
 	defaultEnv := false
 	if params.Name == "local" {
 		defaultEnv = true
 	}
-	options := []docker.Option{
-		docker.WithAddress(params.Address),
-		docker.WithName(params.Name),
-	}
+
 	if params.EnableComposePath {
 		if params.ComposePath == "" {
 			params.ComposePath = fmt.Sprintf("compose-%s", params.Name)
 		}
 	}
 	_ = os.MkdirAll(filepath.Join(storage.Local{}.GetStorageLocalPath(), params.ComposePath), 0755)
-
-	if params.RemoteType == "ssh" {
-		options = append(options, docker.WithSSH(params.SshServerInfo))
-	}
 
 	client := &docker.Client{
 		Name:              params.Name,
@@ -130,54 +176,46 @@ func (self Env) Create(http *gin.Context) {
 	}
 
 	if params.EnableTLS {
-		if strings.HasSuffix(params.TlsCa, ".pem") {
-			options = append(options, docker.WithTLS(params.TlsCa, params.TlsCert, params.TlsKey))
-		} else {
-			certList := []struct {
-				name    string
-				content string
-			}{
-				{
-					name:    "ca.pem",
-					content: params.TlsCa,
-				},
-				{
-					name:    "cert.pem",
-					content: params.TlsCert,
-				},
-				{
-					name:    "key.pem",
-					content: params.TlsKey,
-				},
-			}
-			certRootPath := filepath.Join("docker", params.Name)
-			for _, s := range certList {
-				path := filepath.Join(storage.Local{}.GetStorageCertPath(), certRootPath, s.name)
-				err := os.MkdirAll(filepath.Dir(path), os.ModePerm)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
-				}
-				err = os.WriteFile(path, []byte(s.content), 0o600)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
-				}
-			}
-			client.TlsCa = filepath.Join(certRootPath, "ca.pem")
-			client.TlsCert = filepath.Join(certRootPath, "cert.pem")
-			client.TlsKey = filepath.Join(certRootPath, "key.pem")
-
-			options = append(options,
-				docker.WithTLS(
-					client.TlsCa,
-					client.TlsCert,
-					client.TlsKey,
-				),
-			)
+		certList := []struct {
+			name    string
+			content string
+		}{
+			{
+				name:    "ca.pem",
+				content: params.TlsCa,
+			},
+			{
+				name:    "cert.pem",
+				content: params.TlsCert,
+			},
+			{
+				name:    "key.pem",
+				content: params.TlsKey,
+			},
 		}
+		certRootPath := client.CertRoot()
+		for _, s := range certList {
+			if s.content == "" {
+				continue
+			}
+			path := filepath.Join(storage.Local{}.GetStorageCertPath(), client.CertRoot(), s.name)
+			err := os.MkdirAll(filepath.Dir(path), os.ModePerm)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			err = os.WriteFile(path, []byte(s.content), 0o600)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
+		client.TlsCa = filepath.Join(certRootPath, "ca.pem")
+		client.TlsCert = filepath.Join(certRootPath, "cert.pem")
+		client.TlsKey = filepath.Join(certRootPath, "key.pem")
 	}
-	dockerClient, err := docker.NewBuilder(options...)
+
+	dockerClient, err := docker.NewBuilderWithDockerEnv(client)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -192,6 +230,7 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiFailed, "error", err.Error()), 500)
 		return
 	}
+
 	if defaultEnv {
 		// 获取面板信息
 		if info, err := dockerClient.Client.ContainerInspect(dockerClient.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
@@ -237,7 +276,7 @@ func (self Env) Switch(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	if docker.Sdk.Client.DaemonHost() == dockerEnv.Address {
+	if docker.Sdk.Name == dockerEnv.Name {
 		self.JsonSuccessResponse(http)
 		return
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	_ "embed"
+	"fmt"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
 	"github.com/donknap/dpanel/app/ctrl"
@@ -12,12 +13,15 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	common2 "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/migrate"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	app "github.com/we7coreteam/w7-rangine-go/v2/src"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http"
@@ -82,6 +86,10 @@ func main() {
 			panic(err)
 		}
 		err = initPath()
+		if err != nil {
+			panic(err)
+		}
+		err = initRSA()
 		if err != nil {
 			panic(err)
 		}
@@ -212,5 +220,62 @@ func initPath() error {
 			}
 		}
 	}
+	return nil
+}
+
+func initRSA() error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+
+	defaultSSHIdFiles := []string{
+		filepath.Join(homeDir, ".ssh", define.DefaultIdPubFile),
+		filepath.Join(homeDir, ".ssh", define.DefaultIdKeyFile),
+	}
+
+	defer func() {
+		result := make([]string, 0)
+		for _, file := range defaultSSHIdFiles {
+			if content, err := os.ReadFile(file); err == nil {
+				result = append(result, string(content))
+			}
+		}
+		_ = storage.Cache.Add(storage.CacheKeyIdFile, result, cache.DefaultExpiration)
+	}()
+
+	if function.FileExists(defaultSSHIdFiles...) {
+		return nil
+	}
+	_ = os.MkdirAll(filepath.Join(homeDir, ".ssh"), os.ModePerm)
+
+	// 如果已经存在证书，优先使用
+	if !function.FileExists(
+		filepath.Join(storage.Local{}.GetStorageCertPath(), ".ssh", define.DefaultIdPubFile),
+		filepath.Join(storage.Local{}.GetStorageCertPath(), ".ssh", define.DefaultIdKeyFile),
+	) {
+		_ = os.MkdirAll(filepath.Join(storage.Local{}.GetStorageCertPath(), ".ssh"), os.ModePerm)
+		_, err = local.QuickRun(fmt.Sprintf(`ssh-keygen -t ed25519 -f %s/.ssh/id_ed25519 -N "" -C "dpanel@dpanel.cc"`, storage.Local{}.GetStorageCertPath()))
+		if err != nil {
+			return err
+		}
+	}
+	// 无论如何删除文件，保证成功复制
+	for _, file := range defaultSSHIdFiles {
+		_ = os.RemoveAll(file)
+	}
+
+	err = os.CopyFS(filepath.Join(homeDir, ".ssh"), os.DirFS(filepath.Join(storage.Local{}.GetStorageCertPath(), ".ssh")))
+	if err != nil {
+		return err
+	}
+
+	for _, file := range defaultSSHIdFiles {
+		_ = os.Chmod(file, 0600)
+	}
+
 	return nil
 }
