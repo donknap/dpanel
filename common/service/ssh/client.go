@@ -1,14 +1,12 @@
 package ssh
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"io"
-	"strings"
+	"log/slog"
 	"time"
 )
 
@@ -18,7 +16,6 @@ func NewClient(opt ...Option) (*Client, error) {
 			Timeout: time.Second * 5,
 		},
 	}
-	c.ctx, c.ctxCancel = context.WithCancel(context.Background())
 	var err error
 	knownHostsCallback := DefaultKnownHostsCallback{
 		path: storage.Local{}.GetSshKnownHostsPath(),
@@ -31,6 +28,11 @@ func NewClient(opt ...Option) (*Client, error) {
 			return nil, err
 		}
 	}
+
+	if c.ctx == nil {
+		c.ctx, c.ctxCancel = context.WithCancel(context.Background())
+	}
+
 	c.Conn, err = ssh.Dial(c.protocol, c.address, c.sshClientConfig)
 	if err != nil {
 		return nil, err
@@ -44,41 +46,24 @@ func NewClient(opt ...Option) (*Client, error) {
 		}
 	}
 
-	return c, nil
-}
-
-func (self *Client) RunContext(ctx context.Context, name string, args ...string) (string, string, error) {
-	session, err := self.Conn.NewSession()
-	if err != nil {
-		return "", "", err
-	}
-	sessionCtx, sessionCtxCancel := context.WithCancel(ctx)
-	defer func() {
-		sessionCtxCancel()
-	}()
-	errBuffer := new(bytes.Buffer)
-	session.Stderr = errBuffer
-
-	cmd := fmt.Sprintf("%s %s", name, strings.Join(args, " "))
-	out, err := session.Output(cmd)
-	if err != nil {
-		return "", "", err
-	}
 	go func() {
-		select {
-		case <-sessionCtx.Done():
-			if session != nil {
-				_ = session.Close()
-				_ = session.Signal(ssh.SIGINT)
+		<-c.ctx.Done()
+		slog.Debug("ssh client close start")
+		if c.Conn != nil {
+			err = c.Conn.Close()
+			if err != nil {
+				slog.Debug("ssh client close", "err", err)
+			}
+		}
+		if c.SftpConn != nil {
+			err = c.SftpConn.Close()
+			if err != nil {
+				slog.Debug("ssh sftp close", "err", err)
 			}
 		}
 	}()
 
-	return strings.TrimSuffix(string(out), "\n"), errBuffer.String(), nil
-}
-
-func (self *Client) Run(name string, args ...string) (string, string, error) {
-	return self.RunContext(context.Background(), name, args...)
+	return c, nil
 }
 
 func (self *Client) NewSession() (*ssh.Session, error) {
@@ -142,8 +127,9 @@ func (self *Client) NewSftpSession() (*sftp.Client, error) {
 }
 
 func (self *Client) Close() {
-	if self.Conn != nil {
-		_ = self.Conn.Close()
-	}
 	self.ctxCancel()
+}
+
+func (self *Client) Ctx() context.Context {
+	return self.ctx
 }

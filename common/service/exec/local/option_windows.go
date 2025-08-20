@@ -1,9 +1,9 @@
 //go:build windows
 
-package exec
+package local
 
 func WithIndependentProcessGroup() Option {
-	return func(self *Command) error {
+	return func(self *Local) error {
 		// windows 不支持
 		return nil
 	}
