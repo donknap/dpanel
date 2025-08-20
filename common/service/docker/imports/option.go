@@ -1,36 +1,16 @@
-package docker
+package imports
 
 import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
 	"errors"
-	"github.com/donknap/dpanel/common/service/storage"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 )
-
-func NewFileImport(targetRootPath string, opts ...ImportFileOption) (*ImportFile, error) {
-	var err error
-	o := &ImportFile{
-		targetRootPath: targetRootPath,
-	}
-	o.reader, err = storage.Local{}.CreateTempFile("")
-	if err != nil {
-		return nil, err
-	}
-	o.tarWrite = tar.NewWriter(o.reader)
-	for _, opt := range opts {
-		err := opt(o)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return o, nil
-}
 
 func WithImportFilePath(sourcePath string, fileName string) ImportFileOption {
 	return func(self *ImportFile) (err error) {

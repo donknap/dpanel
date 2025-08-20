@@ -1,9 +1,6 @@
 package docker
 
 import (
-	"archive/tar"
-	"io"
-	"os"
 	"strings"
 )
 
@@ -175,30 +172,6 @@ type ImagePlatform struct {
 	Type string `json:"type"`
 	Arch string `json:"arch"`
 }
-
-type ImportFile struct {
-	targetRootPath string
-	tarWrite       *tar.Writer
-	reader         *os.File
-	io.Closer
-}
-
-func (self ImportFile) Reader() io.Reader {
-	_, _ = self.reader.Seek(0, io.SeekStart)
-	return self.reader
-}
-
-func (self ImportFile) TarReader() *tar.Reader {
-	_, _ = self.reader.Seek(0, io.SeekStart)
-	return tar.NewReader(self.reader)
-}
-
-func (self ImportFile) Close() {
-	_ = self.reader.Close()
-	_ = os.Remove(self.reader.Name())
-}
-
-type ImportFileOption func(self *ImportFile) (err error)
 
 type FileItemResult struct {
 	ShowName string `json:"showName"` // 展示名称，包含名称 + link 名称
