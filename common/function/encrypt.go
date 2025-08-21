@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rsa"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"golang.org/x/crypto/ssh"
 )
 
 const CommonKey = "DPanelCommonAseKey20231208"
@@ -92,4 +95,15 @@ func URIEncodeComponent(s string, excluded ...[]byte) string {
 	}
 	b.WriteString(s[written:])
 	return b.String()
+}
+
+func ParseRsaPrivateKey(data []byte) (*rsa.PrivateKey, error) {
+	privateKey, err := ssh.ParseRawPrivateKey(data)
+	if err != nil {
+		return nil, err
+	}
+	if v, ok := privateKey.(*rsa.PrivateKey); ok {
+		return v, nil
+	}
+	return nil, errors.New("invalid rsa key content")
 }

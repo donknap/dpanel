@@ -6,11 +6,12 @@ import (
 )
 
 var (
-	CacheKeyImageRemoteList  = "image:remoteTag:%s"
-	CacheKeyExplorerUsername = "explorer:%s:uid:%d"
-	CacheKeyCommonUserInfo   = "user:%d"
-	CacheKeyXkStorageInfo    = "xk:storageInfo"
-	CacheKeyLoginFailed      = "login:failed:%s"
+	CacheKeyImageRemoteList     = "image:remoteTag:%s"
+	CacheKeyExplorerUsername    = "explorer:%s:uid:%d"
+	CacheKeyCommonUserInfo      = "user:%d"
+	CacheKeyCommonUserJwtIssuer = "user:jwtIssuer"
+	CacheKeyXkStorageInfo       = "xk:storageInfo"
+	CacheKeyLoginFailed         = "login:failed:%s"
 )
 
 var (

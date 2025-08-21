@@ -54,10 +54,17 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 	}
 
 	myUserInfo := logic.UserInfo{}
-	jwtSecret := logic.User{}.GetJwtSecret()
 	token, err := jwt.ParseWithClaims(authCode[1], &myUserInfo, func(t *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
-	}, jwt.WithValidMethods([]string{"HS256"}))
+		_, private, err := storage.GetCertRsaContent()
+		if err != nil {
+			return nil, err
+		}
+		privateKey, err := function.ParseRsaPrivateKey(private)
+		if err != nil {
+			return nil, err
+		}
+		return &privateKey.PublicKey, nil
+	}, jwt.WithValidMethods([]string{"RS512"}))
 	if err != nil {
 		slog.Debug("auth middleware", "url", currentUrlPath, "code", authCode)
 		self.JsonResponseWithError(http, ErrLogin, 401)
@@ -65,20 +72,23 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		return
 	}
 	if token.Valid {
-		if myUserInfo.AutoLogin {
-			if _, err := new(logic.Setting).GetValueById(myUserInfo.UserId); err == nil {
-				myUserInfo.Fd = http.GetHeader("AuthorizationFd")
-				http.Set("userInfo", myUserInfo)
-				http.Next()
-				return
-			}
-		} else {
-			if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyCommonUserInfo, myUserInfo.UserId)); ok {
-				if _, ok := v.(logic.UserInfo); ok {
+		issuer, _ := token.Claims.GetIssuer()
+		if v, ok := storage.Cache.Get(storage.CacheKeyCommonUserJwtIssuer); ok && issuer == v {
+			if myUserInfo.AutoLogin {
+				if _, err := new(logic.Setting).GetValueById(myUserInfo.UserId); err == nil {
 					myUserInfo.Fd = http.GetHeader("AuthorizationFd")
 					http.Set("userInfo", myUserInfo)
 					http.Next()
 					return
+				}
+			} else {
+				if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyCommonUserInfo, myUserInfo.UserId)); ok {
+					if _, ok := v.(logic.UserInfo); ok {
+						myUserInfo.Fd = http.GetHeader("AuthorizationFd")
+						http.Set("userInfo", myUserInfo)
+						http.Next()
+						return
+					}
 				}
 			}
 		}

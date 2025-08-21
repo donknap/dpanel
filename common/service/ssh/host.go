@@ -2,7 +2,8 @@ package ssh
 
 import (
 	"errors"
-	"github.com/donknap/dpanel/common/service/storage"
+	"fmt"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 	"net"
@@ -13,7 +14,7 @@ var keyErr *knownhosts.KeyError
 
 func NewDefaultKnownHostCallback() *DefaultKnownHostsCallback {
 	return &DefaultKnownHostsCallback{
-		path: storage.Local{}.GetSshKnownHostsPath(),
+		path: os.ExpandEnv("$HOME/.ssh/known_hosts"),
 	}
 }
 
@@ -82,6 +83,13 @@ func (self DefaultKnownHostsCallback) add(hostname string, remote net.Addr, key 
 	return err
 }
 
-func (self DefaultKnownHostsCallback) Delete() error {
-	return os.Remove(self.path)
+func (self DefaultKnownHostsCallback) Delete(address string, port int) error {
+	host := ""
+	if port == 22 {
+		host = address
+	} else {
+		host = fmt.Sprintf("[%s]:%d", address, port)
+	}
+	_, err := local.QuickRun(fmt.Sprintf(`ssh-keygen -R "%s"`, host))
+	return err
 }

@@ -43,17 +43,17 @@ func (self Env) GetList(http *gin.Context) {
 	if setting, err := (logic.Setting{}).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDocker); err == nil {
 		for _, item := range setting.Value.Docker {
 			if params.EnableCertContent && item.EnableTLS {
-				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetStorageCertPath(), item.TlsCa)); err == nil {
+				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetCertPath(), item.TlsCa)); err == nil {
 					item.TlsCa = string(content)
 				} else {
 					item.TlsCa = ""
 				}
-				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetStorageCertPath(), item.TlsCert)); err == nil {
+				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetCertPath(), item.TlsCert)); err == nil {
 					item.TlsCert = string(content)
 				} else {
 					item.TlsCert = ""
 				}
-				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetStorageCertPath(), item.TlsKey)); err == nil {
+				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetCertPath(), item.TlsKey)); err == nil {
 					item.TlsKey = string(content)
 				} else {
 					item.TlsKey = ""
@@ -92,9 +92,8 @@ func (self Env) Create(http *gin.Context) {
 	if params.EnableSSH {
 		knownHostsCallback := ssh.NewDefaultKnownHostCallback()
 		if params.SshServerInfo != nil && params.SshServerInfo.Address != "" {
-			_ = knownHostsCallback.Delete()
+			_ = knownHostsCallback.Delete(params.SshServerInfo.Address, params.SshServerInfo.Port)
 		}
-
 		sshClient, err := ssh.NewClient(ssh.WithServerInfo(params.SshServerInfo)...)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -109,10 +108,12 @@ func (self Env) Create(http *gin.Context) {
 			return
 		}
 		slog.Debug("docker env", "ssh home", string(homeDir))
+
 		if params.RemoteType == docker.RemoteTypeSSH {
-			idFile := make([]string, 0)
-			if v, ok := storage.Cache.Get(storage.CacheKeyIdFile); ok {
-				idFile = v.([]string)
+			publicKey, _, err := storage.GetCertRsaContent()
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
 			}
 			sftp, err := sshClient.NewSftpSession()
 			if err != nil {
@@ -122,7 +123,7 @@ func (self Env) Create(http *gin.Context) {
 			defer func() {
 				_ = sftp.Close()
 			}()
-			file, err := sftp.OpenFile(fmt.Sprintf("%s/.ssh/authorized_keys", string(homeDir)), os.O_CREATE|os.O_RDWR)
+			file, err := sftp.OpenFile(fmt.Sprintf("%s/.ssh/authorized_keys", string(homeDir)), os.O_CREATE|os.O_RDWR|os.O_APPEND)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
@@ -135,9 +136,8 @@ func (self Env) Create(http *gin.Context) {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-			if !strings.Contains(string(content), idFile[0]) {
-				_, _ = file.Seek(0, io.SeekEnd)
-				_, err = file.Write(append([]byte("\n"), []byte(idFile[0])...))
+			if !strings.Contains(string(content), string(publicKey)) {
+				_, err = file.Write(publicKey)
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return
@@ -193,12 +193,11 @@ func (self Env) Create(http *gin.Context) {
 				content: params.TlsKey,
 			},
 		}
-		certRootPath := client.CertRoot()
 		for _, s := range certList {
 			if s.content == "" {
 				continue
 			}
-			path := filepath.Join(storage.Local{}.GetStorageCertPath(), client.CertRoot(), s.name)
+			path := filepath.Join(client.CertRoot(), s.name)
 			err := os.MkdirAll(filepath.Dir(path), os.ModePerm)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
@@ -210,9 +209,9 @@ func (self Env) Create(http *gin.Context) {
 				return
 			}
 		}
-		client.TlsCa = filepath.Join(certRootPath, "ca.pem")
-		client.TlsCert = filepath.Join(certRootPath, "cert.pem")
-		client.TlsKey = filepath.Join(certRootPath, "key.pem")
+		client.TlsCa = filepath.Join(client.CertRoot(), "ca.pem")
+		client.TlsCert = filepath.Join(client.CertRoot(), "cert.pem")
+		client.TlsKey = filepath.Join(client.CertRoot(), "key.pem")
 	}
 
 	dockerClient, err := docker.NewBuilderWithDockerEnv(client)

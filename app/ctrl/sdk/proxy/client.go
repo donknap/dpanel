@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/app/ctrl/sdk/types"
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"io"
@@ -93,8 +95,15 @@ func (self *Client) token() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	jwtSecret := logic.User{}.GetJwtSecret()
-	jwtClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, logic.UserInfo{
+	_, privateKeyContent, err := storage.GetCertRsaContent()
+	if err != nil {
+		return "", err
+	}
+	privateKey, err := function.ParseRsaPrivateKey(privateKeyContent)
+	if err != nil {
+		return "", err
+	}
+	jwtClaims := jwt.NewWithClaims(jwt.SigningMethodRS512, logic.UserInfo{
 		UserId:       currentUser.ID,
 		Username:     currentUser.Value.Username,
 		RoleIdentity: currentUser.Name,
@@ -103,5 +112,5 @@ func (self *Client) token() (string, error) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(self.tokenExpire)),
 		},
 	})
-	return jwtClaims.SignedString(jwtSecret)
+	return jwtClaims.SignedString(privateKey)
 }

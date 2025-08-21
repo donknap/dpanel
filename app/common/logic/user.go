@@ -7,7 +7,6 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/golang-jwt/jwt/v5"
@@ -39,10 +38,6 @@ type UserInfo struct {
 }
 
 type User struct {
-}
-
-func (self User) GetJwtSecret() []byte {
-	return []byte(docker.BuilderAuthor + facade.GetConfig().GetString("app.name") + facade.GetConfig().GetString("jwt.secret"))
 }
 
 func (self User) GetBuiltInPublicUsername() string {
@@ -107,9 +102,19 @@ func (self User) GetUserOauthToken(user *entity.Setting, autoLogin bool) (string
 		},
 		AutoLogin: autoLogin,
 	}
-	jwtSecret := self.GetJwtSecret()
-	jwtClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, userInfo)
+	if v, ok := storage.Cache.Get(storage.CacheKeyCommonUserJwtIssuer); ok {
+		userInfo.RegisteredClaims.Issuer = v.(string)
+	}
+	_, privateKeyContent, err := storage.GetCertRsaContent()
+	if err != nil {
+		return "", err
+	}
+	privateKey, err := function.ParseRsaPrivateKey(privateKeyContent)
+	if err != nil {
+		return "", err
+	}
+	jwtClaims := jwt.NewWithClaims(jwt.SigningMethodRS512, userInfo)
 	// 登录成功后在缓存中写入用户数据，用于后端主动退出用户时使用
 	storage.Cache.Set(fmt.Sprintf(storage.CacheKeyCommonUserInfo, userInfo.UserId), userInfo, cache.DefaultExpiration)
-	return jwtClaims.SignedString(jwtSecret)
+	return jwtClaims.SignedString(privateKey)
 }

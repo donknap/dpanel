@@ -2,7 +2,6 @@ package ssh
 
 import (
 	"context"
-	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"io"
@@ -17,9 +16,7 @@ func NewClient(opt ...Option) (*Client, error) {
 		},
 	}
 	var err error
-	knownHostsCallback := DefaultKnownHostsCallback{
-		path: storage.Local{}.GetSshKnownHostsPath(),
-	}
+	knownHostsCallback := NewDefaultKnownHostCallback()
 	c.sshClientConfig.HostKeyCallback = knownHostsCallback.Handler
 
 	for _, option := range opt {

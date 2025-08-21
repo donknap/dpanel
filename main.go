@@ -13,6 +13,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	common2 "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/migrate"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -47,10 +48,6 @@ func main() {
 	if os.Getenv("STORAGE_LOCAL_PATH") == "" {
 		exePath, _ := os.Executable()
 		_ = os.Setenv("STORAGE_LOCAL_PATH", filepath.Dir(exePath))
-	}
-
-	if os.Getenv("DP_JWT_SECRET") == "" {
-		_ = os.Setenv("DP_JWT_SECRET", uuid.New().String())
 	}
 
 	myApp := app.NewApp(
@@ -93,6 +90,8 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		storage.Cache.Set(storage.CacheKeyCommonUserJwtIssuer, uuid.New().String(), cache.DefaultExpiration)
+
 		// 业务中需要使用 http server，这里需要先实例化
 		httpServer := new(http.Provider).Register(myApp.GetConfig(), myApp.GetConsole(), myApp.GetServerManager()).Export()
 		// 注册一些全局中间件，路由或是其它一些全局操作
@@ -193,23 +192,20 @@ func initPath() error {
 	}
 	// 初始化挂载目录
 	initPathList := []string{
-		"storage",
+		"acme",
 		"backup",
+		"cert",
+		"cert/rsa",
+		"cert/docker",
 		"compose",
-	}
-	if runEnvType == "production" {
-		initPathList = append(initPathList,
-			"nginx/default_host",
-			"nginx/proxy_host",
-			"nginx/redirection_host",
-			"nginx/dead_host",
-			"nginx/temp",
-			"acme",
-			"cert",
-			"compose",
-			"store",
-			"script",
-		)
+		"nginx/default_host",
+		"nginx/proxy_host",
+		"nginx/redirection_host",
+		"nginx/dead_host",
+		"nginx/temp",
+		"script",
+		"storage",
+		"store",
 	}
 	for _, path := range initPathList {
 		realPath := storage.Local{}.GetStorageLocalPath() + "/" + path
@@ -224,56 +220,55 @@ func initPath() error {
 }
 
 func initRSA() error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-
-	defaultSSHIdFiles := []string{
+	// 用户可以自行挂载证书，如果没有则自动生成
+	// 证书用于验证 ssh 登录以及 jwt 签名
+	homeDir, _ := os.UserHomeDir()
+	userRsaIdFiles := []string{
 		filepath.Join(homeDir, ".ssh", define.DefaultIdPubFile),
 		filepath.Join(homeDir, ".ssh", define.DefaultIdKeyFile),
 	}
 
-	defer func() {
-		result := make([]string, 0)
-		for _, file := range defaultSSHIdFiles {
-			if content, err := os.ReadFile(file); err == nil {
-				result = append(result, string(content))
+	rsaIdFiles := []string{
+		filepath.Join(storage.Local{}.GetCertRsaPath(), define.DefaultIdPubFile),
+		filepath.Join(storage.Local{}.GetCertRsaPath(), define.DefaultIdKeyFile),
+	}
+
+	if function.FileExists(userRsaIdFiles...) {
+		// 如果系统已经存在了 id_rsa 表示当前非容器内
+		// 将系统的 rsa 文件复制过来方便后续使用
+		for _, file := range rsaIdFiles {
+			_ = os.Remove(file)
+		}
+		for _, file := range userRsaIdFiles {
+			_, err := local.QuickRun(fmt.Sprintf("cp %s %s", file, storage.Local{}.GetCertRsaPath()))
+			if err != nil {
+				return err
 			}
 		}
-		_ = storage.Cache.Add(storage.CacheKeyIdFile, result, cache.DefaultExpiration)
-	}()
-
-	if function.FileExists(defaultSSHIdFiles...) {
 		return nil
 	}
-	_ = os.MkdirAll(filepath.Join(homeDir, ".ssh"), os.ModePerm)
 
-	// 如果已经存在证书，优先使用
-	if !function.FileExists(
-		filepath.Join(storage.Local{}.GetStorageCertPath(), ".ssh", define.DefaultIdPubFile),
-		filepath.Join(storage.Local{}.GetStorageCertPath(), ".ssh", define.DefaultIdKeyFile),
-	) {
-		_ = os.MkdirAll(filepath.Join(storage.Local{}.GetStorageCertPath(), ".ssh"), os.ModePerm)
-		_, err = local.QuickRun(fmt.Sprintf(`ssh-keygen -t ed25519 -f %s/.ssh/id_ed25519 -N "" -C "dpanel@dpanel.cc"`, storage.Local{}.GetStorageCertPath()))
+	if !function.FileExists(rsaIdFiles...) {
+		for _, file := range rsaIdFiles {
+			_ = os.Remove(file)
+		}
+		_, err := local.QuickRun(fmt.Sprintf(
+			`ssh-keygen -t rsa -b 4096 -f %s -N "" -C "%s@%s"`,
+			filepath.Join(storage.Local{}.GetCertRsaPath(), define.DefaultIdKeyFile),
+			docker.BuilderAuthor,
+			docker.BuildWebSite,
+		))
 		if err != nil {
 			return err
 		}
 	}
-	// 无论如何删除文件，保证成功复制
-	for _, file := range defaultSSHIdFiles {
-		_ = os.RemoveAll(file)
-	}
 
-	err = os.CopyFS(filepath.Join(homeDir, ".ssh"), os.DirFS(filepath.Join(storage.Local{}.GetStorageCertPath(), ".ssh")))
+	err := os.CopyFS(filepath.Join(homeDir, ".ssh"), os.DirFS(storage.Local{}.GetCertRsaPath()))
 	if err != nil {
 		return err
 	}
 
-	for _, file := range defaultSSHIdFiles {
+	for _, file := range userRsaIdFiles {
 		_ = os.Chmod(file, 0600)
 	}
 
