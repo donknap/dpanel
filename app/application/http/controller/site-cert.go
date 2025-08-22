@@ -268,7 +268,7 @@ func (self SiteCert) Import(http *gin.Context) {
 		fmt.Sprintf("Le_NextRenewTimeStr='%s'", cert.NotAfter.Format(time.RFC3339)),
 		fmt.Sprintf("Le_SerialNumber='%s'", cert.SerialNumber.String()),
 	}
-	confFilePath := filepath.Join(storage.Local{}.GetNginxCertPath(), fmt.Sprintf(logic.CertName, mainDomain), mainDomain+".conf")
+	confFilePath := filepath.Join(storage.Local{}.GetCertDomainPath(), fmt.Sprintf(logic.CertName, mainDomain), mainDomain+".conf")
 	err = os.MkdirAll(filepath.Dir(confFilePath), os.ModePerm)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

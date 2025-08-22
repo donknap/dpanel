@@ -58,7 +58,7 @@ func (self Client) CommandEnv() []string {
 	if self.EnableTLS {
 		result = append(result,
 			"DOCKER_TLS_VERIFY=1",
-			"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetStorageCertPath(), self.TlsCa)),
+			"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetCertPath(), self.TlsCa)),
 		)
 	}
 	return result
@@ -82,7 +82,7 @@ func (self Client) CommandParams() []string {
 }
 
 func (self Client) CertRoot() string {
-	return filepath.Join("docker", self.Name)
+	return filepath.Join(storage.Local{}.GetCertDockerPath(), self.Name)
 }
 
 type Builder struct {
@@ -171,9 +171,9 @@ func WithDockerEnv(info *Client) Option {
 
 func WithTLS(caPath, certPath, keyPath string) Option {
 	certRealPath := map[string]string{
-		"ca":   filepath.Join(storage.Local{}.GetStorageCertPath(), caPath),
-		"cert": filepath.Join(storage.Local{}.GetStorageCertPath(), certPath),
-		"key":  filepath.Join(storage.Local{}.GetStorageCertPath(), keyPath),
+		"ca":   filepath.Join(storage.Local{}.GetCertPath(), caPath),
+		"cert": filepath.Join(storage.Local{}.GetCertPath(), certPath),
+		"key":  filepath.Join(storage.Local{}.GetCertPath(), keyPath),
 	}
 	return func(self *Builder) error {
 		if caPath == "" || certPath == "" || keyPath == "" {

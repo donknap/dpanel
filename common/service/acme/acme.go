@@ -2,11 +2,11 @@ package acme
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,15 +50,14 @@ type Acme struct {
 }
 
 func (self Acme) Run() (io.ReadCloser, error) {
-	options := []exec.Option{
-		exec.WithCommandName(self.commandName),
-		exec.WithArgs(self.argv...),
+	options := []local.Option{
+		local.WithCommandName(self.commandName),
+		local.WithArgs(self.argv...),
 	}
 	if !function.IsEmptyArray(self.env) {
-		options = append(options, exec.WithEnv(self.env))
+		options = append(options, local.WithEnv(self.env))
 	}
-	slog.Debug("acme apply run", "env", self.env, "argv", self.argv)
-	cmd, err := exec.New(options...)
+	cmd, err := local.New(options...)
 	if err != nil {
 		return nil, err
 	}
@@ -101,19 +100,19 @@ func (self *Cert) GetConfigPath() string {
 
 func (self Acme) List() ([]*Cert, error) {
 	self.argv = append(self.argv, "--list", "--listraw")
-	cmd, err := exec.New(
-		exec.WithCommandName(self.commandName),
-		exec.WithArgs(self.argv...),
+	cmd, err := local.New(
+		local.WithCommandName(self.commandName),
+		local.WithArgs(self.argv...),
 	)
 	if err != nil {
 		return nil, err
 	}
-	out, err := cmd.Run()
+	out, err := cmd.RunWithResult()
 	if err != nil {
 		return nil, err
 	}
 	result := make([]*Cert, 0)
-	scanner := bufio.NewScanner(out)
+	scanner := bufio.NewScanner(bytes.NewBuffer(out))
 	for scanner.Scan() {
 		if strings.Contains(scanner.Text(), "Main_Domain") {
 			continue
@@ -157,17 +156,20 @@ func (self Acme) List() ([]*Cert, error) {
 
 func (self Acme) Remove(name string) error {
 	self.argv = append(self.argv, "--remove", "-d", name)
-	cmd, err := exec.New(
-		exec.WithCommandName(self.commandName),
-		exec.WithArgs(self.argv...),
+	cmd, err := local.New(
+		local.WithCommandName(self.commandName),
+		local.WithArgs(self.argv...),
 	)
 	if err != nil {
 		return err
 	}
-	out := cmd.RunWithResult()
-	if strings.Contains(out, "has been removed") {
+	out, err := cmd.RunWithResult()
+	if err != nil {
+		return err
+	}
+	if strings.Contains(string(out), "has been removed") {
 		return nil
 	} else {
-		return errors.New(out)
+		return errors.New(string(out))
 	}
 }

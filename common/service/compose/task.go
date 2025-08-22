@@ -9,7 +9,6 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/exec"
 	"io"
 	"log/slog"
 	"os"
@@ -24,7 +23,7 @@ type Task struct {
 	Status   string
 }
 
-func (self Task) Deploy(serviceName []string, removeOrphans bool, pullImage bool) (io.Reader, error) {
+func (self Task) Deploy(serviceName []string, removeOrphans bool, pullImage bool) (io.ReadCloser, error) {
 	cmd := []string{
 		//"--progress", "tty",
 		"up", "-d", "--build",
@@ -57,7 +56,7 @@ func (self Task) Deploy(serviceName []string, removeOrphans bool, pullImage bool
 	return response, nil
 }
 
-func (self Task) Destroy(deleteImage bool, deleteVolume bool) (io.Reader, error) {
+func (self Task) Destroy(deleteImage bool, deleteVolume bool) (io.ReadCloser, error) {
 	cmd := []string{
 		//"--progress", "tty",
 		"down", "--remove-orphans",
@@ -84,7 +83,7 @@ func (self Task) Destroy(deleteImage bool, deleteVolume bool) (io.Reader, error)
 	return self.runCommand(cmd)
 }
 
-func (self Task) Ctrl(op string) (io.Reader, error) {
+func (self Task) Ctrl(op string) (io.ReadCloser, error) {
 	cmd := []string{
 		//"--progress", "tty",
 		op,
@@ -140,27 +139,27 @@ func (self Task) Ps() []*ContainerResult {
 	args := self.Composer.GetBaseCommand()
 	args = append(args, "ps", "--format", "json", "--all")
 
-	cmd, err := exec.New(docker.Sdk.GetComposeCmd(args...)...)
+	cmd, err := docker.Sdk.Compose(args...)
 	if err != nil {
 		return result
 	}
 
-	out := cmd.RunWithResult()
-	if out == "" {
+	out, err := cmd.RunWithResult()
+	if err != nil {
 		return result
 	}
 
-	if strings.HasPrefix(out, "[{") {
+	if strings.HasPrefix(string(out), "[{") {
 		// 兼容 docker-compose ps 返回数据
 		temp := make([]*ContainerResult, 0)
-		err := json.Unmarshal([]byte(out), &temp)
+		err := json.Unmarshal(out, &temp)
 		if err != nil {
 			slog.Debug("compose task docker-compose failed", err.Error())
 			return nil
 		}
 		return temp
 	} else {
-		newReader := bufio.NewReader(bytes.NewReader([]byte(out)))
+		newReader := bufio.NewReader(bytes.NewReader(out))
 		line := make([]byte, 0)
 		for {
 			t, isPrefix, err := newReader.ReadLine()
@@ -199,7 +198,7 @@ func (self Task) GetYaml() ([2]string, error) {
 
 func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 	command = append(self.Composer.GetBaseCommand(), command...)
-	cmd, err := exec.New(docker.Sdk.GetComposeCmd(command...)...)
+	cmd, err := docker.Sdk.Compose(command...)
 	if err != nil {
 		return nil, err
 	}

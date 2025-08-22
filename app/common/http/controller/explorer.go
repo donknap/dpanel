@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/imports"
+	"github.com/donknap/dpanel/common/service/exec/remote"
 	"github.com/donknap/dpanel/common/service/fs"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -170,7 +171,7 @@ func (self Explorer) Import(http *gin.Context) {
 	}
 	defer func() {
 		for _, s := range params.FileList {
-			realPath := storage.Local{}.GetRealPath(s.Path)
+			realPath := storage.Local{}.GetSaveRealPath(s.Path)
 			_ = os.Remove(realPath)
 		}
 	}()
@@ -185,7 +186,7 @@ func (self Explorer) Import(http *gin.Context) {
 
 	for _, item := range params.FileList {
 		err = func() error {
-			realPath, err := os.Open(storage.Local{}.GetRealPath(item.Path))
+			realPath, err := os.Open(storage.Local{}.GetSaveRealPath(item.Path))
 			if err != nil {
 				return err
 			}
@@ -225,7 +226,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 	defer func() {
 		sshClient.Close()
 	}()
-	options := make([]docker.ImportFileOption, 0)
+	options := make([]imports.ImportFileOption, 0)
 	for _, path := range params.File {
 		file, err := afs.OpenFile(path, os.O_RDONLY, 0o644)
 		if err != nil {
@@ -243,11 +244,11 @@ func (self Explorer) Unzip(http *gin.Context) {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-			options = append(options, docker.WithImportZip(zipReader))
+			options = append(options, imports.WithImportZip(zipReader))
 			break
 		case ".tar":
 			tarReader := tar.NewReader(file)
-			options = append(options, docker.WithImportTar(tarReader))
+			options = append(options, imports.WithImportTar(tarReader))
 			break
 		case ".gz":
 			gzReader, err := gzip.NewReader(file)
@@ -256,7 +257,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 				return
 			}
 			tarReader := tar.NewReader(gzReader)
-			options = append(options, docker.WithImportTar(tarReader))
+			options = append(options, imports.WithImportTar(tarReader))
 			break
 		default:
 			slog.Debug("explorer unzip ", "filetype", filepath.Ext(file.Name()))
@@ -264,7 +265,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			return
 		}
 	}
-	importFile, err := docker.NewFileImport(params.Path, options...)
+	importFile, err := imports.NewFileImport(params.Path, options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -373,9 +374,10 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		sshClient.Close()
 	}()
 	if params.Path == "" {
-		if defaultPath, message, err := sshClient.Run("pwd"); err == nil && !strings.Contains(message, "Could not chdir") {
-			params.Path = defaultPath
+		if defaultPath, err := remote.QuickRun(sshClient, "pwd"); err == nil {
+			params.Path = string(defaultPath)
 		} else {
+			slog.Debug("explorer GetPathList pwd", "err", err)
 			params.Path = "/"
 		}
 	}
@@ -406,10 +408,11 @@ func (self Explorer) GetPathList(http *gin.Context) {
 				fileData.User = username.(string)
 			}
 			if fileData.User == "" {
-				if username, _, err := sshClient.Run(fmt.Sprintf("id -un %d", v.UID)); err == nil {
-					fileData.User = strings.TrimSpace(username)
-					_ = storage.Cache.Add(cacheKey, username, time.Hour)
+				if username, err := remote.QuickRun(sshClient, fmt.Sprintf("id -un %d", v.UID)); err == nil {
+					fileData.User = strings.TrimSpace(string(username))
+					_ = storage.Cache.Add(cacheKey, string(username), time.Hour)
 				} else {
+					slog.Debug("explorer GetPathList username", "err", err)
 					fileData.User = strconv.Itoa(int(v.UID))
 				}
 			}

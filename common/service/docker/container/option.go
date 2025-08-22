@@ -96,7 +96,7 @@ func WithRestartPolicy(restartPolicy *docker.RestartPolicy) Option {
 			restartPolicy.Name = "no"
 		}
 		self.hostConfig.RestartPolicy = container.RestartPolicy{}
-		self.hostConfig.RestartPolicy.Name = docker.GetRestartPolicyByString(restartPolicy.Name)
+		self.hostConfig.RestartPolicy.Name = function.ParseRestartPolicy(restartPolicy.Name)
 		if self.hostConfig.RestartPolicy.Name == container.RestartPolicyOnFailure {
 			self.hostConfig.RestartPolicy.MaximumRetryCount = restartPolicy.MaxAttempt
 		}
@@ -301,7 +301,7 @@ func WithUser(user string) Option {
 }
 
 func WithCommandStr(cmd string) Option {
-	return WithCommand(docker.CommandSplit(cmd))
+	return WithCommand(function.SplitCommandArray(cmd))
 }
 
 func WithCommand(cmd []string) Option {
@@ -315,7 +315,7 @@ func WithCommand(cmd []string) Option {
 }
 
 func WithEntrypointStr(cmd string) Option {
-	return WithEntrypoint(docker.CommandSplit(cmd))
+	return WithEntrypoint(function.SplitCommandArray(cmd))
 }
 
 func WithEntrypoint(cmd []string) Option {
@@ -459,7 +459,7 @@ func WithHealthcheck(item *docker.HealthcheckItem) Option {
 		if item == nil || item.Cmd == "" {
 			return nil
 		}
-		command := docker.CommandSplit(item.Cmd)
+		command := function.SplitCommandArray(item.Cmd)
 		self.containerConfig.Healthcheck = &container.HealthConfig{
 			Timeout:  time.Duration(item.Timeout) * time.Second,
 			Retries:  item.Retries,

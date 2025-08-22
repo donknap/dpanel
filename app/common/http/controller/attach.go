@@ -50,7 +50,7 @@ func (self Attach) Delete(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	path := storage.Local{}.GetRealPath(params.Path)
+	path := storage.Local{}.GetSaveRealPath(params.Path)
 	fmt.Printf("%v \n", path)
 	_, err := os.Stat(path)
 	if err == nil {

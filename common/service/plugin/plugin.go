@@ -118,7 +118,12 @@ func (self plugin) Create() (string, error) {
 	options := []builder.Option{
 		builder.WithImage(imageUrl, imageTryPull),
 		builder.WithContainerName(service.ContainerName),
-		builder.WithLabel(docker.NewValueItemFromMap(service.Labels)...),
+		builder.WithLabel(function.PluckMapWalkArray(service.Labels, func(key string, value string) (docker.ValueItem, bool) {
+			return docker.ValueItem{
+				Name:  key,
+				Value: value,
+			}, true
+		})...),
 		builder.WithPrivileged(service.Privileged),
 		builder.WithAutoRemove(serviceExt.AutoRemove),
 		builder.WithRestartPolicy(&docker.RestartPolicy{

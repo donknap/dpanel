@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
@@ -55,7 +55,7 @@ func (self RunLog) Run(http *gin.Context) {
 		return
 	}
 	if params.Download {
-		buffer, err := docker.GetContentFromStdFormat(response)
+		out, err := function.CombineStdout(response)
 		_ = response.Close()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -63,14 +63,13 @@ func (self RunLog) Run(http *gin.Context) {
 		}
 		http.Header("Content-Type", "text/plain")
 		http.Header("Content-Disposition", "attachment; filename="+params.Id+".log")
-		http.Data(200, "text/plain", buffer.Bytes())
+		http.Data(200, "text/plain", out.Bytes())
 		return
 	}
 
 	progress.OnWrite = func(p string) error {
 		newReader := bytes.NewReader([]byte(p))
-		stdout := new(bytes.Buffer)
-		_, err = stdcopy.StdCopy(stdout, stdout, newReader)
+		stdout, err := function.CombineStdout(newReader)
 		if err != nil {
 			progress.BroadcastMessage(p)
 		} else {
@@ -91,18 +90,11 @@ func (self RunLog) Run(http *gin.Context) {
 	}()
 
 	_, err = io.Copy(progress, response)
-	//if err != nil {
-	//	self.JsonResponseWithError(http, errors.New("读取日志失败"), 500)
-	//	return
-	//}
-	//newReader := bytes.NewReader(out.Bytes())
-	//
-	//stdout := new(bytes.Buffer)
-	//_, err = stdcopy.StdCopy(stdout, stdout, newReader)
-	//
-	//if err == nil {
-	//	out = stdout
-	//}
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"log": "",
 	})

@@ -21,7 +21,7 @@ COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-  apk add --no-cache --update musl docker-compose tzdata git
+  apk add --no-cache --update musl docker-compose tzdata git openssh-client
 
 WORKDIR /app/server
 VOLUME [ "/dpanel" ]

@@ -11,6 +11,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
@@ -181,6 +182,7 @@ func (self Store) Sync(http *gin.Context) {
 		if params.Type == accessor.StoreTypeOnePanel {
 			err = logic.Store{}.SyncByGit(storeRootPath, params.Url)
 			if err != nil {
+				_ = notice.Message{}.Error(".gitPullEarlyEOF", "name", params.Name, "url", params.Url)
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}

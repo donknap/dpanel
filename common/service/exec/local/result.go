@@ -1,6 +1,7 @@
 package local
 
 import (
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -31,4 +32,18 @@ func (self TerminalResult) Close() error {
 
 func (self TerminalResult) Read(p []byte) (n int, err error) {
 	return self.Conn.Read(p)
+}
+
+type readCloser struct {
+	cmd  *Local
+	Conn io.ReadCloser
+}
+
+func (self readCloser) Read(p []byte) (n int, err error) {
+	return self.Conn.Read(p)
+}
+
+func (self readCloser) Close() error {
+	_ = self.Conn.Close()
+	return self.cmd.Close()
 }

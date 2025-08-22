@@ -199,7 +199,7 @@ func WithContainerSpec(option *accessor.SiteEnvOption) Option {
 			Labels: function.PluckArrayMapWalk(option.Label, func(item docker.ValueItem) (string, string, bool) {
 				return item.Name, item.Value, true
 			}),
-			Command:  docker.CommandSplit(option.Command),
+			Command:  function.SplitCommandArray(option.Command),
 			Hostname: option.Hostname,
 			Env: function.PluckArrayWalk(option.Environment, func(item docker.EnvItem) (string, bool) {
 				return fmt.Sprintf("%s=%s", item.Name, item.Value), true
@@ -223,7 +223,7 @@ func WithContainerSpec(option *accessor.SiteEnvOption) Option {
 				Interval: time.Duration(option.Healthcheck.Interval) * time.Second,
 				Test: append([]string{
 					option.Healthcheck.ShellType,
-				}, docker.CommandSplit(option.Healthcheck.Cmd)...),
+				}, function.SplitCommandArray(option.Healthcheck.Cmd)...),
 			}
 		}
 		return nil

@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/service/fs"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
@@ -143,7 +144,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		return
 	}
 
-	importFile, err := docker.NewFileImport(params.DestPath, docker.WithImportContent(params.File, []byte(params.Content), 0666))
+	importFile, err := imports.NewFileImport(params.DestPath, imports.WithImportContent(params.File, []byte(params.Content), 0666))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -171,7 +172,7 @@ func (self Explorer) Import(http *gin.Context) {
 	}
 	defer func() {
 		for _, s := range params.FileList {
-			realPath := storage.Local{}.GetRealPath(s.Path)
+			realPath := storage.Local{}.GetSaveRealPath(s.Path)
 			_ = os.Remove(realPath)
 		}
 	}()
@@ -180,12 +181,12 @@ func (self Explorer) Import(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	var options []docker.ImportFileOption
+	var options []imports.ImportFileOption
 	for _, item := range params.FileList {
-		realPath := storage.Local{}.GetRealPath(item.Path)
-		options = append(options, docker.WithImportFilePath(realPath, item.Name))
+		realPath := storage.Local{}.GetSaveRealPath(item.Path)
+		options = append(options, imports.WithImportFilePath(realPath, item.Name))
 	}
-	importFile, err := docker.NewFileImport(params.DestPath, options...)
+	importFile, err := imports.NewFileImport(params.DestPath, options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -209,7 +210,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	var options []docker.ImportFileOption
+	var options []imports.ImportFileOption
 	for _, path := range params.File {
 		targetFile, _ := storage.Local{}.CreateTempFile("")
 		defer func() {
@@ -224,13 +225,13 @@ func (self Explorer) Unzip(http *gin.Context) {
 		fileType, err := filetype.MatchFile(targetFile.Name())
 		switch fileType {
 		case matchers.TypeZip:
-			options = append(options, docker.WithImportZipFile(targetFile.Name()))
+			options = append(options, imports.WithImportZipFile(targetFile.Name()))
 			break
 		case matchers.TypeTar:
-			options = append(options, docker.WithImportTarFile(targetFile.Name()))
+			options = append(options, imports.WithImportTarFile(targetFile.Name()))
 			break
 		case matchers.TypeGz:
-			options = append(options, docker.WithImportTarGzFile(targetFile.Name()))
+			options = append(options, imports.WithImportTarGzFile(targetFile.Name()))
 			break
 		default:
 			slog.Debug("explorer unzip ", "filetype", fileType, "err", err)
@@ -238,7 +239,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			return
 		}
 	}
-	importFile, err := docker.NewFileImport(params.Path, options...)
+	importFile, err := imports.NewFileImport(params.Path, options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

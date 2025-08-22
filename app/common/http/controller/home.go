@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/registry"
@@ -539,25 +537,26 @@ func (self Home) GetStatList(http *gin.Context) {
 		return
 	}
 	var err error
-	command := []string{
+	statCmd := []string{
 		"stats", "-a",
 		"--format", "json",
 	}
-	option := make([]exec.Option, 0)
 	if !params.Follow {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer func() {
-			cancel()
-		}()
-		command = append(command, "--no-stream")
-		option = append(option, docker.Sdk.GetRunCmd(command...)...)
-		option = append(option, exec.WithCtx(ctx))
-		cmd, err := exec.New(option...)
+		statCmd = append(statCmd, "--no-stream")
+		cmd, err := docker.Sdk.Run(statCmd...)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		list, err := logic.Stat{}.GetStat(cmd.RunWithResult())
+		defer func() {
+			_ = cmd.Close()
+		}()
+		out, err := cmd.RunWithResult()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		list, err := logic.Stat{}.GetStat(string(out))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -602,10 +601,15 @@ func (self Home) GetStatList(http *gin.Context) {
 		}
 		return nil
 	}
-	ctx, _ := context.WithTimeout(progress.Context(), time.Hour*1)
-	option = append(option, docker.Sdk.GetRunCmd(command...)...)
-	option = append(option, exec.WithCtx(ctx))
-	cmd, err := exec.New(option...)
+	cmd, err := docker.Sdk.Run(statCmd...)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		_ = cmd.Close()
+	}()
+	out, err := cmd.RunInPip()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -613,23 +617,12 @@ func (self Home) GetStatList(http *gin.Context) {
 	go func() {
 		slog.Debug("home get stat list progress close")
 		<-progress.Done()
-		cmd.Close()
+		_ = cmd.Close()
 	}()
-	out, err := cmd.RunInPip()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	slog.Debug("home get stat list cmd start", "cmd", cmd, "pid", cmd.Cmd().Process.Pid)
 	_, err = io.Copy(progress, out)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
-	}
-	// 等待进程退出
-	err = cmd.Cmd().Wait()
-	if err != nil {
-		slog.Warn("home stat wait process", "error", err)
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": "",

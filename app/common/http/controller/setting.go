@@ -72,6 +72,10 @@ func (self Setting) GetSetting(http *gin.Context) {
 		self.JsonResponseWithoutError(http, gin.H{})
 		return
 	}
+	if params.GroupName == logic.SettingGroupUser {
+		self.JsonResponseWithoutError(http, row.Value)
+		return
+	}
 	refValue := reflect.ValueOf(row.Value).Elem()
 	name := strings.ToUpper(string(params.Name[0])) + params.Name[1:]
 	if refValue.FieldByName(name).IsValid() {

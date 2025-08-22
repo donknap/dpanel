@@ -222,7 +222,7 @@ func (self Container) Update(http *gin.Context) {
 	if params.Restart != nil {
 		restartPolicy := container.RestartPolicy{}
 		if params.Restart.Name != "" {
-			restartPolicy.Name = docker.GetRestartPolicyByString(params.Restart.Name)
+			restartPolicy.Name = function.ParseRestartPolicy(params.Restart.Name)
 		}
 		if restartPolicy.Name == container.RestartPolicyOnFailure {
 			restartPolicy.MaximumRetryCount = 5

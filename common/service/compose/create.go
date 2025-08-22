@@ -215,11 +215,11 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 		}
 
 		if siteOption.Command != "" {
-			service.Command = docker.CommandSplit(siteOption.Command)
+			service.Command = function.SplitCommandArray(siteOption.Command)
 		}
 
 		if siteOption.Entrypoint != "" {
-			service.Entrypoint = docker.CommandSplit(siteOption.Entrypoint)
+			service.Entrypoint = function.SplitCommandArray(siteOption.Entrypoint)
 		}
 
 		if siteOption.UseHostNetwork {

@@ -110,6 +110,7 @@ func (self *Client) token() (string, error) {
 		AutoLogin:    true,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(self.tokenExpire)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	})
 	return jwtClaims.SignedString(privateKey)

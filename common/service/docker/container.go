@@ -2,7 +2,6 @@ package docker
 
 import (
 	"archive/tar"
-	"bytes"
 	"context"
 	"errors"
 	"github.com/docker/docker/api/types"
@@ -10,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/types/define"
 	"io"
 	"log/slog"
@@ -62,7 +62,7 @@ func (self Builder) ContainerByField(ctx context.Context, field string, name ...
 	return result, nil
 }
 
-func (self Builder) ContainerImport(ctx context.Context, containerName string, importFile *ImportFile) error {
+func (self Builder) ContainerImport(ctx context.Context, containerName string, importFile *imports.ImportFile) error {
 	err := self.Client.CopyToContainer(ctx,
 		containerName,
 		"/",
@@ -129,14 +129,14 @@ func (self Builder) ContainerExecResult(ctx context.Context, containerName strin
 	}
 	defer response.Close()
 
-	buffer := new(bytes.Buffer)
-	_, err = io.Copy(buffer, response.Reader)
+	stdout, stderr, err := function.SplitStdout(response.Reader)
 	if err != nil {
 		return "", err
 	}
-	cleanOut := self.ExecCleanResult(buffer.Bytes())
-	slog.Debug("command", "clear result", cleanOut)
-	return cleanOut, nil
+	if stderr.Len() > 0 {
+		return "", errors.New(stderr.String())
+	}
+	return stdout.String(), nil
 }
 
 // ContainerExec 在容器内执行一条 shell 命令

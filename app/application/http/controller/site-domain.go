@@ -11,7 +11,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
@@ -171,8 +171,8 @@ func (self SiteDomain) Create(http *gin.Context) {
 
 	if params.CertName != "" && params.EnableSSL {
 		siteDomainRow.Setting.CertName = params.CertName
-		siteDomainRow.Setting.SslCrt = filepath.Join(storage.Local{}.GetNginxCertPath(), fmt.Sprintf(logic.CertName, params.CertName), logic.CertFileName)
-		siteDomainRow.Setting.SslKey = filepath.Join(storage.Local{}.GetNginxCertPath(), fmt.Sprintf(logic.CertName, params.CertName), fmt.Sprintf(logic.KeyFileName, params.CertName))
+		siteDomainRow.Setting.SslCrt = filepath.Join(storage.Local{}.GetCertDomainPath(), fmt.Sprintf(logic.CertName, params.CertName), logic.CertFileName)
+		siteDomainRow.Setting.SslKey = filepath.Join(storage.Local{}.GetCertDomainPath(), fmt.Sprintf(logic.CertName, params.CertName), fmt.Sprintf(logic.KeyFileName, params.CertName))
 	}
 
 	err = logic.Site{}.MakeNginxConf(siteDomainRow.Setting)
@@ -299,22 +299,20 @@ func (self SiteDomain) Delete(http *gin.Context) {
 }
 
 func (self SiteDomain) RestartNginx(http *gin.Context) {
-	cmd, _ := exec.New(
-		exec.WithCommandName("nginx"),
-		exec.WithArgs("-t"),
-	)
-	out := cmd.RunWithResult()
-	slog.Debug("site domain restart nginx", "-t", out)
-	if !strings.Contains(out, "successful") {
-		self.JsonResponseWithError(http, errors.New(out), 500)
+	out, err := local.QuickRun("nginx -t")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	cmd, _ = exec.New(
-		exec.WithCommandName("nginx"),
-		exec.WithArgs("-s", "reload"),
-	)
-	out = cmd.RunWithResult()
-	slog.Debug("site domain stop nginx", "out", out)
+	if !strings.Contains(string(out), "successful") {
+		self.JsonResponseWithError(http, errors.New(string(out)), 500)
+		return
+	}
+	_, err = local.QuickRun("nginx -s reload")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	self.JsonSuccessResponse(http)
 	return
 }

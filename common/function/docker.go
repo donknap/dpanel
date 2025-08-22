@@ -40,6 +40,15 @@ func SplitStdout(reader io.Reader) (stdout bytes.Buffer, stderr bytes.Buffer, er
 	return stdout, stderr, nil
 }
 
+func CombineStdout(reader io.Reader) (out bytes.Buffer, err error) {
+	newReader := bufio.NewReader(reader)
+	_, err = stdcopy.StdCopy(&out, &out, newReader)
+	if err != nil {
+		return out, err
+	}
+	return out, nil
+}
+
 func ParseRestartPolicy(restartType string) (mode container.RestartPolicyMode) {
 	restartPolicyMap := map[string]container.RestartPolicyMode{
 		"always":         container.RestartPolicyAlways,
@@ -71,12 +80,4 @@ func DefaultCapabilities() []string {
 		"CAP_KILL",
 		"CAP_AUDIT_WRITE",
 	}
-}
-
-func CleanExecResult(str []byte) string {
-	// 执行命令时返回的结果应该以 utf8 字符返回，并过滤掉不可见字符
-	out := BytesCleanWalk(str, func(b byte) bool {
-		return b < 32 && b != '\n' && b != '\r' && b != '\t'
-	})
-	return string(out)
 }

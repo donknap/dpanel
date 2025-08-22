@@ -2,14 +2,12 @@ package logic
 
 import (
 	"archive/zip"
-	"context"
 	"fmt"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/exec"
-	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"gopkg.in/yaml.v3"
@@ -46,24 +44,18 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 	}()
 	slog.Debug("store git download", "path", tempDownloadPath)
 
-	ctx, _ := context.WithTimeout(context.Background(), time.Second*60*5)
-	cmd, err := exec.New(
-		exec.WithCommandName("git"),
-		exec.WithArgs("clone", "--depth", "1",
+	cmd, err := local.New(
+		local.WithCommandName("git"),
+		local.WithArgs("clone", "--depth", "1",
 			gitUrl, tempDownloadPath),
-		exec.WithCtx(ctx),
 	)
 	if err != nil {
 		return err
 	}
-	out, err := cmd.Run()
-	if err != nil {
-		if function.ErrorHasKeyword(err, "fatal: early EOF", "致命错误：过早的文件结束符") {
-			_ = notice.Message{}.Info(".gitPullEarlyEOF", "url", gitUrl)
-		}
-		return err
-	}
-	_, err = io.Copy(os.Stdout, out)
+	time.AfterFunc(time.Minute*5, func() {
+		_ = cmd.Close()
+	})
+	_, err = cmd.RunWithResult()
 	if err != nil {
 		return err
 	}

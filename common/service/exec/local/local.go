@@ -92,7 +92,10 @@ func (self *Local) RunInPip() (io.ReadCloser, error) {
 	if err = self.cmd.Start(); err != nil {
 		return nil, err
 	}
-	return stdout, nil
+	return readCloser{
+		cmd:  self,
+		Conn: stdout,
+	}, nil
 }
 
 func (self *Local) RunInTerminal(size *pty.Winsize) (io.ReadCloser, error) {
@@ -115,9 +118,7 @@ func (self *Local) RunInTerminal(size *pty.Winsize) (io.ReadCloser, error) {
 }
 
 func (self *Local) Kill() error {
-	slog.Debug("run command kill cmd", "cmd", self.cmd)
-	self.ctxCancel()
-	return nil
+	return self.Close()
 }
 
 func (self *Local) Close() error {

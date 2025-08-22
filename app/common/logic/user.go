@@ -102,9 +102,7 @@ func (self User) GetUserOauthToken(user *entity.Setting, autoLogin bool) (string
 		},
 		AutoLogin: autoLogin,
 	}
-	if v, ok := storage.Cache.Get(storage.CacheKeyCommonUserJwtIssuer); ok {
-		userInfo.RegisteredClaims.Issuer = v.(string)
-	}
+	userInfo.RegisteredClaims.IssuedAt = jwt.NewNumericDate(time.Now())
 	_, privateKeyContent, err := storage.GetCertRsaContent()
 	if err != nil {
 		return "", err

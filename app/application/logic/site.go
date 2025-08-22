@@ -185,7 +185,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	}
 
 	if info.HostConfig.CapAdd == nil {
-		envOption.CapAdd = docker.DefaultCapabilities()
+		envOption.CapAdd = function.DefaultCapabilities()
 	} else {
 		envOption.CapAdd = info.HostConfig.CapAdd
 	}

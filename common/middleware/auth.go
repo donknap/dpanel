@@ -11,6 +11,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
 	"log/slog"
 	"strings"
+	"time"
 )
 
 type AuthMiddleware struct {
@@ -71,28 +72,42 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		http.AbortWithStatus(401)
 		return
 	}
+
 	if token.Valid {
-		issuer, _ := token.Claims.GetIssuer()
-		if v, ok := storage.Cache.Get(storage.CacheKeyCommonUserJwtIssuer); ok && issuer == v {
-			if myUserInfo.AutoLogin {
-				if _, err := new(logic.Setting).GetValueById(myUserInfo.UserId); err == nil {
+		issuedAt, err := token.Claims.GetIssuedAt()
+		if err != nil {
+			slog.Debug("auth middleware", "error", "no issuedAt time", "jwt", authToken)
+			self.JsonResponseWithError(http, ErrLogin, 401)
+			http.AbortWithStatus(401)
+			return
+		}
+
+		// Jwt 签发时间必须大于服务启动时间一致，如果签发时间小于启动时间则表示服务重启过，Jwt 全部失效
+		if v, ok := storage.Cache.Get(storage.CacheKeyCommonServerStartTime); !ok || issuedAt == nil || issuedAt.Before(v.(time.Time)) {
+			slog.Debug("auth middleware", "error", "issuedAt time before server start time", "issuedAt", issuedAt, "serverStartedAt", v.(time.Time))
+			self.JsonResponseWithError(http, ErrLogin, 401)
+			http.AbortWithStatus(401)
+			return
+		}
+
+		if myUserInfo.AutoLogin {
+			if _, err := new(logic.Setting).GetValueById(myUserInfo.UserId); err == nil {
+				myUserInfo.Fd = http.GetHeader("AuthorizationFd")
+				http.Set("userInfo", myUserInfo)
+				http.Next()
+				return
+			}
+		} else {
+			if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyCommonUserInfo, myUserInfo.UserId)); ok {
+				if _, ok := v.(logic.UserInfo); ok {
 					myUserInfo.Fd = http.GetHeader("AuthorizationFd")
 					http.Set("userInfo", myUserInfo)
 					http.Next()
 					return
 				}
-			} else {
-				if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyCommonUserInfo, myUserInfo.UserId)); ok {
-					if _, ok := v.(logic.UserInfo); ok {
-						myUserInfo.Fd = http.GetHeader("AuthorizationFd")
-						http.Set("userInfo", myUserInfo)
-						http.Next()
-						return
-					}
-				}
 			}
 		}
-		slog.Debug("auth get cache user error", "url", currentUrlPath, "jwt", authToken, "userInfo", myUserInfo)
+		slog.Debug("auth middleware", "err", "user not found", "userInfo", myUserInfo)
 		self.JsonResponseWithError(http, ErrLogin, 401)
 		http.AbortWithStatus(401)
 		return

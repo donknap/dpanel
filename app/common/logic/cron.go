@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/donknap/dpanel/common/accessor"
@@ -10,17 +9,12 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/robfig/cron/v3"
-	"io"
 	"log/slog"
 	"os"
 	"sync"
 	"time"
-)
-
-const (
-	CronRunDockerExec = "dockerExec"
 )
 
 var (
@@ -59,12 +53,12 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 			return err
 		}
 		globalEnv := make([]string, 0)
-		globalEnv = append(globalEnv, defaultDockerEnv.GetDockerEnv()...)
+		globalEnv = append(globalEnv, defaultDockerEnv.CommandEnv()...)
 		globalEnv = append(globalEnv, function.PluckArrayWalk(task.Setting.Environment, func(i docker.EnvItem) (string, bool) {
 			return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 		})...)
 
-		var out string
+		var out []byte
 		var script string
 
 		if containerName != "" {
@@ -86,26 +80,26 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 		// 如果没有指定容器，则直接在面板 shell 中执行
 		// 在面板容器中执行还需要把 env 注入到命令中
 		globalEnv = append(globalEnv, os.Environ()...)
-		options := []exec.Option{
-			exec.WithCommandName("/bin/sh"),
-			exec.WithArgs("-c", script),
-			exec.WithEnv(globalEnv),
+		options := []local.Option{
+			local.WithCommandName("/bin/sh"),
+			local.WithArgs("-c", script),
+			local.WithEnv(globalEnv),
 		}
 		// 如果有超时间，则需要独立进程，超时后强制终止掉
 		if ctx != nil {
-			options = append(options, exec.WithIndependentProcessGroup())
+			//options = append(options, local.WithIndependentProcessGroup())
 		}
-		cmd, _ := exec.New(options...)
+		cmd, _ := local.New(options...)
 		if ctx != nil {
 			go func() {
 				select {
 				case <-ctx.Done():
 					slog.Debug("cron run timeout", "timeout", task.Setting.ScriptRunTimeout, "task", task)
-					cmd.Close()
+					_ = cmd.Close()
 				}
 			}()
 		}
-		response, err := cmd.Run()
+		out, err = cmd.RunWithResult()
 		if err != nil {
 			_ = dao.CronLog.Create(&entity.CronLog{
 				CronID: task.ID,
@@ -117,25 +111,10 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 			})
 			return err
 		}
-		buffer := new(bytes.Buffer)
-		_, err = io.Copy(buffer, response)
-		if err != nil {
-			_ = dao.CronLog.Create(&entity.CronLog{
-				CronID: task.ID,
-				Value: &accessor.CronLogValueOption{
-					Error:   err.Error(),
-					RunTime: startTime,
-					UseTime: time.Now().Sub(startTime).Seconds(),
-				},
-			})
-			return err
-		}
-		out = buffer.String()
-
 		_ = dao.CronLog.Create(&entity.CronLog{
 			CronID: task.ID,
 			Value: &accessor.CronLogValueOption{
-				Message: out,
+				Message: string(out),
 				RunTime: startTime,
 				UseTime: time.Now().Sub(startTime).Seconds(),
 			},

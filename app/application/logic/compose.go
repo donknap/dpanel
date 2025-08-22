@@ -2,7 +2,6 @@ package logic
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"io"
@@ -105,20 +103,26 @@ func (self Compose) Ls() []*ComposeLsItem {
 		"--format", "json",
 		"--all",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-	}()
-
 	result := make([]*ComposeLsItem, 0)
-	options := docker.Sdk.GetComposeCmd(command...)
-	options = append(options, exec.WithCtx(ctx))
-	cmd, err := exec.New(options...)
+
+	cmd, err := docker.Sdk.Compose(command...)
 	if err != nil {
 		slog.Debug("compose ls", "error", err)
 		return result
 	}
-	err = json.Unmarshal([]byte(cmd.RunWithResult()), &result)
+	defer func() {
+		err = cmd.Close()
+		if err != nil {
+			slog.Debug("compose ls close", "err", err)
+		}
+	}()
+
+	out, err := cmd.RunWithResult()
+	if err != nil {
+		slog.Debug("compose ls", "error", err)
+		return result
+	}
+	err = json.Unmarshal(out, &result)
 	if err != nil {
 		return result
 	}

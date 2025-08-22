@@ -61,7 +61,7 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", imageNameDetail.Uri()), 500)
 		return
 	}
-	containerTar, err := os.Open(storage.Local{}.GetRealPath(params.Tar))
+	containerTar, err := os.Open(storage.Local{}.GetSaveRealPath(params.Tar))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -98,7 +98,7 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_ = os.Remove(storage.Local{}.GetRealPath(params.Tar))
+	_ = os.Remove(storage.Local{}.GetSaveRealPath(params.Tar))
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -175,7 +175,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 
 	if !function.IsEmptyArray(params.LocalUrl) {
 		for _, s := range params.LocalUrl {
-			tarPathList = append(tarPathList, storage.Local{}.GetRealPath(s))
+			tarPathList = append(tarPathList, storage.Local{}.GetSaveRealPath(s))
 		}
 	}
 
@@ -233,7 +233,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	params.Tag = imageNameDetail.Uri()
 
 	if params.BuildZip != "" {
-		path := storage.Local{}.GetRealPath(params.BuildZip)
+		path := storage.Local{}.GetSaveRealPath(params.BuildZip)
 		_, err := os.Stat(path)
 		if os.IsNotExist(err) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonUploadFileEmpty), 500)

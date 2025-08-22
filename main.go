@@ -21,7 +21,6 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	app "github.com/we7coreteam/w7-rangine-go/v2/src"
@@ -33,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 )
 
 var (
@@ -90,7 +90,12 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		storage.Cache.Set(storage.CacheKeyCommonUserJwtIssuer, uuid.New().String(), cache.DefaultExpiration)
+
+		if isDebug() {
+			storage.Cache.Set(storage.CacheKeyCommonServerStartTime, time.Date(2024, 6, 5, 0, 0, 0, 0, time.UTC), cache.DefaultExpiration)
+		} else {
+			storage.Cache.Set(storage.CacheKeyCommonServerStartTime, time.Now(), cache.DefaultExpiration)
+		}
 
 		// 业务中需要使用 http server，这里需要先实例化
 		httpServer := new(http.Provider).Register(myApp.GetConfig(), myApp.GetConsole(), myApp.GetServerManager()).Export()
@@ -129,9 +134,12 @@ func isAppServer() bool {
 	return function.InArray(os.Args, "server:start")
 }
 
+func isDebug() bool {
+	return facade.GetConfig().GetString("app.env") == "debug"
+}
+
 func initDb() error {
-	runEnvType := facade.GetConfig().GetString("app.env")
-	if runEnvType == "debug" {
+	if isDebug() {
 		return nil
 	}
 	db, err := facade.GetDbFactory().Channel("default")

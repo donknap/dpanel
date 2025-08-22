@@ -14,6 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/backup"
+	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -394,7 +395,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			reader, _ := b.Reader.ReadBlobs(volume)
 			gzReader, _ := gzip.NewReader(reader)
 			tarReader := tar.NewReader(gzReader)
-			if options, err := docker.NewFileImport(destPath, docker.WithImportTar(tarReader)); err == nil {
+			if options, err := imports.NewFileImport(destPath, imports.WithImportTar(tarReader)); err == nil {
 				err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, newContainerName, options)
 				if err != nil {
 					slog.Warn("container backup restore", "error", err)

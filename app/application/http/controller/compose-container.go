@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -77,23 +75,28 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
 
+	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
+	defer progress.Close()
+
 	response, err := tasker.Deploy(params.DeployServiceName, params.RemoveOrphans, params.PullImage)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
-	defer wsBuffer.Close()
+	go func() {
+		<-progress.Done()
+		_ = response.Close()
+	}()
 
 	lastMessage := ""
-	wsBuffer.OnWrite = func(p string) error {
+	progress.OnWrite = func(p string) error {
 		lastMessage = p
-		wsBuffer.BroadcastMessage(p)
+		progress.BroadcastMessage(p)
 		return nil
 	}
 
-	_, err = io.Copy(wsBuffer, response)
+	_, err = io.Copy(progress, response)
 	if err != nil {
 		if function.ErrorHasKeyword(err, "denied: You may not login") {
 			_ = notice.Message{}.Error(".imagePullInvalidAuth")
@@ -127,7 +130,11 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		_, err = io.Copy(wsBuffer, response1)
+		go func() {
+			<-progress.Done()
+			_ = response1.Close()
+		}()
+		_, err = io.Copy(progress, response1)
 		self.JsonSuccessResponse(http)
 		return
 	}
@@ -148,7 +155,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	// 这里需要单独适配一下 php 环境的相关扩展安装
 	// 目前只有 php 需要这样处理，暂时先直接进行判断
 	if strings.HasPrefix(composeRow.Setting.Store, accessor.StoreTypeOnePanel) && strings.HasSuffix(composeRow.Setting.Store, "@php") {
-		out, err := docker.Sdk.ContainerExec(docker.Sdk.Ctx, taskContainerList[0].Name, container.ExecOptions{
+		out, err := docker.Sdk.ContainerExec(progress.Context(), taskContainerList[0].Name, container.ExecOptions{
 			Privileged:   true,
 			Tty:          false,
 			AttachStdin:  false,
@@ -172,7 +179,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		defer func() {
 			out.Close()
 		}()
-		_, err = io.Copy(wsBuffer, out.Reader)
+		_, err = io.Copy(progress, out.Reader)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -206,18 +213,22 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
+	defer progress.Close()
+
 	response, err := tasker.Destroy(params.DeleteImage, params.DeleteVolume)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
-	defer wsBuffer.Close()
-
-	_, err = io.Copy(wsBuffer, response)
+	go func() {
+		<-progress.Done()
+		_ = response.Close()
+	}()
+	_, err = io.Copy(progress, response)
 	if err != nil {
-		slog.Error("compose", "destroy copy error", err)
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 
 	if params.DeleteData {
@@ -270,29 +281,23 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		return
 	}
 
+	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
+	defer progress.Close()
+
 	response, err := tasker.Ctrl(params.Op)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
-	defer wsBuffer.Close()
-
-	_, err = io.Copy(wsBuffer, response)
+	go func() {
+		<-progress.Done()
+		_ = response.Close()
+	}()
+	_, err = io.Copy(progress, response)
 	if err != nil {
 		slog.Error("compose", "destroy copy error", err)
 	}
 
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Compose) ContainerProcessKill(http *gin.Context) {
-	err := exec.Kill()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -354,8 +359,7 @@ func (self Compose) ContainerLog(http *gin.Context) {
 
 	wsBuffer.OnWrite = func(p string) error {
 		newReader := bytes.NewReader([]byte(p))
-		stdout := new(bytes.Buffer)
-		_, err = stdcopy.StdCopy(stdout, stdout, newReader)
+		stdout, err := function.CombineStdout(newReader)
 		if err != nil {
 			wsBuffer.BroadcastMessage(p)
 		} else {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -224,7 +223,7 @@ func (self Swarm) Log(http *gin.Context) {
 		return
 	}
 	if params.Download {
-		buffer, err := docker.GetContentFromStdFormat(response)
+		buffer, err := function.CombineStdout(response)
 		_ = response.Close()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -238,8 +237,7 @@ func (self Swarm) Log(http *gin.Context) {
 
 	progress.OnWrite = func(p string) error {
 		newReader := bytes.NewReader([]byte(p))
-		stdout := new(bytes.Buffer)
-		_, err = stdcopy.StdCopy(stdout, stdout, newReader)
+		stdout, err := function.CombineStdout(newReader)
 		if err != nil {
 			progress.BroadcastMessage(p)
 		} else {
