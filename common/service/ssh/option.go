@@ -3,6 +3,7 @@ package ssh
 import (
 	"context"
 	"fmt"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"strings"
@@ -38,6 +39,16 @@ func WithAuthPem(username string, privateKeyPem string, password string) Option 
 	}
 }
 
+func WithAuthDefaultPem(username string) Option {
+	return func(self *Client) error {
+		_, private, err := storage.GetCertRsaContent()
+		if err != nil {
+			return err
+		}
+		return WithAuthPem(username, string(private), "")(self)
+	}
+}
+
 func WithAddress(address string, port int) Option {
 	return func(self *Client) error {
 		if strings.Contains(address, ":") {
@@ -59,6 +70,8 @@ func WithServerInfo(info *ServerInfo) []Option {
 		option = append(option, WithAuthPem(info.Username, info.PrivateKey, info.Password))
 	} else if info.AuthType == SshAuthTypeBasic {
 		option = append(option, WithAuthBasic(info.Username, info.Password))
+	} else if info.AuthType == SshAuthTypePemDefault {
+		option = append(option, WithAuthDefaultPem(info.Username))
 	}
 	return option
 }

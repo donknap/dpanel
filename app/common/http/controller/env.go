@@ -109,7 +109,7 @@ func (self Env) Create(http *gin.Context) {
 		}
 		slog.Debug("docker env", "ssh home", string(homeDir))
 
-		if params.RemoteType == docker.RemoteTypeSSH {
+		if params.RemoteType == docker.RemoteTypeSSH && params.SshServerInfo.AuthType != ssh.SshAuthTypePemDefault {
 			publicKey, _, err := storage.GetCertRsaContent()
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)

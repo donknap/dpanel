@@ -18,6 +18,7 @@ import (
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/ssh"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
@@ -320,6 +321,7 @@ func (self Home) Info(http *gin.Context) {
 	}
 	slog.Debug("docker info time", "use", time.Now().Sub(startTime).String())
 
+	public, _, _ := storage.GetCertRsaContent()
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":          info,
 		"clientVersion": docker.Sdk.Client.ClientVersion(),
@@ -331,6 +333,9 @@ func (self Home) Info(http *gin.Context) {
 			"containerInfo": dpanelContainerInfo,
 		},
 		"plugin": plugin.Wrapper{}.GetPluginList(),
+		"rsa": gin.H{
+			"public": string(public),
+		},
 	})
 	return
 }

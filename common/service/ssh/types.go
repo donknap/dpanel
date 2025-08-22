@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	SshAuthTypeBasic = "basic"
-	SshAuthTypePem   = "pem"
+	SshAuthTypeBasic      = "basic"
+	SshAuthTypePem        = "pem"
+	SshAuthTypePemDefault = "pemDefault"
 )
 
 type Client struct {
