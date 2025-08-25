@@ -92,6 +92,7 @@ func (self Setting) SaveConfig(http *gin.Context) {
 		Console     *accessor.ThemeConsoleConfig `json:"console"`
 		EmailServer *accessor.EmailServer        `json:"emailServer"`
 		Login       *accessor.Login              `json:"login"`
+		TwoFa       *accessor.TwoFa              `json:"twoFa"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -159,6 +160,24 @@ func (self Setting) SaveConfig(http *gin.Context) {
 		}
 	}
 
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Setting) Delete(http *gin.Context) {
+	type ParamsValidate struct {
+		GroupName string `json:"groupName" binding:"required"`
+		Name      string `json:"name" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	err := logic.Setting{}.Delete(params.GroupName, params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	self.JsonSuccessResponse(http)
 	return
 }

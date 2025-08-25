@@ -61,6 +61,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/setting/founder", controller.Setting{}.Founder)
 		cors.POST("/common/setting/get-setting", controller.Setting{}.GetSetting)
 		cors.POST("/common/setting/save-config", controller.Setting{}.SaveConfig)
+		cors.POST("/common/setting/delete", controller.Setting{}.Delete)
 
 		cors.POST("/common/home/info", controller.Home{}.Info)
 		cors.POST("/common/home/check-new-version", controller.Home{}.CheckNewVersion)
