@@ -67,7 +67,7 @@ func (self Client) CommandEnv() []string {
 func (self Client) CommandParams() []string {
 	result := make([]string, 0)
 	if self.RemoteType == RemoteTypeSSH {
-		result = append(result, "-H", fmt.Sprintf("ssh://%s@%s", self.SshServerInfo.Username, self.SshServerInfo.Address))
+		result = append(result, "-H", fmt.Sprintf("ssh://%s@%s:%d", self.SshServerInfo.Username, self.SshServerInfo.Address, self.SshServerInfo.Port))
 		return result
 	}
 	result = append(result, "-H", self.Address)

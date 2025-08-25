@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/exec/remote"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -142,6 +143,15 @@ func (self Env) Create(http *gin.Context) {
 					self.JsonResponseWithError(http, err, 500)
 					return
 				}
+			}
+		}
+		// 验证是否成功配置证书可以正常连接
+		if params.RemoteType == docker.RemoteTypeSSH {
+			result, err := local.QuickRun(fmt.Sprintf("ssh -v %s@%s -p %d", params.SshServerInfo.Username, params.SshServerInfo.Address, params.SshServerInfo.Port))
+			if err != nil {
+				slog.Debug("docker env docker -H ssh://", "error", string(result))
+				self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvDockerApiSSHFailed"), 500)
+				return
 			}
 		}
 	}
