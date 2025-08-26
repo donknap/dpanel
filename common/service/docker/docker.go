@@ -22,7 +22,7 @@ var (
 	BuildVersion               = "1.0.0"
 	HostnameTemplate           = "%s.pod.dpanel.local"
 	DefaultClientName          = "local"
-	ConnectDockerServerTimeout = time.Second * 20
+	ConnectDockerServerTimeout = time.Second * 10
 )
 
 type ClientDockerInfo struct {

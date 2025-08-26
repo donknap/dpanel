@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"embed"
 	_ "embed"
 	"fmt"
+	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
+	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/app/ctrl"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -17,7 +20,6 @@ import (
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
@@ -31,7 +33,6 @@ import (
 	http2 "net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 )
 
@@ -90,6 +91,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		err = initDefaultDocker()
+		if err != nil {
+			panic(err)
+		}
 
 		if isDebug() {
 			storage.Cache.Set(storage.CacheKeyCommonServerStartTime, time.Date(2024, 6, 5, 0, 0, 0, 0, time.UTC), cache.DefaultExpiration)
@@ -100,10 +105,11 @@ func main() {
 		// 业务中需要使用 http server，这里需要先实例化
 		httpServer := new(http.Provider).Register(myApp.GetConfig(), myApp.GetConsole(), myApp.GetServerManager()).Export()
 		// 注册一些全局中间件，路由或是其它一些全局操作
-		httpServer.Use(func(context *gin.Context) {
-			slog.Info("runtime info", "goroutine", runtime.NumGoroutine(), "client total", ws.GetCollect().Total(), "progress total", ws.GetCollect().ProgressTotal())
-		}, middleware.GetPanicHandlerMiddleware())
-		// 全局登录判断
+		httpServer.Use(common2.DebugMiddleware{}.Process, middleware.GetPanicHandlerMiddleware())
+		// 注册 family 中间件
+		if v := (family.Provider{}).Middleware(); v != nil {
+			httpServer.Use(v...)
+		}
 		httpServer.Use(common2.AuthMiddleware{}.Process, common2.CacheMiddleware{}.Process)
 		httpServer.RegisterRouters(
 			func(engine *gin.Engine) {
@@ -280,5 +286,63 @@ func initRSA() error {
 		_ = os.Chmod(file, 0600)
 	}
 
+	return nil
+}
+
+func initDefaultDocker() error {
+	// 当前如果有连接，则添加一条docker环境数据
+	defaultDockerHost := client.DefaultDockerHost
+	if e := os.Getenv(client.EnvOverrideHost); e != "" {
+		defaultDockerHost = e
+	}
+	var defaultDockerEnv *docker.Client
+	var err error
+
+	if v, err := (logic.DockerEnv{}).GetDefaultEnv(); err == nil {
+		defaultDockerEnv = v
+	} else {
+		defaultDockerEnv = &docker.Client{
+			Name:    docker.DefaultClientName,
+			Title:   docker.DefaultClientName,
+			Address: defaultDockerHost,
+			Default: true,
+		}
+	}
+
+	docker.Sdk, err = docker.NewBuilderWithDockerEnv(defaultDockerEnv)
+	if err != nil {
+		return err
+	}
+	// 使用超时上下文，避免 docker 连接地址时间过长卡死程序
+	ctx, _ := context.WithTimeout(context.Background(), docker.ConnectDockerServerTimeout)
+	if dockerInfo, err := docker.Sdk.Client.Info(ctx); err == nil {
+		go logic.EventLogic{}.MonitorLoop()
+
+		defaultDockerEnv.DockerInfo = &docker.ClientDockerInfo{
+			Name: dockerInfo.Name,
+			ID:   dockerInfo.ID,
+		}
+
+		// 面板信息总是从默认环境中获取
+		if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
+			info.ExecIDs = make([]string, 0)
+			_ = logic.Setting{}.Save(&entity.Setting{
+				GroupName: logic.SettingGroupSetting,
+				Name:      logic.SettingGroupSettingDPanelInfo,
+				Value: &accessor.SettingValueOption{
+					DPanelInfo: &info,
+				},
+			})
+		} else {
+			_ = logic.Setting{}.Delete(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo)
+			slog.Warn("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err)
+		}
+	} else {
+		// 获取信息失败，期待用户在面板中修改默认连接的配置
+		slog.Warn("connect default docker server failed", "name", defaultDockerEnv.Name, "address", defaultDockerEnv.Address, "error", err)
+		defaultDockerEnv.DockerInfo = nil
+		docker.Sdk.Close()
+	}
+	logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
 	return nil
 }

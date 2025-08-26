@@ -3,8 +3,8 @@ package logic
 import (
 	"crypto/tls"
 	"github.com/donknap/dpanel/common/accessor"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/jordan-wright/email"
-	"log/slog"
 	"net/smtp"
 	"strconv"
 )
@@ -12,7 +12,7 @@ import (
 type Notice struct {
 }
 
-func (self Notice) Send(emailServer accessor.EmailServer, toEmail string, subject string, htmlContent string) error {
+func (self Notice) Send(emailServer *accessor.NotificationEmailServer, toEmail string, subject string, htmlContent string) error {
 	e := email.NewEmail()
 	e.From = emailServer.Email
 	e.Subject = subject
@@ -26,7 +26,10 @@ func (self Notice) Send(emailServer accessor.EmailServer, toEmail string, subjec
 		},
 	)
 	if err != nil {
-		slog.Debug("email send", "error", err)
+		if function.ErrorHasKeyword(err, "535 Login fail") {
+			return err
+		}
+		return nil
 	}
 	return nil
 }

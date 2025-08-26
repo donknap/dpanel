@@ -1,26 +1,19 @@
 package common
 
 import (
-	"context"
-	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/service/crontab"
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/types"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -50,9 +43,15 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/notice/delete", controller.Notice{}.Delete)
 
 		// 用户
-		if !function.InArrayArray(new(family.Provider).Feature(), types.FeatureFamilyXk) {
+		feature := new(family.Provider).Feature()
+		if !function.InArrayArray(feature, types.FeatureFamilyXk) {
 			cors.POST("/common/user/login", controller.User{}.Login)
 		}
+
+		if !function.InArrayArray(feature, types.FeatureFamilyPe, types.FeatureFamilyXk) {
+			cors.POST("/common/user/oauth/callback", controller.User{}.OauthCallback)
+		}
+
 		cors.POST("/common/user/create-founder", controller.User{}.CreateFounder)
 		cors.POST("/common/user/login-info", controller.User{}.LoginInfo)
 		cors.POST("/common/user/get-user-info", controller.User{}.GetUserInfo)
@@ -62,13 +61,13 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/setting/get-setting", controller.Setting{}.GetSetting)
 		cors.POST("/common/setting/save-config", controller.Setting{}.SaveConfig)
 		cors.POST("/common/setting/delete", controller.Setting{}.Delete)
+		cors.POST("/common/setting/notification-email-test", controller.Home{}.NotificationEmailTest)
 
 		cors.POST("/common/home/info", controller.Home{}.Info)
 		cors.POST("/common/home/check-new-version", controller.Home{}.CheckNewVersion)
 		cors.POST("/common/home/usage", controller.Home{}.Usage)
 		cors.POST("/common/home/upgrade-script", controller.Home{}.UpgradeScript)
 		cors.POST("/common/home/get-stat-list", controller.Home{}.GetStatList)
-		cors.POST("/common/home/email-test", controller.Home{}.EmailTest)
 
 		// 环境管理
 		cors.POST("/common/env/get-list", controller.Env{}.GetList)
@@ -122,57 +121,6 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		wsCors.GET("/common/console/container/:id", controller.Home{}.WsContainerConsole)
 		wsCors.GET("/common/console/host/:name", controller.Home{}.WsHostConsole)
 	})
-
-	// 当前如果有连接，则添加一条docker环境数据
-	defaultDockerHost := client.DefaultDockerHost
-	if e := os.Getenv(client.EnvOverrideHost); e != "" {
-		defaultDockerHost = e
-	}
-	defaultDockerEnv, err := logic.DockerEnv{}.GetDefaultEnv()
-	if err != nil {
-		defaultDockerEnv = &docker.Client{
-			Name:    docker.DefaultClientName,
-			Title:   docker.DefaultClientName,
-			Address: defaultDockerHost,
-			Default: true,
-		}
-		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
-	}
-	docker.Sdk, err = docker.NewBuilderWithDockerEnv(defaultDockerEnv)
-	if err != nil {
-		panic(err)
-	}
-
-	// 使用超时上下文，避免 docker 连接地址时间过长卡死程序
-	ctx, _ := context.WithTimeout(context.Background(), docker.ConnectDockerServerTimeout)
-	defaultDockerInfo, err := docker.Sdk.Client.Info(ctx)
-
-	if err == nil {
-		defaultDockerEnv.DockerInfo = &docker.ClientDockerInfo{
-			Name: defaultDockerInfo.Name,
-			ID:   defaultDockerInfo.ID,
-		}
-		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
-		// 获取面板信息
-		if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
-			info.ExecIDs = make([]string, 0)
-			_ = logic.Setting{}.Save(&entity.Setting{
-				GroupName: logic.SettingGroupSetting,
-				Name:      logic.SettingGroupSettingDPanelInfo,
-				Value: &accessor.SettingValueOption{
-					DPanelInfo: &info,
-				},
-			})
-		} else {
-			_ = logic.Setting{}.Delete(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo)
-			slog.Warn("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err)
-		}
-		go logic.EventLogic{}.MonitorLoop()
-	} else {
-		slog.Warn("connect default docker server failed", "name", defaultDockerEnv.Name, "address", defaultDockerEnv.Address, "error", err)
-		defaultDockerEnv.DockerInfo = nil
-		logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
-	}
 
 	// 启动时，初始化计划任务
 	if cronList, err := dao.Cron.Order(dao.Cron.ID.Desc()).Find(); err == nil {

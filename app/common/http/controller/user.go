@@ -86,8 +86,14 @@ func (self User) Login(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		redirect := "/home/overview"
+		loginSetting := accessor.Login{}
+		if ok := (logic.Setting{}).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingLogin, &loginSetting); ok && loginSetting.DefaultRedirect != "" {
+			redirect = loginSetting.DefaultRedirect
+		}
 		self.JsonResponseWithoutError(http, gin.H{
 			"accessToken": code,
+			"redirect":    redirect,
 		})
 		return
 	} else {
@@ -198,4 +204,8 @@ func (self User) CreateFounder(http *gin.Context) {
 	}
 	self.JsonSuccessResponse(http)
 	return
+}
+
+func (self User) OauthCallback(http *gin.Context) {
+
 }

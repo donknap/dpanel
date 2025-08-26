@@ -97,9 +97,7 @@ func (self User) GetUserOauthToken(user *entity.Setting, autoLogin bool) (string
 		UserId:       user.ID,
 		Username:     user.Value.Username,
 		RoleIdentity: user.Name,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24 * 7)),
-		},
+		RegisteredClaims: jwt.RegisteredClaims{},
 		AutoLogin: autoLogin,
 	}
 	userInfo.RegisteredClaims.IssuedAt = jwt.NewNumericDate(time.Now())

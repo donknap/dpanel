@@ -28,7 +28,7 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		strings.Contains(currentUrlPath, "/pro/home/login-info") ||
 		strings.Contains(currentUrlPath, "/api/common/user/create-founder") ||
 		strings.Contains(currentUrlPath, "/pro/user/reset-info") ||
-		strings.Contains(currentUrlPath, "/xk/user/oauth/callback") ||
+		strings.Contains(currentUrlPath, "/api/common/user/oauth/callback") ||
 		(!strings.HasPrefix(currentUrlPath, "/api") && !strings.HasPrefix(currentUrlPath, "/ws")) {
 		http.Next()
 		return

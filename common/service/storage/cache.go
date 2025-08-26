@@ -12,6 +12,7 @@ var (
 	CacheKeyCommonServerStartTime = "server:startTime"
 	CacheKeyXkStorageInfo         = "xk:storageInfo"
 	CacheKeyLoginFailed           = "login:failed:%s"
+	CacheKeySetting               = "setting:%s"
 )
 
 var (

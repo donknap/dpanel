@@ -26,9 +26,9 @@ var (
 	SettingGroupSettingThemeUserConfig      = "themeUserConfig"
 	SettingGroupSettingThemeConsoleConfig   = "themeConsoleConfig"
 	SettingGroupSettingDnsApi               = "dnsApi"
-	SettingGroupSettingEmailServer          = "emailServer"
 	SettingGroupSettingTag                  = "tag"
 	SettingGroupSettingLogin                = "login"
+	SettingGroupSettingNotification         = "notification"
 )
 
 // 用户相关数据
@@ -164,10 +164,10 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 				exists = true
 				*v = setting.Value.DnsApi
 			}
-		case *accessor.EmailServer:
-			if setting.Value.EmailServer != nil {
+		case *accessor.Notification:
+			if setting.Value.Notification != nil {
 				exists = true
-				*v = *setting.Value.EmailServer
+				*v = *setting.Value.Notification
 			}
 		case *accessor.ContainerCheckAllUpgrade:
 			if setting.Value.ContainerCheckAllUpgrade != nil {

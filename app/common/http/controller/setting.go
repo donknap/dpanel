@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
@@ -8,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
+	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"reflect"
 	"strings"
@@ -88,69 +90,61 @@ func (self Setting) GetSetting(http *gin.Context) {
 
 func (self Setting) SaveConfig(http *gin.Context) {
 	type ParamsValidate struct {
-		Theme       *accessor.ThemeConfig        `json:"theme"`
-		Console     *accessor.ThemeConsoleConfig `json:"console"`
-		EmailServer *accessor.EmailServer        `json:"emailServer"`
-		Login       *accessor.Login              `json:"login"`
-		TwoFa       *accessor.TwoFa              `json:"twoFa"`
+		Theme        *accessor.ThemeConfig        `json:"theme"`
+		Console      *accessor.ThemeConsoleConfig `json:"console"`
+		Notification *accessor.Notification       `json:"notification"`
+		Login        *accessor.Login              `json:"login"`
+		TwoFa        *accessor.TwoFa              `json:"twoFa"`
+		SaveCache    bool                         `json:"saveCache"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+
+	var settingRow *entity.Setting
+	var value interface{}
+
 	if params.Theme != nil {
-		err := logic.Setting{}.Save(&entity.Setting{
+		settingRow = &entity.Setting{
 			GroupName: logic.SettingGroupSetting,
 			Name:      logic.SettingGroupSettingThemeConfig,
 			Value: &accessor.SettingValueOption{
 				ThemeConfig: params.Theme,
 			},
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
 		}
+		value = params.Theme
 	}
 
 	if params.Console != nil {
-		err := logic.Setting{}.Save(&entity.Setting{
+		settingRow = &entity.Setting{
 			GroupName: logic.SettingGroupSetting,
 			Name:      logic.SettingGroupSettingThemeConsoleConfig,
 			Value: &accessor.SettingValueOption{
 				ThemeConsoleConfig: params.Console,
 			},
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
 		}
+		value = params.Console
 	}
 
-	if params.EmailServer != nil {
-		err := logic.Setting{}.Save(&entity.Setting{
+	if params.Notification != nil {
+		settingRow = &entity.Setting{
 			GroupName: logic.SettingGroupSetting,
-			Name:      logic.SettingGroupSettingEmailServer,
+			Name:      logic.SettingGroupSettingNotification,
 			Value: &accessor.SettingValueOption{
-				EmailServer: params.EmailServer,
+				Notification: params.Notification,
 			},
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
 		}
+		value = params.Notification
 	}
 
 	if params.Login != nil {
-		err := logic.Setting{}.Save(&entity.Setting{
+		settingRow = &entity.Setting{
 			GroupName: logic.SettingGroupSetting,
 			Name:      logic.SettingGroupSettingLogin,
 			Value: &accessor.SettingValueOption{
 				Login: params.Login,
 			},
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
 		}
 		// 清空登录缓存
 		for key, _ := range storage.Cache.Items() {
@@ -158,8 +152,17 @@ func (self Setting) SaveConfig(http *gin.Context) {
 				storage.Cache.Delete(key)
 			}
 		}
+		value = params.Login
 	}
 
+	err := logic.Setting{}.Save(settingRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.SaveCache && settingRow != nil {
+		storage.Cache.Set(fmt.Sprintf(storage.CacheKeySetting, settingRow.Name), value, cache.DefaultExpiration)
+	}
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -180,4 +183,22 @@ func (self Setting) Delete(http *gin.Context) {
 	}
 	self.JsonSuccessResponse(http)
 	return
+}
+
+func (self Home) NotificationEmailTest(http *gin.Context) {
+	type ParamsValidate struct {
+		EmailServer *accessor.NotificationEmailServer `json:"emailServer" binding:"required"`
+		Subject     string                            `json:"subject" binding:"required"`
+		Content     string                            `json:"content" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	err := logic.Notice{}.Send(params.EmailServer, params.EmailServer.Email, params.Subject, params.Content)
+	if err != nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSettingBasicEmailInvalid, err.Error()), 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
 }

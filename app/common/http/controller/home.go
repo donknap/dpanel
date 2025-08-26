@@ -645,25 +645,3 @@ func (self Home) UpgradeScript(http *gin.Context) {
 	})
 	return
 }
-
-func (self Home) EmailTest(http *gin.Context) {
-	type ParamsValidate struct {
-		Subject string `json:"subject" binding:"required"`
-		Content string `json:"content" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	emailServer := accessor.EmailServer{}
-	if ok := (logic.Setting{}).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingEmailServer, &emailServer); !ok {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSettingBasicEmailInvalid), 500)
-		return
-	}
-	err := logic.Notice{}.Send(emailServer, emailServer.Email, params.Subject, params.Content)
-	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSettingBasicEmailInvalid, err.Error()), 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
-}

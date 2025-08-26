@@ -24,7 +24,7 @@ type SettingValueOption struct {
 	ThemeUserConfig             *ThemeUserConfig            `json:"themeUserConfig,omitempty"`
 	ThemeConsoleConfig          *ThemeConsoleConfig         `json:"themeConsoleConfig,omitempty"`
 	DnsApi                      []DnsApi                    `json:"dnsApi,omitempty"`
-	EmailServer                 *EmailServer                `json:"emailServer,omitempty"`
+	Notification                *Notification               `json:"notification,omitempty"`
 	Tag                         []Tag                       `json:"tag,omitempty"`
 	Login                       *Login                      `json:"login,omitempty"`
 }
@@ -70,14 +70,6 @@ type DnsApi struct {
 	Env        []docker.EnvItem `json:"env,omitempty"`
 }
 
-type EmailServer struct {
-	Host   string   `json:"host,omitempty" binding:"required"`
-	Port   int      `json:"port,omitempty" binding:"required"`
-	Email  string   `json:"email,omitempty" binding:"required"`
-	Code   string   `json:"code,omitempty" binding:"required"`
-	Status []string `json:"status,omitempty"`
-}
-
 type ContainerCheckAllUpgrade struct {
 	Upgrade   int                 `json:"upgrade"`
 	Failed    int                 `json:"failed"`
@@ -103,7 +95,24 @@ type Tag struct {
 }
 
 type Login struct {
-	FailedEnable   bool `json:"failedEnable"`
-	FailedTotal    int  `json:"failedTotal"`
-	FailedLockTime int  `json:"failedLockTime"`
+	FailedEnable        bool     `json:"failedEnable,omitempty"`
+	FailedTotal         int      `json:"failedTotal,omitempty"`
+	FailedLockTime      int      `json:"failedLockTime,omitempty"`
+	NoPasswordEnable    bool     `json:"noPasswordEnable,omitempty"`
+	NoPasswordUrl       string   `json:"noPasswordUrl,omitempty"`
+	NoPasswordUserAgent string   `json:"noPasswordUserAgent,omitempty"`
+	NoPasswordIpList    []string `json:"noPasswordIpList,omitempty"`
+	DefaultRedirect     string   `json:"defaultRedirect,omitempty"`
+}
+
+type NotificationEmailServer struct {
+	Host  string `json:"host,omitempty" binding:"required"`
+	Port  int    `json:"port,omitempty" binding:"required"`
+	Email string `json:"email,omitempty" binding:"required"`
+	Code  string `json:"code,omitempty" binding:"required"`
+}
+
+type Notification struct {
+	EmailServer *NotificationEmailServer `json:"emailServer,omitempty"`
+	Status      []string                 `json:"status,omitempty"`
 }
