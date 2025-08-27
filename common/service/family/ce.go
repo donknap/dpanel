@@ -23,6 +23,7 @@ func (self Provider) Register(httpServer *server.Server) {
 func (self Provider) Feature() []string {
 	return []string{
 		types.FeatureFamilyCe,
+		types.FeatureInDPanel,
 	}
 }
 

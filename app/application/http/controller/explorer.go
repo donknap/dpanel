@@ -624,3 +624,17 @@ func (self Explorer) AttachVolume(http *gin.Context) {
 		"path":          path,
 	})
 }
+
+func (self Explorer) DestroyProxyContainer(http *gin.Context) {
+	_ = notice.Message{}.Info(".volumeMountSomeVolume")
+	explorerPlugin, err := plugin.NewPlugin(plugin.PluginExplorer, nil)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if explorerPlugin.Exists() {
+		_ = explorerPlugin.Destroy()
+	}
+	self.JsonSuccessResponse(http)
+	return
+}
