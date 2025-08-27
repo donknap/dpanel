@@ -89,11 +89,7 @@ func (self RunLog) Run(http *gin.Context) {
 		}
 	}()
 
-	_, err = io.Copy(progress, response)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+	_, _ = io.Copy(progress, response)
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"log": "",
