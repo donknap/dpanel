@@ -21,7 +21,9 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -124,7 +126,10 @@ func (self Env) Create(http *gin.Context) {
 			defer func() {
 				_ = sftp.Close()
 			}()
-			file, err := sftp.OpenFile(fmt.Sprintf("%s/.ssh/authorized_keys", string(homeDir)), os.O_CREATE|os.O_RDWR|os.O_APPEND)
+			// 这里不能使用 filepath 可能会造成运行环境与服务器路径不一致
+			authKeyFile := fmt.Sprintf("%s/.ssh/authorized_keys", string(homeDir))
+			_ = sftp.MkdirAll(fmt.Sprintf("%s/.ssh", string(homeDir)))
+			file, err := sftp.OpenFile(authKeyFile, os.O_CREATE|os.O_RDWR|os.O_APPEND)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
@@ -147,9 +152,18 @@ func (self Env) Create(http *gin.Context) {
 		}
 		// 验证是否成功配置证书可以正常连接
 		if params.RemoteType == docker.RemoteTypeSSH {
-			result, err := local.QuickRun(fmt.Sprintf("ssh -v %s@%s -p %d", params.SshServerInfo.Username, params.SshServerInfo.Address, params.SshServerInfo.Port))
+			result, err := local.QuickRun(fmt.Sprintf("ssh -v %s@%s -p %d pwd", params.SshServerInfo.Username, params.SshServerInfo.Address, params.SshServerInfo.Port))
 			if err != nil {
 				slog.Debug("docker env docker -H ssh://", "error", string(result))
+				self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvDockerApiSSHFailed"), 500)
+				return
+			}
+		}
+		// 如果当前是 windows 且使用的 wsl 中的 docker cli 还需要同步 .ssh 目录
+		if runtime.GOOS == "windows" && docker.CliInWSL() {
+			osUser, _ := user.Current()
+			if result, err := local.QuickRun(fmt.Sprintf("wsl cp -r /mnt/c/Users/%s/.ssh/* ~/.ssh/ && chmod 600 ~/.ssh/id*", filepath.Base(osUser.HomeDir))); err != nil {
+				slog.Debug("docker env copy id_rsa to wsl", "error", string(result))
 				self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvDockerApiSSHFailed"), 500)
 				return
 			}

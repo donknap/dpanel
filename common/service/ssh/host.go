@@ -8,13 +8,15 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 	"net"
 	"os"
+	"path/filepath"
 )
 
 var keyErr *knownhosts.KeyError
 
 func NewDefaultKnownHostCallback() *DefaultKnownHostsCallback {
+	homeDir, _ := os.UserHomeDir()
 	return &DefaultKnownHostsCallback{
-		path: os.ExpandEnv("$HOME/.ssh/known_hosts"),
+		path: filepath.Join(homeDir, ".ssh", "known_hosts"),
 	}
 }
 

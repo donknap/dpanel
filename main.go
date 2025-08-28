@@ -253,11 +253,9 @@ func initRSA() error {
 		for _, file := range rsaIdFiles {
 			_ = os.Remove(file)
 		}
-		for _, file := range userRsaIdFiles {
-			_, err := local.QuickRun(fmt.Sprintf("cp %s %s", file, storage.Local{}.GetCertRsaPath()))
-			if err != nil {
-				return err
-			}
+		err := function.CopyFile(storage.Local{}.GetCertRsaPath(), userRsaIdFiles...)
+		if err != nil {
+			return err
 		}
 		return nil
 	}
@@ -277,7 +275,7 @@ func initRSA() error {
 		}
 	}
 
-	err := os.CopyFS(filepath.Join(homeDir, ".ssh"), os.DirFS(storage.Local{}.GetCertRsaPath()))
+	err := function.CopyDir(filepath.Join(homeDir, ".ssh"), storage.Local{}.GetCertRsaPath())
 	if err != nil {
 		return err
 	}
