@@ -49,12 +49,12 @@ func (self RunLog) Run(http *gin.Context) {
 		option.Follow = false
 	}
 
-	response, err := docker.Sdk.Client.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	if params.Download {
+		response, err := docker.Sdk.Client.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 		out, err := function.CombineStdout(response)
 		_ = response.Close()
 		if err != nil {
@@ -67,6 +67,11 @@ func (self RunLog) Run(http *gin.Context) {
 		return
 	}
 
+	response, err := docker.Sdk.Client.ContainerLogs(progress.Context(), params.Id, option)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	progress.OnWrite = func(p string) error {
 		newReader := bytes.NewReader([]byte(p))
 		stdout, err := function.CombineStdout(newReader)
@@ -90,7 +95,6 @@ func (self RunLog) Run(http *gin.Context) {
 	}()
 
 	_, _ = io.Copy(progress, response)
-
 	self.JsonResponseWithoutError(http, gin.H{
 		"log": "",
 	})

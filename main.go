@@ -309,7 +309,9 @@ func initDefaultDocker() error {
 
 	docker.Sdk, err = docker.NewBuilderWithDockerEnv(defaultDockerEnv)
 	if err != nil {
-		return err
+		// 如果无法连接，创建一个默认 docker.sdk 期待用户在面板中修改连接配置
+		docker.Sdk, err = docker.NewBuilder(docker.WithAddress(defaultDockerEnv.Address), docker.WithDockerEnv(defaultDockerEnv))
+		return nil
 	}
 	// 使用超时上下文，避免 docker 连接地址时间过长卡死程序
 	ctx, _ := context.WithTimeout(context.Background(), docker.ConnectDockerServerTimeout)

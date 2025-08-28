@@ -92,6 +92,12 @@ func (self *Local) RunInPip() (io.ReadCloser, error) {
 	if err = self.cmd.Start(); err != nil {
 		return nil, err
 	}
+	go func() {
+		err = self.cmd.Wait()
+		if err != nil {
+			slog.Debug("run command wait", "err", "error")
+		}
+	}()
 	return readCloser{
 		cmd:  self,
 		Conn: stdout,
