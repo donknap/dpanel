@@ -82,7 +82,7 @@ func (self Client) CommandParams() []string {
 }
 
 func (self Client) CertRoot() string {
-	return filepath.Join(storage.Local{}.GetCertDockerPath(), self.Name)
+	return filepath.Join("docker", self.Name)
 }
 
 type Builder struct {
