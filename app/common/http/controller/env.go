@@ -221,7 +221,7 @@ func (self Env) Create(http *gin.Context) {
 			if s.content == "" {
 				continue
 			}
-			path := filepath.Join(client.CertRoot(), s.name)
+			path := filepath.Join(storage.Local{}.GetCertPath(), client.CertRoot(), s.name)
 			err := os.MkdirAll(filepath.Dir(path), os.ModePerm)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)

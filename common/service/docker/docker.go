@@ -73,9 +73,9 @@ func (self Client) CommandParams() []string {
 	result = append(result, "-H", self.Address)
 	if self.EnableTLS {
 		result = append(result, "--tlsverify",
-			"--tlscacert", self.TlsCa,
-			"--tlscert", self.TlsCert,
-			"--tlskey", self.TlsKey,
+			"--tlscacert", filepath.Join(storage.Local{}.GetCertPath(), self.TlsCa),
+			"--tlscert", filepath.Join(storage.Local{}.GetCertPath(), self.TlsCert),
+			"--tlskey", filepath.Join(storage.Local{}.GetCertPath(), self.TlsKey),
 		)
 	}
 	return result
