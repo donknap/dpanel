@@ -27,6 +27,7 @@ type BuildImageOption struct {
 	BuildZip               string               `json:"buildZip" binding:"omitempty"`
 	BuildArgs              []docker.EnvItem     `json:"buildArgs"`
 	Platform               docker.ImagePlatform `json:"platform"`
+	EnablePush             bool                 `json:"enablePush,omitempty"`
 }
 
 type ImageRemoteOption struct {

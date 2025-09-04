@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/image"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"io"
@@ -88,6 +90,20 @@ func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
 	_, err = io.Copy(wsBuffer, response.Body)
 	if err != nil {
 		return log.String(), err
+	}
+	if task.EnablePush {
+		tagDetail := registry.GetImageTagDetail(task.Tag)
+		registryConfig := Image{}.GetRegistryConfig(tagDetail.Uri())
+		pushResponse, err := docker.Sdk.Client.ImagePush(wsBuffer.Context(), task.Tag, image.PushOptions{
+			RegistryAuth: registryConfig.GetAuthString(),
+		})
+		if err != nil {
+			return log.String(), err
+		}
+		_, err = io.Copy(wsBuffer, pushResponse)
+		if err != nil {
+			wsBuffer.BroadcastMessage(err.Error())
+		}
 	}
 	return log.String(), nil
 }

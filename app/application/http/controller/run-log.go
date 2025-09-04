@@ -67,7 +67,7 @@ func (self RunLog) Run(http *gin.Context) {
 		return
 	}
 
-	response, err := docker.Sdk.Client.ContainerLogs(progress.Context(), params.Id, option)
+	response, err := docker.Sdk.Client.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -94,7 +94,10 @@ func (self RunLog) Run(http *gin.Context) {
 		}
 	}()
 
-	_, _ = io.Copy(progress, response)
+	_, err = io.Copy(progress, response)
+	if err != nil {
+		slog.Debug("container run log copy", "err", err)
+	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"log": "",
 	})

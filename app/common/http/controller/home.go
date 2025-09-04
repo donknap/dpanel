@@ -611,9 +611,6 @@ func (self Home) GetStatList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		_ = cmd.Close()
-	}()
 	out, err := cmd.RunInPip()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -626,8 +623,7 @@ func (self Home) GetStatList(http *gin.Context) {
 	}()
 	_, err = io.Copy(progress, out)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+		slog.Debug("home get stat list copy progress", "err", err)
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": "",

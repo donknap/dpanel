@@ -22,7 +22,7 @@ func (self Image) GetBuildTask(http *gin.Context) {
 		return
 	}
 	tagDetail := registry2.GetImageTagDetail(imageRow.Tag)
-	imageRow.Tag = tagDetail.ImageName
+	imageRow.Tag = tagDetail.BaseName
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"task": imageRow,
