@@ -2,6 +2,17 @@ package controller
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
+	"net/url"
+	"os"
+	"os/user"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/docker/docker/api/types"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -17,16 +28,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"io"
-	"log/slog"
-	"net/url"
-	"os"
-	"os/user"
-	"path/filepath"
-	"runtime"
-	"sort"
-	"strings"
-	"time"
 )
 
 type Env struct {
@@ -152,7 +153,7 @@ func (self Env) Create(http *gin.Context) {
 		}
 		// 验证是否成功配置证书可以正常连接
 		if params.RemoteType == docker.RemoteTypeSSH {
-			result, err := local.QuickRun(fmt.Sprintf("ssh -v %s@%s -p %d pwd", params.SshServerInfo.Username, params.SshServerInfo.Address, params.SshServerInfo.Port))
+			result, err := local.QuickRun(fmt.Sprintf("ssh %s@%s -p %d pwd", params.SshServerInfo.Username, params.SshServerInfo.Address, params.SshServerInfo.Port))
 			if err != nil {
 				slog.Debug("docker env docker -H ssh://", "error", string(result))
 				self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvDockerApiSSHFailed"), 500)

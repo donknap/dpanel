@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/client"
-	"github.com/donknap/dpanel/common/service/ssh"
-	"github.com/donknap/dpanel/common/service/storage"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/docker/docker/client"
+	"github.com/donknap/dpanel/common/service/ssh"
+	"github.com/donknap/dpanel/common/service/storage"
 )
 
 var (
@@ -51,7 +52,9 @@ type Client struct {
 func (self Client) CommandEnv() []string {
 	result := make([]string, 0)
 	if self.RemoteType == RemoteTypeSSH {
+		// 还需要将系统的 PATH 环境变量传递进去，否则可能会报找不到 ssh 命令
 		result = append(result, fmt.Sprintf("DOCKER_HOST=ssh://%s@%s", self.SshServerInfo.Username, self.SshServerInfo.Address))
+		result = append(result, os.Environ()...)
 		return result
 	}
 	result = append(result, fmt.Sprintf("DOCKER_HOST=%s", self.Address))
