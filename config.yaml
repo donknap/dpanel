@@ -21,7 +21,7 @@ log:
       - console
   file:
     driver: file
-    path: /var/tmp/dpanel.log
+    path: ${STORAGE_LOCAL_PATH}/logs/dpanel.log
     level: info
   console:
     driver: console

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	_ "embed"
@@ -24,8 +25,10 @@ import (
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
+	"github.com/spf13/viper"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	app "github.com/we7coreteam/w7-rangine-go/v2/src"
+	"github.com/we7coreteam/w7-rangine-go/v2/src/core/helper"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
 	"io/fs"
@@ -51,10 +54,26 @@ func main() {
 		_ = os.Setenv("STORAGE_LOCAL_PATH", filepath.Dir(exePath))
 	}
 
+	storagePath := os.Getenv("STORAGE_LOCAL_PATH")
+	storagePathStat, err := os.Stat(storagePath)
+	if err == nil && !storagePathStat.IsDir() {
+		panic(fmt.Sprintf("%s must be a directory", storagePathStat.Name()))
+	}
+	if err != nil {
+		_ = os.MkdirAll(storagePath, os.ModePerm)
+	}
+
 	myApp := app.NewApp(
 		app.Option{
 			Name:    "w7-rangine-go-skeleton",
 			Version: DPanelVersion,
+			DefaultConfigLoader: func(config *viper.Viper) {
+				config.SetConfigType("yaml")
+				err := config.MergeConfig(bytes.NewReader(helper.ParseConfigContentEnv(ConfigFile)))
+				if err != nil {
+					panic(err)
+				}
+			},
 		},
 	)
 
@@ -220,6 +239,7 @@ func initPath() error {
 		"script",
 		"storage",
 		"store",
+		"logs",
 	}
 	for _, path := range initPathList {
 		realPath := storage.Local{}.GetStorageLocalPath() + "/" + path
