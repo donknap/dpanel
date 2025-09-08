@@ -28,10 +28,10 @@ COPY ./docker/entrypoint.sh /docker/entrypoint.sh
 COPY ./docker/acme-reload.sh /docker/acme-reload.sh
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-  apk add --no-cache --update nginx musl docker-compose curl openssl tzdata git openssh-client && \
+  apk add --no-cache --update nginx musl docker-cli docker-cli-compose curl openssl tzdata git openssh-client && \
   mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
   export ${PROXY} && curl https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh | sh -s -- --install-online --config-home /dpanel/acme && \
-  chmod 755 /docker/*
+  rm /usr/bin/docker-compose && chmod 755 /docker/*
 
 WORKDIR /app/server
 VOLUME [ "/dpanel" ]
