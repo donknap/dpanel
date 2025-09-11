@@ -46,6 +46,8 @@ const (
 	ErrorMessageSystemEnvTlsInvalidCert                     = ".systemEnvTlsInvalidCert"
 	ErrorMessageSystemEnvApiTooOld                          = ".systemEnvApiTooOld"
 	ErrorMessageSystemEnvDockerApiFailed                    = ".systemEnvDockerApiFailed"
+	ErrorMessageSystemEnvDockerCreateSSHHomeDirFailed       = ".systemEnvDockerCreateSSHHomeDirFailed"
+	ErrorMessageSystemEnvDockerApiSSHFailed                 = ".systemEnvDockerApiSSHFailed"
 	ErrorMessageSystemEnvCurrentCanNotDelete                = ".systemEnvCurrentCanNotDelete"
 	ErrorMessageSystemStoreNotFoundGit                      = ".systemStoreNotFoundGit"
 	ErrorMessageSystemStoreDownloadFailed                   = ".systemStoreDownloadFailed"

@@ -1,10 +1,11 @@
 package docker
 
 import (
-	"github.com/donknap/dpanel/common/service/exec"
-	"github.com/donknap/dpanel/common/service/exec/local"
 	exec2 "os/exec"
 	"runtime"
+
+	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/donknap/dpanel/common/service/exec/local"
 )
 
 func (self Builder) Run(command ...string) (exec.Executor, error) {

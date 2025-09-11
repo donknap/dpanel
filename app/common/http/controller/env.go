@@ -129,7 +129,11 @@ func (self Env) Create(http *gin.Context) {
 			}()
 			// 这里不能使用 filepath 可能会造成运行环境与服务器路径不一致
 			authKeyFile := fmt.Sprintf("%s/.ssh/authorized_keys", string(homeDir))
-			_ = sftp.MkdirAll(fmt.Sprintf("%s/.ssh", string(homeDir)))
+			err = sftp.MkdirAll(fmt.Sprintf("%s/.ssh", string(homeDir)))
+			if err != nil {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerCreateSSHHomeDirFailed, "user", params.SshServerInfo.Username, "error", err.Error()), 500)
+				return
+			}
 			file, err := sftp.OpenFile(authKeyFile, os.O_CREATE|os.O_RDWR|os.O_APPEND)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
@@ -156,7 +160,7 @@ func (self Env) Create(http *gin.Context) {
 			result, err := local.QuickRun(fmt.Sprintf("ssh %s@%s -p %d pwd", params.SshServerInfo.Username, params.SshServerInfo.Address, params.SshServerInfo.Port))
 			if err != nil {
 				slog.Debug("docker env docker -H ssh://", "error", string(result))
-				self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvDockerApiSSHFailed"), 500)
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiSSHFailed), 500)
 				return
 			}
 		}
@@ -165,7 +169,7 @@ func (self Env) Create(http *gin.Context) {
 			osUser, _ := user.Current()
 			if result, err := local.QuickRun(fmt.Sprintf("wsl cp -r /mnt/c/Users/%s/.ssh/* ~/.ssh/ && chmod 600 ~/.ssh/id*", filepath.Base(osUser.HomeDir))); err != nil {
 				slog.Debug("docker env copy id_rsa to wsl", "error", string(result))
-				self.JsonResponseWithError(http, function.ErrorMessage(".systemEnvDockerApiSSHFailed"), 500)
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiSSHFailed), 500)
 				return
 			}
 		}
