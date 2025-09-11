@@ -50,14 +50,14 @@ clean:
 	docker stop buildx_buildkit_dpanel-builder0 && docker rm /buildx_buildkit_dpanel-builder0
 all: clean-source js amd64 arm64 armv7
 test: amd64 arm64
-#	docker buildx build \
-#	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta \
-#	--platform linux/amd64 \
-#	--build-arg APP_VERSION=${VERSION} \
-#	--build-arg APP_FAMILY=ce \
-#	--build-arg PROXY="https_proxy=http://172.16.1.198:7890 http_proxy=http://172.16.1.198:7890" \
-#	-f ./docker/Dockerfile \
-#	. --push
+	docker buildx build \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta \
+	--platform linux/amd64 \
+	--build-arg APP_VERSION=${VERSION} \
+	--build-arg APP_FAMILY=ce \
+	--build-arg PROXY="https_proxy=http://172.16.1.198:7890 http_proxy=http://172.16.1.198:7890" \
+	-f ./docker/Dockerfile \
+	. --push
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite \
 	--platform linux/amd64,linux/arm64 \
