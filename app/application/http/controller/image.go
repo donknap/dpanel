@@ -472,7 +472,9 @@ func (self Image) ImagePrune(http *gin.Context) {
 		var deleteImageSpaceReclaimed int64 = 0
 		deleteImageTotal := 0
 		useImageList := make([]string, 0)
-		if containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{}); err == nil {
+		if containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+			All: true,
+		}); err == nil {
 			useImageList = function.PluckArrayWalk(containerList, func(item container.Summary) (string, bool) {
 				return item.ImageID, true
 			})
@@ -485,9 +487,14 @@ func (self Image) ImagePrune(http *gin.Context) {
 				if !function.InArray(useImageList, item.ID) {
 					deleteImageSpaceReclaimed += item.Size
 					deleteImageTotal += 1
-					_, _ = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, item.ID, image.RemoveOptions{
-						PruneChildren: true,
-					})
+					for _, tag := range item.RepoTags {
+						_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, tag, image.RemoveOptions{
+							PruneChildren: true,
+						})
+						if err != nil {
+							slog.Debug("image prune image remove", "error", err)
+						}
+					}
 				}
 			}
 		}

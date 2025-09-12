@@ -487,3 +487,13 @@ func WithCap(caps ...string) Option {
 		return nil
 	}
 }
+
+func WithGroupAdd(gid ...string) Option {
+	return func(self *Builder) error {
+		if function.IsEmptyArray(gid) {
+			return nil
+		}
+		self.hostConfig.GroupAdd = gid
+		return nil
+	}
+}

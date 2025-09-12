@@ -46,4 +46,5 @@ type SiteEnvOption struct {
 	Placement       []docker.ValueItem        `json:"placement,omitempty"`
 	Scheduling      *docker.Scheduling        `json:"scheduling,omitempty"`
 	Restart         string                    `json:"restart,omitempty"` // Deprecated: instead RestartPolicy
+	GroupAdd        []string                  `json:"groupAdd,omitempty"`
 }
