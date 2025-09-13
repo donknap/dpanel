@@ -27,3 +27,4 @@ jobs:
             docker-compose-windows-x86_64.exe
           draft: false
           prerelease: false
+          make_latest: false

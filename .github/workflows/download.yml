@@ -37,3 +37,4 @@ jobs:
           files: toolchains/*
           draft: false
           prerelease: false
+          make_latest: false
