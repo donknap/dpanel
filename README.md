@@ -97,6 +97,9 @@ QQ: 837583876
 
     [亚洲最佳CDN、边缘和安全解决方案 - Tencent EdgeOne](https://edgeone.ai/zh?from=github)
 
+- ##### 莱卡云-专业云计算服务器提供商
+    <a href="https://www.lcayun.com/actcloud.html?from=dpanel" target="_blank"><img width="200" src="https://www.lcayun.com/upload/banner/2023-10/11/169700642979539.png" /></a>
+
 #### 感谢贡献人员
 
 [![Contributors](https://contrib.rocks/image?repo=donknap/dpanel)](https://github.com/donknap/dpanel/graphs/contributors)
