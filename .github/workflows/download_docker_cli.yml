@@ -14,7 +14,7 @@ jobs:
           cp docker/docker.exe docker-windows-x86_64.exe
           
           URL=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.assets[] | select(.name == "docker-compose-windows-x86_64.exe") | .browser_download_url')
-          curl -L "$URL"
+          wget "$URL"
       - name: Create Release
         if: always()
         uses: softprops/action-gh-release@v2
