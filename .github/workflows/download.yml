@@ -1,4 +1,4 @@
-name: Download and Release Toolchains
+name: Download Toolchains
 
 on:
   workflow_dispatch:  # 仅手动触发
