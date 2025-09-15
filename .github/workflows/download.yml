@@ -1,4 +1,4 @@
-name: Download and Release Toolchains
+name: Download Toolchains
 
 on:
   workflow_dispatch:  # 仅手动触发
@@ -37,3 +37,4 @@ jobs:
           files: toolchains/*
           draft: false
           prerelease: false
+          make_latest: false

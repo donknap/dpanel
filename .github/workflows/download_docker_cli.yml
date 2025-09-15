@@ -1,0 +1,30 @@
+name: Download Docker Cli
+on:
+  workflow_dispatch:  # 仅手动触发
+jobs:
+  download_resource:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Docker Cli x86
+        continue-on-error: true
+        run: |
+          LATEST_ZIP=$(curl -s https://download.docker.com/win/static/stable/x86_64/ | grep -oE 'docker-[0-9.]+\.zip' | tail -n 1)
+          wget https://download.docker.com/win/static/stable/x86_64/$LATEST_ZIP
+          unzip $LATEST_ZIP
+          cp docker/docker.exe docker-windows-x86_64.exe
+          
+          URL=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.assets[] | select(.name == "docker-compose-windows-x86_64.exe") | .browser_download_url')
+          wget "$URL"
+      - name: Create Release
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: docker-cli-v1
+          name: "Docker Cli Collection"
+          body: "Pre-built docker cli command"
+          files: |
+            docker-windows-x86_64.exe
+            docker-compose-windows-x86_64.exe
+          draft: false
+          prerelease: false
+          make_latest: false

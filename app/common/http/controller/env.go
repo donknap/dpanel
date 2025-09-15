@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"net/url"
 	"os"
@@ -20,7 +19,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec/local"
-	"github.com/donknap/dpanel/common/service/exec/remote"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -106,70 +104,36 @@ func (self Env) Create(http *gin.Context) {
 		defer func() {
 			sshClient.Close()
 		}()
-		homeDir, err := remote.QuickRun(sshClient, "echo $HOME")
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		slog.Debug("docker env", "ssh home", string(homeDir))
 
+		// 同步公钥，如果使用面板公钥不需要这步，人工去添加证书
 		if params.RemoteType == docker.RemoteTypeSSH && params.SshServerInfo.AuthType != ssh.SshAuthTypePemDefault {
-			publicKey, _, err := storage.GetCertRsaContent()
-			if err != nil {
+			if err := (logic.DockerEnv{}).SyncPublicKey(sshClient); err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
-			}
-			sftp, err := sshClient.NewSftpSession()
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			defer func() {
-				_ = sftp.Close()
-			}()
-			// 这里不能使用 filepath 可能会造成运行环境与服务器路径不一致
-			authKeyFile := fmt.Sprintf("%s/.ssh/authorized_keys", string(homeDir))
-			err = sftp.MkdirAll(fmt.Sprintf("%s/.ssh", string(homeDir)))
-			if err != nil {
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerCreateSSHHomeDirFailed, "user", params.SshServerInfo.Username, "error", err.Error()), 500)
-				return
-			}
-			file, err := sftp.OpenFile(authKeyFile, os.O_CREATE|os.O_RDWR|os.O_APPEND)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			defer func() {
-				_ = file.Close()
-			}()
-			content, err := io.ReadAll(file)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			if !strings.Contains(string(content), string(publicKey)) {
-				_, err = file.Write(publicKey)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
-				}
 			}
 		}
+
 		// 验证是否成功配置证书可以正常连接
 		if params.RemoteType == docker.RemoteTypeSSH {
-			result, err := local.QuickRun(fmt.Sprintf("ssh %s@%s -p %d pwd", params.SshServerInfo.Username, params.SshServerInfo.Address, params.SshServerInfo.Port))
-			if err != nil {
-				slog.Debug("docker env docker -H ssh://", "error", string(result))
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiSSHFailed), 500)
+			if err := (logic.DockerEnv{}).CheckSSHPathPermission(sshClient); err != nil {
+				slog.Debug("docker env test ssh path", "error", err)
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiSSHFailed, "error", err.Error()), 500)
+				return
+			}
+
+			if err := (logic.DockerEnv{}).CheckSSHPublicLogin(params.SshServerInfo); err != nil {
+				slog.Debug("docker env test ssh public key", "error", err)
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiSSHFailed, "error", err.Error()), 500)
 				return
 			}
 		}
+
 		// 如果当前是 windows 且使用的 wsl 中的 docker cli 还需要同步 .ssh 目录
 		if runtime.GOOS == "windows" && docker.CliInWSL() {
 			osUser, _ := user.Current()
 			if result, err := local.QuickRun(fmt.Sprintf("wsl cp -r /mnt/c/Users/%s/.ssh/* ~/.ssh/ && chmod 600 ~/.ssh/id*", filepath.Base(osUser.HomeDir))); err != nil {
 				slog.Debug("docker env copy id_rsa to wsl", "error", string(result))
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiSSHFailed), 500)
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiSSHFailed, "error", err.Error()), 500)
 				return
 			}
 		}
