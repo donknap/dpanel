@@ -31,7 +31,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -141,22 +140,16 @@ func (self Container) GetList(http *gin.Context) {
 		containerName = append(containerName, item.Names...)
 		// 如果是直接绑定到宿主机网络或是 Macvlan，端口号不会显示到容器详情中
 		// 需要通过获取镜像详情数据获取一下
-		if function.IsEmptyArray(item.Ports) {
-			if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID); err == nil && info.HostConfig != nil && !function.IsEmptyMap(info.HostConfig.PortBindings) {
+		if item.HostConfig.NetworkMode == network.NetworkHost {
+			if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID); err == nil && info.Config != nil && !function.IsEmptyMap(info.Config.ExposedPorts) {
 				ports := make([]container.Port, 0)
-				for port, bindings := range info.HostConfig.PortBindings {
-					for _, binding := range bindings {
-						hostPort, _ := strconv.Atoi(binding.HostPort)
-						if binding.HostIP == "" {
-							binding.HostIP = "0.0.0.0"
-						}
-						ports = append(ports, container.Port{
-							IP:          binding.HostIP,
-							PublicPort:  uint16(hostPort),
-							PrivatePort: uint16(port.Int()),
-							Type:        port.Proto(),
-						})
-					}
+				for port, _ := range info.Config.ExposedPorts {
+					ports = append(ports, container.Port{
+						IP:          "0.0.0.0",
+						PublicPort:  uint16(port.Int()),
+						PrivatePort: uint16(port.Int()),
+						Type:        port.Proto(),
+					})
 				}
 				result[index].Ports = ports
 			}
