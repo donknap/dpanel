@@ -67,14 +67,14 @@ func PluckArrayWalk[T interface{}, R interface{}](v []T, walk func(i T) (R, bool
 	return result
 }
 
-func PluckArrayItemWalk[T interface{}](v []T, walk func(item T) bool) (T, bool) {
+func PluckArrayItemWalk[T interface{}](v []T, walk func(item T) bool) (T, int, bool) {
 	var result T
-	for _, item := range v {
+	for i, item := range v {
 		if ok := walk(item); ok {
-			return item, true
+			return item, i, true
 		}
 	}
-	return result, false
+	return result, 0, false
 }
 
 func PluckArrayMapWalk[T interface{}, K comparable, V interface{}](v []T, walk func(item T) (K, V, bool)) map[K]V {

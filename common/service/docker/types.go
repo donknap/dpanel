@@ -80,6 +80,7 @@ type NetworkItem struct {
 const (
 	EnvValueRuleRequired = 1 << iota
 	EnvValueRuleDisabled
+	EnvValueRuleInEnvFile
 	_
 	_
 	_

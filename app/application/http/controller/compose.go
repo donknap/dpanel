@@ -151,20 +151,44 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
+	// 如果是外部任务，不插入数据库，有变动后直接修改到 .env 文件中
+	// 如果是面板创建的任务，将 .env 中原有的数据覆盖到 .env 文件中
+	// 未存在的值写入 setting 配置中
+	// .env 文件的值使终保持与文件内的一致
+	envFilePath, envFileContent, err := yamlRow.Setting.GetDefaultEnv()
 	if !function.IsEmptyArray(params.Environment) {
+		globalEnv := make([]string, 0)
 		if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
-			// 如果是外部任务，不插件数据库，有变动后直接修改原文件
-			// 提交写入 .dpanel.env 文件
-			globalEnv := function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
+			globalEnv = function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
 				return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 			})
-			envFileName := filepath.Join(filepath.Dir(yamlRow.Setting.Uri[0]), define.ComposeDefaultEnvFileName)
-			_ = os.MkdirAll(filepath.Dir(envFileName), os.ModePerm)
-			err = os.WriteFile(envFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
-		} else {
-			yamlRow.Setting.Environment = params.Environment
+			params.Environment = make([]docker.EnvItem, 0)
+		} else if err == nil && envFileContent != nil {
+			deleteParamsEnv := make([]string, 0)
+			globalEnv = function.PluckArrayWalk(strings.Split(string(envFileContent), "\n"), func(item string) (string, bool) {
+				newItem := item
+				if findItem, _, ok := function.PluckArrayItemWalk(params.Environment, func(envItem docker.EnvItem) bool {
+					return strings.HasPrefix(item, envItem.Name+"=")
+				}); ok {
+					newItem = fmt.Sprintf("%s=%s", findItem.Name, findItem.Value)
+					deleteParamsEnv = append(deleteParamsEnv, findItem.Name)
+				}
+				return newItem, true
+			})
+			params.Environment = function.PluckArrayWalk(params.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
+				return item, !function.InArray(deleteParamsEnv, item.Name)
+			})
+		}
+		if !function.IsEmptyArray(globalEnv) {
+			_ = os.MkdirAll(filepath.Dir(envFilePath), os.ModePerm)
+			err = os.WriteFile(envFilePath, []byte(strings.Join(globalEnv, "\n")), 0666)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 	}
+	yamlRow.Setting.Environment = params.Environment
 
 	if params.DeployBackground {
 		yamlRow.Setting.Status = accessor.ComposeStatusDeploying
@@ -289,7 +313,8 @@ func (self Compose) GetTask(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	// 搜索一下该项目是否有子任务
+
+	// 搜索一下该项目是否有子任务，仅为了兼容 1panel 应用商店， 1panel v2 变更了 php 环境处理方式
 	subTask := make([]*entity.Compose, 0)
 	if strings.HasPrefix(yamlRow.Setting.Store, accessor.StoreTypeOnePanel) || strings.HasPrefix(yamlRow.Setting.Store, accessor.StoreTypeOnePanelLocal) {
 		subTask = function.PluckMapWalkArray((logic.Compose{}).FindPathTask(filepath.Dir(yamlRow.Setting.GetUriFilePath())), func(item string, v *entity.Compose) (*entity.Compose, bool) {
@@ -307,7 +332,6 @@ func (self Compose) GetTask(http *gin.Context) {
 
 	tasker, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
-		slog.Debug("compose get task", "err", err)
 		// 如果获取任务失败，可能是没有文件或是Yaml文件错误，直接返回内容待用户修改
 		yaml, err := yamlRow.Setting.GetYaml()
 		if err != nil {

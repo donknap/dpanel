@@ -249,7 +249,6 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeleteFileMustDeleteTask), 500)
 			return
 		}
-		err = os.Remove(filepath.Join(filepath.Dir(composeRow.Setting.GetUriFilePath()), define.ComposeProjectEnvFileName))
 		err = os.RemoveAll(filepath.Dir(composeRow.Setting.GetUriFilePath()))
 		if err != nil {
 			slog.Debug("compose", "destroy", err)

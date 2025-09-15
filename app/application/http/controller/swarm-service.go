@@ -71,7 +71,7 @@ func (self Swarm) ServiceDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	item, ok := function.PluckArrayItemWalk(serviceList, func(item swarm.Service) bool {
+	item, _, ok := function.PluckArrayItemWalk(serviceList, func(item swarm.Service) bool {
 		return item.ID == params.Id
 	})
 	if !ok {

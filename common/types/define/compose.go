@@ -6,6 +6,5 @@ const (
 	ComposeProjectPrefix         = "dpanel-c-"
 	ComposeProjectName           = ComposeProjectPrefix + "%s"
 	ComposeProjectDeployFileName = "dpanel-deploy.yaml"
-	ComposeProjectEnvFileName    = ".dpanel.env"
 	ComposeDefaultEnvFileName    = ".env"
 )

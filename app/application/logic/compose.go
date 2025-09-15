@@ -17,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/joho/godotenv"
 	"io"
 	"log/slog"
 	"net/http"
@@ -302,6 +303,11 @@ func (self Compose) Sync(dockerEnvName string) error {
 }
 
 func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
+	projectName := fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(entity.Name, "@", "-"))
+	tasker := &compose.Task{
+		Name: projectName,
+	}
+
 	workingDir := entity.Setting.GetWorkingDir()
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
@@ -332,7 +338,14 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	}
 
 	slog.Info("compose get task", "workDir", workingDir)
-	composeRun := self.LsItem(entity.Name)
+
+	if composeRun := self.LsItem(entity.Name); composeRun != nil {
+		tasker.Status = composeRun.Status
+		if !composeRun.IsDPanel {
+			tasker.Name = entity.Name
+		}
+	}
+
 	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
 	if entity.Setting.Type == accessor.ComposeTypeRemoteUrl {
 		tempYamlFilePath := entity.Setting.GetUriFilePath()
@@ -389,78 +402,44 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		options = append(options, compose.WithYamlPath(path))
 	}
 
-	defaultEnvFileName := filepath.Join(taskFileDir, define.ComposeDefaultEnvFileName)
-	var defaultEnvFileExists error
-
 	// 如果任务中的环境变量值为空，则使用默认 .env 中的值填充
 	// 默认情况下，不管 compose 中有没有指定 env_files 都会加载 .env 文件
-	// 组合后最终的值，再写入回 .env 文件，写入时不要破坏 .env 原始文件内容，只替换变量
-
-	if _, defaultEnvFileExists = os.Stat(defaultEnvFileName); defaultEnvFileExists == nil {
-		if defaultEnvContent, err := os.ReadFile(defaultEnvFileName); err == nil {
-			for _, s := range strings.Split(string(defaultEnvContent), "\n") {
-				if name, value, exists := strings.Cut(s, "="); exists {
-					if exists, i := function.IndexArrayWalk(entity.Setting.Environment, func(i docker.EnvItem) bool {
-						if i.Name == name {
-							return true
-						}
-						return false
-					}); exists {
-						// 以 .env 中的数据为优先，因为最后保存的时候会同步一份给 .env
-						if entity.Setting.Environment[i].Value == "" {
-							entity.Setting.Environment[i].Value = value
-						}
-					} else {
-						entity.Setting.Environment = append(entity.Setting.Environment, docker.EnvItem{
-							Name:  name,
-							Value: value,
-						})
-					}
-				}
-			}
+	// 将面板添加的环境变量通过 -e 参数进行附加, .env 文件使终保持原样
+	// 用户修改环境变量时，如果在 .env 文件存在则覆盖文件，否则保存至 setting 中
+	mergeEnvironment := make([]docker.EnvItem, 0)
+	if envFile, envFileContent, err := entity.Setting.GetDefaultEnv(); err == nil {
+		if envMap, err := godotenv.UnmarshalBytes(envFileContent); err == nil {
+			mergeEnvironment = append(mergeEnvironment, function.PluckMapWalkArray(envMap, func(k string, v string) (docker.EnvItem, bool) {
+				return docker.EnvItem{
+					Name:  k,
+					Value: v,
+					Rule: &docker.ValueRuleItem{
+						Kind: docker.EnvValueRuleInEnvFile,
+					},
+				}, true
+			})...)
 		}
+		options = append(options, cli.WithEnvFiles(envFile))
 	}
 
-	if dpanelEnvContent, err := os.ReadFile(filepath.Join(taskFileDir, define.ComposeProjectEnvFileName)); err == nil {
-		for _, s := range strings.Split(string(dpanelEnvContent), "\n") {
-			if name, value, exists := strings.Cut(s, "="); exists {
-				if exists, i := function.IndexArrayWalk(entity.Setting.Environment, func(i docker.EnvItem) bool {
-					// 如果数据库中环境变量有值时，则不使用 .env 中的覆盖
-					if i.Name == name {
-						return true
-					}
-					return false
-				}); exists {
-					// .dpanel.env 中的数据强制覆盖到 .env 中
-					if entity.Setting.Environment[i].Value == "" {
-						entity.Setting.Environment[i].Value = value
-					}
-				} else {
-					entity.Setting.Environment = append(entity.Setting.Environment, docker.EnvItem{
-						Name:  name,
-						Value: value,
-					})
-				}
-			}
-		}
-	}
+	options = append(options, cli.WithDotEnv)
 
 	if !function.IsEmptyArray(entity.Setting.Environment) {
-		globalEnv := function.PluckArrayWalk(entity.Setting.Environment, func(i docker.EnvItem) (string, bool) {
-			return fmt.Sprintf("%s=%s", i.Name, i.Value), true
-		})
-		err := os.MkdirAll(filepath.Dir(defaultEnvFileName), os.ModePerm)
-		if err != nil {
-			return nil, err
-		}
-		err = os.WriteFile(defaultEnvFileName, []byte(strings.Join(globalEnv, "\n")), 0666)
-		// 环境变量只为生成 .env 文件，不能直接附加，可能会出来 环境变量中套用环境变量，产生值不对的情况
-		//options = append(options, cli.WithEnv(globalEnv))
-		options = append(options, cli.WithEnvFiles(defaultEnvFileName))
-		options = append(options, cli.WithDotEnv)
+		mergeEnvironment = append(mergeEnvironment, function.PluckArrayWalk(entity.Setting.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
+			if _, _, ok := function.PluckArrayItemWalk(mergeEnvironment, func(mergeItem docker.EnvItem) bool {
+				return mergeItem.Name == item.Name
+			}); !ok {
+				return item, true
+			}
+			return item, false
+		})...)
 	}
+	entity.Setting.Environment = mergeEnvironment
+	globalEnv := function.PluckArrayWalk(mergeEnvironment, func(i docker.EnvItem) (string, bool) {
+		return fmt.Sprintf("%s=%s", i.Name, i.Value), true
+	})
+	options = append(options, cli.WithEnv(globalEnv))
 
-	projectName := fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(entity.Name, "@", "-"))
 	if entity.Setting.Type == accessor.ComposeTypeOutPath {
 		// compose 项止名称不允许有大小写，但是compose的目录名可以包含特殊字符，这里统一用id进行区分
 		// 如果是外部任务，则保持原有名称
@@ -470,11 +449,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		// 此处还需要兼容包含 dpanel-c 前缀的外部任务
 	}
 
-	if !composeRun.IsDPanel {
-		projectName = entity.Name
-	}
-
-	options = append(options, cli.WithName(projectName))
+	options = append(options, cli.WithName(tasker.Name))
 
 	// 最终Yaml需要用到原始的compose，创建一个原始的对象
 	originalComposer, err := compose.NewCompose(options...)
@@ -483,11 +458,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		return nil, err
 	}
 
-	tasker := &compose.Task{
-		Name:     projectName,
-		Composer: originalComposer,
-		Status:   composeRun.Status,
-	}
+	tasker.Composer = originalComposer
 	return tasker, nil
 }
 
