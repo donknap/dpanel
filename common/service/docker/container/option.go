@@ -460,6 +460,10 @@ func WithHealthcheck(item *docker.HealthcheckItem) Option {
 			return nil
 		}
 		command := function.SplitCommandArray(item.Cmd)
+		if len(command) > 1 && (strings.ToUpper(command[0]) == "CMD" || strings.ToUpper(command[0]) == "CMD-SHELL") {
+			item.ShellType = command[0]
+			command = command[1:]
+		}
 		self.containerConfig.Healthcheck = &container.HealthConfig{
 			Timeout:  time.Duration(item.Timeout) * time.Second,
 			Retries:  item.Retries,
