@@ -6,6 +6,13 @@ import (
 	"embed"
 	_ "embed"
 	"fmt"
+	"io/fs"
+	"log/slog"
+	http2 "net/http"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
@@ -31,12 +38,6 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/helper"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
-	"io/fs"
-	"log/slog"
-	http2 "net/http"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 var (
@@ -278,6 +279,11 @@ func initRSA() error {
 			return err
 		}
 		return nil
+	}
+
+	// 如果用户目录的 id_rsa 不完整，删除后重新生成或是复制
+	for _, file := range userRsaIdFiles {
+		_ = os.Remove(file)
 	}
 
 	if !function.FileExists(rsaIdFiles...) {
