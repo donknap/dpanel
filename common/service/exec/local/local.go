@@ -20,7 +20,9 @@ func New(opts ...Option) (exec.Executor, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	c := &Local{
-		cmd:       &exec2.Cmd{},
+		cmd: &exec2.Cmd{
+			Env: make([]string, 0),
+		},
 		ctx:       ctx,
 		ctxCancel: cancel,
 	}
@@ -53,6 +55,14 @@ type Local struct {
 	cmd       *exec2.Cmd
 	ctx       context.Context
 	ctxCancel context.CancelFunc
+}
+
+func (self *Local) AppendEnv(env []string) {
+	self.cmd.Env = append(self.cmd.Env, env...)
+}
+
+func (self *Local) AppendSystemEnv() {
+	self.cmd.Env = append(self.cmd.Env, os.Environ()...)
 }
 
 func (self *Local) String() string {

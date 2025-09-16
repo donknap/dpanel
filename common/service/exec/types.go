@@ -14,4 +14,6 @@ type Executor interface {
 	Kill() error
 	Close() error
 	String() string
+	AppendEnv(env []string)
+	AppendSystemEnv()
 }

@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/creack/pty"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/ssh"
 	ssh2 "golang.org/x/crypto/ssh"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 )
 
@@ -59,11 +61,26 @@ type Remote struct {
 	ctxCancel context.CancelFunc
 }
 
+func (self *Remote) AppendEnv(env []string) {
+	self.Env = append(self.Env, env...)
+}
+
+func (self *Remote) AppendSystemEnv() {
+	self.Env = append(self.Env, os.Environ()...)
+}
+
 func (self *Remote) Run() error {
 	// session.Run 无法被上下文关闭，所以采用 Pip 代替
 	session, err := self.client.NewSession()
 	if err != nil {
 		return err
+	}
+	if !function.IsEmptyArray(self.Env) {
+		for _, s := range self.Env {
+			if temp := strings.Split(s, "="); len(temp) > 1 {
+				_ = session.Setenv(temp[0], strings.Join(temp[1:], "="))
+			}
+		}
 	}
 	pipeReader, pipeWriter := io.Pipe()
 
@@ -126,7 +143,13 @@ func (self *Remote) RunInPip() (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	if !function.IsEmptyArray(self.Env) {
+		for _, s := range self.Env {
+			if temp := strings.Split(s, "="); len(temp) > 1 {
+				_ = session.Setenv(temp[0], strings.Join(temp[1:], "="))
+			}
+		}
+	}
 	pipeReader, pipeWriter := io.Pipe()
 
 	go func() {

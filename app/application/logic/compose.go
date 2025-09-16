@@ -410,12 +410,15 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	if envFile, envFileContent, err := entity.Setting.GetDefaultEnv(); err == nil {
 		if envMap, err := godotenv.UnmarshalBytes(envFileContent); err == nil {
 			mergeEnvironment = append(mergeEnvironment, function.PluckMapWalkArray(envMap, func(k string, v string) (docker.EnvItem, bool) {
+				rule := &docker.ValueRuleItem{}
+				// 外部任务会直接覆盖 .env 文件所以这里全部可以修改
+				if entity.Setting.Type != accessor.ComposeTypeOutPath {
+					rule.Kind = docker.EnvValueRuleRWOnly
+				}
 				return docker.EnvItem{
 					Name:  k,
 					Value: v,
-					Rule: &docker.ValueRuleItem{
-						Kind: docker.EnvValueRuleInEnvFile,
-					},
+					Rule:  rule,
 				}, true
 			})...)
 		}

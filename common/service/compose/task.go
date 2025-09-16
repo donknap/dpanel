@@ -202,5 +202,10 @@ func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	if self.Composer != nil && self.Composer.Project != nil && self.Composer.Project.Environment != nil {
+		cmd.AppendEnv(function.PluckMapWalkArray(self.Composer.Project.Environment, func(k string, v string) (string, bool) {
+			return fmt.Sprintf("%s=%s", k, v), true
+		}))
+	}
 	return cmd.RunInPip()
 }
