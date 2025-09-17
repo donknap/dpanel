@@ -30,7 +30,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		CreatePath        bool             `json:"createPath"`
 		RemoveOrphans     bool             `json:"removeOrphans"`
 		PullImage         bool             `json:"pullImage"`
-		AutoRemove        bool             `json:"autoRemove"`
+		Build             bool             `json:"build"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -48,10 +48,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 	if !function.IsEmptyArray(params.DeployServiceName) {
 		composeRow.Setting.DeployServiceName = params.DeployServiceName
-	} else if !function.IsEmptyArray(composeRow.Setting.DeployServiceName) {
-		params.DeployServiceName = composeRow.Setting.DeployServiceName
 	}
-	composeRow.Setting.UpdatedAt = time.Now().Format(function.ShowYmdHis)
 	if composeRow.Setting.Status == accessor.ComposeStatusWaiting {
 		composeRow.Setting.CreatedAt = time.Now().Format(function.ShowYmdHis)
 	}
@@ -61,6 +58,21 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	// 添加禁用服务，只有部署的时候需要，避免在获取详情时拿不到全部服务
+	if !function.IsEmptyArray(composeRow.Setting.DeployServiceName) {
+		services, err := tasker.Project().GetServices()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		for _, item := range services {
+			if !function.InArray(composeRow.Setting.DeployServiceName, item.Name) {
+				tasker.Composer.Project = tasker.Composer.Project.WithServicesDisabled(item.Name)
+			}
+		}
+	}
+
 	// 尝试创建 compose 挂载的目录，如果运行在容器内创建也无效
 	if params.CreatePath {
 		for _, service := range tasker.Project().Services {
@@ -78,7 +90,12 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer progress.Close()
 
-	response, err := tasker.Deploy(params.DeployServiceName, params.RemoveOrphans, params.PullImage)
+	var response io.ReadCloser
+	if params.Build {
+		response, err = tasker.Build()
+	} else {
+		response, err = tasker.Deploy(params.RemoveOrphans, params.PullImage)
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -117,25 +134,11 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	// 再次验证 任务是否部署成功，从而判断要不要输出错误信息
 	tasker, err = logic.Compose{}.GetTasker(composeRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	if params.AutoRemove {
-		response1, err := tasker.Destroy(false, true)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		go func() {
-			<-progress.Done()
-			_ = response1.Close()
-		}()
-		_, err = io.Copy(progress, response1)
-		self.JsonSuccessResponse(http)
 		return
 	}
 
@@ -239,8 +242,6 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	} else {
 		composeRow.Setting.DeployServiceName = make([]string, 0)
 		composeRow.Setting.Status = ""
-		composeRow.Setting.CreatedAt = ""
-		composeRow.Setting.UpdatedAt = ""
 		_ = dao.Compose.Save(composeRow)
 	}
 

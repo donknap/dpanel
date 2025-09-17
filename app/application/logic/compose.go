@@ -82,6 +82,7 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 					v.Setting.Uri = function.PluckArrayWalk(v.Setting.Uri, func(item string) (string, bool) {
 						return filepath.Join(name, item), true
 					})
+					v.Setting.DockerEnvName = composeRow.Setting.DockerEnvName
 					return v, nil
 				}
 			}
@@ -413,7 +414,7 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 				rule := &docker.ValueRuleItem{}
 				// 外部任务会直接覆盖 .env 文件所以这里全部可以修改
 				if entity.Setting.Type != accessor.ComposeTypeOutPath {
-					rule.Kind = docker.EnvValueRuleRWOnly
+					rule.Kind = docker.EnvValueRuleInEnvFile
 				}
 				return docker.EnvItem{
 					Name:  k,
@@ -426,9 +427,9 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	}
 
 	options = append(options, cli.WithDotEnv)
-
 	if !function.IsEmptyArray(entity.Setting.Environment) {
 		mergeEnvironment = append(mergeEnvironment, function.PluckArrayWalk(entity.Setting.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
+			// 合并的时候注意要保留原有的选项
 			if _, _, ok := function.PluckArrayItemWalk(mergeEnvironment, func(mergeItem docker.EnvItem) bool {
 				return mergeItem.Name == item.Name
 			}); !ok {
@@ -453,14 +454,14 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 	}
 
 	options = append(options, cli.WithName(tasker.Name))
-
 	// 最终Yaml需要用到原始的compose，创建一个原始的对象
 	originalComposer, err := compose.NewCompose(options...)
 	if err != nil {
 		slog.Warn("compose get task ", "error", err)
 		return nil, err
 	}
-
+	y, _ := originalComposer.Project.MarshalYAML()
+	fmt.Printf("GetTasker %v \n", function.GetSha256(y))
 	tasker.Composer = originalComposer
 	return tasker, nil
 }

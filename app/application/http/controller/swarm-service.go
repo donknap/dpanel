@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/donknap/dpanel/common/accessor"
@@ -34,7 +33,7 @@ func (self Swarm) ServiceList(http *gin.Context) {
 	if params.Name != "" {
 		filter.Add("name", params.Name)
 	}
-	serviceList, err := docker.Sdk.Client.ServiceList(docker.Sdk.Ctx, types.ServiceListOptions{
+	serviceList, err := docker.Sdk.Client.ServiceList(docker.Sdk.Ctx, swarm.ServiceListOptions{
 		Status:  true,
 		Filters: filter,
 	})
@@ -63,7 +62,7 @@ func (self Swarm) ServiceDetail(http *gin.Context) {
 	if params.Id != "" {
 		filter.Add("id", params.Id)
 	}
-	serviceList, err := docker.Sdk.Client.ServiceList(docker.Sdk.Ctx, types.ServiceListOptions{
+	serviceList, err := docker.Sdk.Client.ServiceList(docker.Sdk.Ctx, swarm.ServiceListOptions{
 		Status:  true,
 		Filters: filter,
 	})
@@ -95,13 +94,13 @@ func (self Swarm) ServiceScaling(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	serviceInfo, _, err := docker.Sdk.Client.ServiceInspectWithRaw(docker.Sdk.Ctx, params.Name, types.ServiceInspectOptions{})
+	serviceInfo, _, err := docker.Sdk.Client.ServiceInspectWithRaw(docker.Sdk.Ctx, params.Name, swarm.ServiceInspectOptions{})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
-	updateOptions := types.ServiceUpdateOptions{}
+	updateOptions := swarm.ServiceUpdateOptions{}
 
 	if params.Rollback {
 		updateOptions.Rollback = "previous"
@@ -182,7 +181,7 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 
 	options := make([]swarm2.Option, 0)
 	if params.ServiceId != "" {
-		serviceInfo, _, err := docker.Sdk.Client.ServiceInspectWithRaw(docker.Sdk.Ctx, params.ServiceId, types.ServiceInspectOptions{})
+		serviceInfo, _, err := docker.Sdk.Client.ServiceInspectWithRaw(docker.Sdk.Ctx, params.ServiceId, swarm.ServiceInspectOptions{})
 		if err != nil {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted, err.Error()), 500)
 			return

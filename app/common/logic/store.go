@@ -240,6 +240,20 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 					Label: "",
 					Value: compose.ContainerDefaultName,
 				})
+				if function.InArray([]string{
+					"php5", "php7", "php8",
+				}, storeItem.Name) {
+					env = append(env, docker.EnvItem{
+						Name:  "IMAGE_NAME",
+						Label: "",
+						Value: "1panel-php:" + storeVersionItem.Name,
+					})
+					env = append(env, docker.EnvItem{
+						Name:  "PANEL_WEBSITE_DIR",
+						Label: "",
+						Value: compose.WebsiteDefaultPath,
+					})
+				}
 				for index, field := range fields {
 					envItem := docker.EnvItem{
 						Label:  field["labelZh"],

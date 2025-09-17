@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/donknap/dpanel/common/function"
@@ -26,7 +25,7 @@ func (self Swarm) TaskList(http *gin.Context) {
 	if params.Status != "" {
 		filter.Add("desired-state", params.Status)
 	}
-	list, err := docker.Sdk.Client.TaskList(docker.Sdk.Ctx, types.TaskListOptions{
+	list, err := docker.Sdk.Client.TaskList(docker.Sdk.Ctx, swarm.TaskListOptions{
 		Filters: filter,
 	})
 	if err != nil {
@@ -59,7 +58,7 @@ func (self Swarm) TaskListInNode(http *gin.Context) {
 	filter := filters.NewArgs()
 	filter.Add("node", params.NodeId)
 
-	taskList, err := docker.Sdk.Client.TaskList(docker.Sdk.Ctx, types.TaskListOptions{
+	taskList, err := docker.Sdk.Client.TaskList(docker.Sdk.Ctx, swarm.TaskListOptions{
 		Filters: filter,
 	})
 	if err != nil {
@@ -70,7 +69,7 @@ func (self Swarm) TaskListInNode(http *gin.Context) {
 	for _, task := range taskList {
 		filter1.Add("id", task.ServiceID)
 	}
-	serviceList, err := docker.Sdk.Client.ServiceList(docker.Sdk.Ctx, types.ServiceListOptions{
+	serviceList, err := docker.Sdk.Client.ServiceList(docker.Sdk.Ctx, swarm.ServiceListOptions{
 		Filters: filter1,
 	})
 	if err != nil {

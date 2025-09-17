@@ -124,7 +124,6 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	envOption.ImageId = info.Image
 	envOption.Privileged = info.HostConfig.Privileged
 	envOption.AutoRemove = info.HostConfig.AutoRemove
-	envOption.Restart = string(info.HostConfig.RestartPolicy.Name)
 	envOption.RestartPolicy = &docker.RestartPolicy{
 		Name:       string(info.HostConfig.RestartPolicy.Name),
 		MaxAttempt: info.HostConfig.RestartPolicy.MaximumRetryCount,

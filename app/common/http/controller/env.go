@@ -288,7 +288,7 @@ func (self Env) Switch(http *gin.Context) {
 
 	docker.Sdk = dockerClient
 	if dockerEnv.RemoteType == docker.RemoteTypeDocker {
-		go logic.EventLogic{}.MonitorLoop()
+		go logic.NewEventLogin().MonitorLoop()
 	}
 
 	// 清除掉统计数据

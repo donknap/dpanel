@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -9,7 +8,7 @@ import (
 )
 
 func (self Swarm) NodeList(http *gin.Context) {
-	list, err := docker.Sdk.Client.NodeList(docker.Sdk.Ctx, types.NodeListOptions{})
+	list, err := docker.Sdk.Client.NodeList(docker.Sdk.Ctx, swarm.NodeListOptions{})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -73,7 +72,7 @@ func (self Swarm) NodeRemove(http *gin.Context) {
 		return
 	}
 	if info.Swarm.ControlAvailable && params.NodeId != "" {
-		err := docker.Sdk.Client.NodeRemove(docker.Sdk.Ctx, params.NodeId, types.NodeRemoveOptions{
+		err := docker.Sdk.Client.NodeRemove(docker.Sdk.Ctx, params.NodeId, swarm.NodeRemoveOptions{
 			Force: params.Force,
 		})
 		if err != nil {
@@ -92,10 +91,10 @@ func (self Swarm) NodeRemove(http *gin.Context) {
 }
 
 func (self Swarm) NodePrune(http *gin.Context) {
-	if nodeList, err := docker.Sdk.Client.NodeList(docker.Sdk.Ctx, types.NodeListOptions{}); err == nil {
+	if nodeList, err := docker.Sdk.Client.NodeList(docker.Sdk.Ctx, swarm.NodeListOptions{}); err == nil {
 		for _, node := range nodeList {
 			if node.Status.State == swarm.NodeStateDown {
-				_ = docker.Sdk.Client.NodeRemove(docker.Sdk.Ctx, node.ID, types.NodeRemoveOptions{})
+				_ = docker.Sdk.Client.NodeRemove(docker.Sdk.Ctx, node.ID, swarm.NodeRemoveOptions{})
 			}
 		}
 	}

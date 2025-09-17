@@ -2,7 +2,7 @@ package image
 
 import (
 	"context"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/build"
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 )
@@ -10,7 +10,7 @@ import (
 func New(opts ...Option) (*Builder, error) {
 	var err error
 	c := &Builder{
-		imageBuildOption: types.ImageBuildOptions{
+		imageBuildOption: build.ImageBuildOptions{
 			Dockerfile: "Dockerfile", // 默认在根目录
 			Remove:     true,
 			NoCache:    true,
@@ -33,12 +33,12 @@ func New(opts ...Option) (*Builder, error) {
 }
 
 type Builder struct {
-	imageBuildOption types.ImageBuildOptions
+	imageBuildOption build.ImageBuildOptions
 	buildContext     io.Reader
 	ctx              context.Context
 }
 
-func (self *Builder) Execute() (response types.ImageBuildResponse, err error) {
+func (self *Builder) Execute() (response build.ImageBuildResponse, err error) {
 	response, err = docker.Sdk.Client.ImageBuild(
 		self.ctx,
 		self.buildContext,

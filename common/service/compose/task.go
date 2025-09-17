@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,7 +24,7 @@ type Task struct {
 	Status   string
 }
 
-func (self Task) Deploy(serviceName []string, removeOrphans bool, pullImage bool) (io.ReadCloser, error) {
+func (self Task) Deploy(removeOrphans bool, pullImage bool) (io.ReadCloser, error) {
 	cmd := []string{
 		//"--progress", "tty",
 		"up", "-d", "--build",
@@ -35,14 +36,15 @@ func (self Task) Deploy(serviceName []string, removeOrphans bool, pullImage bool
 		cmd = append(cmd, "--remove-orphans")
 	}
 
-	if !function.IsEmptyArray(serviceName) {
-		cmd = append(cmd, serviceName...)
+	if !function.IsEmptyArray(self.Project().DisabledServiceNames()) {
+		cmd = append(cmd, self.Project().ServiceNames()...)
 	}
 
 	response, err := self.runCommand(cmd)
 	if err != nil {
 		return nil, err
 	}
+
 	for _, item := range self.Composer.Project.Networks {
 		for _, serviceItem := range self.Composer.Project.Services {
 			for _, linkItem := range serviceItem.ExternalLinks {
@@ -54,6 +56,14 @@ func (self Task) Deploy(serviceName []string, removeOrphans bool, pullImage bool
 		}
 	}
 	return response, nil
+}
+
+func (self Task) Build() (io.ReadCloser, error) {
+	cmd := []string{
+		//"--progress", "tty",
+		"build",
+	}
+	return self.runCommand(cmd)
 }
 
 func (self Task) Destroy(deleteImage bool, deleteVolume bool) (io.ReadCloser, error) {
@@ -136,7 +146,7 @@ func (self Task) Ps() []*ContainerResult {
 		return result
 	}
 	// self.runCommand 只负责执行，Ps 命令需要返回结果
-	args := self.Composer.GetBaseCommand()
+	args := self.getBaseCommand()
 	args = append(args, "ps", "--format", "json", "--all")
 
 	cmd, err := docker.Sdk.Compose(args...)
@@ -197,7 +207,7 @@ func (self Task) GetYaml() ([2]string, error) {
 }
 
 func (self Task) runCommand(command []string) (io.ReadCloser, error) {
-	command = append(self.Composer.GetBaseCommand(), command...)
+	command = append(self.getBaseCommand(), command...)
 	cmd, err := docker.Sdk.Compose(command...)
 	if err != nil {
 		return nil, err
@@ -208,4 +218,23 @@ func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 		}))
 	}
 	return cmd.RunInPip()
+}
+
+func (self Task) getBaseCommand() []string {
+	project := self.Project()
+	cmd := make([]string, 0)
+	for _, file := range self.Project().ComposeFiles {
+		cmd = append(cmd, "-f", file)
+	}
+	cmd = append(cmd, "-p", project.Name)
+	for _, envFileName := range []string{
+		".env",
+	} {
+		envFilePath := filepath.Join(project.WorkingDir, envFileName)
+		_, err := os.Stat(envFilePath)
+		if err == nil {
+			cmd = append(cmd, "--env-file", envFilePath)
+		}
+	}
+	return cmd
 }

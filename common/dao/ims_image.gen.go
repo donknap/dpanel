@@ -6,6 +6,7 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -31,7 +32,6 @@ func newImage(db *gorm.DB, opts ...gen.DOOption) image {
 	_image.Tag = field.NewString(tableName, "tag")
 	_image.Title = field.NewString(tableName, "title")
 	_image.Setting = field.NewField(tableName, "setting")
-	_image.ImageInfo = field.NewField(tableName, "image_info")
 	_image.BuildType = field.NewString(tableName, "build_type")
 	_image.Status = field.NewInt32(tableName, "status")
 	_image.Message = field.NewString(tableName, "message")
@@ -49,7 +49,6 @@ type image struct {
 	Tag       field.String
 	Title     field.String
 	Setting   field.Field
-	ImageInfo field.Field
 	BuildType field.String
 	Status    field.Int32
 	Message   field.String
@@ -73,7 +72,6 @@ func (i *image) updateTableName(table string) *image {
 	i.Tag = field.NewString(table, "tag")
 	i.Title = field.NewString(table, "title")
 	i.Setting = field.NewField(table, "setting")
-	i.ImageInfo = field.NewField(table, "image_info")
 	i.BuildType = field.NewString(table, "build_type")
 	i.Status = field.NewInt32(table, "status")
 	i.Message = field.NewString(table, "message")
@@ -93,12 +91,11 @@ func (i *image) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (i *image) fillFieldMap() {
-	i.fieldMap = make(map[string]field.Expr, 8)
+	i.fieldMap = make(map[string]field.Expr, 7)
 	i.fieldMap["id"] = i.ID
 	i.fieldMap["tag"] = i.Tag
 	i.fieldMap["title"] = i.Title
 	i.fieldMap["setting"] = i.Setting
-	i.fieldMap["image_info"] = i.ImageInfo
 	i.fieldMap["build_type"] = i.BuildType
 	i.fieldMap["status"] = i.Status
 	i.fieldMap["message"] = i.Message
@@ -171,6 +168,8 @@ type IImageDo interface {
 	FirstOrCreate() (*entity.Image, error)
 	FindByPage(offset int, limit int) (result []*entity.Image, count int64, err error)
 	ScanByPage(result interface{}, offset int, limit int) (count int64, err error)
+	Rows() (*sql.Rows, error)
+	Row() *sql.Row
 	Scan(result interface{}) (err error)
 	Returning(value interface{}, columns ...string) IImageDo
 	UnderlyingDB() *gorm.DB

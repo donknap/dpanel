@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -274,9 +274,6 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	}
 	imageNew.Status = docker.ImageBuildStatusSuccess
 	imageNew.Message = log
-	imageNew.ImageInfo = &accessor.ImageInfoOption{
-		Id: imageNameDetail.Uri(),
-	}
 	_ = dao.Image.Save(imageNew)
 	self.JsonResponseWithoutError(http, gin.H{
 		"imageId": imageNew.ID,
@@ -305,8 +302,7 @@ func (self Image) GetList(http *gin.Context) {
 
 	var result []image.Summary
 	imageList, err := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, image.ListOptions{
-		All:            false,
-		ContainerCount: true,
+		All: false,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -480,8 +476,7 @@ func (self Image) ImagePrune(http *gin.Context) {
 			})
 		}
 		if imageList, err := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, image.ListOptions{
-			All:            true,
-			ContainerCount: true,
+			All: true,
 		}); err == nil {
 			for _, item := range imageList {
 				if !function.InArray(useImageList, item.ID) {
@@ -505,7 +500,7 @@ func (self Image) ImagePrune(http *gin.Context) {
 }
 
 func (self Image) BuildPrune(http *gin.Context) {
-	res, err := docker.Sdk.Client.BuildCachePrune(docker.Sdk.Ctx, types.BuildCachePruneOptions{
+	res, err := docker.Sdk.Client.BuildCachePrune(docker.Sdk.Ctx, build.CachePruneOptions{
 		All: true,
 	})
 	if err != nil {

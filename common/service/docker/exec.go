@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"os"
 	exec2 "os/exec"
 	"runtime"
 
@@ -63,6 +64,7 @@ func (self Builder) Compose(command ...string) (exec.Executor, error) {
 			options = append(options,
 				local.WithCommandName("docker"),
 				local.WithArgs(append(append(self.DockerEnv.CommandParams(), "compose"), command...)...),
+				local.WithEnv(os.Environ()),
 			)
 		}
 	}

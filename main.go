@@ -336,7 +336,7 @@ func initDefaultDocker() error {
 	// 使用超时上下文，避免 docker 连接地址时间过长卡死程序
 	ctx, _ := context.WithTimeout(context.Background(), docker.ConnectDockerServerTimeout)
 	if dockerInfo, err := docker.Sdk.Client.Info(ctx); err == nil {
-		go logic.EventLogic{}.MonitorLoop()
+		go logic.NewEventLogin().MonitorLoop()
 
 		defaultDockerEnv.DockerInfo = &docker.ClientDockerInfo{
 			Name: dockerInfo.Name,

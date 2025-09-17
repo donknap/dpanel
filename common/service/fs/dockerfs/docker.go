@@ -182,7 +182,7 @@ func (self Fs) readDirFromContainer(path string) ([]os.FileInfo, error) {
 	//lines := strings.Split(out, "\t")
 	// 这里不能单纯的用换行进行分隔，正常的数据中会有多余的 \n
 	lines := make([][]byte, 0)
-	reg := regexp.MustCompile(`\{d>[a-zA-Z-][a-zA-Z-]{3}[a-zA-Z-]{3}[a-zA-Z-]{3}<d\}`).FindAllStringIndex(string(out), -1)
+	reg := regexp.MustCompile(`\{d>[a-zA-Z-][a-zA-Z-]{3}[a-zA-Z-]{3}[a-zA-Z-]{3}<d\}`).FindAllStringIndex(out, -1)
 	for i, _ := range reg {
 		line := make([]byte, 0)
 		start, end := reg[i][0], 0

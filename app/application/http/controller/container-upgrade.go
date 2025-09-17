@@ -205,7 +205,7 @@ func (self Container) Ignore(http *gin.Context) {
 
 	ignore := fmt.Sprintf("%s@%s", params.Md5, params.ImageId)
 	exists, i := function.IndexArrayWalk(checkIgnore, func(i string) bool {
-		return strings.HasPrefix(string(i), params.Md5+"@")
+		return strings.HasPrefix(i, params.Md5+"@")
 	})
 
 	if params.ImageId == "" {

@@ -20,7 +20,7 @@ COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/ser
 COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
+RUN sed -i 's/dl-cdn.alpinelinux1111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update musl docker-cli docker-cli-compose tzdata git openssh-client && \
   rm /usr/bin/docker-compose
 

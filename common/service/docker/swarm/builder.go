@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/donknap/dpanel/common/service/docker"
 )
@@ -25,7 +24,7 @@ func New(opts ...Option) (*Builder, error) {
 			RollbackConfig: &swarm.UpdateConfig{},
 			EndpointSpec:   &swarm.EndpointSpec{},
 		},
-		options: types.ServiceUpdateOptions{},
+		options: swarm.ServiceUpdateOptions{},
 	}
 	for _, opt := range opts {
 		err = opt(c)
@@ -38,7 +37,7 @@ func New(opts ...Option) (*Builder, error) {
 
 type Builder struct {
 	serviceSpec swarm.ServiceSpec
-	options     types.ServiceUpdateOptions
+	options     swarm.ServiceUpdateOptions
 	Update      *swarm.Service
 }
 
@@ -53,7 +52,7 @@ func (self *Builder) Execute() (string, []string, error) {
 		response, err := docker.Sdk.Client.ServiceCreate(
 			docker.Sdk.Ctx,
 			self.serviceSpec,
-			types.ServiceCreateOptions{
+			swarm.ServiceCreateOptions{
 				EncodedRegistryAuth: self.options.EncodedRegistryAuth,
 				QueryRegistry:       self.options.QueryRegistry,
 			},

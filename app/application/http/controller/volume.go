@@ -202,8 +202,8 @@ func (self Volume) Prune(http *gin.Context) {
 		}
 		for _, item := range volumeList.Volumes {
 			has := false
-			for _, container := range containerList {
-				for _, mount := range container.Mounts {
+			for _, containerItem := range containerList {
+				for _, mount := range containerItem.Mounts {
 					if mount.Name != "" && mount.Name == item.Name {
 						has = true
 					}

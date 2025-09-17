@@ -1,29 +1,57 @@
 package logic
 
 import (
-	"fmt"
 	"github.com/docker/docker/api/types/events"
-	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"log/slog"
+	"strings"
+	"sync"
 	"time"
 )
 
-type EventLogic struct {
+func NewEventLogin() *EventLogic {
+	return &EventLogic{
+		dataPool: make([]*entity.Event, 0),
+		ticker:   time.NewTicker(10 * time.Second),
+	}
 }
 
-func (self EventLogic) MonitorLoop() {
-	slog.Debug("Event Monitor Loop")
+type EventLogic struct {
+	dataPool []*entity.Event
+	mu       sync.Mutex
+	max      int
+	ticker   *time.Ticker
+}
+
+func (self *EventLogic) Close() {
+	slog.Debug("Event monitor done", "name", docker.Sdk.Name)
+	self.commit()
+	self.ticker.Stop()
+	self.dataPool = []*entity.Event{}
+}
+
+func (self *EventLogic) MonitorLoop() {
+	slog.Debug("Event monitor start", "name", docker.Sdk.Name)
+
+	go func() {
+		for {
+			<-self.ticker.C
+			self.commit()
+		}
+	}()
+
 	messageChan, errorChan := docker.Sdk.Client.Events(docker.Sdk.Ctx, events.ListOptions{})
 	for {
 		select {
 		case <-docker.Sdk.Ctx.Done():
-			slog.Debug("event", "loop", "exit event loop")
+			self.Close()
 			return
 		case message := <-messageChan:
-			msg := ""
+			slog.Debug("Event monitor catch", "message", message)
+			var msg []string
 			switch string(message.Type) + "/" + string(message.Action) {
 			case "image/tag", "image/save", "image/push", "image/pull", "image/load",
 				"image/import", "image/delete",
@@ -31,38 +59,79 @@ func (self EventLogic) MonitorLoop() {
 				"container/stop", "container/start", "container/restart",
 				"container/kill", "container/die",
 				"container/extract-to-dir":
-				msg += message.Actor.Attributes["name"]
+				msg = []string{
+					message.Actor.Attributes["name"],
+				}
 			case "container/resize":
-				msg += fmt.Sprintf("%s: %s-%s", message.Actor.Attributes["name"],
-					message.Actor.Attributes["width"], message.Actor.Attributes["height"])
+				msg = []string{
+					message.Actor.Attributes["name"], ":",
+					message.Actor.Attributes["width"], "-", message.Actor.Attributes["height"],
+				}
 			case "volume/mount":
-				msg += fmt.Sprintf("%s, %s:%s, %s", message.Actor.Attributes["container"],
-					message.Actor.Attributes["driver"], message.Actor.Attributes["destination"], message.Actor.Attributes["read/write"])
+				msg = []string{
+					"container", message.Actor.Attributes["container"],
+					"mount", message.Actor.Attributes["destination"],
+					"driver", message.Actor.Attributes["driver"],
+					"permission", message.Actor.Attributes["read/write"],
+				}
 			case "volume/destroy":
-				msg += fmt.Sprintf("%s", message.Actor.ID)
+				msg = []string{
+					message.Actor.ID,
+				}
 			case "network/disconnect", "network/connect":
-				msg += fmt.Sprintf("%s %s", message.Actor.Attributes["name"],
-					message.Actor.Attributes["type"])
+				msg = []string{
+					"container", message.Actor.Attributes["container"][:12],
+					string(message.Action),
+					message.Actor.Attributes["name"],
+					"type", message.Actor.Attributes["type"],
+				}
 			}
-			if msg != "" {
-				eventRow := &entity.Event{
+			if msg != nil {
+				self.mu.Lock()
+				self.dataPool = append(self.dataPool, &entity.Event{
 					Type:      string(message.Type),
 					Action:    string(message.Action),
-					Message:   msg,
+					Message:   strings.Join(msg, " "),
 					CreatedAt: time.Unix(message.Time, 0).In(time.Local).Format("2006-01-02 15:04:05"),
-				}
-				_ = dao.Event.Create(eventRow)
-				time.Sleep(time.Second * 1)
+				})
+				self.mu.Unlock()
 			}
 		case err := <-errorChan:
 			if err != nil {
-				_ = dao.Event.Create(&entity.Event{
+				slog.Debug("Event monitor catch", "err", err)
+				self.mu.Lock()
+				self.dataPool = append(self.dataPool, &entity.Event{
 					Type:      "error",
 					Message:   err.Error(),
 					CreatedAt: time.Now().Format(function.ShowYmdHis),
 				})
+				self.mu.Unlock()
 			}
-			time.Sleep(time.Second)
 		}
 	}
+}
+
+func (self *EventLogic) commit() {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+
+	if len(self.dataPool) == 0 {
+		return
+	}
+
+	db, err := facade.GetDbFactory().Channel("default")
+	if err != nil {
+		slog.Debug("Event monitor commit", "err", err)
+		return
+	}
+
+	err = db.CreateInBatches(self.dataPool, len(self.dataPool)).Error
+	if err != nil {
+		slog.Debug("Event monitor commit", "len", len(self.dataPool), "err", err)
+		return
+	}
+
+	slog.Debug("Event monitor commit finish", "len", len(self.dataPool))
+	self.dataPool = []*entity.Event{}
+	return
 }

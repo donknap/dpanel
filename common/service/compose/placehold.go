@@ -11,6 +11,7 @@ import (
 // 仅在应用商店中的配置文件 data.yml 中支持
 const (
 	ContainerDefaultName = "%CONTAINER_DEFAULT_NAME%"
+	WebsiteDefaultPath   = "%WEBSITE_DEFAULT_PATH%"
 	CurrentUsername      = "%CURRENT_USERNAME%"
 	CurrentDate          = "%CURRENT_DATE%"
 	XkStoragePath        = "%XK_STORAGE_INFO%"
@@ -25,7 +26,7 @@ func NewReplaceTable(rt ...ReplaceFunc) ReplaceTable {
 			if !strings.Contains(item.Value, ContainerDefaultName) {
 				return nil
 			}
-			item.Value = strings.ReplaceAll(item.Value, ContainerDefaultName, "")
+			item.Value = strings.ReplaceAll(item.Value, ContainerDefaultName, function.GetRandomString(12))
 			return nil
 		},
 		func(item *docker.EnvItem) error {
@@ -48,6 +49,13 @@ func NewReplaceTable(rt ...ReplaceFunc) ReplaceTable {
 					}, true
 				})
 			}
+			return nil
+		},
+		func(item *docker.EnvItem) error {
+			if !strings.Contains(item.Value, WebsiteDefaultPath) {
+				return nil
+			}
+			item.Value = strings.ReplaceAll(item.Value, WebsiteDefaultPath, storage.Local{}.GetDefaultWebsitePath())
 			return nil
 		},
 	}

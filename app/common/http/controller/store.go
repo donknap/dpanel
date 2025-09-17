@@ -18,8 +18,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"gorm.io/datatypes"
-	"gorm.io/gen"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -231,6 +229,7 @@ func (self Store) Deploy(http *gin.Context) {
 	type ParamsValidate struct {
 		StoreId     int32            `json:"storeId" binding:"required"`
 		Name        string           `json:"name"`
+		Version     string           `json:"version"`
 		AppName     string           `json:"appName"`
 		Title       string           `json:"title"`
 		ComposeFile string           `json:"composeFile" binding:"required"`
@@ -247,6 +246,7 @@ func (self Store) Deploy(http *gin.Context) {
 		return
 	}
 
+	// 适配 1panel
 	if storeRow.Setting.Type == accessor.StoreTypeOnePanel {
 		if _, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, "1panel-network", network.InspectOptions{}); err != nil {
 			if _, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, "1panel-network", network.CreateOptions{}); err != nil {
@@ -280,13 +280,6 @@ func (self Store) Deploy(http *gin.Context) {
 		}
 	}
 
-	params.Name = strings.ToLower(params.Name)
-	total, err := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"))...).Count()
-	if total != 0 {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageStoreCreateNameExists, "name", params.Name), 500)
-		return
-	}
-
 	for i, item := range params.Environment {
 		if err := envReplaceTable.Replace(&item); err == nil {
 			params.Environment[i] = item
@@ -296,7 +289,7 @@ func (self Store) Deploy(http *gin.Context) {
 	}
 
 	composeNew := &entity.Compose{
-		Name:  params.Name,
+		Name:  strings.ToLower(params.Name),
 		Title: params.Title,
 		Setting: &accessor.ComposeSettingOption{
 			Type:        accessor.ComposeTypeStore,
@@ -320,7 +313,7 @@ func (self Store) Deploy(http *gin.Context) {
 		return
 	}
 
-	err = os.CopyFS(targetPath, os.DirFS(filepath.Join(storage.Local{}.GetStorePath(), filepath.Dir(params.ComposeFile))))
+	err = function.CopyDir(targetPath, filepath.Join(storage.Local{}.GetStorePath(), filepath.Dir(params.ComposeFile)))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

@@ -124,7 +124,7 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 			Volumes:       make([]types.ServiceVolumeConfig, 0),
 			Networks:      map[string]*types.ServiceNetworkConfig{},
 			Privileged:    siteOption.Privileged,
-			Restart:       siteOption.Restart,
+			Restart:       siteOption.RestartPolicy.Name,
 			CPUS:          siteOption.Cpus,
 			MemLimit:      types.UnitBytes(siteOption.Memory * 1024 * 1024),
 			WorkingDir:    siteOption.WorkDir,

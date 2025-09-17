@@ -38,10 +38,6 @@ func (self Image) TagRemote(http *gin.Context) {
 
 	slog.Debug("image remote", "type", params.Type, "tag", imageNameDetail.Uri())
 
-	if params.Type == "pull" {
-		_ = notice.Message{}.Info(".imagePull", "name", params.Tag)
-	}
-
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, params.Tag))
 	defer wsBuffer.Close()
 
@@ -74,8 +70,6 @@ func (self Image) TagRemote(http *gin.Context) {
 				if params.Platform != "" {
 					pullOption.Platform = params.Platform
 				}
-				slog.Debug("image remote proxy", "tag", imageNameDetail.Uri())
-
 				out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption)
 				if err != nil {
 					slog.Debug("image remote pull", "error", err)
@@ -108,7 +102,9 @@ func (self Image) TagRemote(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
+	if params.Type == "pull" {
+		_ = notice.Message{}.Info(".imagePull", "name", imageNameDetail.Uri())
+	}
 	err = logic.DockerTask{}.ImageRemote(wsBuffer, out)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
