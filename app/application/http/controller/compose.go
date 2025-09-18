@@ -123,7 +123,7 @@ func (self Compose) Create(http *gin.Context) {
 
 	overrideYamlFileName := "dpanel-override.yaml"
 	if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
-		// 外部 compose 的覆盖文件采用同名
+		// 外部 compose 的覆盖文件添加文件前缀，避免同目录中可能有多个文件导致重复
 		overrideYamlFileName = fmt.Sprintf("dpanel-%s-override.yaml", yamlRow.Name)
 	}
 	overrideYamlFilePath := filepath.Join(filepath.Dir(yamlRow.Setting.GetUriFilePath()), overrideYamlFileName)
@@ -151,49 +151,19 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
-	// 如果是外部任务，不插入数据库，有变动后直接修改到 .env 文件中
-	// 如果是面板创建的任务，将 .env 中原有的数据覆盖到 .env 文件中
-	// 未存在的值写入 setting 配置中
-	// .env 文件的值使终保持与文件内的一致
-	envFilePath, envFileContent, err := yamlRow.Setting.GetDefaultEnv()
-	if !function.IsEmptyArray(params.Environment) {
-		globalEnv := make([]string, 0)
-		if yamlRow.Setting.Type == accessor.ComposeTypeOutPath {
-			globalEnv = function.PluckArrayWalk(params.Environment, func(i docker.EnvItem) (string, bool) {
-				return fmt.Sprintf("%s=%s", i.Name, i.Value), true
-			})
-			params.Environment = make([]docker.EnvItem, 0)
-		} else if err == nil && envFileContent != nil {
-			deleteParamsEnv := make([]string, 0)
-			globalEnv = function.PluckArrayWalk(strings.Split(string(envFileContent), "\n"), func(item string) (string, bool) {
-				newItem := item
-				if findItem, _, ok := function.PluckArrayItemWalk(params.Environment, func(envItem docker.EnvItem) bool {
-					return strings.HasPrefix(item, envItem.Name+"=")
-				}); ok {
-					newItem = fmt.Sprintf("%s=%s", findItem.Name, findItem.Value)
-					deleteParamsEnv = append(deleteParamsEnv, findItem.Name)
-				}
-				return newItem, true
-			})
-			params.Environment = function.PluckArrayWalk(params.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
-				return item, !function.InArray(deleteParamsEnv, item.Name)
-			})
-		}
-		if !function.IsEmptyArray(globalEnv) {
-			_ = os.MkdirAll(filepath.Dir(envFilePath), os.ModePerm)
-			err = os.WriteFile(envFilePath, []byte(strings.Join(globalEnv, "\n")), 0666)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
-	}
 	yamlRow.Setting.Environment = params.Environment
 
 	if params.DeployBackground {
 		yamlRow.Setting.Status = accessor.ComposeStatusDeploying
 	} else {
 		yamlRow.Setting.Status = ""
+	}
+
+	// 验证任务，并初始化各种配置
+	_, err = logic.Compose{}.GetTasker(yamlRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 
 	if yamlRow.ID > 0 {
@@ -444,7 +414,6 @@ func (self Compose) GetFromUri(http *gin.Context) {
 func (self Compose) Parse(http *gin.Context) {
 	type ParamsValidate struct {
 		Yaml        []string         `json:"yaml" binding:"required"`
-		Id          string           `json:"id"`
 		Environment []docker.EnvItem `json:"environment"`
 	}
 	params := ParamsValidate{}
@@ -455,32 +424,18 @@ func (self Compose) Parse(http *gin.Context) {
 	var composer *compose.Wrapper
 	var err error
 
-	if params.Id != "" {
-		composeRow, err := logic.Compose{}.Get(params.Id)
-		if err != nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
-			return
-		}
-		tasker, err := logic.Compose{}.GetTasker(composeRow)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		composer = tasker.Composer
-	} else {
-		options := make([]cli.ProjectOptionsFn, 0)
-		if !function.IsEmptyArray(params.Environment) {
-			options = append(options, compose.WithDockerEnvItem(params.Environment...))
-		}
-		options = append(options, compose.WithYamlContent(params.Yaml...))
-
-		composer, err = compose.NewCompose(options...)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		_ = os.RemoveAll(composer.Project.WorkingDir)
+	options := make([]cli.ProjectOptionsFn, 0)
+	if !function.IsEmptyArray(params.Environment) {
+		options = append(options, compose.WithDockerEnvItem(params.Environment...))
 	}
+	options = append(options, compose.WithYamlContent(params.Yaml...))
+
+	composer, err = compose.NewCompose(options...)
+	if err != nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", err.Error()), 500)
+		return
+	}
+	_ = os.RemoveAll(composer.Project.WorkingDir)
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"project":     composer.Project,

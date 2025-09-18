@@ -90,6 +90,11 @@ func (self Task) Destroy(deleteImage bool, deleteVolume bool) (io.ReadCloser, er
 	if deleteVolume {
 		cmd = append(cmd, "--volumes")
 	}
+
+	if !function.IsEmptyArray(self.Project().DisabledServiceNames()) {
+		cmd = append(cmd, self.Project().DisabledServiceNames()...)
+	}
+
 	return self.runCommand(cmd)
 }
 

@@ -1,7 +1,10 @@
 package compose
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/cli"
@@ -11,6 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/sirupsen/logrus"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -86,10 +90,42 @@ func NewCompose(opts ...cli.ProjectOptionsFn) (*Wrapper, error) {
 		return nil, err
 	}
 
+	originalFormatter := logrus.StandardLogger().Formatter
+	originalOutput := logrus.StandardLogger().Out
+
+	bufOut := new(bytes.Buffer)
+	logrus.SetOutput(bufOut)
+	logrus.SetFormatter(&logrus.JSONFormatter{
+		PrettyPrint:       false,
+		DisableTimestamp:  true,
+		DisableHTMLEscape: true,
+	})
+	defer func() {
+		logrus.SetOutput(originalOutput)
+		logrus.SetFormatter(originalFormatter)
+	}()
+
 	project, err := options.LoadProject(context.Background())
 	if err != nil {
 		return nil, err
 	}
+
+	if bufOut.Len() > 0 {
+		msg := make([]string, 0)
+		var data map[string]string
+		reader := bufio.NewReader(bufOut)
+		for {
+			line, _, err := reader.ReadLine()
+			if err != nil {
+				break
+			}
+			if err = json.Unmarshal(line, &data); err == nil {
+				msg = append(msg, data["msg"])
+			}
+		}
+		return nil, errors.New(strings.Join(msg, ", \n"))
+	}
+
 	wrapper := &Wrapper{
 		Project: project,
 	}

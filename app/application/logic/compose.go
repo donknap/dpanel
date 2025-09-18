@@ -303,13 +303,13 @@ func (self Compose) Sync(dockerEnvName string) error {
 	return nil
 }
 
-func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
-	projectName := fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(entity.Name, "@", "-"))
+func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error) {
+	projectName := fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(dbRow.Name, "@", "-"))
 	tasker := &compose.Task{
 		Name: projectName,
 	}
 
-	workingDir := entity.Setting.GetWorkingDir()
+	workingDir := dbRow.Setting.GetWorkingDir()
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
 	// windows 下无法使用 link 目录对齐到宿主机目录
@@ -340,21 +340,21 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 
 	slog.Info("compose get task", "workDir", workingDir)
 
-	if composeRun := self.LsItem(entity.Name); composeRun != nil {
+	if composeRun := self.LsItem(dbRow.Name); composeRun != nil {
 		tasker.Status = composeRun.Status
 		if !composeRun.IsDPanel {
-			tasker.Name = entity.Name
+			tasker.Name = dbRow.Name
 		}
 	}
 
 	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
-	if entity.Setting.Type == accessor.ComposeTypeRemoteUrl {
-		tempYamlFilePath := entity.Setting.GetUriFilePath()
+	if dbRow.Setting.Type == accessor.ComposeTypeRemoteUrl {
+		tempYamlFilePath := dbRow.Setting.GetUriFilePath()
 		err := os.MkdirAll(filepath.Dir(tempYamlFilePath), os.ModePerm)
 		if err != nil {
 			return nil, err
 		}
-		response, err := http.Get(entity.Setting.RemoteUrl)
+		response, err := http.Get(dbRow.Setting.RemoteUrl)
 		if err != nil {
 			return nil, err
 		}
@@ -371,29 +371,29 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		}
 	}
 
-	taskFileDir := filepath.Join(workingDir, filepath.Dir(entity.Setting.Uri[0]))
+	taskFileDir := filepath.Join(workingDir, filepath.Dir(dbRow.Setting.Uri[0]))
 
 	yamlFilePath := make([]string, 0)
 
-	if entity.Setting.Type == accessor.ComposeTypeOutPath {
-		taskFileDir = filepath.Join(filepath.Dir(entity.Setting.Uri[0]))
+	if dbRow.Setting.Type == accessor.ComposeTypeOutPath {
+		taskFileDir = filepath.Join(filepath.Dir(dbRow.Setting.Uri[0]))
 
 		// 外部路径分两种，一种是原目录挂载，二是将Yaml文件放置到存储目录中（这种情况还是会当成挂载文件来对待）
 		// 外部任务也可能是 dpanel 面板创建的，面板会将 compose 的文件地址与宿主机中的保持一致
 		// 就会导致无法找到真正的文件，需要把文件中的主机路径，还是需要再添加一个软链接
-		for _, item := range entity.Setting.Uri {
+		for _, item := range dbRow.Setting.Uri {
 			yamlFilePath = append(yamlFilePath, item)
 		}
 
 		// 查找当前目录下是否有 dpanel-override 文件
-		overrideFilePath := filepath.Join(taskFileDir, fmt.Sprintf("dpanel-%s-override.yaml", entity.Name))
+		overrideFilePath := filepath.Join(taskFileDir, fmt.Sprintf("dpanel-%s-override.yaml", dbRow.Name))
 		if len(yamlFilePath) > 0 && !function.InArray(yamlFilePath, overrideFilePath) {
 			if _, err := os.Stat(overrideFilePath); err == nil {
 				yamlFilePath = append(yamlFilePath, overrideFilePath)
 			}
 		}
 	} else {
-		for _, item := range entity.Setting.Uri {
+		for _, item := range dbRow.Setting.Uri {
 			yamlFilePath = append(yamlFilePath, filepath.Join(taskFileDir, filepath.Base(item)))
 		}
 	}
@@ -403,34 +403,54 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 		options = append(options, compose.WithYamlPath(path))
 	}
 
-	// 如果任务中的环境变量值为空，则使用默认 .env 中的值填充
-	// 默认情况下，不管 compose 中有没有指定 env_files 都会加载 .env 文件
-	// 将面板添加的环境变量通过 -e 参数进行附加, .env 文件使终保持原样
-	// 用户修改环境变量时，如果在 .env 文件存在则覆盖文件，否则保存至 setting 中
-	mergeEnvironment := make([]docker.EnvItem, 0)
-	if envFile, envFileContent, err := entity.Setting.GetDefaultEnv(); err == nil {
+	// 默认情况下，compose 会加载 .env 文件
+	// 构建时，将 .env 文件与 setting 附加的环境变量通过调用命令时的环境变量指定
+	// 用户修改环境变量时，如果未在 .env 文件中的变量保存至 setting ，存在 env 文件中的则直接写入 .env 文件
+	// task 任务数据的 setting environment 字段则是将两种数据合并返回
+	// 在提交保存时，通过过滤器，将 EnvInFile 规则的过滤掉
+	allEnvironment := make([]docker.EnvItem, 0)
+	if envFilePath, envFileContent, err := dbRow.Setting.GetDefaultEnv(); err == nil {
 		if envMap, err := godotenv.UnmarshalBytes(envFileContent); err == nil {
-			mergeEnvironment = append(mergeEnvironment, function.PluckMapWalkArray(envMap, func(k string, v string) (docker.EnvItem, bool) {
+			allEnvironment = append(allEnvironment, function.PluckMapWalkArray(envMap, func(k string, v string) (docker.EnvItem, bool) {
 				rule := &docker.ValueRuleItem{}
-				// 外部任务会直接覆盖 .env 文件所以这里全部可以修改
-				if entity.Setting.Type != accessor.ComposeTypeOutPath {
+				// 外部任务会直接覆盖 .env 文件，所以这里不配置规则
+				if dbRow.Setting.Type != accessor.ComposeTypeOutPath {
 					rule.Kind = docker.EnvValueRuleInEnvFile
 				}
+				// 如果提交数据中有新的值，则重写 .env 文件
+				value := v
+				if newItem, _, ok := function.PluckArrayItemWalk(dbRow.Setting.Environment, func(item docker.EnvItem) bool {
+					return item.Name == k
+				}); ok {
+					value = newItem.Value
+				}
+				envMap[k] = value
 				return docker.EnvItem{
 					Name:  k,
-					Value: v,
+					Value: value,
 					Rule:  rule,
 				}, true
 			})...)
+
+			_ = os.MkdirAll(filepath.Dir(envFilePath), os.ModePerm)
+			newEnvFileContent, err := godotenv.Marshal(envMap)
+			if err != nil {
+				return nil, err
+			}
+			err = os.WriteFile(envFilePath, []byte(newEnvFileContent), 0666)
+			if err != nil {
+				return nil, err
+			}
 		}
-		options = append(options, cli.WithEnvFiles(envFile))
+		options = append(options, cli.WithEnvFiles(envFilePath))
 	}
 
 	options = append(options, cli.WithDotEnv)
-	if !function.IsEmptyArray(entity.Setting.Environment) {
-		mergeEnvironment = append(mergeEnvironment, function.PluckArrayWalk(entity.Setting.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
+	// dbRow 中的 env 提交过来的值，所以这里包括了文件中及附加的值，这里筛选出来，避免客户端显示重复
+	if !function.IsEmptyArray(dbRow.Setting.Environment) {
+		allEnvironment = append(allEnvironment, function.PluckArrayWalk(dbRow.Setting.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
 			// 合并的时候注意要保留原有的选项
-			if _, _, ok := function.PluckArrayItemWalk(mergeEnvironment, func(mergeItem docker.EnvItem) bool {
+			if _, _, ok := function.PluckArrayItemWalk(allEnvironment, func(mergeItem docker.EnvItem) bool {
 				return mergeItem.Name == item.Name
 			}); !ok {
 				return item, true
@@ -438,13 +458,14 @@ func (self Compose) GetTasker(entity *entity.Compose) (*compose.Task, error) {
 			return item, false
 		})...)
 	}
-	entity.Setting.Environment = mergeEnvironment
-	globalEnv := function.PluckArrayWalk(mergeEnvironment, func(i docker.EnvItem) (string, bool) {
+	dbRow.Setting.Environment = allEnvironment
+
+	globalEnv := function.PluckArrayWalk(allEnvironment, func(i docker.EnvItem) (string, bool) {
 		return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 	})
 	options = append(options, cli.WithEnv(globalEnv))
 
-	if entity.Setting.Type == accessor.ComposeTypeOutPath {
+	if dbRow.Setting.Type == accessor.ComposeTypeOutPath {
 		// compose 项止名称不允许有大小写，但是compose的目录名可以包含特殊字符，这里统一用id进行区分
 		// 如果是外部任务，则保持原有名称
 		// 如果该任务已经运行，但是不包含面板dpanel-c前缀，则表示该任务并非是面板创建的

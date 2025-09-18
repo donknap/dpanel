@@ -16,6 +16,7 @@ const (
 	ErrorMessageComposeDisableStorageType                   = ".composeDisableStorageType"
 	ErrorMessageComposeDisableStore                         = ".composeDisableStore"
 	ErrorMessageComposeDeleteMustDestroyContainer           = ".composeDeleteMustDestroyContainer"
+	ErrorMessageComposeParseYamlIncorrect                   = ".composeParseYamlIncorrect"
 	ErrorMessageStoreCreateNameExists                       = ".storeCreateNameExists"
 	ErrorMessageContainerUpgradeDPanel                      = ".containerUpgradeDPanel"
 	ErrorMessageContainerExplorerInvalidFilename            = ".containerExplorerInvalidFilename"

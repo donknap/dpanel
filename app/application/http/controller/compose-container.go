@@ -195,11 +195,12 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 func (self Compose) ContainerDestroy(http *gin.Context) {
 	type ParamsValidate struct {
-		Id           string `json:"id" binding:"required"`
-		DeleteImage  bool   `json:"deleteImage"`
-		DeleteVolume bool   `json:"deleteVolume"`
-		DeleteData   bool   `json:"deleteData"`
-		DeletePath   bool   `json:"deletePath"`
+		Id                 string   `json:"id" binding:"required"`
+		DeleteImage        bool     `json:"deleteImage"`
+		DeleteVolume       bool     `json:"deleteVolume"`
+		DeleteData         bool     `json:"deleteData"`
+		DeletePath         bool     `json:"deletePath"`
+		DestroyServiceName []string `json:"destroyServiceName"`
 	}
 
 	params := ParamsValidate{}
@@ -216,6 +217,13 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	if !function.IsEmptyArray(params.DestroyServiceName) {
+		for _, item := range params.DestroyServiceName {
+			tasker.Composer.Project = tasker.Composer.Project.WithServicesDisabled(item)
+		}
+	}
+
 	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer progress.Close()
 
