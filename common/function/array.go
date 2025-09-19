@@ -3,6 +3,7 @@ package function
 import (
 	"cmp"
 	"reflect"
+	"sort"
 )
 
 func IsEmptyArray[T interface{}](v []T) bool {
@@ -137,4 +138,29 @@ func FindArrayValueIndex(items interface{}, value ...interface{}) (exists bool, 
 	} else {
 		return false, nil
 	}
+}
+
+func CombinedArrayValueCount[T cmp.Ordered](v []T, callback func(key T, count int)) map[T]int {
+	nbByStatus := map[T]int{}
+	keys := make([]T, 0)
+	for _, status := range v {
+		nb, ok := nbByStatus[status]
+		if !ok {
+			nb = 0
+			keys = append(keys, status)
+		}
+		nbByStatus[status] = nb + 1
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+
+	for _, key := range keys {
+		nb := nbByStatus[key]
+		if callback != nil {
+			callback(key, nb)
+		}
+	}
+
+	return nbByStatus
 }

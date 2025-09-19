@@ -76,7 +76,7 @@ func WithDockerEnvItem(envItem ...docker.EnvItem) cli.ProjectOptionsFn {
 	}
 }
 
-func NewCompose(opts ...cli.ProjectOptionsFn) (*Wrapper, error) {
+func NewCompose(opts ...cli.ProjectOptionsFn) (wrapper *Wrapper, warning , err error) {
 	// 自定义解析
 	opts = append(opts,
 		cli.WithExtension(ExtensionName, Ext{}),
@@ -87,7 +87,7 @@ func NewCompose(opts ...cli.ProjectOptionsFn) (*Wrapper, error) {
 		opts...,
 	)
 	if err != nil {
-		return nil, err
+		return nil, warning, err
 	}
 
 	originalFormatter := logrus.StandardLogger().Formatter
@@ -107,7 +107,7 @@ func NewCompose(opts ...cli.ProjectOptionsFn) (*Wrapper, error) {
 
 	project, err := options.LoadProject(context.Background())
 	if err != nil {
-		return nil, err
+		return nil, warning, err
 	}
 
 	if bufOut.Len() > 0 {
@@ -119,17 +119,17 @@ func NewCompose(opts ...cli.ProjectOptionsFn) (*Wrapper, error) {
 			if err != nil {
 				break
 			}
-			if err = json.Unmarshal(line, &data); err == nil {
+			if err = json.Unmarshal(line, &data); err == nil && data["level"] != "debug" {
 				msg = append(msg, data["msg"])
 			}
 		}
-		return nil, errors.New(strings.Join(msg, ", \n"))
+		warning = errors.New(strings.Join(msg, ", \n"))
 	}
 
-	wrapper := &Wrapper{
+	wrapper = &Wrapper{
 		Project: project,
 	}
-	return wrapper, nil
+	return wrapper, warning, nil
 }
 
 func NewComposeBySiteEnvMap(options map[string]accessor.SiteEnvOption) (*Wrapper, error) {

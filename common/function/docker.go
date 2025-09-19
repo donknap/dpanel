@@ -40,7 +40,7 @@ func SplitStdout(reader io.Reader) (stdout bytes.Buffer, stderr bytes.Buffer, er
 	return stdout, stderr, nil
 }
 
-func CombineStdout(reader io.Reader) (out bytes.Buffer, err error) {
+func CombinedStdout(reader io.Reader) (out bytes.Buffer, err error) {
 	newReader := bufio.NewReader(reader)
 	_, err = stdcopy.StdCopy(&out, &out, newReader)
 	if err != nil {

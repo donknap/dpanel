@@ -13,13 +13,14 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
@@ -49,13 +50,9 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	if !function.IsEmptyArray(params.DeployServiceName) {
 		composeRow.Setting.DeployServiceName = params.DeployServiceName
 	}
-	if composeRow.Setting.Status == accessor.ComposeStatusWaiting {
-		composeRow.Setting.CreatedAt = time.Now().Format(function.ShowYmdHis)
-	}
-
-	tasker, err := logic.Compose{}.GetTasker(composeRow)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	tasker, warning, err := logic.Compose{}.GetTasker(composeRow)
+	if err != nil || warning != nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
 	}
 
@@ -136,13 +133,13 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 
 	// 再次验证 任务是否部署成功，从而判断要不要输出错误信息
-	tasker, err = logic.Compose{}.GetTasker(composeRow)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	tasker, warning, err = logic.Compose{}.GetTasker(composeRow)
+	if err != nil || warning != nil {
+		self.JsonResponseWithError(http, errors.Join(warning, err), 500)
 		return
 	}
 
-	taskContainerList := logic.Compose{}.GetTaskContainer(composeRow.Name)
+	taskContainerList := logic.Compose{}.Ps(composeRow.Name)
 	if function.IsEmptyArray(taskContainerList) {
 		self.JsonResponseWithError(http, errors.New(lastMessage), 500)
 		return
@@ -212,7 +209,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	tasker, err := logic.Compose{}.GetTasker(composeRow)
+	tasker, _, err := logic.Compose{}.GetTasker(composeRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -246,6 +243,11 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		_, err = dao.Compose.Where(dao.Compose.ID.Eq(composeRow.ID)).Delete()
 		if err != nil {
 			slog.Debug("compose", "destroy", err)
+		} else {
+			facade.GetEvent().Publish(event.ComposeDeleteEvent, event.ComposePayload{
+				Compose: composeRow,
+				Ctx:     http,
+			})
 		}
 	} else {
 		composeRow.Setting.DeployServiceName = make([]string, 0)
@@ -283,7 +285,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	tasker, err := logic.Compose{}.GetTasker(composeRow)
+	tasker, _, err := logic.Compose{}.GetTasker(composeRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -327,7 +329,7 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	tasker, err := logic.Compose{}.GetTasker(composeRow)
+	tasker, _, err := logic.Compose{}.GetTasker(composeRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -367,7 +369,7 @@ func (self Compose) ContainerLog(http *gin.Context) {
 
 	wsBuffer.OnWrite = func(p string) error {
 		newReader := bytes.NewReader([]byte(p))
-		stdout, err := function.CombineStdout(newReader)
+		stdout, err := function.CombinedStdout(newReader)
 		if err != nil {
 			wsBuffer.BroadcastMessage(p)
 		} else {

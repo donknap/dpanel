@@ -223,7 +223,7 @@ func (self Swarm) Log(http *gin.Context) {
 		return
 	}
 	if params.Download {
-		buffer, err := function.CombineStdout(response)
+		buffer, err := function.CombinedStdout(response)
 		_ = response.Close()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -237,7 +237,7 @@ func (self Swarm) Log(http *gin.Context) {
 
 	progress.OnWrite = func(p string) error {
 		newReader := bytes.NewReader([]byte(p))
-		stdout, err := function.CombineStdout(newReader)
+		stdout, err := function.CombinedStdout(newReader)
 		if err != nil {
 			progress.BroadcastMessage(p)
 		} else {

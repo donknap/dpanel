@@ -1,23 +1,18 @@
 package compose
 
 import (
-	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 // docker compose 任务执行，包含 部署，销毁，控制
-
 type Task struct {
 	Name     string
 	Composer *Wrapper
@@ -125,77 +120,6 @@ func (self Task) Logs(tail int, showTime, follow bool) (io.ReadCloser, error) {
 
 func (self Task) Project() *types.Project {
 	return self.Composer.Project
-}
-
-type ContainerResult struct {
-	Name       string                      `json:"name"`
-	Project    string                      `json:"project"`
-	Service    string                      `json:"service"`
-	Publishers []ContainerPublishersResult `json:"publishers"`
-	State      string                      `json:"state"`
-	Status     string                      `json:"status"`
-	Health     string
-}
-
-type ContainerPublishersResult struct {
-	URL           string `json:"url"`
-	TargetPort    uint16 `json:"targetPort"`
-	PublishedPort uint16 `json:"publishedPort"`
-	Protocol      string `json:"protocol"`
-}
-
-// Ps Deprecated /**
-func (self Task) Ps() []*ContainerResult {
-	result := make([]*ContainerResult, 0)
-	if self.Name == "" {
-		return result
-	}
-	// self.runCommand 只负责执行，Ps 命令需要返回结果
-	args := self.getBaseCommand()
-	args = append(args, "ps", "--format", "json", "--all")
-
-	cmd, err := docker.Sdk.Compose(args...)
-	if err != nil {
-		return result
-	}
-
-	out, err := cmd.RunWithResult()
-	if err != nil {
-		return result
-	}
-
-	if strings.HasPrefix(string(out), "[{") {
-		// 兼容 docker-compose ps 返回数据
-		temp := make([]*ContainerResult, 0)
-		err := json.Unmarshal(out, &temp)
-		if err != nil {
-			slog.Debug("compose task docker-compose failed", err.Error())
-			return nil
-		}
-		return temp
-	} else {
-		newReader := bufio.NewReader(bytes.NewReader(out))
-		line := make([]byte, 0)
-		for {
-			t, isPrefix, err := newReader.ReadLine()
-			if err == io.EOF {
-				break
-			}
-			line = append(line, t...)
-			if isPrefix {
-				continue
-			}
-			temp := ContainerResult{}
-			if err = json.Unmarshal(line, &temp); err == nil {
-				if temp.Health != "" {
-					temp.State = temp.Health
-				}
-				result = append(result, &temp)
-			}
-			line = make([]byte, 0)
-		}
-		return result
-	}
 }
 
 func (self Task) GetYaml() ([2]string, error) {

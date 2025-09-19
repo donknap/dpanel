@@ -3,6 +3,7 @@ package controller
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/donknap/dpanel/app/application/logic"
@@ -21,7 +22,6 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gen"
 	"io"
-	"log/slog"
 	http2 "net/http"
 	"os"
 	"path/filepath"
@@ -88,6 +88,7 @@ func (self Compose) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
 			return
 		}
+		createTime := time.Now().Local().Format(time.DateTime)
 		yamlRow = &entity.Compose{
 			Title: params.Title,
 			Name:  params.Name,
@@ -97,6 +98,8 @@ func (self Compose) Create(http *gin.Context) {
 				Uri:           make([]string, 0),
 				RemoteUrl:     params.RemoteUrl,
 				DockerEnvName: dockerEnvName,
+				CreatedAt:     createTime,
+				UpdatedAt:     createTime,
 			},
 		}
 		if function.InArray([]string{
@@ -160,17 +163,17 @@ func (self Compose) Create(http *gin.Context) {
 	}
 
 	// 验证任务，并初始化各种配置
-	_, err = logic.Compose{}.GetTasker(yamlRow)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	_, warning, err := logic.Compose{}.GetTasker(yamlRow)
+	if err != nil || warning != nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
 	}
 
 	if yamlRow.ID > 0 {
+		yamlRow.Setting.UpdatedAt = time.Now().Local().Format(time.DateTime)
 		_ = dao.Compose.Save(yamlRow)
 	} else if yamlRow.Setting.Type != accessor.ComposeTypeOutPath {
 		_ = dao.Compose.Create(yamlRow)
-
 		facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposePayload{
 			Compose: yamlRow,
 			Ctx:     http,
@@ -233,10 +236,7 @@ func (self Compose) GetList(http *gin.Context) {
 	query.Where(gen.Cond(
 		datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
 	)...)
-
 	composeList, _ = query.Find()
-
-	runComposeList := logic.Compose{}.FindRunTask()
 
 	for i, item := range composeList {
 		if !function.InArray([]string{
@@ -245,18 +245,35 @@ func (self Compose) GetList(http *gin.Context) {
 		}, item.Setting.Status) {
 			composeList[i].Setting.Status = accessor.ComposeStatusWaiting
 		}
-
-		if find, ok := runComposeList[item.Name]; ok {
-			composeList[i].Setting.Status = find.Setting.Status
-			delete(runComposeList, item.Name)
-		}
 	}
 
-	for _, item := range runComposeList {
-		if params.Name != "" && !strings.Contains(item.Name, params.Name) {
+	runComposeList := logic.Compose{}.Ls()
+	for _, runItem := range runComposeList {
+		if _, i, ok := function.PluckArrayItemWalk(composeList, func(dbItem *entity.Compose) bool {
+			return dbItem.Name == runItem.Name
+		}); ok {
+			composeList[i].Setting.Status = runItem.Status
+			composeList[i].Setting.UpdatedAt = runItem.UpdatedAt.Local().Format(time.DateTime)
 			continue
 		}
-		composeList = append(composeList, item)
+		outPathTask := &entity.Compose{
+			Name:  runItem.Name,
+			Title: "",
+			Setting: &accessor.ComposeSettingOption{
+				Status:        runItem.Status,
+				Uri:           runItem.ConfigFileList,
+				Type:          accessor.ComposeTypeOutPath,
+				DockerEnvName: docker.Sdk.Name,
+				Environment:   make([]docker.EnvItem, 0),
+				UpdatedAt:     runItem.UpdatedAt.Local().Format(time.DateTime),
+			},
+		}
+		if runItem.CanManage {
+			outPathTask.Setting.Type = accessor.ComposeTypeOutPath
+		} else {
+			outPathTask.Setting.Type = accessor.ComposeTypeDangling
+		}
+		composeList = append(composeList, outPathTask)
 	}
 
 	sort.Slice(composeList, func(i, j int) bool {
@@ -265,7 +282,7 @@ func (self Compose) GetList(http *gin.Context) {
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"list":          composeList,
-		"containerList": logic.Compose{}.GetTaskContainer(""),
+		"containerList": logic.Compose{}.Ps(),
 	})
 	return
 }
@@ -300,7 +317,7 @@ func (self Compose) GetTask(http *gin.Context) {
 		})
 	}
 
-	tasker, err := logic.Compose{}.GetTasker(yamlRow)
+	tasker, _, err := logic.Compose{}.GetTasker(yamlRow)
 	if err != nil {
 		// 如果获取任务失败，可能是没有文件或是Yaml文件错误，直接返回内容待用户修改
 		yaml, err := yamlRow.Setting.GetYaml()
@@ -311,7 +328,7 @@ func (self Compose) GetTask(http *gin.Context) {
 		data := gin.H{
 			"detail":        yamlRow,
 			"yaml":          yaml,
-			"containerList": logic.Compose{}.GetTaskContainer(yamlRow.Name),
+			"containerList": logic.Compose{}.Ps(yamlRow.Name),
 			"task":          subTask,
 		}
 		self.JsonResponseWithoutError(http, data)
@@ -334,51 +351,10 @@ func (self Compose) GetTask(http *gin.Context) {
 	}
 
 	if yamlRow.Setting.Status != accessor.ComposeStatusWaiting {
-		data["containerList"] = logic.Compose{}.GetTaskContainer(yamlRow.Name)
+		data["containerList"] = logic.Compose{}.Ps(yamlRow.Name)
 	}
 
 	self.JsonResponseWithoutError(http, data)
-	return
-}
-
-func (self Compose) Delete(http *gin.Context) {
-	type ParamsValidate struct {
-		Id []int32 `form:"id" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	composeRunList := logic.Compose{}.Ls()
-	for _, id := range params.Id {
-		row, err := dao.Compose.Where(dao.Compose.ID.Eq(id)).First()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		for _, runItem := range composeRunList {
-			if fmt.Sprintf(define.ComposeProjectName, row.Name) == runItem.Name {
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeleteMustDestroyContainer), 500)
-				return
-			}
-		}
-		_, err = dao.Compose.Where(dao.Compose.ID.Eq(id)).Delete()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		err = os.RemoveAll(filepath.Join(row.Setting.GetWorkingDir(), row.Name))
-		if err != nil {
-			slog.Error("compose", "delete", err.Error())
-		}
-
-		facade.GetEvent().Publish(event.ComposeDeleteEvent, event.ComposePayload{
-			Compose: row,
-			Ctx:     http,
-		})
-	}
-
-	self.JsonSuccessResponse(http)
 	return
 }
 
@@ -423,6 +399,7 @@ func (self Compose) Parse(http *gin.Context) {
 
 	var composer *compose.Wrapper
 	var err error
+	var warning error
 
 	options := make([]cli.ProjectOptionsFn, 0)
 	if !function.IsEmptyArray(params.Environment) {
@@ -430,9 +407,9 @@ func (self Compose) Parse(http *gin.Context) {
 	}
 	options = append(options, compose.WithYamlContent(params.Yaml...))
 
-	composer, err = compose.NewCompose(options...)
-	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", err.Error()), 500)
+	composer, warning, err = compose.NewCompose(options...)
+	if err != nil || warning != nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
 	}
 	_ = os.RemoveAll(composer.Project.WorkingDir)

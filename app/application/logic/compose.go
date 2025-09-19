@@ -2,8 +2,6 @@ package logic
 
 import (
 	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
@@ -25,6 +23,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var ComposeFileNameSuffix = []string{
@@ -32,183 +31,212 @@ var ComposeFileNameSuffix = []string{
 	"compose.yml", "compose.yaml",
 }
 
-type StoreItem struct {
-	Title       string `json:"title"`
-	Name        string `json:"name"`
-	Logo        string `json:"logo"`
-	Description string `json:"description"`
-}
-
 type Compose struct {
 }
 
 func (self Compose) Get(key string) (*entity.Compose, error) {
-	runTaskList := self.FindRunTask()
+	var composeRow *entity.Compose
 
 	if id, err := strconv.Atoi(key); err == nil {
-		if row, err := dao.Compose.Where(dao.Compose.ID.Eq(int32(id))).First(); err == nil {
-			if run, ok := runTaskList[row.Name]; ok {
-				row.Setting.Status = run.Setting.Status
-			} else {
-				row.Setting.Status = accessor.ComposeStatusWaiting
-			}
-			return row, nil
-		}
-		return nil, errors.New("db compose not found")
+		composeRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(int32(id))).First()
 	} else {
-		// 尝试通过标识查询一次
-		if row, err := dao.Compose.Where(dao.Compose.Name.Eq(key)).First(); err == nil {
-			if run, ok := runTaskList[row.Name]; ok {
-				row.Setting.Status = run.Setting.Status
-			} else {
-				row.Setting.Status = accessor.ComposeStatusWaiting
+		composeRow, _ = dao.Compose.Where(dao.Compose.Name.Eq(key)).First()
+	}
+
+	if composeRow == nil {
+		composeRow = &entity.Compose{
+			Name:  key,
+			Title: "",
+			Setting: &accessor.ComposeSettingOption{
+				Type:          accessor.ComposeTypeOutPath,
+				DockerEnvName: docker.Sdk.Name,
+				Environment:   make([]docker.EnvItem, 0),
+			},
+		}
+	}
+
+	runTaskList := self.Ls()
+	if v, _, ok := function.PluckArrayItemWalk(runTaskList, func(item *compose.ProjectResult) bool {
+		return item.Name == composeRow.Name
+	}); ok {
+		composeRow.Setting.Status = v.Status
+		composeRow.Setting.UpdatedAt = v.UpdatedAt.Local().Format(time.DateTime)
+
+		if composeRow.Setting.Type == accessor.ComposeTypeOutPath {
+			if !v.CanManage {
+				composeRow.Setting.Type = accessor.ComposeTypeDangling
 			}
-			return row, nil
+			composeRow.Setting.Uri = v.ConfigFileList
 		}
-		// 尝试去掉前缀先查询一次
-		if item, ok := runTaskList[strings.ReplaceAll(key, define.ComposeProjectPrefix, "")]; ok {
-			return item, nil
+	} else {
+		composeRow.Setting.Status = accessor.ComposeStatusWaiting
+	}
+	// @todo 子任务应该放到商城同步的时候
+	//if item, ok := runTaskList[key]; ok {
+	//	return item, nil
+	//}
+	//// 尝试再查询一下子任务
+	//if name, task, ok := strings.Cut(key, "@"); ok {
+	//	if composeRow, err := self.Get(name); err == nil {
+	//		taskList := self.FindPathTask(filepath.Dir(composeRow.Setting.GetUriFilePath()))
+	//		if v, ok := taskList[task]; ok {
+	//			// 目录需要添加上父级目录
+	//			v.Name = fmt.Sprintf("%s@%s", name, v.Name)
+	//			v.Setting.Uri = function.PluckArrayWalk(v.Setting.Uri, func(item string) (string, bool) {
+	//				return filepath.Join(name, item), true
+	//			})
+	//			v.Setting.DockerEnvName = composeRow.Setting.DockerEnvName
+	//			return v, nil
+	//		}
+	//	}
+	//}
+	return composeRow, nil
+}
+
+// Ps 获取所有 compose 下的容器
+func (self Compose) Ps(projectNameList ...string) []*compose.ContainerResult {
+	result := make([]*compose.ContainerResult, 0)
+
+	runComposeList := self.Ls()
+	// 如果为空，则获取所有的 compose 容器
+	if function.IsEmptyArray(projectNameList) {
+		projectNameList = function.PluckArrayWalk(runComposeList, func(item *compose.ProjectResult) (string, bool) {
+			return item.Name, true
+		})
+	}
+	for _, name := range projectNameList {
+		project, _, ok := function.PluckArrayItemWalk(runComposeList, func(project *compose.ProjectResult) bool {
+			return project.Name == name
+		})
+		if !ok {
+			return result
 		}
-		if item, ok := runTaskList[key]; ok {
-			return item, nil
-		}
-		// 尝试再查询一下子任务
-		if name, task, ok := strings.Cut(key, "@"); ok {
-			if composeRow, err := self.Get(name); err == nil {
-				taskList := self.FindPathTask(filepath.Dir(composeRow.Setting.GetUriFilePath()))
-				if v, ok := taskList[task]; ok {
-					// 目录需要添加上父级目录
-					v.Name = fmt.Sprintf("%s@%s", name, v.Name)
-					v.Setting.Uri = function.PluckArrayWalk(v.Setting.Uri, func(item string) (string, bool) {
-						return filepath.Join(name, item), true
-					})
-					v.Setting.DockerEnvName = composeRow.Setting.DockerEnvName
-					return v, nil
+		for _, summary := range project.ContainerList {
+			if containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, summary.Container.ID); err == nil {
+				health := ""
+				if containerInfo.State.Health != nil {
+					health = containerInfo.State.Health.Status
 				}
-			}
-		}
-		return nil, errors.New("run compose not found")
-	}
-}
-
-type ComposeLsItem struct {
-	Name           string `json:"name"`
-	Status         string `json:"status"`
-	ConfigFiles    string `json:"configFiles"`
-	ConfigFileList []string
-	IsDPanel       bool
-}
-
-func (self Compose) Ls() []*ComposeLsItem {
-	command := []string{
-		"ls",
-		"--format", "json",
-		"--all",
-	}
-	result := make([]*ComposeLsItem, 0)
-
-	cmd, err := docker.Sdk.Compose(command...)
-	if err != nil {
-		slog.Debug("compose ls", "error", err)
-		return result
-	}
-	defer func() {
-		err = cmd.Close()
-		if err != nil {
-			slog.Debug("compose ls close", "err", err)
-		}
-	}()
-
-	out, err := cmd.RunWithResult()
-	if err != nil {
-		slog.Debug("compose ls", "error", err)
-		return result
-	}
-	err = json.Unmarshal(out, &result)
-	if err != nil {
-		return result
-	}
-	for i, item := range result {
-		if strings.HasPrefix(item.Name, "dpanel-c") {
-			item.IsDPanel = true
-		}
-		if strings.Contains(item.ConfigFiles, ",") {
-			result[i].ConfigFileList = strings.Split(item.ConfigFiles, ",")
-		} else {
-			result[i].ConfigFileList = []string{
-				item.ConfigFiles,
+				result = append(result, &compose.ContainerResult{
+					Project: project.Name,
+					Name:    containerInfo.Name,
+					Service: summary.Service,
+					Publishers: function.PluckArrayWalk(summary.Container.Ports, func(i container.Port) (compose.ContainerPublishersResult, bool) {
+						publicPort := i.PublicPort
+						if publicPort == 0 {
+							publicPort = i.PrivatePort
+						}
+						return compose.ContainerPublishersResult{
+							URL:           i.IP,
+							TargetPort:    i.PrivatePort,
+							PublishedPort: publicPort,
+							Protocol:      i.Type,
+						}, true
+					}),
+					State:  summary.Container.State,
+					Status: summary.Container.Status,
+					Health: health,
+				})
 			}
 		}
 	}
 	return result
 }
 
-func (self Compose) LsItem(name string) *ComposeLsItem {
-	ls := self.Ls()
-	for _, item := range ls {
-		if item.Name == name || item.Name == fmt.Sprintf(define.ComposeProjectName, name) {
-			return item
+func (self Compose) Ls() []*compose.ProjectResult {
+	composeGroupContainerList := make(map[string][]container.Summary)
+	if containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+		All: true,
+	}); err == nil {
+		for _, summary := range containerList {
+			projectName, ok := summary.Labels[define.ComposeLabelProject]
+			if !ok {
+				continue
+			}
+			group, ok := composeGroupContainerList[projectName]
+			if !ok {
+				group = []container.Summary{}
+			}
+			group = append(group, summary)
+			composeGroupContainerList[projectName] = group
 		}
 	}
-	return &ComposeLsItem{
-		Name:           name,
-		Status:         accessor.ComposeStatusWaiting,
-		ConfigFiles:    "",
-		ConfigFileList: make([]string, 0),
-		IsDPanel:       true,
+
+	result := make([]*compose.ProjectResult, 0)
+	for name, containerList := range composeGroupContainerList {
+		task := &compose.ProjectResult{
+			Name:           name,
+			RunName:        name,
+			ConfigFileList: make([]string, 0),
+			ContainerList:  make([]compose.TaskResultRunContainerResult, 0),
+			Status:         "",
+		}
+
+		if strings.HasPrefix(name, define.ComposeProjectPrefix) {
+			_, task.Name, _ = strings.Cut(name, define.ComposeProjectPrefix)
+			task.IsDPanel = true
+		}
+
+		status := make([]string, 0)
+		for _, summary := range containerList {
+			if configFiles, ok := summary.Labels[define.ComposeLabelConfigFiles]; ok {
+				task.ConfigFileList = append(task.ConfigFileList, function.PluckArrayWalk(strings.Split(configFiles, ","), func(item string) (string, bool) {
+					return item, !function.InArray(task.ConfigFileList, item)
+				})...)
+			}
+			status = append(status, summary.State)
+			if v := time.Unix(summary.Created, 0); v.After(task.UpdatedAt) {
+				task.UpdatedAt = v
+			}
+			// 原来是使用任务名称来区分哪些是 dpanel 任务，现在保持任务原有名称，采用容器 label 来区分
+			// compose 任务名就可以保持原样显示
+			if _, ok := summary.Labels[define.ComposeLabelDPanelProject]; ok {
+				task.IsDPanel = true
+			}
+			task.ContainerList = append(task.ContainerList, compose.TaskResultRunContainerResult{
+				Container:  summary,
+				ConfigHash: summary.Labels[define.ComposeLabelConfigHash],
+				Service:    summary.Labels[define.ComposeLabelService],
+			})
+		}
+
+		function.CombinedArrayValueCount(status, func(key string, count int) {
+			if task.Status != "" {
+				task.Status += ", "
+			}
+			task.Status += fmt.Sprintf("%s(%d)", key, count)
+		})
+
+		// 面板为了对齐宿主机的目录，实际部署的时候可能 config_files 的路径并不是 /dpanel/compose
+		// 直接使用 Name 到 /dpanel/compose 查找，如果存在，直接将 config_files 重定向到面板路径中
+		// 如果不存在，再直接查找，属于外部任务
+		// 如果不存在，属于 dangling 任务，无法管理
+		tryFind := function.PluckArrayWalk(task.ConfigFileList, func(file string) (string, bool) {
+			return filepath.Join("/dpanel", task.Name, filepath.Base(file)), true
+		})
+		if function.FileExists(tryFind...) {
+			task.ConfigFileList = tryFind
+		}
+		if !task.CanManage && function.FileExists(task.ConfigFileList...) {
+			task.CanManage = true
+		}
+		task.ConfigFiles = strings.Join(task.ConfigFileList, ",")
+		result = append(result, task)
 	}
+	return result
 }
 
-func (self Compose) FindRunTask() map[string]*entity.Compose {
-	dpanelMountDir := ""
-
-	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
-	for _, mount := range dpanelContainerInfo.Mounts {
-		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" {
-			dpanelMountDir = mount.Source
-		}
-	}
-
-	findComposeList := make(map[string]*entity.Compose)
+func (self Compose) LsItem(name string) *compose.ProjectResult {
+	result := &compose.ProjectResult{}
 
 	for _, item := range self.Ls() {
-		if strings.HasPrefix(item.Name, define.ComposeProjectPrefix) {
-			item.Name = item.Name[9:]
+		if item.Name == name {
+			result = item
+			break
 		}
-		// 如果外部任务文件可以访问，则正常管理
-		outComposeFileExists := true
-		for _, file := range item.ConfigFileList {
-			if _, err := os.Stat(file); err != nil {
-				// 如果外部任务是 dpanel-c 开头的，还需要将文件路径变更为容器内的实际目录，再尝试查找一次
-				if item.IsDPanel && dpanelMountDir != "" {
-					rel, _ := filepath.Rel(dpanelMountDir, file)
-					if _, err := os.Stat(filepath.Join("/dpanel", rel)); err != nil {
-						outComposeFileExists = false
-					}
-				} else {
-					outComposeFileExists = false
-				}
-			}
-		}
-
-		findRow := &entity.Compose{
-			Name:  item.Name,
-			Title: "",
-			Setting: &accessor.ComposeSettingOption{
-				Status:        item.Status,
-				Uri:           item.ConfigFileList,
-				Type:          accessor.ComposeTypeOutPath,
-				DockerEnvName: docker.Sdk.Name,
-				Environment:   make([]docker.EnvItem, 0),
-			},
-		}
-		if !outComposeFileExists {
-			findRow.Setting.Type = accessor.ComposeTypeDangling
-		}
-
-		findComposeList[item.Name] = findRow
 	}
-	return findComposeList
+
+	return result
 }
 
 func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
@@ -303,7 +331,7 @@ func (self Compose) Sync(dockerEnvName string) error {
 	return nil
 }
 
-func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error) {
+func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, error) {
 	projectName := fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(dbRow.Name, "@", "-"))
 	tasker := &compose.Task{
 		Name: projectName,
@@ -352,22 +380,22 @@ func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error) {
 		tempYamlFilePath := dbRow.Setting.GetUriFilePath()
 		err := os.MkdirAll(filepath.Dir(tempYamlFilePath), os.ModePerm)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		response, err := http.Get(dbRow.Setting.RemoteUrl)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		defer func() {
 			_ = response.Body.Close()
 		}()
 		content, err := io.ReadAll(response.Body)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		err = os.WriteFile(tempYamlFilePath, self.makeDeployYamlHeader(content), 0666)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -408,39 +436,43 @@ func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error) {
 	// 用户修改环境变量时，如果未在 .env 文件中的变量保存至 setting ，存在 env 文件中的则直接写入 .env 文件
 	// task 任务数据的 setting environment 字段则是将两种数据合并返回
 	// 在提交保存时，通过过滤器，将 EnvInFile 规则的过滤掉
+	// 外部任务没有数据，默认写入 .env 文件，提交什么值写入什么值
 	allEnvironment := make([]docker.EnvItem, 0)
 	if envFilePath, envFileContent, err := dbRow.Setting.GetDefaultEnv(); err == nil {
-		if envMap, err := godotenv.UnmarshalBytes(envFileContent); err == nil {
-			allEnvironment = append(allEnvironment, function.PluckMapWalkArray(envMap, func(k string, v string) (docker.EnvItem, bool) {
-				rule := &docker.ValueRuleItem{}
-				// 外部任务会直接覆盖 .env 文件，所以这里不配置规则
-				if dbRow.Setting.Type != accessor.ComposeTypeOutPath {
-					rule.Kind = docker.EnvValueRuleInEnvFile
-				}
-				// 如果提交数据中有新的值，则重写 .env 文件
-				value := v
-				if newItem, _, ok := function.PluckArrayItemWalk(dbRow.Setting.Environment, func(item docker.EnvItem) bool {
-					return item.Name == k
-				}); ok {
-					value = newItem.Value
-				}
-				envMap[k] = value
-				return docker.EnvItem{
-					Name:  k,
-					Value: value,
-					Rule:  rule,
-				}, true
-			})...)
-
-			_ = os.MkdirAll(filepath.Dir(envFilePath), os.ModePerm)
-			newEnvFileContent, err := godotenv.Marshal(envMap)
-			if err != nil {
-				return nil, err
+		envMap, _ := godotenv.UnmarshalBytes(envFileContent)
+		allEnvironment = append(allEnvironment, function.PluckMapWalkArray(envMap, func(k string, v string) (docker.EnvItem, bool) {
+			rule := &docker.ValueRuleItem{}
+			// 外部任务会直接覆盖 .env 文件，所以这里不配置规则
+			if dbRow.Setting.Type != accessor.ComposeTypeOutPath {
+				rule.Kind = docker.EnvValueRuleInEnvFile
 			}
-			err = os.WriteFile(envFilePath, []byte(newEnvFileContent), 0666)
-			if err != nil {
-				return nil, err
+			// 如果提交数据中有新的值，则重写 .env 文件
+			value := v
+			if newItem, _, ok := function.PluckArrayItemWalk(dbRow.Setting.Environment, func(item docker.EnvItem) bool {
+				return item.Name == k
+			}); ok {
+				value = newItem.Value
 			}
+			envMap[k] = value
+			return docker.EnvItem{
+				Name:  k,
+				Value: value,
+				Rule:  rule,
+			}, true
+		})...)
+		if dbRow.Setting.Type == accessor.ComposeTypeOutPath {
+			for _, item := range dbRow.Setting.Environment {
+				envMap[item.Name] = item.Value
+			}
+		}
+		_ = os.MkdirAll(filepath.Dir(envFilePath), os.ModePerm)
+		newEnvFileContent, err := godotenv.Marshal(envMap)
+		if err != nil {
+			return nil, nil, err
+		}
+		err = os.WriteFile(envFilePath, []byte(newEnvFileContent), 0666)
+		if err != nil {
+			return nil, nil, err
 		}
 		options = append(options, cli.WithEnvFiles(envFilePath))
 	}
@@ -476,15 +508,15 @@ func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error) {
 
 	options = append(options, cli.WithName(tasker.Name))
 	// 最终Yaml需要用到原始的compose，创建一个原始的对象
-	originalComposer, err := compose.NewCompose(options...)
+	originalComposer, warning, err := compose.NewCompose(options...)
 	if err != nil {
 		slog.Warn("compose get task ", "error", err)
-		return nil, err
+		return nil, nil, err
 	}
 	y, _ := originalComposer.Project.MarshalYAML()
 	fmt.Printf("GetTasker %v \n", function.GetSha256(y))
 	tasker.Composer = originalComposer
-	return tasker, nil
+	return tasker, warning, nil
 }
 
 func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
@@ -495,47 +527,6 @@ func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
 `), yaml...)
 	}
 	return yaml
-}
-
-func (self Compose) GetTaskContainer(taskName string) []*compose.ContainerResult {
-	result := make([]*compose.ContainerResult, 0)
-	if containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
-		All: true,
-	}); err == nil {
-		result = function.PluckArrayWalk(containerList, func(item container.Summary) (*compose.ContainerResult, bool) {
-			if _, ok := item.Labels[define.ComposeLabelProject]; !ok {
-				return nil, false
-			}
-			if v, ok := item.Labels[define.ComposeLabelProject]; ok && taskName != "" && !strings.HasSuffix(v, taskName) {
-				return nil, false
-			}
-			containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID)
-			if err != nil {
-				return nil, false
-			}
-			health := ""
-			if containerInfo.State.Health != nil {
-				health = containerInfo.State.Health.Status
-			}
-			return &compose.ContainerResult{
-				Project: item.Labels[define.ComposeLabelProject],
-				Name:    containerInfo.Name,
-				Service: item.Labels[define.ComposeLabelService],
-				Publishers: function.PluckArrayWalk(item.Ports, func(i container.Port) (compose.ContainerPublishersResult, bool) {
-					return compose.ContainerPublishersResult{
-						URL:           i.IP,
-						TargetPort:    i.PrivatePort,
-						PublishedPort: i.PublicPort,
-						Protocol:      i.Type,
-					}, true
-				}),
-				State:  item.State,
-				Status: item.Status,
-				Health: health,
-			}, true
-		})
-	}
-	return result
 }
 
 func (self Compose) GetDPanelProjectName(name string) string {

@@ -55,7 +55,7 @@ func (self RunLog) Run(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		out, err := function.CombineStdout(response)
+		out, err := function.CombinedStdout(response)
 		_ = response.Close()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -74,7 +74,7 @@ func (self RunLog) Run(http *gin.Context) {
 	}
 	progress.OnWrite = func(p string) error {
 		newReader := bytes.NewReader([]byte(p))
-		stdout, err := function.CombineStdout(newReader)
+		stdout, err := function.CombinedStdout(newReader)
 		if err != nil {
 			progress.BroadcastMessage(p)
 		} else {
