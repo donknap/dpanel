@@ -128,7 +128,7 @@ func (self DockerEnv) CheckSSHPublicLogin(info *ssh.ServerInfo) error {
 		slog.Debug("docker env test ssh public key", "error", err)
 		return err
 	}
-	time.AfterFunc(time.Second*10, func() {
+	time.AfterFunc(time.Second*30, func() {
 		_ = testSSHCmd.Close()
 	})
 	result, err := testSSHCmd.RunWithResult()

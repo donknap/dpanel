@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/client"
+	commandconn "github.com/donknap/dpanel/common/service/docker/conn"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 )
@@ -255,6 +256,7 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 
 func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
+
 		sshClient, err := ssh.NewClient(ssh.WithServerInfo(serverInfo)...)
 		if err != nil {
 			return err
@@ -265,7 +267,7 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 		}()
 		transport := &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return sshClient.Conn.Dial("unix", "/var/run/docker.sock")
+				return commandconn.New(ctx, "ssh", fmt.Sprintf("%s@%s", serverInfo.Username, serverInfo.Address), "docker", "system", "dial-stdio")
 			},
 		}
 		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))
