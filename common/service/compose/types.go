@@ -18,7 +18,7 @@ type ContainerResult struct {
 	Publishers []ContainerPublishersResult `json:"publishers"`
 	State      string                      `json:"state"`
 	Status     string                      `json:"status"`
-	Health     string
+	Health     string                      `json:"health"`
 }
 
 type ContainerPublishersResult struct {
@@ -29,16 +29,14 @@ type ContainerPublishersResult struct {
 }
 
 type ProjectResult struct {
-	// Name 任务的原始名称，为了兼容之前 dpanel-c 前缀的问题
-	// 此名称是去掉前缀后的名称，与数据库中的任务名称对应
-	Name string `json:"name"`
-	// RunName 为 compose 实际运行的名称，可能会包含 dpanel-c 只在部署时候使用
-	// 查询时均采用 Name
-	RunName        string `json:"runName"`
-	Status         string `json:"status"`
-	ConfigFiles    string `json:"configFiles"`
+	Name string
+	// 当前任务实际运行的名称，使终保持 Name == RunName
+	// 旧版带前缀的名称会放置到 RunName 中，销毁重建后则会恢复到原始名称
+	// Deprecated
+	RunName        string
+	Status         string
+	ConfigFiles    string
 	ConfigFileList []string
-	IsDPanel       bool
 	UpdatedAt      time.Time
 	ContainerList  []TaskResultRunContainerResult
 	CanManage      bool

@@ -38,8 +38,13 @@ func (self *EventLogic) MonitorLoop() {
 
 	go func() {
 		for {
-			<-self.ticker.C
-			self.commit()
+			select {
+			case <-docker.Sdk.Ctx.Done():
+				self.Close()
+				return
+			case <-self.ticker.C:
+				self.commit()
+			}
 		}
 	}()
 
@@ -47,6 +52,7 @@ func (self *EventLogic) MonitorLoop() {
 	for {
 		select {
 		case <-docker.Sdk.Ctx.Done():
+			slog.Debug("Event monitor close")
 			self.Close()
 			return
 		case message := <-messageChan:

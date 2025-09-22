@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/donknap/dpanel/common/service/docker/conn"
 	"net"
 	"net/http"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/client"
-	commandconn "github.com/donknap/dpanel/common/service/docker/conn"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 )
@@ -198,76 +198,19 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 	}
 }
 
-//func WithSSH(serverInfo *ssh.ServerInfo) Option {
-//	return func(self *Builder) error {
-//		sshClient, err := ssh.NewClient(ssh.WithServerInfo(serverInfo)...)
-//		if err != nil {
-//			return err
-//		}
-//		remoteConn, err := sshClient.Conn.Dial("unix", "/var/run/docker.sock")
-//		if err != nil {
-//			sshClient.Close()
-//			return err
-//		}
-//		_ = remoteConn.Close()
-//
-//		localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
-//		_ = os.Remove(localProxySock)
-//		listener, _ := net.ListenUnix("unix", &net.UnixAddr{Name: localProxySock})
-//
-//		go func() {
-//			select {
-//			case <-self.Ctx.Done():
-//				_ = listener.Close()
-//				_ = remoteConn.Close()
-//				sshClient.Close()
-//			}
-//		}()
-//
-//		go func() {
-//			for {
-//				localConn, err := listener.Accept()
-//				if err != nil {
-//					slog.Warn("docker proxy sock local close", "err", err)
-//					return
-//				}
-//				remoteConn, err := sshClient.Conn.Dial("unix", "/var/run/docker.sock")
-//				if err != nil {
-//					slog.Warn("docker proxy sock create remote", "err", err)
-//					return
-//				}
-//				go func() {
-//					_, _ = io.Copy(remoteConn, localConn)
-//					_ = remoteConn.Close()
-//				}()
-//				go func() {
-//					_, _ = io.Copy(localConn, remoteConn)
-//					_ = localConn.Close()
-//				}()
-//			}
-//		}()
-//		// 清空掉之前的配置
-//		self.runParams = make([]string, 0)
-//		self.runEnv = make([]string, 0)
-//		self.clientOption = make([]client.Opt, 0)
-//		return WithAddress("unix://" + localProxySock)(self)
-//	}
-//}
-
 func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
-
-		sshClient, err := ssh.NewClient(ssh.WithServerInfo(serverInfo)...)
+		option := []ssh.Option{
+			ssh.WithContext(self.Ctx),
+		}
+		option = append(option, ssh.WithServerInfo(serverInfo)...)
+		sshClient, err := ssh.NewClient(option...)
 		if err != nil {
 			return err
 		}
-		go func() {
-			<-self.Ctx.Done()
-			sshClient.Close()
-		}()
 		transport := &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return commandconn.New(ctx, "ssh", fmt.Sprintf("%s@%s", serverInfo.Username, serverInfo.Address), "docker", "system", "dial-stdio")
+				return sshconn.New(self.Ctx, sshClient, "docker", "system", "dial-stdio")
 			},
 		}
 		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))

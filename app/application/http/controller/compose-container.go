@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
@@ -20,7 +20,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
@@ -44,13 +43,21 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	if !function.IsEmptyArray(params.Environment) {
-		composeRow.Setting.Environment = params.Environment
-	}
+
 	if !function.IsEmptyArray(params.DeployServiceName) {
 		composeRow.Setting.DeployServiceName = params.DeployServiceName
 	}
-	tasker, warning, err := logic.Compose{}.GetTasker(composeRow)
+	tasker, warning, err := logic.Compose{}.GetTasker(&entity.Compose{
+		Name: composeRow.Name,
+		Setting: &accessor.ComposeSettingOption{
+			Type:          composeRow.Setting.Type,
+			Uri:           composeRow.Setting.Uri,
+			RemoteUrl:     composeRow.Setting.RemoteUrl,
+			Environment:   params.Environment,
+			DockerEnvName: composeRow.Setting.DockerEnvName,
+			RunName:       composeRow.Setting.RunName,
+		},
+	})
 	if err != nil || warning != nil {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
@@ -58,21 +65,21 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 	// 添加禁用服务，只有部署的时候需要，避免在获取详情时拿不到全部服务
 	if !function.IsEmptyArray(composeRow.Setting.DeployServiceName) {
-		services, err := tasker.Project().GetServices()
+		services, err := tasker.Project.GetServices()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 		for _, item := range services {
 			if !function.InArray(composeRow.Setting.DeployServiceName, item.Name) {
-				tasker.Composer.Project = tasker.Composer.Project.WithServicesDisabled(item.Name)
+				tasker.Project = tasker.Project.WithServicesDisabled(item.Name)
 			}
 		}
 	}
 
 	// 尝试创建 compose 挂载的目录，如果运行在容器内创建也无效
 	if params.CreatePath {
-		for _, service := range tasker.Project().Services {
+		for _, service := range tasker.Project.Services {
 			for _, volume := range service.Volumes {
 				if filepath.IsAbs(volume.Source) {
 					if _, err = os.Stat(volume.Source); err != nil {
@@ -103,9 +110,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		_ = response.Close()
 	}()
 
-	lastMessage := ""
 	progress.OnWrite = func(p string) error {
-		lastMessage = p
 		progress.BroadcastMessage(p)
 		return nil
 	}
@@ -132,59 +137,23 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
-	// 再次验证 任务是否部署成功，从而判断要不要输出错误信息
-	tasker, warning, err = logic.Compose{}.GetTasker(composeRow)
-	if err != nil || warning != nil {
-		self.JsonResponseWithError(http, errors.Join(warning, err), 500)
+	// 查看当前任务下的容器 hash 值是否部署成功，并写入 dpanel 的标识用于查找
+	runCompose := logic.Compose{}.LsItem(composeRow.Name)
+	if runCompose == nil || len(runCompose.ContainerList) != len(tasker.Project.Services) {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
 		return
 	}
 
-	taskContainerList := logic.Compose{}.Ps(composeRow.Name)
-	if function.IsEmptyArray(taskContainerList) {
-		self.JsonResponseWithError(http, errors.New(lastMessage), 500)
-		return
-	}
-
-	for _, item := range taskContainerList {
-		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.Name); err != nil {
-			self.JsonResponseWithError(http, errors.New(lastMessage), 500)
+	for _, item := range runCompose.ContainerList {
+		if hash, err := tasker.GetServiceConfigHash(item.Service); err != nil || item.ConfigHash != hash {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
 			return
 		}
 	}
 
+	// @todo 支持商店安装 Php 扩展
 	// 这里需要单独适配一下 php 环境的相关扩展安装
 	// 目前只有 php 需要这样处理，暂时先直接进行判断
-	if strings.HasPrefix(composeRow.Setting.Store, accessor.StoreTypeOnePanel) && strings.HasSuffix(composeRow.Setting.Store, "@php") {
-		out, err := docker.Sdk.ContainerExec(progress.Context(), taskContainerList[0].Name, container.ExecOptions{
-			Privileged:   true,
-			Tty:          false,
-			AttachStdin:  false,
-			AttachStdout: true,
-			AttachStderr: false,
-			Cmd: []string{
-				"install-ext",
-				strings.Join(function.PluckArrayWalk(params.Environment, func(item docker.EnvItem) (string, bool) {
-					if item.Name == "PHP_EXTENSIONS" {
-						return item.Value, true
-					} else {
-						return "", false
-					}
-				}), " "),
-			},
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer func() {
-			out.Close()
-		}()
-		_, err = io.Copy(progress, out.Reader)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
 
 	self.JsonSuccessResponse(http)
 	return
@@ -217,7 +186,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 
 	if !function.IsEmptyArray(params.DestroyServiceName) {
 		for _, item := range params.DestroyServiceName {
-			tasker.Composer.Project = tasker.Composer.Project.WithServicesDisabled(item)
+			tasker.Project = tasker.Project.WithServicesDisabled(item)
 		}
 	}
 

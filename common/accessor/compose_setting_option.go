@@ -1,16 +1,11 @@
 package accessor
 
 import (
-	"context"
-	"encoding/json"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
-	"gorm.io/gorm/schema"
 	"os"
 	"path/filepath"
-	"reflect"
 )
 
 const (
@@ -37,16 +32,8 @@ type ComposeSettingOption struct {
 	CreatedAt         string           `json:"createdAt,omitempty"`
 	UpdatedAt         string           `json:"updatedAt,omitempty"`
 	Message           string           `json:"message,omitempty"`
-}
-
-func (self ComposeSettingOption) Value(ctx context.Context, field *schema.Field, dst reflect.Value, fieldValue interface{}) (interface{}, error) {
-	if v, ok := fieldValue.(*ComposeSettingOption); ok {
-		v.Environment = function.PluckArrayWalk(v.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
-			return item, item.Rule == nil || (item.Rule.Kind&docker.EnvValueRuleInEnvFile) == 0
-		})
-		return json.Marshal(fieldValue)
-	}
-	return json.Marshal(fieldValue)
+	// Deprecated
+	RunName string `json:"-"`
 }
 
 func (self ComposeSettingOption) GetUriFilePath() string {
@@ -81,7 +68,7 @@ func (self ComposeSettingOption) GetWorkingDir() string {
 	}
 }
 
-func (self ComposeSettingOption) GetYaml() ([2]string, error) {
+func (self ComposeSettingOption) GetYaml() [2]string {
 	yaml := [2]string{
 		"", "",
 	}
@@ -102,5 +89,5 @@ func (self ComposeSettingOption) GetYaml() ([2]string, error) {
 			yaml[i] = string(content)
 		}
 	}
-	return yaml, nil
+	return yaml
 }

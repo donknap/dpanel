@@ -46,16 +46,16 @@ func NewClient(opt ...Option) (*Client, error) {
 	go func() {
 		<-c.ctx.Done()
 		slog.Debug("ssh client close start")
-		if c.Conn != nil {
-			err = c.Conn.Close()
-			if err != nil {
-				slog.Debug("ssh client close", "err", err)
-			}
-		}
 		if c.SftpConn != nil {
 			err = c.SftpConn.Close()
 			if err != nil {
-				slog.Debug("ssh sftp close", "err", err)
+				slog.Debug("ssh sftp close", "error", err)
+			}
+		}
+		if c.Conn != nil {
+			err = c.Conn.Close()
+			if err != nil {
+				slog.Debug("ssh client close", "error", err)
 			}
 		}
 	}()

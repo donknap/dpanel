@@ -284,7 +284,10 @@ func (self Env) Switch(http *gin.Context) {
 		return
 	}
 	oldDockerClient.CtxCancelFunc()
-	_ = oldDockerClient.Client.Close()
+	err = oldDockerClient.Client.Close()
+	if err != nil {
+		slog.Debug("env switch close old", "error", err)
+	}
 
 	docker.Sdk = dockerClient
 	if dockerEnv.RemoteType == docker.RemoteTypeDocker {

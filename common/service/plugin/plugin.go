@@ -23,11 +23,6 @@ import (
 const PluginExplorer = "explorer"
 const PluginBackup = "backup"
 
-const (
-	LabelContainerAutoRemove = "com.dpanel.container.auto_remove"
-	LabelContainerTitle      = "com.dpanel.container.title"
-)
-
 type TemplateParser struct {
 	Volumes       []string
 	Command       []string
@@ -73,7 +68,7 @@ func NewPlugin(name string, composeData map[string]*TemplateParser) (*plugin, er
 type plugin struct {
 	asset   embed.FS
 	name    string
-	compose *compose.Wrapper
+	compose *compose.Task
 }
 
 func (self plugin) Create() (string, error) {
@@ -177,7 +172,7 @@ func (self plugin) Destroy() error {
 	}
 	containerRow, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, service.ContainerName)
 	if err == nil {
-		if v, ok := containerRow.Config.Labels[LabelContainerAutoRemove]; ok && v == "false" {
+		if v, ok := containerRow.Config.Labels[define.DPanelLabelContainerAutoRemove]; ok && v == "false" {
 			return nil
 		}
 		if containerRow.State.Running {

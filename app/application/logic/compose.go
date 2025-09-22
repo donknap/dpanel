@@ -61,7 +61,9 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 	}); ok {
 		composeRow.Setting.Status = v.Status
 		composeRow.Setting.UpdatedAt = v.UpdatedAt.Local().Format(time.DateTime)
-
+		if strings.HasPrefix(v.RunName, define.ComposeProjectPrefix) {
+			composeRow.Setting.RunName = v.RunName
+		}
 		if composeRow.Setting.Type == accessor.ComposeTypeOutPath {
 			if !v.CanManage {
 				composeRow.Setting.Type = accessor.ComposeTypeDangling
@@ -71,6 +73,43 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 	} else {
 		composeRow.Setting.Status = accessor.ComposeStatusWaiting
 	}
+
+	// 合并任务中的 .env 和 数据库的环境变量
+	allEnvironment := make([]docker.EnvItem, 0)
+	if _, envFileContent, err := composeRow.Setting.GetDefaultEnv(); err == nil {
+		envMap, _ := godotenv.UnmarshalBytes(envFileContent)
+		allEnvironment = append(allEnvironment, function.PluckMapWalkArray(envMap, func(k string, v string) (docker.EnvItem, bool) {
+			rule := &docker.ValueRuleItem{}
+			if composeRow.Setting.Type != accessor.ComposeTypeOutPath {
+				rule.Kind = docker.EnvValueRuleInEnvFile
+			}
+			if newItem, _, ok := function.PluckArrayItemWalk(composeRow.Setting.Environment, func(item docker.EnvItem) bool {
+				return item.Name == k
+			}); ok {
+				if newItem.Rule != nil {
+					rule = newItem.Rule
+				}
+			}
+			return docker.EnvItem{
+				Name:  k,
+				Value: v,
+				Rule:  rule,
+			}, true
+		})...)
+	}
+
+	// dbRow 中的 env 提交过来的值，所以这里包括了文件中及附加的值，这里筛选出来，避免客户端显示重复
+	if !function.IsEmptyArray(composeRow.Setting.Environment) {
+		allEnvironment = append(allEnvironment, function.PluckArrayWalk(composeRow.Setting.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
+			if _, _, ok := function.PluckArrayItemWalk(allEnvironment, func(mergeItem docker.EnvItem) bool {
+				return mergeItem.Name == item.Name
+			}); !ok {
+				return item, true
+			}
+			return item, false
+		})...)
+	}
+
 	// @todo 子任务应该放到商城同步的时候
 	//if item, ok := runTaskList[key]; ok {
 	//	return item, nil
@@ -90,6 +129,7 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 	//		}
 	//	}
 	//}
+	composeRow.Setting.Environment = allEnvironment
 	return composeRow, nil
 }
 
@@ -153,6 +193,10 @@ func (self Compose) Ls() []*compose.ProjectResult {
 			if !ok {
 				continue
 			}
+			if strings.HasPrefix(projectName, define.ComposeProjectPrefix) {
+				// 将带前缀的任务也当成普通任务进行分组，防止丢失，后续更新全部会恢复到原始名称
+				_, projectName, _ = strings.Cut(projectName, define.ComposeProjectPrefix)
+			}
 			group, ok := composeGroupContainerList[projectName]
 			if !ok {
 				group = []container.Summary{}
@@ -166,15 +210,9 @@ func (self Compose) Ls() []*compose.ProjectResult {
 	for name, containerList := range composeGroupContainerList {
 		task := &compose.ProjectResult{
 			Name:           name,
-			RunName:        name,
 			ConfigFileList: make([]string, 0),
 			ContainerList:  make([]compose.TaskResultRunContainerResult, 0),
 			Status:         "",
-		}
-
-		if strings.HasPrefix(name, define.ComposeProjectPrefix) {
-			_, task.Name, _ = strings.Cut(name, define.ComposeProjectPrefix)
-			task.IsDPanel = true
 		}
 
 		status := make([]string, 0)
@@ -188,16 +226,12 @@ func (self Compose) Ls() []*compose.ProjectResult {
 			if v := time.Unix(summary.Created, 0); v.After(task.UpdatedAt) {
 				task.UpdatedAt = v
 			}
-			// 原来是使用任务名称来区分哪些是 dpanel 任务，现在保持任务原有名称，采用容器 label 来区分
-			// compose 任务名就可以保持原样显示
-			if _, ok := summary.Labels[define.ComposeLabelDPanelProject]; ok {
-				task.IsDPanel = true
-			}
 			task.ContainerList = append(task.ContainerList, compose.TaskResultRunContainerResult{
 				Container:  summary,
 				ConfigHash: summary.Labels[define.ComposeLabelConfigHash],
 				Service:    summary.Labels[define.ComposeLabelService],
 			})
+			task.RunName = summary.Labels[define.ComposeLabelProject]
 		}
 
 		function.CombinedArrayValueCount(status, func(key string, count int) {
@@ -227,22 +261,25 @@ func (self Compose) Ls() []*compose.ProjectResult {
 }
 
 func (self Compose) LsItem(name string) *compose.ProjectResult {
-	result := &compose.ProjectResult{}
-
+	var result *compose.ProjectResult
 	for _, item := range self.Ls() {
 		if item.Name == name {
 			result = item
 			break
 		}
 	}
-
 	return result
 }
 
-func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
-	// 查询当前运行中的和目录中的 compose 任务
-	// 查找运行中的任务，如果是 dpanel-c- 开头表示是系统部署的任务，需要重新定义一下 name
-	// 非面板部署的任务记录下 Yaml 所在位置，如果在目录中找到对应的名称则重新定义 uri
+// FindPathTask 查询 docker 环境下 compose 目录下的所有任务
+func (self Compose) FindPathTask(dockerEnvName string) map[string]*entity.Compose {
+	var rootDir string
+	if dockerEnvName == docker.DefaultClientName {
+		rootDir = storage.Local{}.GetComposePath()
+	} else {
+		rootDir = filepath.Join(filepath.Dir(storage.Local{}.GetComposePath()), "compose-"+dockerEnvName)
+	}
+
 	if _, err := os.Stat(rootDir); err != nil {
 		slog.Error("compose sync path not found", "error", err)
 		return make(map[string]*entity.Compose)
@@ -282,6 +319,7 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 						Uri: []string{
 							relYamlFilePath,
 						},
+						DockerEnvName: dockerEnvName,
 					},
 				}
 				findComposeList[name] = findRow
@@ -292,23 +330,12 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 	return findComposeList
 }
 
-// 同步当前挂载目录中的 compose
+// Sync 同步当前挂载目录中的 compose
 func (self Compose) Sync(dockerEnvName string) error {
-	var rootDir string
-	if dockerEnvName == docker.DefaultClientName {
-		rootDir = storage.Local{}.GetComposePath()
-	} else {
-		rootDir = filepath.Join(filepath.Dir(storage.Local{}.GetComposePath()), "compose-"+dockerEnvName)
-	}
-	findComposeList := self.FindPathTask(rootDir)
-	for i, _ := range findComposeList {
-		findComposeList[i].Setting.DockerEnvName = dockerEnvName
-	}
-
-	// 重置所有任务状态为等待
-	composeList, _ := dao.Compose.Find()
+	findComposeList := self.FindPathTask(dockerEnvName)
 
 	// 循环任务，添加，清理任务
+	composeList, _ := dao.Compose.Find()
 	for _, dbComposeRow := range composeList {
 		if find, ok := findComposeList[dbComposeRow.Name]; ok && find.Setting.DockerEnvName == dbComposeRow.Setting.DockerEnvName {
 			delete(findComposeList, dbComposeRow.Name)
@@ -332,11 +359,6 @@ func (self Compose) Sync(dockerEnvName string) error {
 }
 
 func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, error) {
-	projectName := fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(dbRow.Name, "@", "-"))
-	tasker := &compose.Task{
-		Name: projectName,
-	}
-
 	workingDir := dbRow.Setting.GetWorkingDir()
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
@@ -367,13 +389,6 @@ func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, erro
 	}
 
 	slog.Info("compose get task", "workDir", workingDir)
-
-	if composeRun := self.LsItem(dbRow.Name); composeRun != nil {
-		tasker.Status = composeRun.Status
-		if !composeRun.IsDPanel {
-			tasker.Name = dbRow.Name
-		}
-	}
 
 	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
 	if dbRow.Setting.Type == accessor.ComposeTypeRemoteUrl {
@@ -431,92 +446,25 @@ func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, erro
 		options = append(options, compose.WithYamlPath(path))
 	}
 
-	// 默认情况下，compose 会加载 .env 文件
-	// 构建时，将 .env 文件与 setting 附加的环境变量通过调用命令时的环境变量指定
-	// 用户修改环境变量时，如果未在 .env 文件中的变量保存至 setting ，存在 env 文件中的则直接写入 .env 文件
-	// task 任务数据的 setting environment 字段则是将两种数据合并返回
-	// 在提交保存时，通过过滤器，将 EnvInFile 规则的过滤掉
-	// 外部任务没有数据，默认写入 .env 文件，提交什么值写入什么值
-	allEnvironment := make([]docker.EnvItem, 0)
-	if envFilePath, envFileContent, err := dbRow.Setting.GetDefaultEnv(); err == nil {
-		envMap, _ := godotenv.UnmarshalBytes(envFileContent)
-		allEnvironment = append(allEnvironment, function.PluckMapWalkArray(envMap, func(k string, v string) (docker.EnvItem, bool) {
-			rule := &docker.ValueRuleItem{}
-			// 外部任务会直接覆盖 .env 文件，所以这里不配置规则
-			if dbRow.Setting.Type != accessor.ComposeTypeOutPath {
-				rule.Kind = docker.EnvValueRuleInEnvFile
-			}
-			// 如果提交数据中有新的值，则重写 .env 文件
-			value := v
-			if newItem, _, ok := function.PluckArrayItemWalk(dbRow.Setting.Environment, func(item docker.EnvItem) bool {
-				return item.Name == k
-			}); ok {
-				value = newItem.Value
-			}
-			envMap[k] = value
-			return docker.EnvItem{
-				Name:  k,
-				Value: value,
-				Rule:  rule,
-			}, true
-		})...)
-		if dbRow.Setting.Type == accessor.ComposeTypeOutPath {
-			for _, item := range dbRow.Setting.Environment {
-				envMap[item.Name] = item.Value
-			}
-		}
-		_ = os.MkdirAll(filepath.Dir(envFilePath), os.ModePerm)
-		newEnvFileContent, err := godotenv.Marshal(envMap)
-		if err != nil {
-			return nil, nil, err
-		}
-		err = os.WriteFile(envFilePath, []byte(newEnvFileContent), 0666)
-		if err != nil {
-			return nil, nil, err
-		}
-		options = append(options, cli.WithEnvFiles(envFilePath))
-	}
-
-	options = append(options, cli.WithDotEnv)
-	// dbRow 中的 env 提交过来的值，所以这里包括了文件中及附加的值，这里筛选出来，避免客户端显示重复
-	if !function.IsEmptyArray(dbRow.Setting.Environment) {
-		allEnvironment = append(allEnvironment, function.PluckArrayWalk(dbRow.Setting.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
-			// 合并的时候注意要保留原有的选项
-			if _, _, ok := function.PluckArrayItemWalk(allEnvironment, func(mergeItem docker.EnvItem) bool {
-				return mergeItem.Name == item.Name
-			}); !ok {
-				return item, true
-			}
-			return item, false
-		})...)
-	}
-	dbRow.Setting.Environment = allEnvironment
-
-	globalEnv := function.PluckArrayWalk(allEnvironment, func(i docker.EnvItem) (string, bool) {
+	// 始终以提交上来的环境变量（包含 .env 文件），.env 的内容仅在编辑任务的时候会覆盖写入
+	globalEnv := function.PluckArrayWalk(dbRow.Setting.Environment, func(i docker.EnvItem) (string, bool) {
 		return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 	})
 	options = append(options, cli.WithEnv(globalEnv))
 
-	if dbRow.Setting.Type == accessor.ComposeTypeOutPath {
-		// compose 项止名称不允许有大小写，但是compose的目录名可以包含特殊字符，这里统一用id进行区分
-		// 如果是外部任务，则保持原有名称
-		// 如果该任务已经运行，但是不包含面板dpanel-c前缀，则表示该任务并非是面板创建的
-		// 只不过文件挂载到目录中，当成了挂载任务来对待
-		// 需要特殊的处理一下 -p 参数
-		// 此处还需要兼容包含 dpanel-c 前缀的外部任务
+	if dbRow.Setting.RunName != "" {
+		options = append(options, cli.WithName(dbRow.Setting.RunName))
+	} else {
+		options = append(options, cli.WithName(dbRow.Name))
 	}
 
-	options = append(options, cli.WithName(tasker.Name))
 	// 最终Yaml需要用到原始的compose，创建一个原始的对象
-	originalComposer, warning, err := compose.NewCompose(options...)
+	task, warning, err := compose.NewCompose(options...)
 	if err != nil {
 		slog.Warn("compose get task ", "error", err)
 		return nil, nil, err
 	}
-	y, _ := originalComposer.Project.MarshalYAML()
-	fmt.Printf("GetTasker %v \n", function.GetSha256(y))
-	tasker.Composer = originalComposer
-	return tasker, warning, nil
+	return task, warning, nil
 }
 
 func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
@@ -529,6 +477,6 @@ func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
 	return yaml
 }
 
-func (self Compose) GetDPanelProjectName(name string) string {
+func (self Compose) getDPanelProjectName(name string) string {
 	return fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(name, "@", "-"))
 }

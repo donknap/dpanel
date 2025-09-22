@@ -76,7 +76,7 @@ func WithDockerEnvItem(envItem ...docker.EnvItem) cli.ProjectOptionsFn {
 	}
 }
 
-func NewCompose(opts ...cli.ProjectOptionsFn) (wrapper *Wrapper, warning , err error) {
+func NewCompose(opts ...cli.ProjectOptionsFn) (wrapper *Task, warning, err error) {
 	// 自定义解析
 	opts = append(opts,
 		cli.WithExtension(ExtensionName, Ext{}),
@@ -126,13 +126,13 @@ func NewCompose(opts ...cli.ProjectOptionsFn) (wrapper *Wrapper, warning , err e
 		warning = errors.New(strings.Join(msg, ", \n"))
 	}
 
-	wrapper = &Wrapper{
+	wrapper = &Task{
 		Project: project,
 	}
 	return wrapper, warning, nil
 }
 
-func NewComposeBySiteEnvMap(options map[string]accessor.SiteEnvOption) (*Wrapper, error) {
+func NewComposeBySiteEnvMap(options map[string]accessor.SiteEnvOption) (*Task, error) {
 	arr := make([]accessor.SiteEnvOption, 0)
 	for _, option := range options {
 		arr = append(arr, option)
@@ -140,7 +140,7 @@ func NewComposeBySiteEnvMap(options map[string]accessor.SiteEnvOption) (*Wrapper
 	return NewComposeBySiteEnv(arr...)
 }
 
-func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
+func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Task, error) {
 	// 完全适配 compose spec 的参数
 	project := types.Project{
 		Services: map[string]types.ServiceConfig{},
@@ -333,7 +333,7 @@ func NewComposeBySiteEnv(options ...accessor.SiteEnvOption) (*Wrapper, error) {
 	project.Extensions = map[string]any{
 		ExtensionName: extProject,
 	}
-	return &Wrapper{
+	return &Task{
 		Project: &project,
 	}, nil
 }

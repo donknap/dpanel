@@ -124,7 +124,6 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/compose/get-list", controller.Compose{}.GetList)
 			cors.POST("/app/compose/get-task", controller.Compose{}.GetTask)
 			cors.POST("/app/compose/get-from-uri", controller.Compose{}.GetFromUri)
-			cors.POST("/app/compose/parse", controller.Compose{}.Parse)
 			cors.POST("/app/compose/download", controller.Compose{}.Download)
 
 			cors.POST("/app/compose/container-deploy", controller.Compose{}.ContainerDeploy)
