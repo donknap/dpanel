@@ -241,6 +241,7 @@ func initPath() error {
 		"storage",
 		"store",
 		"logs",
+		"sock",
 	}
 	for _, path := range initPathList {
 		realPath := storage.Local{}.GetStorageLocalPath() + "/" + path

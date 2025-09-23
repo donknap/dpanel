@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/donknap/dpanel/common/service/docker/conn"
+	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
+	"io"
+	"log/slog"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -200,20 +201,64 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 
 func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
-		option := []ssh.Option{
-			ssh.WithContext(self.Ctx),
-		}
-		option = append(option, ssh.WithServerInfo(serverInfo)...)
-		sshClient, err := ssh.NewClient(option...)
+		sshClient, err := ssh.NewClient(ssh.WithServerInfo(serverInfo)...)
 		if err != nil {
 			return err
 		}
-		transport := &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return sshconn.New(self.Ctx, sshClient, "docker", "system", "dial-stdio")
-			},
-		}
-		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))
-		return nil
+		localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
+		_ = os.Remove(localProxySock)
+		listener, _ := net.ListenUnix("unix", &net.UnixAddr{Name: localProxySock})
+
+		go func() {
+			select {
+			case <-self.Ctx.Done():
+				_ = listener.Close()
+				sshClient.Close()
+			}
+		}()
+
+		go func() {
+			for {
+				localConn, err := listener.Accept()
+				if err != nil {
+					slog.Warn("docker proxy sock local close", "err", err)
+					return
+				}
+				netConn, err := sshconn.New(self.Ctx, sshClient, "docker", "system", "dial-stdio")
+				if err != nil {
+					slog.Warn("docker proxy sock create remote", "err", err)
+					return
+				}
+				go func() {
+					_, _ = io.Copy(netConn, localConn)
+					_ = netConn.Close()
+				}()
+				go func() {
+					_, _ = io.Copy(localConn, netConn)
+					_ = localConn.Close()
+				}()
+			}
+		}()
+		return WithAddress("unix://" + localProxySock)(self)
 	}
 }
+
+//func WithSSH(serverInfo *ssh.ServerInfo) Option {
+//	return func(self *Builder) error {
+//		option := []ssh.Option{
+//			ssh.WithContext(self.Ctx),
+//		}
+//		option = append(option, ssh.WithServerInfo(serverInfo)...)
+//		sshClient, err := ssh.NewClient(option...)
+//		if err != nil {
+//			return err
+//		}
+//		transport := &http.Transport{
+//			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+//				return sshconn.New(self.Ctx, sshClient, "docker", "system", "dial-stdio")
+//			},
+//		}
+//		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))
+//		return nil
+//	}
+//}

@@ -29,7 +29,6 @@ import (
 	ssh2 "golang.org/x/crypto/ssh"
 	"io"
 	"log/slog"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -634,10 +633,12 @@ func (self Home) GetStatList(http *gin.Context) {
 func (self Home) UpgradeScript(http *gin.Context) {
 	dpanelContainerInfo := container.InspectResponse{}
 	new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo)
-	execPath, _ := os.Executable()
+	if dpanelContainerInfo.ContainerJSONBase == nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonNotFoundDPanel), 500)
+		return
+	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"info":     dpanelContainerInfo,
-		"execPath": execPath,
+		"info": dpanelContainerInfo,
 	})
 	return
 }

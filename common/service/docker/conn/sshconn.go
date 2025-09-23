@@ -60,7 +60,6 @@ func New(ctx context.Context, sshClient *ssh.Client, cmd string, args ...string)
 	// Capture stderr with writer
 	c := &sshConn{
 		session:    session,
-		sshClient:  sshClient,
 		stdin:      stdin,
 		stdout:     stdout,
 		localAddr:  dummyAddr{network: "ssh", s: "local"},
@@ -89,9 +88,9 @@ func New(ctx context.Context, sshClient *ssh.Client, cmd string, args ...string)
 
 // sshConn implements net.Conn
 type sshConn struct {
+	session *ssh2.Session
+
 	cmdMutex   sync.Mutex // Protects session.Wait() and cmdWaitErr
-	session    *ssh2.Session
-	sshClient  *ssh.Client
 	cmdWaitErr error
 	cmdExited  atomic.Bool // true after session.Wait() returns
 

@@ -61,8 +61,9 @@ func (self Local) GetBackupPath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "backup")
 }
 
-func (self Local) GetSSHConfigPath() string {
-	return filepath.Join(self.GetStorageLocalPath(), "ssh_config.d")
+func (self Local) GetLocalProxySockPath() string {
+	path := filepath.Join(self.GetStorageLocalPath(), "sock")
+	return path
 }
 
 func (self Local) GetNginxSettingPath() string {
