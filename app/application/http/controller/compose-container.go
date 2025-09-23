@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -145,7 +146,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 
 	for _, item := range runCompose.ContainerList {
-		if hash, err := tasker.GetServiceConfigHash(item.Service); err != nil || item.ConfigHash != hash {
+		if hash, err := tasker.GetServiceConfigHash(item.Service); err != nil || item.ConfigHash != hash || item.Container.State == container.StateCreated {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
 			return
 		}
@@ -178,38 +179,41 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	tasker, _, err := logic.Compose{}.GetTasker(composeRow)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+	runCompose := logic.Compose{}.LsItem(composeRow.Name)
+	if runCompose != nil && len(runCompose.ContainerList) != 0 {
+		tasker, _, err := logic.Compose{}.GetTasker(composeRow)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 
-	if !function.IsEmptyArray(params.DestroyServiceName) {
-		for _, item := range params.DestroyServiceName {
-			tasker.Project = tasker.Project.WithServicesDisabled(item)
+		if !function.IsEmptyArray(params.DestroyServiceName) {
+			for _, item := range params.DestroyServiceName {
+				tasker.Project = tasker.Project.WithServicesDisabled(item)
+			}
+		}
+
+		progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
+		defer progress.Close()
+
+		response, err := tasker.Destroy(params.DeleteImage, params.DeleteVolume)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		go func() {
+			<-progress.Done()
+			_ = response.Close()
+		}()
+		_, err = io.Copy(progress, response)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
 		}
 	}
 
-	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
-	defer progress.Close()
-
-	response, err := tasker.Destroy(params.DeleteImage, params.DeleteVolume)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	go func() {
-		<-progress.Done()
-		_ = response.Close()
-	}()
-	_, err = io.Copy(progress, response)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
 	if params.DeleteData {
-		_, err = dao.Compose.Where(dao.Compose.ID.Eq(composeRow.ID)).Delete()
+		_, err := dao.Compose.Where(dao.Compose.ID.Eq(composeRow.ID)).Delete()
 		if err != nil {
 			slog.Debug("compose", "destroy", err)
 		} else {
@@ -229,7 +233,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeleteFileMustDeleteTask), 500)
 			return
 		}
-		err = os.RemoveAll(filepath.Dir(composeRow.Setting.GetUriFilePath()))
+		err := os.RemoveAll(filepath.Dir(composeRow.Setting.GetUriFilePath()))
 		if err != nil {
 			slog.Debug("compose", "destroy", err)
 		}

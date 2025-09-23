@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
@@ -12,11 +14,11 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
@@ -27,6 +29,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -120,35 +123,35 @@ func (self Compose) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-	}
 
-	overrideYamlFileName := define.ComposeProjectDeployOverrideFileName
-	if composeRow.Setting.Type == accessor.ComposeTypeOutPath {
-		// 外部 compose 的覆盖文件添加文件前缀，避免同目录中可能有多个文件导致重复
-		overrideYamlFileName = fmt.Sprintf(define.ComposeProjectDeployOverrideOutPathFileName, composeRow.Name)
-	}
-	overrideYamlFilePath := filepath.Join(filepath.Dir(composeRow.Setting.GetUriFilePath()), overrideYamlFileName)
-	overrideRelPath, _ := filepath.Rel(composeRow.Setting.GetWorkingDir(), overrideYamlFilePath)
+		overrideYamlFileName := define.ComposeProjectDeployOverrideFileName
+		if composeRow.Setting.Type == accessor.ComposeTypeOutPath {
+			// 外部 compose 的覆盖文件添加文件前缀，避免同目录中可能有多个文件导致重复
+			overrideYamlFileName = fmt.Sprintf(define.ComposeProjectDeployOverrideOutPathFileName, composeRow.Name)
+		}
+		overrideYamlFilePath := filepath.Join(filepath.Dir(composeRow.Setting.GetUriFilePath()), overrideYamlFileName)
+		overrideRelPath, _ := filepath.Rel(composeRow.Setting.GetWorkingDir(), overrideYamlFilePath)
 
-	if params.YamlOverride != "" {
-		err := os.MkdirAll(filepath.Dir(overrideYamlFilePath), os.ModePerm)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		err = os.WriteFile(overrideYamlFilePath, []byte(params.YamlOverride), 0644)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		if !function.InArray(composeRow.Setting.Uri, overrideRelPath) {
-			composeRow.Setting.Uri = append(composeRow.Setting.Uri, overrideRelPath)
-		}
-	} else {
-		if err = os.Remove(overrideYamlFilePath); err == nil {
-			composeRow.Setting.Uri = slices.DeleteFunc(composeRow.Setting.Uri, func(s string) bool {
-				return s == overrideRelPath
-			})
+		if params.YamlOverride != "" {
+			err := os.MkdirAll(filepath.Dir(overrideYamlFilePath), os.ModePerm)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			err = os.WriteFile(overrideYamlFilePath, []byte(params.YamlOverride), 0644)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			if !function.InArray(composeRow.Setting.Uri, overrideRelPath) {
+				composeRow.Setting.Uri = append(composeRow.Setting.Uri, overrideRelPath)
+			}
+		} else {
+			if err = os.Remove(overrideYamlFilePath); err == nil {
+				composeRow.Setting.Uri = slices.DeleteFunc(composeRow.Setting.Uri, func(s string) bool {
+					return s == overrideRelPath
+				})
+			}
 		}
 	}
 
@@ -157,17 +160,15 @@ func (self Compose) Create(http *gin.Context) {
 	// 优先以 .env 文件中的数据为准，编辑 yaml 时，也会将提交的 env 覆盖到 .env 文件中
 	// 获取 .env 文件中的环境变量时，还需要将数据库中的规则和选项全部附加上，这样在表单中才会显示出来各种数据类型
 	if envFilePath, envFileContent, err := composeRow.Setting.GetDefaultEnv(); err == nil {
-		envMap, _ := godotenv.UnmarshalBytes(envFileContent)
-		for name, value := range envMap {
+		envLines := strings.Split(string(envFileContent), "\n")
+		for i, line := range envLines {
 			if v, _, ok := function.PluckArrayItemWalk(params.Environment, func(item docker.EnvItem) bool {
-				return item.Name == name && item.Value != value
+				return strings.HasPrefix(line, item.Name+"=")
 			}); ok {
-				envMap[name] = v.Value
+				envLines[i] = fmt.Sprintf("%s=%s", v.Name, v.Value)
 			}
 		}
-		// 写入 .env
-		_ = os.MkdirAll(filepath.Dir(envFilePath), os.ModePerm)
-		err = godotenv.Write(envMap, envFilePath)
+		err = os.WriteFile(envFilePath, []byte(strings.Join(envLines, "\n")), 0o600)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -309,7 +310,7 @@ func (self Compose) GetTask(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	yamlRow, err := logic.Compose{}.Get(params.Id)
+	composeRow, err := logic.Compose{}.Get(params.Id)
 	if err != nil {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
@@ -332,20 +333,25 @@ func (self Compose) GetTask(http *gin.Context) {
 	//}
 
 	data := gin.H{
-		"yaml":          yamlRow.Setting.GetYaml(),
+		"yaml":          composeRow.Setting.GetYaml(),
 		"task":          subTask,
 		"project":       &types.Project{},
-		"containerList": logic.Compose{}.Ps(yamlRow.Name),
-		"detail":        yamlRow,
+		"containerList": logic.Compose{}.Ps(composeRow.Name),
+		"detail":        composeRow,
 	}
 
-	if tasker, _, err := (logic.Compose{}).GetTasker(yamlRow); err == nil {
+	options := logic.Compose{}.ComposeProjectOptionsFn(composeRow)
+	options = append(options, cli.WithLoadOptions(func(options *loader.Options) {
+		options.SkipValidation = true
+	}))
+
+	if tasker, _, err := compose.NewCompose(options...); err == nil {
 		data["project"] = tasker.Project
 	}
 
-	if run := (logic.Compose{}).LsItem(yamlRow.Name); run != nil {
-		yamlRow.Setting.Status = run.Status
-		yamlRow.Setting.UpdatedAt = run.UpdatedAt.Format(time.DateTime)
+	if run := (logic.Compose{}).LsItem(composeRow.Name); run != nil {
+		composeRow.Setting.Status = run.Status
+		composeRow.Setting.UpdatedAt = run.UpdatedAt.Format(time.DateTime)
 	}
 
 	self.JsonResponseWithoutError(http, data)

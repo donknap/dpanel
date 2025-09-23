@@ -221,11 +221,19 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 			if err != nil {
 				return err
 			}
+			var composeYaml string
+			if v, err := os.ReadFile(filepath.Join(filepath.Dir(path), "docker-compose.yml")); err == nil {
+				composeYaml = string(v)
+			}
 
 			// 应用介绍信息 data.yaml
 			if len(segments) == 2 {
 				storeItem.Description = yamlData.GetString("additionalProperties.shortDescZh")
-				storeItem.Descriptions = yamlData.GetStringMapString("additionalProperties.description")
+				storeItem.Descriptions = function.PluckMapWalk(yamlData.GetStringMapString("additionalProperties.description"), func(k string, v string) bool {
+					return function.InArray([]string{
+						"zh", "en",
+					}, k)
+				})
 				storeItem.Tag = yamlData.GetStringSlice("additionalProperties.tags")
 				storeItem.Website = yamlData.GetString("additionalProperties.website")
 				storeItem.Title = yamlData.GetString("additionalProperties.name")
@@ -235,31 +243,51 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 			if len(segments) == 3 {
 				fields := yamlData.GetSliceStringMapString("additionalProperties.formFields")
 				env := make([]docker.EnvItem, 0)
-				env = append(env, docker.EnvItem{
-					Name:  "CONTAINER_NAME",
-					Label: "",
-					Value: compose.ContainerDefaultName,
-				})
-				if function.InArray([]string{
-					"php5", "php7", "php8",
-				}, storeItem.Name) {
-					env = append(env, docker.EnvItem{
+
+				for envName, envItem := range map[string]docker.EnvItem{
+					"${CONTAINER_NAME}": {
+						Name:  "CONTAINER_NAME",
+						Label: "容器名称",
+						Labels: map[string]string{
+							"zh": "容器名称",
+						},
+						Rule: &docker.ValueRuleItem{
+							Kind: docker.EnvValueRuleRequired,
+						},
+						Value: "",
+					},
+					"${IMAGE_NAME}": {
 						Name:  "IMAGE_NAME",
-						Label: "",
+						Label: "镜像名称",
+						Labels: map[string]string{
+							"zh": "镜像名称",
+						},
 						Value: "1panel-php:" + storeVersionItem.Name,
-					})
-					env = append(env, docker.EnvItem{
+					},
+					"${PANEL_WEBSITE_DIR}": {
 						Name:  "PANEL_WEBSITE_DIR",
-						Label: "",
+						Label: "网站目录",
+						Labels: map[string]string{
+							"zh": "网站目录",
+						},
 						Value: compose.WebsiteDefaultPath,
-					})
+					},
+				} {
+					if strings.Contains(composeYaml, envName) {
+						env = append(env, envItem)
+					}
 				}
+
 				for index, field := range fields {
 					envItem := docker.EnvItem{
-						Label:  field["labelZh"],
-						Labels: yamlData.GetStringMapString(fmt.Sprintf("additionalProperties.formFields.%d.label", index)),
-						Name:   field["envKey"],
-						Value:  field["default"],
+						Label: field["labelZh"],
+						Labels: function.PluckMapWalk(yamlData.GetStringMapString(fmt.Sprintf("additionalProperties.formFields.%d.label", index)), func(k string, v string) bool {
+							return function.InArray([]string{
+								"zh", "en",
+							}, k)
+						}),
+						Name:  field["envKey"],
+						Value: field["default"],
 						Rule: &docker.ValueRuleItem{
 							Kind:   0,
 							Option: make([]docker.ValueItem, 0),

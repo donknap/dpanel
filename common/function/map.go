@@ -32,3 +32,20 @@ func PluckMapWalkArray[K cmp.Ordered, U interface{}, R interface{}](m map[K]U, w
 	}
 	return result
 }
+
+func PluckMapWalk[K cmp.Ordered, U interface{}](m map[K]U, walk func(k K, v U) bool) map[K]U {
+	var keys []K
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+	result := make(map[K]U)
+	for _, key := range keys {
+		if walk(key, m[key]) {
+			result[key] = m[key]
+		}
+	}
+	return result
+}

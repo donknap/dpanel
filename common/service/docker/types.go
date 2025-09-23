@@ -88,7 +88,6 @@ const (
 	_
 	_
 	_
-	_
 	EnvValueTypeNumber
 	EnvValueTypeText
 	EnvValueTypeSelect

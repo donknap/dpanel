@@ -15,7 +15,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
-	"github.com/joho/godotenv"
 	"io"
 	"log/slog"
 	"net/http"
@@ -74,42 +73,6 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 		composeRow.Setting.Status = accessor.ComposeStatusWaiting
 	}
 
-	// 合并任务中的 .env 和 数据库的环境变量
-	allEnvironment := make([]docker.EnvItem, 0)
-	if _, envFileContent, err := composeRow.Setting.GetDefaultEnv(); err == nil {
-		envMap, _ := godotenv.UnmarshalBytes(envFileContent)
-		allEnvironment = append(allEnvironment, function.PluckMapWalkArray(envMap, func(k string, v string) (docker.EnvItem, bool) {
-			rule := &docker.ValueRuleItem{}
-			if composeRow.Setting.Type != accessor.ComposeTypeOutPath {
-				rule.Kind = docker.EnvValueRuleInEnvFile
-			}
-			if newItem, _, ok := function.PluckArrayItemWalk(composeRow.Setting.Environment, func(item docker.EnvItem) bool {
-				return item.Name == k
-			}); ok {
-				if newItem.Rule != nil {
-					rule = newItem.Rule
-				}
-			}
-			return docker.EnvItem{
-				Name:  k,
-				Value: v,
-				Rule:  rule,
-			}, true
-		})...)
-	}
-
-	// dbRow 中的 env 提交过来的值，所以这里包括了文件中及附加的值，这里筛选出来，避免客户端显示重复
-	if !function.IsEmptyArray(composeRow.Setting.Environment) {
-		allEnvironment = append(allEnvironment, function.PluckArrayWalk(composeRow.Setting.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
-			if _, _, ok := function.PluckArrayItemWalk(allEnvironment, func(mergeItem docker.EnvItem) bool {
-				return mergeItem.Name == item.Name
-			}); !ok {
-				return item, true
-			}
-			return item, false
-		})...)
-	}
-
 	// @todo 子任务应该放到商城同步的时候
 	//if item, ok := runTaskList[key]; ok {
 	//	return item, nil
@@ -129,7 +92,6 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 	//		}
 	//	}
 	//}
-	composeRow.Setting.Environment = allEnvironment
 	return composeRow, nil
 }
 
@@ -358,7 +320,7 @@ func (self Compose) Sync(dockerEnvName string) error {
 	return nil
 }
 
-func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, error) {
+func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.ProjectOptionsFn {
 	workingDir := dbRow.Setting.GetWorkingDir()
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
@@ -382,35 +344,38 @@ func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, erro
 		}
 		if _, err := os.Readlink(linkComposePath); err != nil {
 			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
-			err := os.Symlink(workingDir, linkComposePath)
-			slog.Debug("make compose symlink", "workdir", workingDir, "target", linkComposePath, "error", err)
+			err = os.Symlink(workingDir, linkComposePath)
+			if err != nil {
+				slog.Debug("db compose make path symlink", "workdir", workingDir, "target", linkComposePath, "error", err)
+			}
 		}
 		workingDir = linkComposePath
 	}
 
-	slog.Info("compose get task", "workDir", workingDir)
+	slog.Info("db compose ", "workDir", workingDir)
 
 	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
 	if dbRow.Setting.Type == accessor.ComposeTypeRemoteUrl {
-		tempYamlFilePath := dbRow.Setting.GetUriFilePath()
-		err := os.MkdirAll(filepath.Dir(tempYamlFilePath), os.ModePerm)
-		if err != nil {
-			return nil, nil, err
-		}
-		response, err := http.Get(dbRow.Setting.RemoteUrl)
-		if err != nil {
-			return nil, nil, err
-		}
-		defer func() {
-			_ = response.Body.Close()
+		err := func() error {
+			response, err := http.Get(dbRow.Setting.RemoteUrl)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = response.Body.Close()
+			}()
+			content, err := io.ReadAll(response.Body)
+			if err != nil {
+				return err
+			}
+			err = os.WriteFile(dbRow.Setting.GetUriFilePath(), self.makeDeployYamlHeader(content), 0666)
+			if err != nil {
+				return err
+			}
+			return nil
 		}()
-		content, err := io.ReadAll(response.Body)
 		if err != nil {
-			return nil, nil, err
-		}
-		err = os.WriteFile(tempYamlFilePath, self.makeDeployYamlHeader(content), 0666)
-		if err != nil {
-			return nil, nil, err
+			slog.Debug("db compose remote download", "error", err)
 		}
 	}
 
@@ -458,8 +423,11 @@ func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, erro
 		options = append(options, cli.WithName(dbRow.Name))
 	}
 
-	// 最终Yaml需要用到原始的compose，创建一个原始的对象
-	task, warning, err := compose.NewCompose(options...)
+	return options
+}
+
+func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, error) {
+	task, warning, err := compose.NewCompose(self.ComposeProjectOptionsFn(dbRow)...)
 	if err != nil {
 		slog.Warn("compose get task ", "error", err)
 		return nil, nil, err
