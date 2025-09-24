@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
@@ -146,15 +147,43 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 
 	for _, item := range runCompose.ContainerList {
-		if hash, err := tasker.GetServiceConfigHash(item.Service); err != nil || item.ConfigHash != hash || item.Container.State == container.StateCreated {
+		if item.Container.State != container.StateRunning {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
 			return
 		}
 	}
 
-	// @todo 支持商店安装 Php 扩展
 	// 这里需要单独适配一下 php 环境的相关扩展安装
 	// 目前只有 php 需要这样处理，暂时先直接进行判断
+	if strings.HasPrefix(composeRow.Setting.Store, accessor.StoreTypeOnePanel) && strings.HasSuffix(composeRow.Setting.Store, "@php") {
+		if phpExt, _, ok := function.PluckArrayItemWalk(params.Environment, func(item docker.EnvItem) bool {
+			return item.Name == "PHP_EXTENSIONS"
+		}); ok {
+			out, err := docker.Sdk.ContainerExec(progress.Context(), runCompose.ContainerList[0].Container.ID, container.ExecOptions{
+				Privileged:   true,
+				Tty:          false,
+				AttachStdin:  false,
+				AttachStdout: true,
+				AttachStderr: false,
+				Cmd: []string{
+					"install-ext",
+					phpExt.Value,
+				},
+			})
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			defer func() {
+				out.Close()
+			}()
+			_, err = io.Copy(progress, out.Reader)
+			if err != nil {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
+				return
+			}
+		}
+	}
 
 	self.JsonSuccessResponse(http)
 	return

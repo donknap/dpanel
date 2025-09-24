@@ -10,10 +10,8 @@ const (
 	DPanelLabelContainerAutoRemove = "com.dpanel.container.auto_remove"
 	DPanelLabelContainerTitle      = "com.dpanel.container.title"
 
-	// Deprecated
-	ComposeProjectPrefix = "dpanel-c-"
-	// Deprecated
-	ComposeProjectName = ComposeProjectPrefix + "%s"
+	ComposeProjectPrefix = "dpanel-c-"                 // Deprecated
+	ComposeProjectName   = ComposeProjectPrefix + "%s" // Deprecated
 
 	ComposeProjectDeployFileName                = "dpanel-deploy.yaml"
 	ComposeProjectDeployOverrideFileName        = "dpanel-override.yaml"

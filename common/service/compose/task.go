@@ -1,13 +1,11 @@
 package compose
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/opencontainers/go-digest"
 	"io"
 	"os"
 	"path/filepath"
@@ -164,26 +162,4 @@ func (self Task) GetService(name string) (types.ServiceConfig, ExtService, error
 		return service, ext, nil
 	}
 	return service, ExtService{}, nil
-}
-
-func (self Task) GetServiceConfigHash(serviceName string) (string, error) {
-	o, err := self.Project.GetService(serviceName)
-	if err != nil {
-		return "", err
-	}
-	// remove the Build config when generating the service hash
-	o.Build = nil
-	o.PullPolicy = ""
-	o.Scale = nil
-	if o.Deploy != nil {
-		o.Deploy.Replicas = nil
-	}
-	o.DependsOn = nil
-	o.Profiles = nil
-
-	bytes, err := json.Marshal(o)
-	if err != nil {
-		return "", err
-	}
-	return digest.SHA256.FromBytes(bytes).Encoded(), nil
 }

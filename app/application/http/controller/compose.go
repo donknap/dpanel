@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -161,11 +162,13 @@ func (self Compose) Create(http *gin.Context) {
 	// 获取 .env 文件中的环境变量时，还需要将数据库中的规则和选项全部附加上，这样在表单中才会显示出来各种数据类型
 	if envFilePath, envFileContent, err := composeRow.Setting.GetDefaultEnv(); err == nil {
 		envLines := strings.Split(string(envFileContent), "\n")
-		for i, line := range envLines {
-			if v, _, ok := function.PluckArrayItemWalk(params.Environment, func(item docker.EnvItem) bool {
+		for _, item := range params.Environment {
+			if _, i, ok := function.PluckArrayItemWalk(envLines, func(line string) bool {
 				return strings.HasPrefix(line, item.Name+"=")
 			}); ok {
-				envLines[i] = fmt.Sprintf("%s=%s", v.Name, v.Value)
+				envLines[i] = fmt.Sprintf("%s=%s", item.Name, strconv.Quote(item.Value))
+			} else {
+				envLines = append(envLines, fmt.Sprintf("%s=%s", item.Name, strconv.Quote(item.Value)))
 			}
 		}
 		err = os.WriteFile(envFilePath, []byte(strings.Join(envLines, "\n")), 0o600)
@@ -316,21 +319,8 @@ func (self Compose) GetTask(http *gin.Context) {
 		return
 	}
 
-	// @todo 二级任务应该在解析商店数据时处理，搜索一下该项目是否有子任务，仅为了兼容 1panel 应用商店， 1panel v2 变更了 php 环境处理方式
+	// 查询任务中是否包含子任务
 	subTask := make([]*entity.Compose, 0)
-	//if strings.HasPrefix(yamlRow.Setting.Store, accessor.StoreTypeOnePanel) || strings.HasPrefix(yamlRow.Setting.Store, accessor.StoreTypeOnePanelLocal) {
-	//	subTask = function.PluckMapWalkArray((logic.Compose{}).FindPathTask(filepath.Dir(yamlRow.Setting.GetUriFilePath())), func(item string, v *entity.Compose) (*entity.Compose, bool) {
-	//		if function.IsEmptyArray(v.Setting.Uri) {
-	//			return nil, false
-	//		}
-	//		v.Name = fmt.Sprintf("%s@%s", yamlRow.Name, v.Name)
-	//		// 目录需要添加上父级目录
-	//		v.Setting.Uri = function.PluckArrayWalk(v.Setting.Uri, func(item string) (string, bool) {
-	//			return filepath.Join(yamlRow.Name, item), true
-	//		})
-	//		return v, true
-	//	})
-	//}
 
 	data := gin.H{
 		"yaml":          composeRow.Setting.GetYaml(),
@@ -347,6 +337,21 @@ func (self Compose) GetTask(http *gin.Context) {
 
 	if tasker, _, err := compose.NewCompose(options...); err == nil {
 		data["project"] = tasker.Project
+		// 展示的时候需要使用 tasker 中的环境变量，结合了数据库中的与 .env 文件中的
+		composeRow.Setting.Environment = function.PluckMapWalkArray(tasker.Project.Environment, func(k string, v string) (docker.EnvItem, bool) {
+			if dbItem, _, ok := function.PluckArrayItemWalk(composeRow.Setting.Environment, func(item docker.EnvItem) bool {
+				return item.Name == k
+			}); ok {
+				return dbItem, true
+			}
+			return docker.EnvItem{
+				Name:  k,
+				Value: v,
+				Rule: &docker.ValueRuleItem{
+					Kind: docker.EnvValueRuleInEnvFile,
+				},
+			}, true
+		})
 	}
 
 	if run := (logic.Compose{}).LsItem(composeRow.Name); run != nil {

@@ -411,6 +411,10 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 		options = append(options, compose.WithYamlPath(path))
 	}
 
+	if defaultEnvPath, defaultEnvContent, err := dbRow.Setting.GetDefaultEnv(); err == nil && defaultEnvContent != nil {
+		options = append(options, cli.WithEnvFiles(defaultEnvPath))
+	}
+	options = append(options, cli.WithDotEnv)
 	// 始终以提交上来的环境变量（包含 .env 文件），.env 的内容仅在编辑任务的时候会覆盖写入
 	globalEnv := function.PluckArrayWalk(dbRow.Setting.Environment, func(i docker.EnvItem) (string, bool) {
 		return fmt.Sprintf("%s=%s", i.Name, i.Value), true

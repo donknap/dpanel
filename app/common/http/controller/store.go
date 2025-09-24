@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/network"
+	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -239,6 +240,15 @@ func (self Store) Deploy(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+
+	runComposeList := logic2.Compose{}.Ls()
+	if _, _, ok := function.PluckArrayItemWalk(runComposeList, func(item *compose.ProjectResult) bool {
+		return item.Name == params.Name
+	}); ok {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
+		return
+	}
+
 	storeRow, err := dao.Store.Where(dao.Store.ID.Eq(params.StoreId)).First()
 	if storeRow == nil {
 		slog.Debug("sto deploy get store", "error", err)
@@ -258,7 +268,7 @@ func (self Store) Deploy(http *gin.Context) {
 
 	envReplaceTable := compose.NewReplaceTable(
 		func(item *docker.EnvItem) error {
-			if !strings.Contains(item.Value, compose.CurrentUsername) {
+			if !strings.Contains(item.Value, compose.PlaceholderCurrentUsername) {
 				return nil
 			}
 			if data, ok := http.Get("userInfo"); ok {
@@ -269,9 +279,16 @@ func (self Store) Deploy(http *gin.Context) {
 			}
 			return errors.New("not found userinfo")
 		},
+		func(item *docker.EnvItem) error {
+			if !strings.Contains(item.Value, compose.PlaceholderProjectName) {
+				return nil
+			}
+			item.Value = strings.ReplaceAll(item.Value, compose.PlaceholderProjectName, params.Name)
+			return nil
+		},
 	)
 
-	if strings.Contains(params.Name, compose.CurrentDate) {
+	if strings.Contains(params.Name, compose.PlaceholderCurrentDate) {
 		temp := docker.EnvItem{
 			Value: params.Name,
 		}

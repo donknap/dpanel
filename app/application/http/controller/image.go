@@ -482,6 +482,8 @@ func (self Image) ImagePrune(http *gin.Context) {
 				if !function.InArray(useImageList, item.ID) {
 					deleteImageSpaceReclaimed += item.Size
 					deleteImageTotal += 1
+					// 当 tag 没有的时候把 id 也附加上
+					item.RepoTags = append(item.RepoTags, item.ID)
 					for _, tag := range item.RepoTags {
 						_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, tag, image.RemoveOptions{
 							PruneChildren: true,

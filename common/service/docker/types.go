@@ -100,7 +100,7 @@ type ValueRuleItem struct {
 }
 
 type EnvItem struct {
-	Label  string            `json:"label,omitempty" yaml:"label,omitempty"`
+	Label  string            `json:"label,omitempty" yaml:"label,omitempty"` // Deprecated: instead Labels["zh"]
 	Labels map[string]string `json:"labels,omitempty"`
 	Name   string            `json:"name"`
 	Value  string            `json:"value"`

@@ -32,8 +32,7 @@ type ComposeSettingOption struct {
 	CreatedAt         string           `json:"createdAt,omitempty"`
 	UpdatedAt         string           `json:"updatedAt,omitempty"`
 	Message           string           `json:"message,omitempty"`
-	// Deprecated
-	RunName string `json:"-"`
+	RunName           string           `json:"-"` // Deprecated: 兼容旧版有前缀的名称
 }
 
 func (self ComposeSettingOption) GetUriFilePath() string {
@@ -51,13 +50,13 @@ func (self ComposeSettingOption) GetDefaultEnv() (envFile string, envFileContent
 	// 用户修改环境变量时，如果在 .env 文件存在则覆盖文件，否则保存至 setting 中
 	_, err = os.Stat(envFile)
 	if err != nil {
-		return envFile, envFileContent, err
+		return envFile, envFileContent, nil
 	}
 	envFileContent, err = os.ReadFile(envFile)
 	if err != nil {
 		return envFile, envFileContent, err
 	}
-	return envFile, envFileContent, err
+	return envFile, envFileContent, nil
 }
 
 func (self ComposeSettingOption) GetWorkingDir() string {

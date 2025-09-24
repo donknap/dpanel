@@ -10,11 +10,11 @@ import (
 
 // 仅在应用商店中的配置文件 data.yml 中支持
 const (
-	ContainerDefaultName = "%CONTAINER_DEFAULT_NAME%"
-	WebsiteDefaultPath   = "%WEBSITE_DEFAULT_PATH%"
-	CurrentUsername      = "%CURRENT_USERNAME%"
-	CurrentDate          = "%CURRENT_DATE%"
-	XkStoragePath        = "%XK_STORAGE_INFO%"
+	PlaceholderProjectName        = "%PROJECT_NAME%"
+	PlaceholderWebsiteDefaultPath = "%WEBSITE_DEFAULT_PATH%"
+	PlaceholderCurrentUsername    = "%CURRENT_USERNAME%"
+	PlaceholderCurrentDate        = "%CURRENT_DATE%"
+	PlaceholderXkStoragePath      = "%XK_STORAGE_INFO%"
 )
 
 type ReplaceFunc func(item *docker.EnvItem) error
@@ -23,21 +23,14 @@ type ReplaceTable []ReplaceFunc
 func NewReplaceTable(rt ...ReplaceFunc) ReplaceTable {
 	defaultTable := ReplaceTable{
 		func(item *docker.EnvItem) error {
-			if !strings.Contains(item.Value, ContainerDefaultName) {
+			if !strings.Contains(item.Value, PlaceholderCurrentDate) {
 				return nil
 			}
-			item.Value = strings.ReplaceAll(item.Value, ContainerDefaultName, function.GetRandomString(12))
+			item.Value = strings.ReplaceAll(item.Value, PlaceholderCurrentDate, time.Now().Format(function.YmdHis))
 			return nil
 		},
 		func(item *docker.EnvItem) error {
-			if !strings.Contains(item.Value, CurrentDate) {
-				return nil
-			}
-			item.Value = strings.ReplaceAll(item.Value, CurrentDate, time.Now().Format(function.YmdHis))
-			return nil
-		},
-		func(item *docker.EnvItem) error {
-			if !strings.Contains(item.Value, XkStoragePath) {
+			if !strings.Contains(item.Value, PlaceholderXkStoragePath) {
 				return nil
 			}
 			item.Value = ""
@@ -52,10 +45,10 @@ func NewReplaceTable(rt ...ReplaceFunc) ReplaceTable {
 			return nil
 		},
 		func(item *docker.EnvItem) error {
-			if !strings.Contains(item.Value, WebsiteDefaultPath) {
+			if !strings.Contains(item.Value, PlaceholderWebsiteDefaultPath) {
 				return nil
 			}
-			item.Value = strings.ReplaceAll(item.Value, WebsiteDefaultPath, storage.Local{}.GetDefaultWebsitePath())
+			item.Value = strings.ReplaceAll(item.Value, PlaceholderWebsiteDefaultPath, storage.Local{}.GetDefaultWebsitePath())
 			return nil
 		},
 	}
