@@ -347,7 +347,7 @@ func (self Compose) GetTask(http *gin.Context) {
 			return docker.EnvItem{
 				Name:  k,
 				Value: v,
-				Rule: &docker.ValueRuleItem{
+				Rule: &docker.EnvValueRule{
 					Kind: docker.EnvValueRuleInEnvFile,
 				},
 			}, true

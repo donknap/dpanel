@@ -55,7 +55,7 @@ func (self CronTemplate) Template(dir string) ([]CronTemplateItem, error) {
 					Name:  field["name"],
 					Label: field["labelZh"],
 				}
-				envItem.Rule = Store{}.ParseSettingField(field, func(item *docker.ValueRuleItem) {
+				envItem.Rule = Store{}.ParseSettingField(field, func(item *docker.EnvValueRule) {
 					if (item.Kind & docker.EnvValueTypeSelect) != 0 {
 						item.Option = function.PluckArrayWalk(
 							yamlData.GetSliceStringMapString(fmt.Sprintf("task.environment.%d.values", index)),

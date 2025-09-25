@@ -1,11 +1,11 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	"github.com/docker/docker/api/types/network"
 	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/app/common/logic/onepanel"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -256,53 +256,50 @@ func (self Store) Deploy(http *gin.Context) {
 		return
 	}
 
+	composeYamlRealPath := filepath.Join(storage.Local{}.GetStorePath(), params.ComposeFile)
+
 	// 适配 1panel
-	if storeRow.Setting.Type == accessor.StoreTypeOnePanel {
+	if storeRow.Setting.Type == accessor.StoreTypeOnePanel || storeRow.Setting.Type == accessor.StoreTypeOnePanelLocal {
 		if _, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, "1panel-network", network.InspectOptions{}); err != nil {
 			if _, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, "1panel-network", network.CreateOptions{}); err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
 		}
-	}
-
-	envReplaceTable := compose.NewReplaceTable(
-		func(item *docker.EnvItem) error {
-			if !strings.Contains(item.Value, compose.PlaceholderCurrentUsername) {
-				return nil
-			}
-			if data, ok := http.Get("userInfo"); ok {
-				if userInfo, ok := data.(logic.UserInfo); ok {
-					item.Value = userInfo.Username
-					return nil
-				}
-			}
-			return errors.New("not found userinfo")
-		},
-		func(item *docker.EnvItem) error {
-			if !strings.Contains(item.Value, compose.PlaceholderProjectName) {
-				return nil
-			}
-			item.Value = strings.ReplaceAll(item.Value, compose.PlaceholderProjectName, params.Name)
-			return nil
-		},
-	)
-
-	if strings.Contains(params.Name, compose.PlaceholderCurrentDate) {
-		temp := docker.EnvItem{
-			Value: params.Name,
-		}
-		if err = envReplaceTable.Replace(&temp); err == nil {
-			params.Name = temp.Value
+		params.Environment = append(params.Environment, onepanel.CommonEnv[onepanel.ContainerName])
+		if v, ok := onepanel.DefaultEnv[params.AppName]; ok {
+			params.Environment = append(params.Environment, v...)
 		}
 	}
 
+	valueReplaceTable := function.NewReplacerTable(compose.ValueReplaceTable...)
+	valueReplaceTable = append(valueReplaceTable, func(v *string) {
+		*v = function.StringReplaceAll(*v, compose.PlaceholderAppTaskName, params.Name)
+	})
+	valueReplaceTable = append(valueReplaceTable, func(v *string) {
+		*v = function.StringReplaceAll(*v, compose.PlaceholderAppName, params.AppName)
+	})
+	valueReplaceTable = append(valueReplaceTable, func(v *string) {
+		*v = function.StringReplaceAll(*v, compose.PlaceholderAppVersion, params.Version)
+	})
+	valueReplaceTable = append(valueReplaceTable, func(v *string) {
+		if data, ok := http.Get("userInfo"); ok {
+			if userInfo, ok := data.(logic.UserInfo); ok {
+				*v = function.StringReplaceAll(*v, compose.PlaceholderCurrentUsername, userInfo.Username)
+				return
+			}
+		}
+	})
+	function.Placeholder(&params.Name, valueReplaceTable...)
+
+	envReplaceTable := function.NewReplacerTable(compose.EnvItemReplaceTable...)
+	envReplaceTable = append(envReplaceTable, func(v *docker.EnvItem) {
+		function.Placeholder(&v.Value, valueReplaceTable...)
+		return
+	})
 	for i, item := range params.Environment {
-		if err := envReplaceTable.Replace(&item); err == nil {
-			params.Environment[i] = item
-		} else {
-			slog.Debug("store replace env", "error", err)
-		}
+		function.Placeholder(&item, envReplaceTable...)
+		params.Environment[i] = item
 	}
 
 	composeNew := &entity.Compose{
@@ -330,7 +327,7 @@ func (self Store) Deploy(http *gin.Context) {
 		return
 	}
 
-	err = function.CopyDir(targetPath, filepath.Join(storage.Local{}.GetStorePath(), filepath.Dir(params.ComposeFile)))
+	err = function.CopyDir(targetPath, filepath.Dir(composeYamlRealPath))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

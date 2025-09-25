@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"github.com/donknap/dpanel/common/function"
 	"strings"
 )
 
@@ -92,9 +93,10 @@ const (
 	EnvValueTypeText
 	EnvValueTypeSelect
 	EnvValueTypeSelectMultiple
+	EnvValueTypeOnePanel
 )
 
-type ValueRuleItem struct {
+type EnvValueRule struct {
 	Kind   int         `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Option []ValueItem `json:"option,omitempty" yaml:"option,omitempty"`
 }
@@ -104,7 +106,16 @@ type EnvItem struct {
 	Labels map[string]string `json:"labels,omitempty"`
 	Name   string            `json:"name"`
 	Value  string            `json:"value"`
-	Rule   *ValueRuleItem    `json:"rule,omitempty"`
+	Rule   *EnvValueRule     `json:"rule,omitempty"`
+}
+
+func NewValueItemWithArray(s ...string) []ValueItem {
+	return function.PluckArrayWalk(s, func(item string) (ValueItem, bool) {
+		return ValueItem{
+			Name:  item,
+			Value: item,
+		}, true
+	})
 }
 
 type ValueItem struct {
