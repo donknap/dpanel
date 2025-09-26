@@ -14,7 +14,6 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
@@ -335,7 +334,7 @@ func (self Compose) GetTask(http *gin.Context) {
 		options.SkipValidation = true
 	}))
 
-	if tasker, _, err := compose.NewCompose(options...); err == nil {
+	if tasker, _, err := (logic.Compose{}).GetTasker(composeRow); err == nil {
 		data["project"] = tasker.Project
 		// 展示的时候需要使用 tasker 中的环境变量，结合了数据库中的与 .env 文件中的
 		composeRow.Setting.Environment = function.PluckMapWalkArray(tasker.Project.Environment, func(k string, v string) (docker.EnvItem, bool) {

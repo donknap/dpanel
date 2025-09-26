@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/common/logic"
@@ -431,7 +432,11 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 }
 
 func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, error) {
-	task, warning, err := compose.NewCompose(self.ComposeProjectOptionsFn(dbRow)...)
+	options := self.ComposeProjectOptionsFn(dbRow)
+	options = append(options, cli.WithLoadOptions(func(options *loader.Options) {
+		options.SkipValidation = true
+	}))
+	task, warning, err := compose.NewCompose(options...)
 	if err != nil {
 		slog.Warn("compose get task ", "error", err)
 		return nil, nil, err
