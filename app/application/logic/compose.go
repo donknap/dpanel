@@ -3,7 +3,17 @@ package logic
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
@@ -16,14 +26,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
-	"io"
-	"log/slog"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 )
 
 var ComposeFileNameSuffix = []string{
@@ -418,6 +420,10 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 	options = append(options, cli.WithDotEnv)
 	// 始终以提交上来的环境变量（包含 .env 文件），.env 的内容仅在编辑任务的时候会覆盖写入
 	globalEnv := function.PluckArrayWalk(dbRow.Setting.Environment, func(i docker.EnvItem) (string, bool) {
+		if i.Rule != nil && i.Rule.IsInEnvFile() {
+			// 如果变量属于 .env 文件，则不主动附加，而是通过上面的 withEnvFile 进行附加
+			return "", false
+		}
 		return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 	})
 	options = append(options, cli.WithEnv(globalEnv))
@@ -456,4 +462,19 @@ func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {
 
 func (self Compose) getDPanelProjectName(name string) string {
 	return fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(name, "@", "-"))
+}
+
+func (self Compose) ParseEnvItemValue(env []docker.EnvItem) ([]docker.EnvItem, error) {
+	envMap, err := dotenv.UnmarshalWithLookup(strings.Join(function.PluckArrayWalk(env, func(item docker.EnvItem) (string, bool) {
+		return item.String(), true
+	}), "\n"), nil)
+	if err != nil {
+		return nil, err
+	}
+	return function.PluckArrayWalk(env, func(item docker.EnvItem) (docker.EnvItem, bool) {
+		if v, ok := envMap[item.Name]; ok {
+			item.Value = v
+		}
+		return item, true
+	}), nil
 }

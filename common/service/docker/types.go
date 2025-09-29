@@ -1,8 +1,10 @@
 package docker
 
 import (
-	"github.com/donknap/dpanel/common/function"
+	"fmt"
 	"strings"
+
+	"github.com/donknap/dpanel/common/function"
 )
 
 const (
@@ -101,12 +103,41 @@ type EnvValueRule struct {
 	Option []ValueItem `json:"option,omitempty" yaml:"option,omitempty"`
 }
 
+func (self EnvValueRule) IsInEnvFile() bool {
+	return self.Kind&EnvValueRuleInEnvFile != 0
+}
+
+func NewEnvItemFromString(s string) EnvItem {
+	if k, v, ok := strings.Cut(s, "="); ok {
+		return EnvItem{
+			Name:  k,
+			Value: v,
+		}
+	} else {
+		return EnvItem{
+			Name:  s,
+			Value: "",
+		}
+	}
+}
+
+func NewEnvItemFromKV(k, v string) EnvItem {
+	return EnvItem{
+		Name:  k,
+		Value: v,
+	}
+}
+
 type EnvItem struct {
 	Label  string            `json:"label,omitempty" yaml:"label,omitempty"` // Deprecated: instead Labels["zh"]
 	Labels map[string]string `json:"labels,omitempty"`
 	Name   string            `json:"name"`
 	Value  string            `json:"value"`
 	Rule   *EnvValueRule     `json:"rule,omitempty"`
+}
+
+func (self EnvItem) String() string {
+	return fmt.Sprintf("%s=%s", self.Name, self.Value)
 }
 
 func NewValueItemWithArray(s ...string) []ValueItem {

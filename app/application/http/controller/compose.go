@@ -5,8 +5,16 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/loader"
+	"io"
+	http2 "net/http"
+	"os"
+	"path/filepath"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
@@ -22,15 +30,6 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
-	"io"
-	http2 "net/http"
-	"os"
-	"path/filepath"
-	"slices"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type Compose struct {
@@ -43,7 +42,7 @@ func (self Compose) Create(http *gin.Context) {
 		Title        string           `json:"title"`
 		Name         string           `json:"name" binding:"required,lowercase"`
 		Type         string           `json:"type" binding:"required"`
-		Yaml         string           `json:"yaml"`
+		Yaml         string           `json:"yaml" binding:"required_without=Id"`
 		YamlOverride string           `json:"yamlOverride"`
 		RemoteUrl    string           `json:"remoteUrl"`
 		Environment  []docker.EnvItem `json:"environment"`
@@ -155,19 +154,30 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
-	// 获取任务 .env 的时候有两个数据源
-	// 一个是任务目录下的 .env 文件，一个是数据库存储的环境变量
-	// 优先以 .env 文件中的数据为准，编辑 yaml 时，也会将提交的 env 覆盖到 .env 文件中
-	// 获取 .env 文件中的环境变量时，还需要将数据库中的规则和选项全部附加上，这样在表单中才会显示出来各种数据类型
+	// 清理掉值中的注释等其它信息
+	newEnv, err := logic.Compose{}.ParseEnvItemValue(params.Environment)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	composeRow.Setting.Environment = newEnv
+
+	// 将存在于 .env 的变量的值重新写入到 .env 文件，并添加 EnvInFile 标识
+	// 数据库中的环境变量包含了文件+数据库+自定义字段选项等完整数据
 	if envFilePath, envFileContent, err := composeRow.Setting.GetDefaultEnv(); err == nil {
 		envLines := strings.Split(string(envFileContent), "\n")
-		for _, item := range params.Environment {
+		for j, item := range composeRow.Setting.Environment {
 			if _, i, ok := function.PluckArrayItemWalk(envLines, func(line string) bool {
 				return strings.HasPrefix(line, item.Name+"=")
 			}); ok {
 				envLines[i] = fmt.Sprintf("%s=%s", item.Name, strconv.Quote(item.Value))
-			} else {
-				envLines = append(envLines, fmt.Sprintf("%s=%s", item.Name, strconv.Quote(item.Value)))
+				if composeRow.Setting.Environment[j].Rule == nil {
+					composeRow.Setting.Environment[j].Rule = &docker.EnvValueRule{
+						Kind: docker.EnvValueRuleInEnvFile,
+					}
+				} else {
+					composeRow.Setting.Environment[j].Rule.Kind |= docker.EnvValueRuleInEnvFile
+				}
 			}
 		}
 		err = os.WriteFile(envFilePath, []byte(strings.Join(envLines, "\n")), 0o600)
@@ -177,11 +187,9 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
-	composeRow.Setting.Environment = params.Environment
-
 	// 验证 yaml 是否正确
 	_, warning, err := logic.Compose{}.GetTasker(composeRow)
-	if err != nil || warning != nil {
+	if err != nil {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
 	}
@@ -329,18 +337,14 @@ func (self Compose) GetTask(http *gin.Context) {
 		"detail":        composeRow,
 	}
 
-	options := logic.Compose{}.ComposeProjectOptionsFn(composeRow)
-	options = append(options, cli.WithLoadOptions(func(options *loader.Options) {
-		options.SkipValidation = true
-	}))
-
 	if tasker, _, err := (logic.Compose{}).GetTasker(composeRow); err == nil {
 		data["project"] = tasker.Project
-		// 展示的时候需要使用 tasker 中的环境变量，结合了数据库中的与 .env 文件中的
+		// 获取环境变量时，需要从 .env 文件中拿到最新值和新增的变量
 		composeRow.Setting.Environment = function.PluckMapWalkArray(tasker.Project.Environment, func(k string, v string) (docker.EnvItem, bool) {
 			if dbItem, _, ok := function.PluckArrayItemWalk(composeRow.Setting.Environment, func(item docker.EnvItem) bool {
 				return item.Name == k
 			}); ok {
+				dbItem.Value = v
 				return dbItem, true
 			}
 			return docker.EnvItem{
@@ -416,7 +420,7 @@ func (self Compose) Download(http *gin.Context) {
 
 	if yaml[0] != "" {
 		zipHeader := &zip.FileHeader{
-			Name:               "compose.yaml",
+			Name:               filepath.Join(yamlRow.Name, "compose.yaml"),
 			Method:             zip.Deflate,
 			UncompressedSize64: uint64(len(yaml[0])),
 			Modified:           time.Now(),
@@ -431,7 +435,7 @@ func (self Compose) Download(http *gin.Context) {
 
 	if yaml[1] != "" {
 		zipHeader := &zip.FileHeader{
-			Name:               "dpanel-override.yaml",
+			Name:               filepath.Join(yamlRow.Name, define.ComposeProjectDeployOverrideFileName),
 			Method:             zip.Deflate,
 			UncompressedSize64: uint64(len(yaml[1])),
 			Modified:           time.Now(),
@@ -444,25 +448,23 @@ func (self Compose) Download(http *gin.Context) {
 		}
 	}
 
-	//if !function.IsEmptyArray(yamlRow.Setting.Environment) {
-	//	envList := make([]string, 0)
-	//	for _, item := range yamlRow.Setting.Environment {
-	//		envList = append(envList, fmt.Sprintf("%s=%s", item.Name, item.Value))
-	//	}
-	//	content := strings.Join(envList, "\n")
-	//	zipHeader := &zip.FileHeader{
-	//		Name:               ".dpanel.env",
-	//		Method:             zip.Deflate,
-	//		UncompressedSize64: uint64(len(content)),
-	//		Modified:           time.Now(),
-	//	}
-	//	writer, _ := zipWriter.CreateHeader(zipHeader)
-	//	_, err := writer.Write([]byte(content))
-	//	if err != nil {
-	//		self.JsonResponseWithError(http, err, 500)
-	//		return
-	//	}
-	//}
+	if !function.IsEmptyArray(yamlRow.Setting.Environment) {
+		content := strings.Join(function.PluckArrayWalk(yamlRow.Setting.Environment, func(item docker.EnvItem) (string, bool) {
+			return item.String(), true
+		}), "\n")
+		zipHeader := &zip.FileHeader{
+			Name:               filepath.Join(yamlRow.Name, define.ComposeDefaultEnvFileName),
+			Method:             zip.Deflate,
+			UncompressedSize64: uint64(len(content)),
+			Modified:           time.Now(),
+		}
+		writer, _ := zipWriter.CreateHeader(zipHeader)
+		_, err := writer.Write([]byte(content))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
 	_ = zipWriter.Close()
 
 	http.Header("Content-Type", "application/zip")

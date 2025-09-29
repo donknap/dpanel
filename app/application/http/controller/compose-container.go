@@ -4,6 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -17,11 +23,6 @@ import (
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
-	"io"
-	"log/slog"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
@@ -60,7 +61,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			RunName:       composeRow.Setting.RunName,
 		},
 	})
-	if err != nil || warning != nil {
+	if err != nil {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
 	}

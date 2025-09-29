@@ -2,6 +2,12 @@ package controller
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/docker/docker/api/types/network"
 	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
@@ -19,11 +25,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"log/slog"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 type Store struct {
@@ -266,7 +267,6 @@ func (self Store) Deploy(http *gin.Context) {
 				return
 			}
 		}
-		params.Environment = append(params.Environment, onepanel.CommonEnv[onepanel.ContainerName])
 		if v, ok := onepanel.DefaultEnv[params.AppName]; ok {
 			params.Environment = append(params.Environment, v...)
 		}
