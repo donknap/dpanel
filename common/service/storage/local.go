@@ -53,6 +53,10 @@ func (self Local) GetLicenseFilePath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "dpanel.lic")
 }
 
+func (self Local) GetW7OpenSoftwareLicenseFilePath() string {
+	return filepath.Join(self.GetStorageLocalPath(), "w7_opensoftware.pem")
+}
+
 func (self Local) GetScriptTemplatePath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "script")
 }
