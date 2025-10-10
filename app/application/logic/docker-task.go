@@ -14,8 +14,7 @@ type CreateContainerOption struct {
 }
 
 type BuildImageOption struct {
-	Id                     int32 `json:"id"`
-	MessageId              string
+	Id                     int32                `json:"id"`
 	Registry               string               `json:"registry"`
 	Tag                    string               `json:"tag" binding:"required"`
 	Title                  string               `json:"title"`

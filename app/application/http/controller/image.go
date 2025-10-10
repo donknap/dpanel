@@ -6,6 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	http2 "net/http"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -25,12 +32,6 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"io"
-	"log/slog"
-	http2 "net/http"
-	"os"
-	"strings"
-	"time"
 )
 
 type Image struct {
@@ -206,7 +207,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 		}
 	}
 
-	notice.Message{}.Info(".imageImport", "name", strings.Join(importImageTag, ", "))
+	_ = notice.Message{}.Info(".imageImport", "name", strings.Join(importImageTag, ", "))
 	self.JsonResponseWithoutError(http, gin.H{
 		"tag": importImageTag,
 	})
@@ -253,6 +254,7 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 			BuildDockerfileName: params.BuildDockerfileName,
 			BuildArgs:           params.BuildArgs,
 			Platform:            &params.Platform,
+			EnablePush:          params.EnablePush,
 		},
 		BuildType: params.BuildType,
 		Status:    docker.ImageBuildStatusStop,
@@ -263,7 +265,6 @@ func (self Image) CreateByDockerfile(http *gin.Context) {
 	}
 	_ = dao.Image.Save(imageNew)
 
-	params.MessageId = fmt.Sprintf(ws.MessageTypeImageBuild, params.Id)
 	log, err := logic.DockerTask{}.ImageBuild(&params)
 	if err != nil {
 		imageNew.Status = docker.ImageBuildStatusError

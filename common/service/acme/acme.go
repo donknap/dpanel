@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/exec/local"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/exec/local"
 )
 
 const (
@@ -111,47 +112,66 @@ func (self Acme) List() ([]*Cert, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := make([]*Cert, 0)
+	return self.ParseListRaw(out), nil
+}
+
+func (self Acme) ParseListRaw(out []byte) []*Cert {
+	certList := make([]map[string]string, 0)
+	certHeader := make([]string, 0)
+
 	scanner := bufio.NewScanner(bytes.NewBuffer(out))
 	for scanner.Scan() {
 		if strings.Contains(scanner.Text(), "Main_Domain") {
+			certHeader = strings.Split(scanner.Text(), "|")
 			continue
 		}
-		if split := strings.Split(scanner.Text(), "|"); len(split) >= 6 {
-			domain := []string{
-				split[0],
-			}
-			if split[2] != "no" {
-				domain = append(domain, strings.Split(split[2], ",")...)
-			}
-			success := false
-			if split[4] != "" && split[3] != "" {
-				success = true
-			}
-			cert := &Cert{
-				MainDomain: split[0],
-				RootPath:   filepath.Join(self.configHome, split[0]),
-				Domain:     domain,
-				CA:         split[3],
-				CreatedAt:  split[4],
-				RenewAt:    split[5],
-				Success:    success,
-			}
-			if !cert.IsImport() {
-				if conf, err := os.ReadFile(cert.GetConfigPath()); err == nil {
-					item := function.PluckArrayWalk(strings.Split(string(conf), "\n"), func(i string) (string, bool) {
-						if k, v, exists := strings.Cut(i, "="); exists && k == "Le_Webroot" {
-							return strings.Trim(v, "'"), true
-						}
-						return "", false
-					})
-					cert.DnsApi = strings.Join(item, "")
+		if values := strings.Split(scanner.Text(), "|"); len(values) >= 6 {
+			entry := make(map[string]string)
+			for i, value := range values {
+				if key := strings.TrimSpace(certHeader[i]); key != "" {
+					entry[key] = value
 				}
 			}
-			result = append(result, cert)
+			certList = append(certList, entry)
 		}
 	}
-	return result, nil
+
+	result := make([]*Cert, 0)
+	for _, item := range certList {
+		domain := []string{
+			item["Main_Domain"],
+		}
+		if item["SAN_Domains"] != "" && item["SAN_Domains"] != "no" {
+			domain = append(domain, strings.Split(item["SAN_Domains"], ",")...)
+		}
+
+		success := false
+		if item["CA"] != "" && item["Created"] != "" {
+			success = true
+		}
+		cert := &Cert{
+			MainDomain: item["Main_Domain"],
+			RootPath:   filepath.Join(self.configHome, item["Main_Domain"]),
+			Domain:     domain,
+			CA:         item["CA"],
+			CreatedAt:  item["Created"],
+			RenewAt:    item["Renew"],
+			Success:    success,
+		}
+		if !cert.IsImport() {
+			if conf, err := os.ReadFile(cert.GetConfigPath()); err == nil {
+				item := function.PluckArrayWalk(strings.Split(string(conf), "\n"), func(i string) (string, bool) {
+					if k, v, exists := strings.Cut(i, "="); exists && k == "Le_Webroot" {
+						return strings.Trim(v, "'"), true
+					}
+					return "", false
+				})
+				cert.DnsApi = strings.Join(item, "")
+			}
+		}
+		result = append(result, cert)
+	}
+	return result
 }
 
 func (self Acme) Remove(name string) error {

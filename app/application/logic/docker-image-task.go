@@ -6,6 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"math"
+	"strings"
+	"time"
+
 	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -14,17 +20,12 @@ import (
 	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
-	"io"
-	"log/slog"
-	"math"
-	"strings"
-	"time"
 )
 
 func (self DockerTask) ImageBuild(task *BuildImageOption) (string, error) {
 	_ = notice.Message{}.Info(".imageBuild", "tag", task.Tag)
 
-	wsBuffer := ws.NewProgressPip(task.MessageId)
+	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImageBuild, task.Id))
 	defer wsBuffer.Close()
 
 	b, err := builder.New(

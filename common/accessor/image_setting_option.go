@@ -10,4 +10,5 @@ type ImageSettingOption struct {
 	BuildArgs           []docker.EnvItem      `json:"buildArgs,omitempty"`
 	Platform            *docker.ImagePlatform `json:"platform,omitempty"`
 	Registry            string                `json:"registry"`
+	EnablePush          bool                  `json:"enablePush,omitempty"`
 }
