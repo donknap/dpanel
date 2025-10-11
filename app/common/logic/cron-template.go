@@ -2,13 +2,14 @@ package logic
 
 import (
 	"fmt"
-	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
-	"gopkg.in/yaml.v3"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
+	"gopkg.in/yaml.v3"
 )
 
 type CronTemplateItem struct {
@@ -31,7 +32,7 @@ func (self CronTemplate) Template(dir string) ([]CronTemplateItem, error) {
 			if err != nil {
 				return err
 			}
-			yamlData := new(function.YamlGetter)
+			yamlData := new(function.ConfigMap)
 			err = yaml.Unmarshal(content, &yamlData)
 			if err != nil {
 				return err

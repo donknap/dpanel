@@ -6,13 +6,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 )
 
 type Option func(builder *Builder) error
@@ -77,7 +78,7 @@ func WithTag(name ...string) Option {
 	}
 }
 
-func WithPlatform(item docker.ImagePlatform) Option {
+func WithPlatform(item *docker.ImagePlatform) Option {
 	return func(self *Builder) error {
 		if item.Arch == "" || item.Type == "" {
 			return nil

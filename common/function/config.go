@@ -2,13 +2,14 @@ package function
 
 import (
 	"fmt"
-	"github.com/spf13/cast"
 	"strings"
+
+	"github.com/spf13/cast"
 )
 
-type YamlGetter map[string]interface{}
+type ConfigMap map[string]interface{}
 
-func (self YamlGetter) GetString(path string) string {
+func (self ConfigMap) GetString(path string) string {
 	return cast.ToString(self.getValueInterface(path))
 }
 
@@ -17,7 +18,7 @@ func (self YamlGetter) GetString(path string) string {
 // tag:
 //   - a
 //   - b
-func (self YamlGetter) GetStringSlice(path string) []string {
+func (self ConfigMap) GetStringSlice(path string) []string {
 	return cast.ToStringSlice(self.toSlice(self.getValueInterface(path)))
 }
 
@@ -33,12 +34,12 @@ func (self YamlGetter) GetStringSlice(path string) []string {
 //     values:
 //   - a
 //   - b
-func (self YamlGetter) GetSliceStringMapString(path string) []map[string]string {
+func (self ConfigMap) GetSliceStringMapString(path string) []map[string]string {
 	result := make([]map[string]string, 0)
 	slice := cast.ToSlice(self.toSlice(self.getValueInterface(path)))
 	for _, item := range slice {
 		temp := make(map[string]string)
-		for key, value := range item.(YamlGetter) {
+		for key, value := range item.(ConfigMap) {
 			temp[key] = cast.ToString(value)
 		}
 		result = append(result, temp)
@@ -52,19 +53,19 @@ func (self YamlGetter) GetSliceStringMapString(path string) []map[string]string 
 //
 //	name: a
 //	age: 1
-func (self YamlGetter) GetStringMapString(path string) map[string]string {
+func (self ConfigMap) GetStringMapString(path string) map[string]string {
 	result := make(map[string]string)
 	v := self.getValueInterface(path)
 	if v == nil {
 		return make(map[string]string)
 	}
-	for key, value := range self.getValueInterface(path).(YamlGetter) {
+	for key, value := range self.getValueInterface(path).(ConfigMap) {
 		result[key] = cast.ToString(value)
 	}
 	return result
 }
 
-func (self YamlGetter) getValueInterface(path string) interface{} {
+func (self ConfigMap) getValueInterface(path string) interface{} {
 	if self == nil {
 		return interface{}(nil)
 	}
@@ -77,12 +78,12 @@ func (self YamlGetter) getValueInterface(path string) interface{} {
 		switch t := current[pathList[i]].(type) {
 		case []interface{}:
 			// 断言是数组类型时，需要转换成 map 再继续下一步
-			temp := make(YamlGetter)
+			temp := make(ConfigMap)
 			for j, v := range t {
 				temp[fmt.Sprintf("%d", j)] = v
 			}
 			current = temp
-		case YamlGetter:
+		case ConfigMap:
 			current = t
 		default:
 			// 类型非 map 或是 数组，直接返回数据上层再进行转换
@@ -95,8 +96,8 @@ func (self YamlGetter) getValueInterface(path string) interface{} {
 	return interface{}(nil)
 }
 
-func (self YamlGetter) toSlice(data interface{}) []interface{} {
-	if temp, ok := data.(YamlGetter); ok {
+func (self ConfigMap) toSlice(data interface{}) []interface{} {
+	if temp, ok := data.(ConfigMap); ok {
 		result := make([]interface{}, len(temp))
 		for key, value := range temp {
 			k := cast.ToInt(key)
