@@ -2,11 +2,12 @@ package controller
 
 import (
 	"fmt"
+	"io"
+	"time"
+
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
-	"io"
-	"time"
 )
 
 func (self Container) GetStatInfo(http *gin.Context) {

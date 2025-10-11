@@ -3,8 +3,9 @@ package local
 import (
 	"context"
 	"errors"
-	"github.com/donknap/dpanel/common/function"
 	"os/exec"
+
+	"github.com/donknap/dpanel/common/function"
 )
 
 type Option func(command *Local) error

@@ -3,10 +3,11 @@ package ws
 import (
 	"context"
 	"errors"
+	"time"
+
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/gin-gonic/gin"
-	"time"
 )
 
 type ProgressWrite func(p []byte) ([]byte, error)

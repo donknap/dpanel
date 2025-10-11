@@ -1,8 +1,9 @@
 package exec
 
 import (
-	"github.com/creack/pty"
 	"io"
+
+	"github.com/creack/pty"
 )
 
 type Executor interface {

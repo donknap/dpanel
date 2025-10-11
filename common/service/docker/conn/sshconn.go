@@ -16,8 +16,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/donknap/dpanel/common/service/ssh"
-	ssh2 "golang.org/x/crypto/ssh"
 	"io"
 	"log/slog"
 	"net"
@@ -25,6 +23,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/donknap/dpanel/common/service/ssh"
+	ssh2 "golang.org/x/crypto/ssh"
 )
 
 // New returns a net.Conn that runs the given command via SSH.

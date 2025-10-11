@@ -3,6 +3,11 @@ package controller
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"log/slog"
+	"net"
+	"strconv"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/donknap/dpanel/app/common/logic"
@@ -12,10 +17,6 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"io"
-	"log/slog"
-	"net"
-	"strconv"
 )
 
 type Swarm struct {

@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/storage"
 	"io"
 	"log/slog"
 	"net"
@@ -15,6 +13,9 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/storage"
 )
 
 func New(opts ...Option) *Registry {

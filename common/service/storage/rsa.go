@@ -1,9 +1,10 @@
 package storage
 
 import (
-	"github.com/donknap/dpanel/common/types/define"
 	"os"
 	"path/filepath"
+
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 func GetCertRsaContent() (public, private []byte, err error) {

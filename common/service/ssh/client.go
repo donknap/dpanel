@@ -2,11 +2,12 @@ package ssh
 
 import (
 	"context"
-	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
 	"io"
 	"log/slog"
 	"time"
+
+	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
 )
 
 func NewClient(opt ...Option) (*Client, error) {

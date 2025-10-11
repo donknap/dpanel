@@ -2,8 +2,9 @@ package dockerfs
 
 import (
 	"errors"
-	"github.com/spf13/afero/mem"
 	"os"
+
+	"github.com/spf13/afero/mem"
 )
 
 type File struct {

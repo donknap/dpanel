@@ -2,6 +2,8 @@ package logic
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -14,7 +16,6 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
-	"time"
 )
 
 var (
@@ -94,11 +95,11 @@ func (self User) GetUserByUsername(username string) (*entity.Setting, error) {
 
 func (self User) GetUserOauthToken(user *entity.Setting, autoLogin bool) (string, error) {
 	userInfo := UserInfo{
-		UserId:       user.ID,
-		Username:     user.Value.Username,
-		RoleIdentity: user.Name,
+		UserId:           user.ID,
+		Username:         user.Value.Username,
+		RoleIdentity:     user.Name,
 		RegisteredClaims: jwt.RegisteredClaims{},
-		AutoLogin: autoLogin,
+		AutoLogin:        autoLogin,
 	}
 	userInfo.RegisteredClaims.IssuedAt = jwt.NewNumericDate(time.Now())
 	_, privateKeyContent, err := storage.GetCertRsaContent()

@@ -4,25 +4,17 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"html/template"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
-	"html/template"
-	"os"
-	"path/filepath"
-	"strings"
-)
-
-const (
-	LangPhp    = "php"
-	LangJava   = "java"
-	LangNode   = "node"
-	LangGolang = "golang"
-	LangHtml   = "html"
-	LangOther  = "other"
 )
 
 var (

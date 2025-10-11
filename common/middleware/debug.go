@@ -1,11 +1,12 @@
 package common
 
 import (
+	"log/slog"
+	"runtime"
+
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
-	"log/slog"
-	"runtime"
 )
 
 type DebugMiddleware struct {

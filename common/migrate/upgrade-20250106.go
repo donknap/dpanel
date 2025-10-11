@@ -1,11 +1,12 @@
 package migrate
 
 import (
+	"log/slog"
+
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/service/docker"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
-	"log/slog"
 )
 
 type Upgrade20250106 struct{}

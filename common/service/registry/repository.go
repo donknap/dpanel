@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/mcuadros/go-version"
 	"io"
 	"net/http"
 	"sort"
+
+	"github.com/mcuadros/go-version"
 )
 
 const ContentDigestHeader = "Docker-Content-Digest"

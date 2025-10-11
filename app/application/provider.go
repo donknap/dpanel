@@ -4,13 +4,13 @@ import (
 	"github.com/donknap/dpanel/app/application/http/controller"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
-	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
+	httpserver "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
 
 type Provider struct {
 }
 
-func (provider *Provider) Register(httpServer *http_server.Server) {
+func (provider *Provider) Register(httpServer *httpserver.Server) {
 	// 注册一些路由
 	httpServer.RegisterRouters(
 		func(engine *gin.Engine) {

@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 	"log/slog"
 	"net/http"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
 var (

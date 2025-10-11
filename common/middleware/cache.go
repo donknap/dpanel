@@ -1,10 +1,11 @@
 package common
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
 	"strconv"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
 )
 
 type CacheMiddleware struct {

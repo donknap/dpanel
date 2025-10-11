@@ -2,14 +2,15 @@ package compose
 
 import (
 	"fmt"
-	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/network"
-	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/docker/api/types/network"
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 )
 
 type Task struct {

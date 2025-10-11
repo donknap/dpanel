@@ -2,10 +2,11 @@ package logic
 
 import (
 	"encoding/json"
-	"github.com/docker/go-units"
-	"github.com/donknap/dpanel/common/function"
 	"strconv"
 	"strings"
+
+	"github.com/docker/go-units"
+	"github.com/donknap/dpanel/common/function"
 )
 
 type Stat struct {
