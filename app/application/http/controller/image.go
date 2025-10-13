@@ -525,7 +525,6 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 	}
 	// 如果本地 digest 为空，则不检测
 	if function.IsEmptyArray(imageInfo.RepoDigests) {
-		_ = notice.Message{}.Info(".imageCheckUpgradeImageNotDigest")
 		self.JsonResponseWithoutError(http, gin.H{
 			"upgrade":     false,
 			"digest":      "",
