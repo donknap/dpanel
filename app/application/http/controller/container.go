@@ -332,7 +332,7 @@ func (self Container) Delete(http *gin.Context) {
 	var err error
 	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
@@ -363,8 +363,13 @@ func (self Container) Delete(http *gin.Context) {
 			Info: containerInfo,
 			Id:   containerInfo.ID,
 		}
+		// 如果存在 site 数据，则只保留最后一条
+		dao.Site.Unscoped().Where(gen.Cond(
+			datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
+		)...).Where(dao.Site.SiteName.Eq(siteRow.SiteName)).Where(dao.Site.DeletedAt.IsNotNull()).Delete()
 	}
 	_ = dao.Site.Save(siteRow)
+
 	// 删除域名、配置、证书
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.Name)).Find()
 	for _, domain := range domainList {
