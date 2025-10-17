@@ -184,7 +184,7 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	return envOption, nil
 }
 
-func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error {
+func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 	var asset embed.FS
 	err := facade.GetContainer().NamedResolve(&asset, "asset")
 	if err != nil {
@@ -202,6 +202,7 @@ func (self Site) MakeNginxConf(setting *accessor.SiteDomainSettingOption) error 
 	if err != nil {
 		return err
 	}
+	setting.WWWRoot = filepath.Join(storage.Local{}.GetDefaultWebsitePath(), setting.WWWRoot)
 	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", setting)
 	if err != nil {
 		return err

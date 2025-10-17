@@ -27,29 +27,15 @@ import (
 	"gorm.io/gen"
 )
 
-var (
-	defaultNetworkName = "dpanel-local"
-)
-
 type SiteDomain struct {
 	controller.Abstract
 }
 
 func (self SiteDomain) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id                        int32    `json:"id"`
-		ContainerId               string   `json:"containerId"`
-		ServerName                string   `json:"serverName" binding:"required"`
-		ServerNameAlias           []string `json:"serverNameAlias"`
-		Hostname                  string   `json:"hostname"`
-		Protocol                  string   `json:"protocol"`
-		Port                      int32    `json:"port" binding:"required"`
-		EnableBlockCommonExploits bool     `json:"enableBlockCommonExploits"`
-		EnableAssetCache          bool     `json:"enableAssetCache"`
-		EnableWs                  bool     `json:"enableWs"`
-		ExtraNginx                string   `json:"extraNginx"`
-		EnableSSL                 bool     `json:"enableSSL"`
-		CertName                  string   `json:"certName"`
+		Id          int32  `json:"id"`
+		ContainerId string `json:"containerId"`
+		accessor.SiteDomainSettingOption
 	}
 
 	params := ParamsValidate{}
@@ -87,10 +73,6 @@ func (self SiteDomain) Create(http *gin.Context) {
 		}
 	}
 
-	var hostname string
-	if params.Hostname != "" {
-		hostname = params.Hostname
-	}
 	if params.ContainerId != "" {
 		containerRow, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId)
 		if err != nil {
@@ -104,13 +86,12 @@ func (self SiteDomain) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSiteDomainNotFoundDPanel), 500)
 			return
 		}
-		slog.Debug("site domain dpanel container", "id", dpanelContainerInfo.ID)
-		if _, err = docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, defaultNetworkName, network.InspectOptions{}); err != nil {
-			slog.Debug("site domain create default network", "name", defaultNetworkName)
-			_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, defaultNetworkName, network.CreateOptions{
+		if _, err = docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, define.DPanelProxyNetworkName, network.InspectOptions{}); err != nil {
+			slog.Debug("site domain create default network", "name", define.DPanelProxyNetworkName)
+			_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, define.DPanelProxyNetworkName, network.CreateOptions{
 				Driver: "bridge",
 				Options: map[string]string{
-					"name": defaultNetworkName,
+					"name": define.DPanelProxyNetworkName,
 				},
 				EnableIPv6: function.Ptr(false),
 			})
@@ -122,11 +103,11 @@ func (self SiteDomain) Create(http *gin.Context) {
 
 		// 当面板自己没有加入默认网络时，加入并配置 hostname
 		// 假如当前转发的容器就是面板自己，则不在这里处理，统一在下面加入网络
-		if _, ok := dpanelContainerInfo.NetworkSettings.Networks[defaultNetworkName]; !ok {
+		if _, ok := dpanelContainerInfo.NetworkSettings.Networks[define.DPanelProxyNetworkName]; !ok {
 			if dpanelContainerInfo.ID != containerRow.ID {
-				err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, dpanelContainerInfo.ID, &network.EndpointSettings{
+				err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, define.DPanelProxyNetworkName, dpanelContainerInfo.ID, &network.EndpointSettings{
 					Aliases: []string{
-						fmt.Sprintf(docker.HostnameTemplate, strings.Trim(dpanelContainerInfo.Name, "/")),
+						fmt.Sprintf(define.DPanelNetworkHostName, strings.Trim(dpanelContainerInfo.Name, "/")),
 					},
 				})
 				if err != nil {
@@ -137,12 +118,12 @@ func (self SiteDomain) Create(http *gin.Context) {
 		}
 
 		// 当目标容器不在默认网络时，加入默认网络
-		hostname = fmt.Sprintf(docker.HostnameTemplate, strings.Trim(containerRow.Name, "/"))
-		if _, ok := containerRow.NetworkSettings.Networks[defaultNetworkName]; !ok {
-			slog.Debug("site domain join default network ", "container name", containerRow.Name, "hostname", hostname)
-			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, defaultNetworkName, params.ContainerId, &network.EndpointSettings{
+		params.ServerAddress = fmt.Sprintf(define.DPanelNetworkHostName, strings.Trim(containerRow.Name, "/"))
+		if _, ok := containerRow.NetworkSettings.Networks[define.DPanelProxyNetworkName]; !ok {
+			slog.Debug("site domain join default network ", "container name", containerRow.Name, "hostname", params.ServerAddress)
+			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, define.DPanelProxyNetworkName, params.ContainerId, &network.EndpointSettings{
 				Aliases: []string{
-					hostname,
+					params.ServerAddress,
 				},
 			})
 			if err != nil {
@@ -152,23 +133,9 @@ func (self SiteDomain) Create(http *gin.Context) {
 		}
 		siteDomainRow.ContainerID = containerRow.Name
 	}
-
-	siteDomainRow.Setting = &accessor.SiteDomainSettingOption{
-		ServerName:                params.ServerName,
-		ServerNameAlias:           params.ServerNameAlias,
-		ServerAddress:             hostname,
-		ServerProtocol:            params.Protocol,
-		Port:                      params.Port,
-		EnableBlockCommonExploits: params.EnableBlockCommonExploits,
-		EnableWs:                  params.EnableWs,
-		EnableAssetCache:          params.EnableAssetCache,
-		EnableSSL:                 params.EnableSSL,
-		ExtraNginx:                template.HTML(params.ExtraNginx),
-		TargetName:                function.GetMd5(params.ServerName),
-		CertName:                  "",
-		SslCrt:                    "",
-		SslKey:                    "",
-	}
+	params.ExtraNginx = template.HTML(params.ExtraNginx)
+	params.TargetName = function.GetMd5(params.ServerName)
+	siteDomainRow.Setting = &params.SiteDomainSettingOption
 
 	if params.CertName != "" && params.EnableSSL {
 		siteDomainRow.Setting.CertName = params.CertName
@@ -176,11 +143,12 @@ func (self SiteDomain) Create(http *gin.Context) {
 		siteDomainRow.Setting.SslKey = filepath.Join(storage.Local{}.GetCertDomainPath(), fmt.Sprintf(logic.CertName, params.CertName), fmt.Sprintf(logic.KeyFileName, params.CertName))
 	}
 
-	err = logic.Site{}.MakeNginxConf(siteDomainRow.Setting)
+	err = logic.Site{}.MakeNginxConf(*siteDomainRow.Setting)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	if siteDomainRow.ID > 0 {
 		err = dao.SiteDomain.Save(siteDomainRow)
 	} else {
@@ -285,7 +253,7 @@ func (self SiteDomain) Delete(http *gin.Context) {
 			// 如果只有dpanel-local一个网络则保留
 			containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, list[0].ContainerID)
 			if err == nil && len(containerInfo.NetworkSettings.Networks) > 1 {
-				err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, defaultNetworkName, list[0].ContainerID, false)
+				err = docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, define.DPanelProxyNetworkName, list[0].ContainerID, false)
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return

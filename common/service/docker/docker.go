@@ -24,7 +24,6 @@ var (
 	BuildDesc                  = "DPanel is a lightweight Docker web management panel"
 	BuildWebSite               = "https://dpanel.cc"
 	BuildVersion               = "1.0.0"
-	HostnameTemplate           = "%s.pod.dpanel.local"
 	DefaultClientName          = "local"
 	ConnectDockerServerTimeout = time.Second * 10
 )
