@@ -31,7 +31,6 @@ func WithContainerInfo(containerInfo container.InspectResponse) Option {
 func WithContainerName(name string) Option {
 	return func(self *Builder) error {
 		self.containerConfig.Hostname = name
-		self.containerConfig.Domainname = "pod.dpanel.local"
 		self.containerName = name
 		//  防止退出
 		self.containerConfig.AttachStdin = true
