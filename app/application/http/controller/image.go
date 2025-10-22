@@ -6,14 +6,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types/build"
+	"io"
+	"log/slog"
+	http2 "net/http"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/app/application/logic"
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
@@ -25,12 +30,6 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"io"
-	"log/slog"
-	http2 "net/http"
-	"os"
-	"strings"
-	"time"
 )
 
 type Image struct {
@@ -206,77 +205,9 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 		}
 	}
 
-	notice.Message{}.Info(".imageImport", "name", strings.Join(importImageTag, ", "))
+	_ = notice.Message{}.Info(".imageImport", "name", strings.Join(importImageTag, ", "))
 	self.JsonResponseWithoutError(http, gin.H{
 		"tag": importImageTag,
-	})
-	return
-}
-
-func (self Image) CreateByDockerfile(http *gin.Context) {
-	params := logic.BuildImageOption{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	if params.BuildDockerfileContent == "" && params.BuildZip == "" && params.BuildGit == "" {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildTypeEmpty), 500)
-		return
-	}
-	if params.BuildZip != "" && params.BuildGit != "" {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildTypeConflict), 500)
-		return
-	}
-	imageNameDetail := registry.GetImageTagDetail(params.Tag)
-	if params.Registry != "" {
-		imageNameDetail.Registry = params.Registry
-	}
-	params.Tag = imageNameDetail.Uri()
-
-	if params.BuildZip != "" {
-		path := storage.Local{}.GetSaveRealPath(params.BuildZip)
-		_, err := os.Stat(path)
-		if os.IsNotExist(err) {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonUploadFileEmpty), 500)
-			return
-		}
-		params.BuildZip = path
-	}
-
-	imageNew := &entity.Image{
-		Tag:   imageNameDetail.Uri(),
-		Title: params.Title,
-		Setting: &accessor.ImageSettingOption{
-			Registry:            params.Registry,
-			BuildGit:            params.BuildGit,
-			BuildDockerfile:     params.BuildDockerfileContent,
-			BuildRoot:           params.BuildDockerfileRoot,
-			BuildDockerfileName: params.BuildDockerfileName,
-			BuildArgs:           params.BuildArgs,
-			Platform:            &params.Platform,
-		},
-		BuildType: params.BuildType,
-		Status:    docker.ImageBuildStatusStop,
-		Message:   "",
-	}
-	if imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First(); imageRow != nil {
-		imageNew.ID = imageRow.ID
-	}
-	_ = dao.Image.Save(imageNew)
-
-	params.MessageId = fmt.Sprintf(ws.MessageTypeImageBuild, params.Id)
-	log, err := logic.DockerTask{}.ImageBuild(&params)
-	if err != nil {
-		imageNew.Status = docker.ImageBuildStatusError
-		imageNew.Message = log + "\n" + err.Error()
-		_ = dao.Image.Save(imageNew)
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	imageNew.Status = docker.ImageBuildStatusSuccess
-	imageNew.Message = log
-	_ = dao.Image.Save(imageNew)
-	self.JsonResponseWithoutError(http, gin.H{
-		"imageId": imageNew.ID,
 	})
 	return
 }
@@ -419,7 +350,7 @@ func (self Image) GetDetail(http *gin.Context) {
 	return
 }
 
-func (self Image) ImageDelete(http *gin.Context) {
+func (self Image) Delete(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5   []string `json:"md5" binding:"required"`
 		Force bool     `json:"force"`
@@ -433,7 +364,7 @@ func (self Image) ImageDelete(http *gin.Context) {
 		for _, sha := range params.Md5 {
 			_, err := docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, sha, image.RemoveOptions{
 				PruneChildren: true,
-				Force:         true,
+				Force:         params.Force,
 			})
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
@@ -445,7 +376,7 @@ func (self Image) ImageDelete(http *gin.Context) {
 	return
 }
 
-func (self Image) ImagePrune(http *gin.Context) {
+func (self Image) Prune(http *gin.Context) {
 	type ParamsValidate struct {
 		EnableUnuseTag bool `json:"enableUnuseTag"`
 	}
@@ -497,19 +428,6 @@ func (self Image) ImagePrune(http *gin.Context) {
 		}
 		_ = notice.Message{}.Info(".imagePrune", "size", units.HumanSize(float64(deleteImageSpaceReclaimed)), "count", fmt.Sprintf("%d", deleteImageTotal))
 	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Image) BuildPrune(http *gin.Context) {
-	res, err := docker.Sdk.Client.BuildCachePrune(docker.Sdk.Ctx, build.CachePruneOptions{
-		All: true,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	_ = notice.Message{}.Info(".imageBuildPrune", "size", units.HumanSize(float64(res.SpaceReclaimed)))
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -607,7 +525,6 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 	}
 	// 如果本地 digest 为空，则不检测
 	if function.IsEmptyArray(imageInfo.RepoDigests) {
-		_ = notice.Message{}.Info(".imageCheckUpgradeImageNotDigest")
 		self.JsonResponseWithoutError(http, gin.H{
 			"upgrade":     false,
 			"digest":      "",

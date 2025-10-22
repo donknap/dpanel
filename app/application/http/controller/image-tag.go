@@ -2,6 +2,11 @@ package controller
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
+	http2 "net/http"
+	"strings"
+
 	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
@@ -13,13 +18,9 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
-	"io"
-	"log/slog"
-	http2 "net/http"
-	"strings"
 )
 
-func (self Image) TagRemote(http *gin.Context) {
+func (self Image) TagSync(http *gin.Context) {
 	type ParamsValidate struct {
 		Tag      string `json:"tag" binding:"required"`
 		Type     string `json:"type" binding:"required,oneof=pull push"`
@@ -156,9 +157,7 @@ func (self Image) TagDelete(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"tag": params.Tag,
-	})
+	self.JsonSuccessResponse(http)
 	return
 }
 
@@ -187,13 +186,11 @@ func (self Image) TagAdd(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"tag": params.Tag,
-	})
+	self.JsonSuccessResponse(http)
 	return
 }
 
-func (self Image) TagSync(http *gin.Context) {
+func (self Image) TagPushBatch(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5          []string `json:"md5" binding:"required"`
 		RegistryId   []int32  `json:"registryId" binding:"required"`

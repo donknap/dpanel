@@ -1,15 +1,16 @@
 package logic
 
 import (
+	"log/slog"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/docker/docker/api/types/events"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
-	"log/slog"
-	"strings"
-	"sync"
-	"time"
 )
 
 func NewEventLogin() *EventLogic {

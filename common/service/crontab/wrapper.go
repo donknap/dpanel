@@ -2,10 +2,11 @@ package crontab
 
 import (
 	"errors"
-	"github.com/robfig/cron/v3"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/robfig/cron/v3"
 )
 
 var (

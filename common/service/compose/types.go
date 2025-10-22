@@ -1,9 +1,10 @@
 package compose
 
 import (
+	"time"
+
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
-	"time"
 )
 
 type Service struct {

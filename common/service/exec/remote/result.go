@@ -1,8 +1,9 @@
 package remote
 
 import (
-	"golang.org/x/crypto/ssh"
 	"io"
+
+	"golang.org/x/crypto/ssh"
 )
 
 type readCloser struct {

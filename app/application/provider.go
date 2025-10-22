@@ -4,13 +4,13 @@ import (
 	"github.com/donknap/dpanel/app/application/http/controller"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
-	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
+	httpserver "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
 
 type Provider struct {
 }
 
-func (provider *Provider) Register(httpServer *http_server.Server) {
+func (provider *Provider) Register(httpServer *httpserver.Server) {
 	// 注册一些路由
 	httpServer.RegisterRouters(
 		func(engine *gin.Engine) {
@@ -21,6 +21,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/site/get-list", controller.Site{}.GetList)
 			cors.POST("/app/site/get-detail", controller.Site{}.GetDetail)
 			cors.POST("/app/site/delete", controller.Site{}.Delete)
+			cors.POST("/app/site/restore", controller.Site{}.Restore)
 
 			cors.POST("/app/site-domain/create", controller.SiteDomain{}.Create)
 			cors.POST("/app/site-domain/delete", controller.SiteDomain{}.Delete)
@@ -60,29 +61,26 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 			cors.POST("/app/container-backup/get-detail", controller.ContainerBackup{}.GetDetail)
 
 			// 镜像相关
-			cors.POST("/app/image/create-by-dockerfile", controller.Image{}.CreateByDockerfile)
-			cors.POST("/app/image/get-list", controller.Image{}.GetList)
-			cors.POST("/app/image/get-detail", controller.Image{}.GetDetail)
-			cors.POST("/app/image/image-delete", controller.Image{}.ImageDelete)
-			cors.POST("/app/image/image-prune", controller.Image{}.ImagePrune)
-			cors.POST("/app/image/build-prune", controller.Image{}.BuildPrune)
-			cors.POST("/app/image/export", controller.Image{}.Export)
 			cors.POST("/app/image/import-by-container-tar", controller.Image{}.ImportByContainerTar)
 			cors.POST("/app/image/import-by-image-tar", controller.Image{}.ImportByImageTar)
-
-			cors.POST("/app/image/get-template-list", controller.Image{}.GetTemplateList)
-			cors.POST("/app/image/get-template-dockerfile", controller.Image{}.GetTemplateDockerfile)
-
-			cors.POST("/app/image/tag-remote", controller.Image{}.TagRemote)
-			cors.POST("/app/image/tag-delete", controller.Image{}.TagDelete)
-			cors.POST("/app/image/tag-add", controller.Image{}.TagAdd)
-			cors.POST("/app/image/tag-sync", controller.Image{}.TagSync)
-
-			cors.POST("/app/image/get-list-build", controller.Image{}.GetListBuild)
-			cors.POST("/app/image/get-build-task", controller.Image{}.GetBuildTask)
-			cors.POST("/app/image/delete-build-task", controller.Image{}.DeleteBuildTask)
+			cors.POST("/app/image/get-list", controller.Image{}.GetList)
+			cors.POST("/app/image/get-detail", controller.Image{}.GetDetail)
+			cors.POST("/app/image/delete", controller.Image{}.Delete)
+			cors.POST("/app/image/prune", controller.Image{}.Prune)
+			cors.POST("/app/image/export", controller.Image{}.Export)
 			cors.POST("/app/image/update-title", controller.Image{}.UpdateTitle)
 			cors.POST("/app/image/check-upgrade", controller.Image{}.CheckUpgrade)
+
+			cors.POST("/app/image/tag-sync", controller.Image{}.TagSync)
+			cors.POST("/app/image/tag-delete", controller.Image{}.TagDelete)
+			cors.POST("/app/image/tag-add", controller.Image{}.TagAdd)
+			cors.POST("/app/image/tag-push-batch", controller.Image{}.TagPushBatch)
+
+			cors.POST("/app/image-build/create", controller.ImageBuild{}.Create)
+			cors.POST("/app/image-build/get-list", controller.ImageBuild{}.GetList)
+			cors.POST("/app/image-build/get-detail", controller.ImageBuild{}.GetDetail)
+			cors.POST("/app/image-build/delete", controller.ImageBuild{}.Delete)
+			cors.POST("/app/image-build/prune", controller.ImageBuild{}.Prune)
 
 			// 文件相关
 			cors.POST("/app/explorer/export", controller.Explorer{}.Export)

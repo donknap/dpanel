@@ -3,6 +3,12 @@ package container
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -10,11 +16,6 @@ import (
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"io"
-	"net"
-	"os"
-	"strings"
-	"time"
 )
 
 type Option func(builder *Builder) error
@@ -30,7 +31,6 @@ func WithContainerInfo(containerInfo container.InspectResponse) Option {
 func WithContainerName(name string) Option {
 	return func(self *Builder) error {
 		self.containerConfig.Hostname = name
-		self.containerConfig.Domainname = "pod.dpanel.local"
 		self.containerName = name
 		//  防止退出
 		self.containerConfig.AttachStdin = true

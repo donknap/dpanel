@@ -5,15 +5,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"strings"
+
 	"github.com/creack/pty"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/ssh"
 	ssh2 "golang.org/x/crypto/ssh"
-	"io"
-	"log/slog"
-	"os"
-	"strings"
 )
 
 func New(opts ...Option) (exec.Executor, error) {

@@ -2,9 +2,10 @@ package imports
 
 import (
 	"archive/tar"
-	"github.com/donknap/dpanel/common/service/storage"
 	"io"
 	"os"
+
+	"github.com/donknap/dpanel/common/service/storage"
 )
 
 type ImportFile struct {

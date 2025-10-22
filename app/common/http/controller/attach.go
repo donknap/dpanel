@@ -2,14 +2,15 @@ package controller
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"log/slog"
-	"os"
-	"path/filepath"
 )
 
 type Attach struct {

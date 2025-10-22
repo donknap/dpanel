@@ -5,9 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/types/fs"
-	"github.com/mcuadros/go-version"
 	"io"
 	"log/slog"
 	"os"
@@ -15,6 +12,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/types/fs"
+	"github.com/mcuadros/go-version"
 )
 
 func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*fs.FileData, path []string, err error) {

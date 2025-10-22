@@ -2,6 +2,10 @@ package common
 
 import (
 	"fmt"
+	"log/slog"
+	"strings"
+	"time"
+
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -9,9 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
-	"log/slog"
-	"strings"
-	"time"
 )
 
 type AuthMiddleware struct {

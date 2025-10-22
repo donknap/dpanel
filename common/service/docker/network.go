@@ -3,9 +3,10 @@ package docker
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
-	"strings"
 )
 
 func (self Builder) NetworkRemove(ctx context.Context, networkName string) error {

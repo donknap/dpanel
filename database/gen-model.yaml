@@ -11,8 +11,10 @@ relation:
         serializer: json
   - table: ims_image
     column:
-      image_info:
-        type: ImageInfoOption
+      tag:
+        comment: "Deprecated: instead setting.tag"
+      build_type:
+        comment: "Deprecated: instead setting.buildType"
       setting:
         type: ImageSettingOption
         serializer: json

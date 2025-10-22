@@ -2,16 +2,17 @@ package logic
 
 import (
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"gopkg.in/yaml.v3"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, error) {
@@ -49,7 +50,7 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 		if err != nil {
 			return err
 		}
-		yamlData := new(function.YamlGetter)
+		yamlData := new(function.ConfigMap)
 		err = yaml.Unmarshal(content, &yamlData)
 		if err != nil {
 			return err
@@ -104,7 +105,7 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 			if err != nil {
 				return err
 			}
-			yamlData := new(function.YamlGetter)
+			yamlData := new(function.ConfigMap)
 			err = yaml.Unmarshal(content, &yamlData)
 			if err != nil {
 				return err
@@ -128,7 +129,7 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 					BuildComposeFile: filepath.Join(resourcePath, versionName, "build", "docker-compose.yml"),
 				}
 				if v, err := os.ReadFile(filepath.Join(versionPath, "build", "config.json")); err == nil {
-					jsonData := new(function.YamlGetter)
+					jsonData := new(function.ConfigMap)
 					err = yaml.Unmarshal(v, &jsonData)
 					if err != nil {
 						return err
@@ -155,7 +156,7 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 	return result, nil
 }
 
-func (self Store) parseOnePanelSetting(getter *function.YamlGetter, root string) []docker.EnvItem {
+func (self Store) parseOnePanelSetting(getter *function.ConfigMap, root string) []docker.EnvItem {
 	result := make([]docker.EnvItem, 0)
 	fields := getter.GetSliceStringMapString(root)
 

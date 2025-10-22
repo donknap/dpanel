@@ -2,6 +2,13 @@ package controller
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -26,12 +33,6 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gen"
 	"gorm.io/gorm"
-	"io"
-	"log/slog"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 )
 
 type Container struct {
@@ -78,8 +79,8 @@ func (self Container) Status(http *gin.Context) {
 
 func (self Container) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5       string `json:"md5"`
 		SiteTitle string `json:"siteTitle"`
+		Image     string `json:"image"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -87,9 +88,6 @@ func (self Container) GetList(http *gin.Context) {
 	}
 	list := make([]container.Summary, 0)
 	filter := filters.NewArgs()
-	if params.Md5 != "" {
-		filter.Add("id", params.Md5)
-	}
 	list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
 		All:     true,
 		Latest:  true,
@@ -117,26 +115,31 @@ func (self Container) GetList(http *gin.Context) {
 		}
 	}
 
-	result := make([]container.Summary, 0)
-	if params.SiteTitle != "" {
-		for _, item := range list {
-			if function.InArray(searchContainerIds, item.ID) {
-				result = append(result, item)
-				continue
+	list = function.PluckArrayWalk(list, func(item container.Summary) (container.Summary, bool) {
+		if function.IsEmptyArray(searchContainerIds) && params.Image == "" && params.SiteTitle == "" {
+			return item, true
+		}
+		if function.InArray(searchContainerIds, item.ID) {
+			return item, true
+		}
+		if params.Image != "" && (strings.Contains(item.Image, params.Image) || strings.Contains(item.ImageID, params.Image)) {
+			return item, true
+		}
+		if params.SiteTitle != "" {
+			if strings.HasPrefix(item.ID, params.SiteTitle) {
+				return item, true
 			}
 			for _, name := range item.Names {
 				if strings.Contains(name, params.SiteTitle) {
-					result = append(result, item)
-					break
+					return item, true
 				}
 			}
 		}
-	} else {
-		result = list
-	}
+		return item, false
+	})
 
 	var containerName []string
-	for index, item := range result {
+	for index, item := range list {
 		containerName = append(containerName, item.Names...)
 		// 如果是直接绑定到宿主机网络或是 Macvlan，端口号不会显示到容器详情中
 		// 需要通过获取镜像详情数据获取一下
@@ -151,7 +154,7 @@ func (self Container) GetList(http *gin.Context) {
 						Type:        port.Proto(),
 					})
 				}
-				result[index].Ports = ports
+				list[index].Ports = ports
 			}
 		}
 	}
@@ -161,14 +164,14 @@ func (self Container) GetList(http *gin.Context) {
 	})...))
 	siteList, _ := query.Find()
 
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Names[0] < result[j].Names[0]
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Names[0] < list[j].Names[0]
 	})
 
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(containerName...)).Find()
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"list":       result,
+		"list":       list,
 		"siteList":   siteList,
 		"domainList": domainList,
 	})
@@ -329,7 +332,7 @@ func (self Container) Delete(http *gin.Context) {
 	var err error
 	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
@@ -360,8 +363,13 @@ func (self Container) Delete(http *gin.Context) {
 			Info: containerInfo,
 			Id:   containerInfo.ID,
 		}
+		// 如果存在 site 数据，则只保留最后一条
+		dao.Site.Unscoped().Where(gen.Cond(
+			datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
+		)...).Where(dao.Site.SiteName.Eq(siteRow.SiteName)).Where(dao.Site.DeletedAt.IsNotNull()).Delete()
 	}
 	_ = dao.Site.Save(siteRow)
+
 	// 删除域名、配置、证书
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.Name)).Find()
 	for _, domain := range domainList {

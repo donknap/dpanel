@@ -28,7 +28,6 @@ const (
 	ErrorMessageContainerBackupImportFileFailed             = ".containerBackupImportFileFailed"
 	ErrorMessageContainerBackupImportFileInCorrect          = ".containerBackupImportFileInCorrect"
 	ErrorMessageContainerBackupRestoreImportImageFailed     = ".containerBackupRestoreImportImageFailed"
-	ErrorMessageContainerRollbackInCorrect                  = ".containerRollbackInCorrect"
 	ErrorMessageSiteDomainExists                            = ".siteDomainExists"
 	ErrorMessageSiteDomainNotFoundDPanel                    = ".siteDomainNotFoundDPanel"
 	ErrorMessageSiteDomainJoinDefaultNetworkFailed          = ".siteDomainJoinDefaultNetworkFailed"

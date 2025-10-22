@@ -2,7 +2,11 @@ package controller
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -12,12 +16,12 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
-	"strconv"
-	"strings"
+	"gorm.io/gorm"
 )
 
 type Site struct {
@@ -75,6 +79,13 @@ func (self Site) CreateByImage(http *gin.Context) {
 		_, _ = dao.Site.
 			Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.ContainerId, "Id"))...).
 			Delete()
+		deleteQuery := dao.Site.Unscoped().Order(dao.Site.ID.Desc()).Where(gen.Cond(
+			datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
+		)...).Where(dao.Site.SiteName.Eq(params.SiteName)).Where(dao.Site.DeletedAt.IsNotNull())
+		deleteIds := make([]int32, 0)
+		if err := deleteQuery.Limit(5).Pluck(dao.Site.ID, &deleteIds); err == nil {
+			_, _ = deleteQuery.Where(dao.Site.ID.NotIn(deleteIds...)).Delete()
+		}
 	}
 
 	// 创建前先查找一下当前环境下是否有容器
@@ -166,8 +177,6 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 func (self Site) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Page      int    `json:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize  int    `json:"pageSize" binding:"omitempty"`
 		SiteTitle string `json:"siteTitle" binding:"omitempty"`
 		SiteName  string `json:"siteName"`
 		Status    int32  `json:"status" binding:"omitempty,oneof=10 20 30"`
@@ -177,9 +186,6 @@ func (self Site) GetList(http *gin.Context) {
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
-	}
-	if params.Page < 1 {
-		params.Page = 1
 	}
 
 	query := dao.Site.Order(dao.Site.ID.Desc())
@@ -206,21 +212,10 @@ func (self Site) GetList(http *gin.Context) {
 		}
 		query = query.Unscoped().Where(dao.Site.DeletedAt.IsNotNull())
 	}
-	if params.PageSize > 0 {
-		list, total, _ := query.FindByPage((params.Page-1)*params.PageSize, params.PageSize)
-		self.JsonResponseWithoutError(http, gin.H{
-			"total": total,
-			"page":  params.Page,
-			"list":  list,
-		})
-	} else {
-		list, _ := query.Find()
-		self.JsonResponseWithoutError(http, gin.H{
-			"total": len(list),
-			"page":  params.Page,
-			"list":  list,
-		})
-	}
+	list, _ := query.Find()
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": list,
+	})
 	return
 }
 
@@ -324,4 +319,63 @@ func (self Site) Delete(http *gin.Context) {
 	}
 	self.JsonSuccessResponse(http)
 	return
+}
+
+func (self Site) Restore(http *gin.Context) {
+	type ParamsValidate struct {
+		SiteName string `json:"siteName"`
+	}
+
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	siteRow, err := dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Last()
+	if err != nil || siteRow.ContainerInfo == nil || siteRow.ContainerInfo.Info.Name == "" {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		return
+	}
+
+	if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, siteRow.ContainerInfo.Info.Name); err == nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", siteRow.ContainerInfo.Info.Name), 500)
+		return
+	}
+
+	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, siteRow.ContainerInfo.Info.Config, siteRow.ContainerInfo.Info.HostConfig, &network.NetworkingConfig{
+		EndpointsConfig: siteRow.ContainerInfo.Info.NetworkSettings.Networks,
+	}, &v1.Platform{}, siteRow.ContainerInfo.Info.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	_ = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, siteRow.ContainerInfo.Info.Name, container.StartOptions{})
+	info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, out.ID)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	_, _ = dao.Site.Unscoped().Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
+
+	err = dao.Site.Create(&entity.Site{
+		SiteTitle: siteRow.SiteTitle,
+		SiteName:  siteRow.SiteName,
+		Env:       siteRow.Env,
+		ContainerInfo: &accessor.SiteContainerInfoOption{
+			Id:   out.ID,
+			Info: info,
+		},
+		Status:    30,
+		Message:   "",
+		DeletedAt: gorm.DeletedAt{},
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"containerId": out.ID,
+	})
 }

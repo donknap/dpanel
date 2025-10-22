@@ -46,10 +46,10 @@ type image struct {
 
 	ALL       field.Asterisk
 	ID        field.Int32
-	Tag       field.String
+	Tag       field.String // Deprecated: instead setting.tag
 	Title     field.String
 	Setting   field.Field
-	BuildType field.String
+	BuildType field.String // Deprecated: instead setting.buildType
 	Status    field.Int32
 	Message   field.String
 

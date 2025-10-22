@@ -2,13 +2,6 @@ package logic
 
 import (
 	"archive/zip"
-	"github.com/donknap/dpanel/common/accessor"
-	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/exec/local"
-	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/donknap/dpanel/common/types/define"
-	"gopkg.in/yaml.v3"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -18,6 +11,14 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/donknap/dpanel/common/accessor"
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec/local"
+	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
+	"gopkg.in/yaml.v3"
 )
 
 type StoreLogoFileSystem struct {
@@ -178,7 +179,7 @@ func (self Store) GetAppByCasaos(storePath string) ([]accessor.StoreAppItem, err
 		if err != nil {
 			return err
 		}
-		yamlData := new(function.YamlGetter)
+		yamlData := new(function.ConfigMap)
 		err = yaml.Unmarshal(composeYaml, &yamlData)
 		if err != nil {
 			return err

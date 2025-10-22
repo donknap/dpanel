@@ -3,10 +3,11 @@ package ssh
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
-	"strings"
 )
 
 func WithAuthBasic(username, password string) Option {

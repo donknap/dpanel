@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/creack/pty"
-	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/exec"
 	"io"
 	"log/slog"
 	"os"
 	exec2 "os/exec"
 	"runtime"
+
+	"github.com/creack/pty"
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/exec"
 )
 
 func New(opts ...Option) (exec.Executor, error) {

@@ -3,10 +3,11 @@ package registry
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/docker/docker/api/types/registry"
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/docker/docker/api/types/registry"
 )
 
 const (

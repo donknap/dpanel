@@ -2,6 +2,8 @@ package compose
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/app"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
@@ -10,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
-	"strings"
 )
 
 type Deploy struct {

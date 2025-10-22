@@ -3,10 +3,11 @@ package function
 import (
 	"bufio"
 	"bytes"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
 	"io"
 	"strings"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 func SplitCommandArray(cmd string) []string {

@@ -1,12 +1,13 @@
 package controller
 
 import (
+	"sort"
+
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/gin-gonic/gin"
-	"sort"
 )
 
 func (self Swarm) TaskList(http *gin.Context) {

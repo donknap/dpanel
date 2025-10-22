@@ -3,13 +3,6 @@ package dockerfs
 import (
 	"errors"
 	"fmt"
-	"github.com/docker/go-units"
-	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/types/define"
-	"github.com/donknap/dpanel/common/types/fs"
-	"github.com/spf13/afero"
-	"github.com/spf13/afero/mem"
 	"io"
 	"log/slog"
 	"os"
@@ -17,6 +10,14 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/docker/go-units"
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/define"
+	"github.com/donknap/dpanel/common/types/fs"
+	"github.com/spf13/afero"
+	"github.com/spf13/afero/mem"
 )
 
 type Fs struct {

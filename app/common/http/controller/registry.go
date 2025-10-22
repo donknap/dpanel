@@ -1,6 +1,9 @@
 package controller
 
 import (
+	"net/url"
+	"strings"
+
 	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -12,8 +15,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"net/url"
-	"strings"
 )
 
 type Registry struct {

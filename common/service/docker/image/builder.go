@@ -2,9 +2,10 @@ package image
 
 import (
 	"context"
+	"io"
+
 	"github.com/docker/docker/api/types/build"
 	"github.com/donknap/dpanel/common/service/docker"
-	"io"
 )
 
 func New(opts ...Option) (*Builder, error) {

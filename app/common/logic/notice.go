@@ -2,11 +2,12 @@ package logic
 
 import (
 	"crypto/tls"
+	"net/smtp"
+	"strconv"
+
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/jordan-wright/email"
-	"net/smtp"
-	"strconv"
 )
 
 type Notice struct {
