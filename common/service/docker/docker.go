@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
-	"io"
-	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
+
+	winio "github.com/Microsoft/go-winio"
+	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
 
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/service/ssh"
@@ -201,45 +202,35 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 
 func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
-		sshClient, err := ssh.NewClient(ssh.WithServerInfo(serverInfo)...)
+		opts := ssh.WithServerInfo(serverInfo)
+		opts = append(opts, ssh.WithContext(self.Ctx))
+		sshClient, err := ssh.NewClient(opts...)
 		if err != nil {
 			return err
 		}
-		localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
-		_ = os.Remove(localProxySock)
-		listener, _ := net.ListenUnix("unix", &net.UnixAddr{Name: localProxySock})
 
-		go func() {
-			select {
-			case <-self.Ctx.Done():
-				_ = listener.Close()
-				sshClient.Close()
-			}
-		}()
+		var listener net.Listener
+		address := ""
 
-		go func() {
-			for {
-				localConn, err := listener.Accept()
-				if err != nil {
-					slog.Warn("docker proxy sock local close", "err", err)
-					return
-				}
-				netConn, err := sshconn.New(self.Ctx, sshClient, "docker", "system", "dial-stdio")
-				if err != nil {
-					slog.Warn("docker proxy sock create remote", "err", err)
-					return
-				}
-				go func() {
-					_, _ = io.Copy(netConn, localConn)
-					_ = netConn.Close()
-				}()
-				go func() {
-					_, _ = io.Copy(localConn, netConn)
-					_ = localConn.Close()
-				}()
+		if runtime.GOOS == "windows" {
+			address = "npipe:////./pipe/" + self.Name
+			listener, err = winio.ListenPipe(address, &winio.PipeConfig{})
+			if err != nil {
+				return err
 			}
-		}()
-		return WithAddress("unix://" + localProxySock)(self)
+		} else {
+			localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
+			_ = os.Remove(localProxySock)
+			address = "unix://" + localProxySock
+			listener, err = net.ListenUnix("unix", &net.UnixAddr{Name: localProxySock})
+			if err != nil {
+
+			}
+		}
+
+		sshconn.NewConnection(self.Ctx, sshClient, listener)
+
+		return WithAddress(address)(self)
 	}
 }
 

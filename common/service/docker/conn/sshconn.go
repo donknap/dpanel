@@ -14,10 +14,7 @@ package sshconn
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"github.com/donknap/dpanel/common/service/ssh"
-	ssh2 "golang.org/x/crypto/ssh"
 	"io"
 	"log/slog"
 	"net"
@@ -25,15 +22,16 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/donknap/dpanel/common/service/ssh"
+	ssh2 "golang.org/x/crypto/ssh"
 )
 
 // New returns a net.Conn that runs the given command via SSH.
 // The command should provide a stdio-based protocol (e.g., "docker system dial-stdio").
-func New(ctx context.Context, sshClient *ssh.Client, cmd string, args ...string) (net.Conn, error) {
+func New(sshClient *ssh.Client, cmd string, args ...string) (net.Conn, error) {
 	// Do not cancel the SSH session when ctx is cancelled.
 	// The lifetime should be managed by the http.Client, not the dial context.
-	ctx = context.WithoutCancel(ctx)
-
 	session, err := sshClient.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ssh session: %w", err)
@@ -98,10 +96,6 @@ type sshConn struct {
 	stdout   io.Reader
 	stderrMu sync.Mutex // Protects stderr buffer
 	stderr   bytes.Buffer
-
-	stdinClosed  atomic.Bool
-	stdoutClosed atomic.Bool
-	closing      atomic.Bool
 
 	localAddr  net.Addr
 	remoteAddr net.Addr
@@ -179,67 +173,31 @@ func (c *sshConn) handleEOF(err error) error {
 	)
 }
 
-func ignorableCloseError(err error) bool {
-	return err == nil ||
-		err == io.ErrClosedPipe ||
-		(err != nil && strings.Contains(err.Error(), "file already closed"))
-}
-
 func (c *sshConn) Read(p []byte) (n int, err error) {
 	n, err = c.stdout.Read(p)
-	// Check closing after blocking call
-	if c.closing.Load() {
-		return n, err
-	}
 	return n, c.handleEOF(err)
 }
 
 func (c *sshConn) Write(p []byte) (n int, err error) {
 	n, err = c.stdin.Write(p)
-	// Check closing after blocking call
-	if c.closing.Load() {
-		return n, err
-	}
 	return n, c.handleEOF(err)
 }
 
 // CloseRead closes the read side (stdout)
 func (c *sshConn) CloseRead() error {
-	c.stdoutClosed.Store(true)
-
-	if c.stdinClosed.Load() {
-		c.kill()
-	}
-	return nil
+	return c.Close()
 }
 
 // CloseWrite closes the write side (stdin)
 func (c *sshConn) CloseWrite() error {
-	if err := c.stdin.Close(); err != nil && !ignorableCloseError(err) {
-		return err
-	}
-	c.stdinClosed.Store(true)
-
-	if c.stdoutClosed.Load() {
-		c.kill()
-	}
-	return nil
+	return c.Close()
 }
 
 // Close implements net.Conn.Close
 func (c *sshConn) Close() error {
-	c.closing.Store(true)
-	defer c.closing.Store(false)
+	_ = c.stdin.Close()
 
-	if err := c.CloseRead(); err != nil {
-		slog.Warn("sshconn.Close: CloseRead:", "error", err)
-		return err
-	}
-	if err := c.CloseWrite(); err != nil {
-		slog.Warn("sshconn.Close: CloseWrite:", "error", err)
-		return err
-	}
-
+	c.kill()
 	return nil
 }
 
