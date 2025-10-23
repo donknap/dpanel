@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
 
-	winio "github.com/Microsoft/go-winio"
 	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
+	net2 "github.com/donknap/dpanel/common/service/docker/net"
 
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/service/ssh"
@@ -208,23 +207,18 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 			return err
 		}
 
-		var listener net.Listener
-		address := ""
-
+		sockPath := ""
 		if runtime.GOOS == "windows" {
-			address = "npipe:////./pipe/" + self.Name
-			listener, err = winio.ListenPipe(address, &winio.PipeConfig{})
-			if err != nil {
-				return err
-			}
+			sockPath = self.Name
 		} else {
 			localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
 			_ = os.Remove(localProxySock)
-			address = "unix://" + localProxySock
-			listener, err = net.ListenUnix("unix", &net.UnixAddr{Name: localProxySock})
-			if err != nil {
+			sockPath = localProxySock
+		}
 
-			}
+		listener, address, err := net2.NewListener(sockPath)
+		if err != nil {
+			return err
 		}
 
 		sshconn.NewConnection(self.Ctx, sshClient, listener)
