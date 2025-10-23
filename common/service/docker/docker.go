@@ -9,10 +9,9 @@ import (
 	"runtime"
 	"time"
 
-	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
-	net2 "github.com/donknap/dpanel/common/service/docker/net"
-
 	"github.com/docker/docker/client"
+	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
+	"github.com/donknap/dpanel/common/service/docker/conn/listener"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 )
@@ -216,12 +215,12 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 			sockPath = localProxySock
 		}
 
-		listener, address, err := net2.NewListener(sockPath)
+		localListener, address, err := listener.New(sockPath)
 		if err != nil {
 			return err
 		}
 
-		sshconn.NewConnection(self.Ctx, sshClient, listener)
+		sshconn.NewConnection(self.Ctx, sshClient, localListener)
 
 		return WithAddress(address)(self)
 	}

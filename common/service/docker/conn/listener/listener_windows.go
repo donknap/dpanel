@@ -1,11 +1,11 @@
 //go:build windows
 
-package net
+package listener
 
 import "net"
 import winio "github.com/Microsoft/go-winio"
 
-func NewListener(sockPath string) (net.Listener, string, error) {
+func New(sockPath string) (net.Listener, string, error) {
 	address := "npipe:////./pipe/" + sockPath
 	listener, err := winio.ListenPipe(address, &winio.PipeConfig{})
 	if err != nil {
