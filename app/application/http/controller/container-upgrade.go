@@ -47,7 +47,7 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 
-	bakTime := time.Now().Format(function.YmdHis)
+	bakTime := time.Now().Format(define.DateYmdHis)
 
 	// 更新容器时可以更改镜像 tag
 	if params.ImageTag != "" {

@@ -54,7 +54,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	backupTime := time.Now().Format(function.YmdHis)
+	backupTime := time.Now().Format(define.DateYmdHis)
 	suffix := fmt.Sprintf("dpanel-%s-%s", strings.TrimLeft(containerInfo.Name, "/"), backupTime)
 	backupRelTar := filepath.Join(containerInfo.Name, suffix+".snapshot")
 	backupTar := filepath.Join(storage.Local{}.GetBackupPath(), backupRelTar)

@@ -45,7 +45,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/container/upgrade", controller.Container{}.Upgrade)
 			cors.POST("/app/container/prune", controller.Container{}.Prune)
 			cors.POST("/app/container/delete", controller.Container{}.Delete)
-			cors.POST("/app/container/export", controller.Container{}.Export)
+			cors.GET("/app/container/export", controller.Container{}.Export)
 			cors.POST("/app/container/commit", controller.Container{}.Commit)
 			cors.POST("/app/container/copy", controller.Container{}.Copy)
 			cors.POST("/app/container/ignore", controller.Container{}.Ignore)
@@ -68,6 +68,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/image/delete", controller.Image{}.Delete)
 			cors.POST("/app/image/prune", controller.Image{}.Prune)
 			cors.POST("/app/image/export", controller.Image{}.Export)
+			cors.GET("/app/image/export", controller.Image{}.Export)
 			cors.POST("/app/image/update-title", controller.Image{}.UpdateTitle)
 			cors.POST("/app/image/check-upgrade", controller.Image{}.CheckUpgrade)
 

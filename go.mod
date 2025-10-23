@@ -3,6 +3,7 @@ module github.com/donknap/dpanel
 go 1.24.0
 
 require (
+	github.com/Microsoft/go-winio v0.6.2
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/compose-spec/compose-go/v2 v2.8.2
 	github.com/creack/pty v1.1.24
@@ -46,7 +47,6 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/asaskevich/EventBus v0.0.0-20200907212545-49d423059eef // indirect
 	github.com/boombuler/barcode v1.1.0 // indirect

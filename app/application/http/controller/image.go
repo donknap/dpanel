@@ -434,8 +434,8 @@ func (self Image) Prune(http *gin.Context) {
 
 func (self Image) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5                []string `json:"md5" binding:"required"`
-		EnableExportToPath bool     `json:"enableExportToPath"`
+		Md5                []string `form:"md5" binding:"required"`
+		EnableExportToPath bool     `form:"enableExportToPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -453,15 +453,13 @@ func (self Image) Export(http *gin.Context) {
 		}
 	}()
 
-	var writer io.Writer
-	var file *os.File
-
+	names := function.PluckArrayWalk(params.Md5, func(i string) (string, bool) {
+		imageDetail := registry.GetImageTagDetail(i)
+		return strings.ReplaceAll(strings.ReplaceAll(imageDetail.BaseName, "-", "_"), "/", "_"), true
+	})
+	fileName := fmt.Sprintf("export/image/%s-%s.tar", strings.Join(names, "-"), time.Now().Format(define.DateYmdHis))
 	if params.EnableExportToPath {
-		names := function.PluckArrayWalk(params.Md5, func(i string) (string, bool) {
-			imageDetail := registry.GetImageTagDetail(i)
-			return strings.ReplaceAll(strings.ReplaceAll(imageDetail.BaseName, "-", "_"), "/", "_"), true
-		})
-		file, err = storage.Local{}.CreateTempFile(fmt.Sprintf("export/image/%s-%s.tar", strings.Join(names, "-"), time.Now().Format(function.YmdHis)))
+		file, err := storage.Local{}.CreateTempFile(fileName)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -469,15 +467,16 @@ func (self Image) Export(http *gin.Context) {
 		defer func() {
 			_ = file.Close()
 		}()
-		writer = file
-		_ = notice.Message{}.Info(".imageExportInPath", "path", file.Name())
+		_, err = io.Copy(file, out)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_ = notice.Message{}.Info(define.InfoMessageCommonExportInPath, "path", file.Name())
 	} else {
-		writer = http.Writer
-	}
-	_, err = io.Copy(writer, out)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+		http.Header("Content-Type", "application/tar")
+		http.Header("Content-Disposition", "attachment; filename="+fileName)
+		http.DataFromReader(200, -1, "application/tar", out, nil)
 	}
 	self.JsonSuccessResponse(http)
 	return

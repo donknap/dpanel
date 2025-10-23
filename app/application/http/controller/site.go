@@ -171,7 +171,10 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Ctx:         http,
 	})
 
-	self.JsonResponseWithoutError(http, gin.H{"siteId": siteRow.ID})
+	self.JsonResponseWithoutError(http, gin.H{
+		"siteId":      siteRow.ID,
+		"containerId": detail.ID,
+	})
 	return
 }
 

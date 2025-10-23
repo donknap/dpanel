@@ -210,7 +210,7 @@ func (self Fs) readDirFromContainer(path string) ([]os.FileInfo, error) {
 
 		modStr := strings.Trim(row[0], "`")
 		size, _ := units.FromHumanSize(row[4])
-		modTime, _ := time.Parse(function.ShowYmdHis, row[5]+" "+row[6])
+		modTime, _ := time.Parse(define.DateShowYmdHis, row[5]+" "+row[6])
 
 		if !function.IsEmptyArray(row) {
 			fileData := &fs.FileData{

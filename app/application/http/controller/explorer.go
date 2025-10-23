@@ -37,24 +37,32 @@ type Explorer struct {
 
 func (self Explorer) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Name             string   `json:"name" binding:"required"`
-		FileList         []string `json:"fileList" binding:"required"`
-		EnableExportHost bool     `json:"enableExportHost"`
-		HostPath         string   `json:"hostPath" binding:"required_if=EnableExportHost true"`
+		Name               string   `json:"name" binding:"required"`
+		FileList           []string `json:"fileList" binding:"required"`
+		EnableExportToPath bool     `json:"enableExportToPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 	var err error
-	tempFile, err := storage.Local{}.CreateTempFile("")
+
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileName := strings.Trim(containerInfo.Name, "/") + "-" + time.Now().Format(define.DateYmdHis) + ".zip"
+	tempFile, err := storage.Local{}.CreateTempFile("export/file/" + fileName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	defer func() {
 		_ = tempFile.Close()
-		_ = os.Remove(tempFile.Name())
+		if !params.EnableExportToPath {
+			_ = os.Remove(tempFile.Name())
+		}
 	}()
 
 	pathInfo := make([]container.PathStat, 0)
@@ -104,20 +112,9 @@ func (self Explorer) Export(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.EnableExportHost {
-		_, afs, err := fs.NewSshExplorer(docker.Sdk.Name)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		hostFilePath := filepath.Join(params.HostPath, fmt.Sprintf("export-%s.zip", time.Now().Format(function.YmdHis)))
-		file, err := afs.Create(hostFilePath)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		_, _ = tempFile.Seek(0, io.SeekStart)
-		_, _ = io.Copy(file, tempFile)
+
+	if params.EnableExportToPath {
+		_ = notice.Message{}.Info(define.InfoMessageCommonExportInPath, "path", tempFile.Name())
 		self.JsonSuccessResponse(http)
 		return
 	} else {
@@ -126,7 +123,6 @@ func (self Explorer) Export(http *gin.Context) {
 		http.File(tempFile.Name())
 		return
 	}
-
 }
 
 func (self Explorer) ImportFileContent(http *gin.Context) {

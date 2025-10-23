@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -440,14 +441,19 @@ func (self Container) Delete(http *gin.Context) {
 
 func (self Container) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 string `json:"md5" binding:"required"`
+		Md5                string `form:"md5" binding:"required"`
+		EnableExportToPath bool   `form:"enableExportToPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	out, err := docker.Sdk.Client.ContainerExport(docker.Sdk.Ctx, params.Md5)
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	out, err := docker.Sdk.Client.ContainerExport(docker.Sdk.Ctx, containerInfo.ID)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -455,15 +461,28 @@ func (self Container) Export(http *gin.Context) {
 	defer func() {
 		_ = out.Close()
 	}()
-
-	data, err := io.ReadAll(out)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	fileName := strings.Trim(containerInfo.Name, "/") + "-" + time.Now().Format(define.DateYmdHis) + ".tar"
+	if params.EnableExportToPath {
+		file, err := storage.Local{}.CreateTempFile("export/container/" + fileName)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer func() {
+			_ = file.Close()
+		}()
+		_, err = io.Copy(file, out)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_ = notice.Message{}.Info(define.InfoMessageCommonExportInPath, "path", file.Name())
+	} else {
+		http.Header("Content-Type", "application/tar")
+		http.Header("Content-Disposition", "attachment; filename="+fileName)
+		http.DataFromReader(200, -1, "application/tar", out, nil)
 	}
-	http.Header("Content-Type", "application/tar")
-	http.Header("Content-Disposition", "attachment; filename="+params.Md5+".tar")
-	http.Data(200, "application/tar", data)
+	self.JsonSuccessResponse(http)
 	return
 }
 

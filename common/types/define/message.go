@@ -65,3 +65,7 @@ const (
 	ErrorMessageHomeWsHostConsoleSshNotSetting              = ".homeWsHostConsoleSshNotSetting"
 	ErrorMessageTagUrlNotFound                              = ".tagUrlNotFound"
 )
+
+const (
+	InfoMessageCommonExportInPath = ".commonExportInPath"
+)

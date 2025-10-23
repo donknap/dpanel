@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 // 仅在应用商店中的配置文件 data.yml 中支持
@@ -22,7 +23,7 @@ const (
 
 var ValueReplaceTable = []function.Replacer[string]{
 	func(v *string) {
-		*v = function.StringReplaceAll(*v, PlaceholderCurrentDate, time.Now().Format(function.YmdHis))
+		*v = function.StringReplaceAll(*v, PlaceholderCurrentDate, time.Now().Format(define.DateYmdHis))
 	},
 	func(v *string) {
 		*v = function.StringReplaceAll(*v, PlaceholderWebsitePath, storage.Local{}.GetDefaultWebsitePath())

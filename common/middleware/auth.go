@@ -36,10 +36,9 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 	}
 
 	var authToken = ""
-	if strings.HasPrefix(currentUrlPath, "/ws/") {
+	authToken = http.GetHeader("Authorization")
+	if authToken == "" {
 		authToken = "Bearer " + http.Query("token")
-	} else {
-		authToken = http.GetHeader("Authorization")
 	}
 
 	if authToken == "" {

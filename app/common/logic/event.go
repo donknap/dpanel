@@ -8,8 +8,8 @@ import (
 
 	"github.com/docker/docker/api/types/events"
 	"github.com/donknap/dpanel/common/entity"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
@@ -110,7 +110,7 @@ func (self *EventLogic) MonitorLoop() {
 				self.dataPool = append(self.dataPool, &entity.Event{
 					Type:      "error",
 					Message:   err.Error(),
-					CreatedAt: time.Now().Format(function.ShowYmdHis),
+					CreatedAt: time.Now().Format(define.DateShowYmdHis),
 				})
 				self.mu.Unlock()
 			}
