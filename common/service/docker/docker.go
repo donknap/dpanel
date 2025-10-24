@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/client"
+	"github.com/donknap/dpanel/common/function"
 	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
 	"github.com/donknap/dpanel/common/service/docker/conn/listener"
 	"github.com/donknap/dpanel/common/service/ssh"
@@ -106,12 +108,38 @@ type Builder struct {
 }
 
 func (self Builder) Close() {
+	if self.DockerEnv.RemoteType == RemoteTypeSSH {
+		localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
+		if strings.Contains(self.Client.DaemonHost(), self.Client.DaemonHost()) {
+			_ = os.Remove(localProxySock)
+		}
+	}
 	if self.CtxCancelFunc != nil {
 		self.CtxCancelFunc()
 	}
 	if self.Client != nil {
 		_ = self.Client.Close()
 	}
+}
+
+func (self Builder) Clone() (*Builder, error) {
+	return NewBuilderWithDockerEnv(&Client{
+		Name:              fmt.Sprintf("%s-%s", self.DockerEnv.Name, function.GetRandomString(5)),
+		Title:             self.DockerEnv.Title,
+		Address:           self.DockerEnv.Address,
+		Default:           false,
+		DockerInfo:        self.DockerEnv.DockerInfo,
+		ServerUrl:         self.DockerEnv.ServerUrl,
+		EnableTLS:         self.DockerEnv.EnableTLS,
+		TlsCa:             self.DockerEnv.TlsCa,
+		TlsCert:           self.DockerEnv.TlsCert,
+		TlsKey:            self.DockerEnv.TlsKey,
+		EnableComposePath: self.DockerEnv.EnableComposePath,
+		ComposePath:       self.DockerEnv.ComposePath,
+		EnableSSH:         self.DockerEnv.EnableSSH,
+		SshServerInfo:     self.DockerEnv.SshServerInfo,
+		RemoteType:        self.DockerEnv.RemoteType,
+	})
 }
 
 func NewBuilderWithDockerEnv(dockerEnv *Client) (*Builder, error) {

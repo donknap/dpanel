@@ -602,7 +602,15 @@ func (self Home) GetStatList(http *gin.Context) {
 		}
 		return nil
 	}
-	cmd, err := docker.Sdk.Run(statCmd...)
+	newDockerSdk := docker.Sdk
+	if docker.Sdk.DockerEnv.RemoteType == docker.RemoteTypeSSH {
+		newDockerSdk, err = docker.Sdk.Clone()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	cmd, err := newDockerSdk.Run(statCmd...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -616,6 +624,7 @@ func (self Home) GetStatList(http *gin.Context) {
 		slog.Debug("home get stat list progress close")
 		<-progress.Done()
 		_ = cmd.Close()
+		newDockerSdk.Close()
 	}()
 	_, err = io.Copy(progress, out)
 	if err != nil {
