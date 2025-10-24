@@ -209,10 +209,6 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
 		opts := ssh.WithServerInfo(serverInfo)
 		opts = append(opts, ssh.WithContext(self.Ctx))
-		sshClient, err := ssh.NewClient(opts...)
-		if err != nil {
-			return err
-		}
 
 		sockPath := ""
 		if runtime.GOOS == "windows" {
@@ -228,7 +224,7 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 			return err
 		}
 
-		sshconn.NewConnection(self.Ctx, sshClient, localListener)
+		sshconn.NewConnection(self.Ctx, opts, localListener)
 
 		return WithAddress(address)(self)
 	}

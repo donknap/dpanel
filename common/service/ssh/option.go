@@ -25,13 +25,15 @@ func WithAuthPem(username string, privateKeyPem string, password string) Option 
 		var signer ssh.Signer
 		var err error
 		self.sshClientConfig.User = username
-		if password != "" {
-			signer, err = ssh.ParsePrivateKeyWithPassphrase([]byte(privateKeyPem), []byte(password))
-		} else {
-			signer, err = ssh.ParsePrivateKey([]byte(privateKeyPem))
-		}
+		signer, err = ssh.ParsePrivateKey([]byte(privateKeyPem))
 		if err != nil {
-			return err
+			if password == "" {
+				return err
+			}
+			signer, err = ssh.ParsePrivateKeyWithPassphrase([]byte(privateKeyPem), []byte(password))
+			if err != nil {
+				return err
+			}
 		}
 		self.sshClientConfig.Auth = []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
