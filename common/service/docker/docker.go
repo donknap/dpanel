@@ -53,7 +53,11 @@ func (self Client) CommandEnv() []string {
 	result := make([]string, 0)
 	if self.RemoteType == RemoteTypeSSH {
 		// 还需要将系统的 PATH 环境变量传递进去，否则可能会报找不到 ssh 命令
-		result = append(result, fmt.Sprintf("DOCKER_HOST=ssh://%s@%s", self.SshServerInfo.Username, self.SshServerInfo.Address))
+		if runtime.GOOS == "windows" {
+			result = append(result, fmt.Sprintf("DOCKER_HOST=npipe:////./pipe/%s", self.Name))
+		} else {
+			result = append(result, fmt.Sprintf("DOCKER_HOST=unix://%s/%s.sock", storage.Local{}.GetLocalProxySockPath(), self.Name))
+		}
 		result = append(result, os.Environ()...)
 		return result
 	}
@@ -70,7 +74,11 @@ func (self Client) CommandEnv() []string {
 func (self Client) CommandParams() []string {
 	result := make([]string, 0)
 	if self.RemoteType == RemoteTypeSSH {
-		result = append(result, "-H", fmt.Sprintf("ssh://%s@%s:%d", self.SshServerInfo.Username, self.SshServerInfo.Address, self.SshServerInfo.Port))
+		if runtime.GOOS == "windows" {
+			result = append(result, "-H", fmt.Sprintf("npipe:////./pipe/%s", self.Name))
+		} else {
+			result = append(result, "-H", fmt.Sprintf("unix://%s/%s.sock", storage.Local{}.GetLocalProxySockPath(), self.Name))
+		}
 		return result
 	}
 	result = append(result, "-H", self.Address)
@@ -225,23 +233,3 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 		return WithAddress(address)(self)
 	}
 }
-
-//func WithSSH(serverInfo *ssh.ServerInfo) Option {
-//	return func(self *Builder) error {
-//		option := []ssh.Option{
-//			ssh.WithContext(self.Ctx),
-//		}
-//		option = append(option, ssh.WithServerInfo(serverInfo)...)
-//		sshClient, err := ssh.NewClient(option...)
-//		if err != nil {
-//			return err
-//		}
-//		transport := &http.Transport{
-//			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-//				return sshconn.New(self.Ctx, sshClient, "docker", "system", "dial-stdio")
-//			},
-//		}
-//		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))
-//		return nil
-//	}
-//}

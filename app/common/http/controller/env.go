@@ -5,9 +5,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"os/user"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -18,7 +16,6 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -104,39 +101,6 @@ func (self Env) Create(http *gin.Context) {
 		defer func() {
 			sshClient.Close()
 		}()
-
-		// 同步公钥，如果使用面板公钥不需要这步，人工去添加证书
-		if params.RemoteType == docker.RemoteTypeSSH && params.SshServerInfo.AuthType != ssh.SshAuthTypePemDefault {
-			if err := (logic.DockerEnv{}).SyncPublicKey(sshClient); err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
-
-		// 验证是否成功配置证书可以正常连接
-		if params.RemoteType == docker.RemoteTypeSSH {
-			if err := (logic.DockerEnv{}).CheckSSHPathPermission(sshClient); err != nil {
-				slog.Debug("docker env test ssh path", "error", err)
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiSSHFailed, "error", err.Error()), 500)
-				return
-			}
-
-			if err := (logic.DockerEnv{}).CheckSSHPublicLogin(params.SshServerInfo); err != nil {
-				slog.Debug("docker env test ssh public key", "error", err)
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiSSHFailed, "error", err.Error()), 500)
-				return
-			}
-		}
-
-		// 如果当前是 windows 且使用的 wsl 中的 docker cli 还需要同步 .ssh 目录
-		if runtime.GOOS == "windows" && docker.CliInWSL() {
-			osUser, _ := user.Current()
-			if result, err := local.QuickRun(fmt.Sprintf("wsl cp -r /mnt/c/Users/%s/.ssh/* ~/.ssh/ && chmod 600 ~/.ssh/id*", filepath.Base(osUser.HomeDir))); err != nil {
-				slog.Debug("docker env copy id_rsa to wsl", "error", string(result))
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiSSHFailed, "error", err.Error()), 500)
-				return
-			}
-		}
 	}
 
 	defaultEnv := false
