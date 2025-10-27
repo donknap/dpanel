@@ -29,6 +29,8 @@ func NewClient(opt ...Option) (*Client, error) {
 
 	if c.ctx == nil {
 		c.ctx, c.ctxCancel = context.WithCancel(context.Background())
+	} else {
+		c.ctx, c.ctxCancel = context.WithCancel(c.ctx)
 	}
 
 	c.Conn, err = ssh.Dial(c.protocol, c.address, c.sshClientConfig)
@@ -46,7 +48,6 @@ func NewClient(opt ...Option) (*Client, error) {
 
 	go func() {
 		<-c.ctx.Done()
-		slog.Debug("ssh client close start")
 		if c.SftpConn != nil {
 			err = c.SftpConn.Close()
 			if err != nil {

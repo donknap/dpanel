@@ -75,8 +75,6 @@ func New(sshClient *ssh.Client, cmd string, args ...string) (net.Conn, error) {
 		_ = session.Close()
 		return nil, fmt.Errorf("failed to start command %q: %w", fullCmd, err)
 	}
-
-	slog.Debug("sshconn: started", "cmd", fullCmd)
 	return c, nil
 }
 
@@ -237,9 +235,6 @@ type stderrWriter struct {
 }
 
 func (w *stderrWriter) Write(p []byte) (int, error) {
-	// Log every line
-	slog.Debug("debug write", "prefix", w.debugPrefix, "error", string(p))
-
 	w.stderrMu.Lock()
 	defer w.stderrMu.Unlock()
 

@@ -235,9 +235,6 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 
 func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
-		opts := ssh.WithServerInfo(serverInfo)
-		opts = append(opts, ssh.WithContext(self.Ctx))
-
 		sockPath := ""
 		if runtime.GOOS == "windows" {
 			sockPath = self.Name
@@ -252,7 +249,7 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 			return err
 		}
 
-		sshconn.NewConnection(self.Ctx, opts, localListener)
+		sshconn.NewConnection(self.Ctx, serverInfo, localListener)
 
 		return WithAddress(address)(self)
 	}
