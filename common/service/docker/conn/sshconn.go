@@ -75,10 +75,6 @@ func New(sshClient *ssh.Client, cmd string, args ...string) (net.Conn, error) {
 		_ = session.Close()
 		return nil, fmt.Errorf("failed to start command %q: %w", fullCmd, err)
 	}
-	go func() {
-		<-sshClient.Ctx().Done()
-		c.kill()
-	}()
 
 	slog.Debug("sshconn: started", "cmd", fullCmd)
 	return c, nil

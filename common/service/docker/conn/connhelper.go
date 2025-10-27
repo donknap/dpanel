@@ -20,8 +20,6 @@ func NewConnection(ctx context.Context, opts []ssh.Option, listener net.Listener
 	}()
 
 	go func() {
-		//sshSessionChan := make(chan struct{}, 8)
-
 		for {
 			localConn, err := listener.Accept()
 			if err != nil {
@@ -29,33 +27,18 @@ func NewConnection(ctx context.Context, opts []ssh.Option, listener net.Listener
 				return
 			}
 
-			//sshSessionChan <- struct{}{}
 			sshClient, err := ssh.NewClient(opts...)
 			if err != nil {
 				return
 			}
-			sshConn, err := New(sshClient, "docker", "system", "dial-stdio")
+			sshConnection, err := New(sshClient, "docker", "system", "dial-stdio")
 			if err != nil {
+				sshClient.Close()
 				slog.Warn("docker proxy sock create remote", "err", err)
 				return
 			}
 
-			//go func() {
-			//	teeReader := io.TeeReader(localConn, os.Stdout)
-			//	_, err = io.Copy(sshConn, teeReader)
-			//	sshConn.Close()
-			//	slog.Debug("connhelper", "err", err)
-			//	//<-sshSessionChan
-			//}()
-			//
-			//go func() {
-			//	teeReader := io.TeeReader(sshConn, os.Stdout)
-			//	_, err = io.Copy(localConn, teeReader)
-			//	slog.Debug("connhelper1", "err", err)
-			//	_ = sshConn.Close()
-			//	sshClient.Close()
-			//}()
-			go handleProxySession(localConn, sshConn, sshClient)
+			go handleProxySession(localConn, sshConnection, sshClient)
 		}
 	}()
 }
