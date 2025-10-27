@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -11,7 +13,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/client"
-	"github.com/donknap/dpanel/common/function"
 	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
 	"github.com/donknap/dpanel/common/service/docker/conn/listener"
 	"github.com/donknap/dpanel/common/service/ssh"
@@ -122,26 +123,6 @@ func (self Builder) Close() {
 	}
 }
 
-func (self Builder) Clone() (*Builder, error) {
-	return NewBuilderWithDockerEnv(&Client{
-		Name:              fmt.Sprintf("%s-%s", self.DockerEnv.Name, function.GetRandomString(5)),
-		Title:             self.DockerEnv.Title,
-		Address:           self.DockerEnv.Address,
-		Default:           false,
-		DockerInfo:        self.DockerEnv.DockerInfo,
-		ServerUrl:         self.DockerEnv.ServerUrl,
-		EnableTLS:         self.DockerEnv.EnableTLS,
-		TlsCa:             self.DockerEnv.TlsCa,
-		TlsCert:           self.DockerEnv.TlsCert,
-		TlsKey:            self.DockerEnv.TlsKey,
-		EnableComposePath: self.DockerEnv.EnableComposePath,
-		ComposePath:       self.DockerEnv.ComposePath,
-		EnableSSH:         self.DockerEnv.EnableSSH,
-		SshServerInfo:     self.DockerEnv.SshServerInfo,
-		RemoteType:        self.DockerEnv.RemoteType,
-	})
-}
-
 func NewBuilderWithDockerEnv(dockerEnv *Client) (*Builder, error) {
 	options := make([]Option, 0)
 	options = append(options, WithDockerEnv(dockerEnv))
@@ -235,6 +216,20 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 
 func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
+		opts := ssh.WithServerInfo(serverInfo)
+		opts = append(opts, ssh.WithContext(self.Ctx))
+		sshClient, err := ssh.NewClient(opts...)
+		if err != nil {
+			return err
+		}
+		transport := &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return sshconn.New(sshClient, "docker", "system", "dial-stdio")
+			},
+		}
+		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))
+
+		// 创建代理 sock
 		sockPath := ""
 		if runtime.GOOS == "windows" {
 			sockPath = self.Name
@@ -243,14 +238,11 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 			_ = os.Remove(localProxySock)
 			sockPath = localProxySock
 		}
-
-		localListener, address, err := listener.New(sockPath)
+		localListener, _, err := listener.New(sockPath)
 		if err != nil {
 			return err
 		}
-
-		sshconn.NewConnection(self.Ctx, serverInfo, localListener)
-
-		return WithAddress(address)(self)
+		sshconn.NewConnection(self.Ctx, self.DockerEnv.SshServerInfo, localListener)
+		return nil
 	}
 }

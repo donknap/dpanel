@@ -538,19 +538,26 @@ func (self Home) GetStatList(http *gin.Context) {
 		return
 	}
 	var err error
+	newDockerSdk, err := docker.Sdk.CmdProxy()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
 	statCmd := []string{
 		"stats", "-a",
 		"--format", "json",
 	}
 	if !params.Follow {
 		statCmd = append(statCmd, "--no-stream")
-		cmd, err := docker.Sdk.Run(statCmd...)
+		cmd, err := newDockerSdk.Run(statCmd...)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 		defer func() {
 			_ = cmd.Close()
+			newDockerSdk.Close()
 		}()
 		out, err := cmd.RunWithResult()
 		if err != nil {
@@ -601,14 +608,6 @@ func (self Home) GetStatList(http *gin.Context) {
 			lastSendTime = time.Now()
 		}
 		return nil
-	}
-	newDockerSdk := docker.Sdk
-	if docker.Sdk.DockerEnv.RemoteType == docker.RemoteTypeSSH {
-		newDockerSdk, err = docker.Sdk.Clone()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
 	}
 	cmd, err := newDockerSdk.Run(statCmd...)
 	if err != nil {

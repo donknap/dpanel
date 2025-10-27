@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/donknap/dpanel/common/service/ssh"
 )
@@ -45,6 +46,7 @@ func NewConnection(ctx context.Context, serverInfo *ssh.ServerInfo, listener net
 // handleProxySession 处理一次完整的代理会话
 func handleProxySession(localConn net.Conn, sshConn io.ReadWriteCloser, sshClient *ssh.Client) {
 	defer func() {
+		slog.Debug("ssh conn handle close")
 		_ = localConn.Close()
 		_ = sshConn.Close()
 		sshClient.Close()
@@ -55,7 +57,9 @@ func handleProxySession(localConn net.Conn, sshConn io.ReadWriteCloser, sshClien
 		slog.Debug("ssh conn handle proxy", "err", err)
 		return
 	}
-	err = req.Write(sshConn)
+	slog.Debug("ssh conn handle", "url", req.URL)
+	tempWrite1 := io.MultiWriter(os.Stdout, sshConn)
+	err = req.Write(tempWrite1)
 	if err != nil {
 		slog.Debug("ssh conn handle proxy request", "err", err)
 		return
@@ -65,9 +69,8 @@ func handleProxySession(localConn net.Conn, sshConn io.ReadWriteCloser, sshClien
 		slog.Debug("ssh conn handle proxy response", "err", err)
 		return
 	}
-	defer resp.Body.Close()
-
-	err = resp.Write(localConn)
+	tempWrite := io.MultiWriter(os.Stdout, localConn)
+	err = resp.Write(tempWrite)
 	if err != nil {
 		slog.Debug("ssh conn handle proxy write sock", "err", err)
 		return
