@@ -538,33 +538,9 @@ func (self Home) GetStatList(http *gin.Context) {
 		return
 	}
 	var err error
-	newDockerSdk, err := docker.Sdk.CmdProxy()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 
-	statCmd := []string{
-		"stats", "-a",
-		"--format", "json",
-	}
 	if !params.Follow {
-		statCmd = append(statCmd, "--no-stream")
-		cmd, err := newDockerSdk.Run(statCmd...)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer func() {
-			_ = cmd.Close()
-			newDockerSdk.Close()
-		}()
-		out, err := cmd.RunWithResult()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		list, err := logic.Stat{}.GetStat(string(out))
+		list, err := docker.Sdk.ContainerStatsOneShot(docker.Sdk.Ctx)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -591,48 +567,24 @@ func (self Home) GetStatList(http *gin.Context) {
 		return
 	}
 	defer progress.Close()
-	lastSendTime := time.Now()
-	progress.OnWrite = func(p string) error {
-		if p == "" {
-			return nil
-		}
-		list, err := logic.Stat{}.GetStat(p)
-		if err != nil {
-			return err
-		}
-		if function.IsEmptyArray(list) {
-			return nil
-		}
-		if time.Now().Sub(lastSendTime) > 2*time.Second {
+
+	out, err := docker.Sdk.ContainerStats(progress.Context(), true)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	for {
+		select {
+		case <-progress.Done():
+			self.JsonResponseWithoutError(http, gin.H{
+				"list": "",
+			})
+			return
+		case list := <-out:
 			progress.BroadcastMessage(list)
-			lastSendTime = time.Now()
 		}
-		return nil
 	}
-	cmd, err := newDockerSdk.Run(statCmd...)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	out, err := cmd.RunInPip()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	go func() {
-		slog.Debug("home get stat list progress close")
-		<-progress.Done()
-		_ = cmd.Close()
-		newDockerSdk.Close()
-	}()
-	_, err = io.Copy(progress, out)
-	if err != nil {
-		slog.Debug("home get stat list copy progress", "err", err)
-	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"list": "",
-	})
-	return
 }
 
 func (self Home) UpgradeScript(http *gin.Context) {

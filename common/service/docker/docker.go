@@ -14,7 +14,6 @@ import (
 
 	"github.com/docker/docker/client"
 	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
-	"github.com/donknap/dpanel/common/service/docker/conn/listener"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 )
@@ -218,31 +217,18 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
 		opts := ssh.WithServerInfo(serverInfo)
 		opts = append(opts, ssh.WithContext(self.Ctx))
-		sshClient, err := ssh.NewClient(opts...)
-		if err != nil {
-			return err
-		}
+
 		transport := &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				sshClient, err := ssh.NewClient(opts...)
+				if err != nil {
+					return nil, err
+				}
+				fmt.Printf("DialContext %v \n", time.Now())
 				return sshconn.New(sshClient, "docker", "system", "dial-stdio")
 			},
 		}
 		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))
-
-		// 创建代理 sock
-		sockPath := ""
-		if runtime.GOOS == "windows" {
-			sockPath = self.Name
-		} else {
-			localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
-			_ = os.Remove(localProxySock)
-			sockPath = localProxySock
-		}
-		localListener, _, err := listener.New(sockPath)
-		if err != nil {
-			return err
-		}
-		sshconn.NewConnection(self.Ctx, self.DockerEnv.SshServerInfo, localListener)
 		return nil
 	}
 }

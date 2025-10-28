@@ -191,7 +191,9 @@ func (self Site) GetList(http *gin.Context) {
 		return
 	}
 
-	query := dao.Site.Order(dao.Site.ID.Desc())
+	query := dao.Site.Order(dao.Site.ID.Desc()).Where(gen.Cond(
+		datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
+	)...)
 	if params.Status != 0 {
 		query = query.Where(dao.Site.Status.Eq(params.Status))
 	}
@@ -216,8 +218,21 @@ func (self Site) GetList(http *gin.Context) {
 		query = query.Unscoped().Where(dao.Site.DeletedAt.IsNotNull())
 	}
 	list, _ := query.Find()
+	// 兼容非面板删除容器时，只取最后一条
+	result := make([]*entity.Site, 0)
+	for _, site := range list {
+		if ok := function.InArrayWalk(result, func(item *entity.Site) bool {
+			if item.SiteName == site.SiteName {
+				return true
+			} else {
+				return false
+			}
+		}); !ok {
+			result = append(result, site)
+		}
+	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": list,
+		"list": result,
 	})
 	return
 }

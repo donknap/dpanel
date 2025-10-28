@@ -65,6 +65,7 @@ func NewClient(opt ...Option) (*Client, error) {
 	return c, nil
 }
 
+// NewSession ssh 限制一个连接默认只能有 10 个会话
 func (self *Client) NewSession() (*ssh.Session, error) {
 	return self.Conn.NewSession()
 }
