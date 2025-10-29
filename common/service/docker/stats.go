@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -12,14 +11,19 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/stats"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
-func (self Builder) ContainerStats(ctx context.Context, stream bool) (<-chan []*stats.Usage, error) {
+func (self Builder) ContainerStats(ctx context.Context, option ContainerStatsOption) (<-chan []*stats.Usage, error) {
 	containerList, err := self.Client.ContainerList(ctx, container.ListOptions{
-		All: true,
+		Filters: option.Filters,
+		All:     true,
 	})
 	if err != nil {
 		return nil, err
+	}
+	if function.IsEmptyArray(containerList) {
+		return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
 	}
 
 	statsChan := make(chan []*stats.Usage)
@@ -37,7 +41,7 @@ func (self Builder) ContainerStats(ctx context.Context, stream bool) (<-chan []*
 		if statsCollect.Add(s) {
 			waitFirst.Add(1)
 			//time.Sleep(500 * time.Microsecond)
-			go collect(ctx, s, self.Client, stream, waitFirst)
+			go collect(ctx, s, self.Client, option.Stream, waitFirst)
 		}
 	}
 
@@ -85,7 +89,7 @@ func (self Builder) ContainerStats(ctx context.Context, stream bool) (<-chan []*
 					return
 				}
 
-				if !stream {
+				if !option.Stream {
 					return
 				}
 			}
@@ -96,7 +100,9 @@ func (self Builder) ContainerStats(ctx context.Context, stream bool) (<-chan []*
 }
 
 func (self Builder) ContainerStatsOneShot(ctx context.Context) ([]*stats.Usage, error) {
-	result, err := self.ContainerStats(ctx, false)
+	result, err := self.ContainerStats(ctx, ContainerStatsOption{
+		Stream: false,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +121,6 @@ func collect(ctx context.Context, containerCollect *stats.Container, sdk *client
 			waitFirst.Done()
 		}
 	}()
-	fmt.Printf("err111 %v \n", containerCollect.Name)
 	response, err := sdk.ContainerStats(ctx, containerCollect.Name, stream)
 	if err != nil {
 		containerCollect.SetError(err)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/common/function"
 )
 
@@ -254,4 +255,9 @@ type Scheduling struct {
 		FailureAction string `json:"failureAction"`
 		Order         string `json:"order"`
 	} `json:"update"`
+}
+
+type ContainerStatsOption struct {
+	Stream  bool
+	Filters filters.Args
 }

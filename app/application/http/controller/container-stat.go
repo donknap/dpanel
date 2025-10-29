@@ -2,9 +2,9 @@ package controller
 
 import (
 	"fmt"
-	"io"
-	"time"
 
+	"github.com/docker/docker/api/types/filters"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
@@ -18,29 +18,35 @@ func (self Container) GetStatInfo(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	_, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Id)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerStat, params.Id))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	response, err := docker.Sdk.Client.ContainerStats(progress.Context(), params.Id, true)
+	response, err := docker.Sdk.ContainerStats(progress.Context(), docker.ContainerStatsOption{
+		Stream:  true,
+		Filters: filters.NewArgs(filters.Arg("id", params.Id)),
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	lastSendTime := time.Now()
-
-	progress.OnWrite = func(p string) error {
-		if time.Now().Sub(lastSendTime) < time.Second*2 {
-			return nil
+	for {
+		select {
+		case <-progress.Done():
+			self.JsonSuccessResponse(http)
+			return
+		case list := <-response:
+			if !function.IsEmptyArray(list) {
+				progress.BroadcastMessage(list[0])
+			}
 		}
-		lastSendTime = time.Now()
-		progress.BroadcastMessage(p)
-		return nil
 	}
-	_, err = io.Copy(progress, response.Body)
-	self.JsonSuccessResponse(http)
-	return
 }
 
 func (self Container) GetProcessInfo(http *gin.Context) {

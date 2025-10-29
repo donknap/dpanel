@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/client"
@@ -215,12 +216,15 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 
 func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
-		opts := ssh.WithServerInfo(serverInfo)
-		opts = append(opts, ssh.WithContext(self.Ctx))
-
+		lock := sync.Mutex{}
 		transport := &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				lock.Lock()
+				//ctx1, _ := context.WithTimeout(ctx, 10*time.Second)
+				opts := ssh.WithServerInfo(serverInfo)
+				opts = append(opts, ssh.WithContext(ctx))
 				sshClient, err := ssh.NewClient(opts...)
+				lock.Unlock()
 				if err != nil {
 					return nil, err
 				}

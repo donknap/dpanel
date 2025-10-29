@@ -568,7 +568,9 @@ func (self Home) GetStatList(http *gin.Context) {
 	}
 	defer progress.Close()
 
-	out, err := docker.Sdk.ContainerStats(progress.Context(), true)
+	out, err := docker.Sdk.ContainerStats(progress.Context(), docker.ContainerStatsOption{
+		Stream: true,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
