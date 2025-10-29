@@ -1,9 +1,12 @@
 package docker
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -15,6 +18,7 @@ import (
 
 	"github.com/docker/docker/client"
 	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
+	"github.com/donknap/dpanel/common/service/docker/conn/listener"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 )
@@ -218,13 +222,17 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 	return func(self *Builder) error {
 		lock := sync.Mutex{}
 		transport := &http.Transport{
+			DisableKeepAlives: true,
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				fmt.Printf("DialContext %v \n", "开始创建连接")
 				lock.Lock()
+				fmt.Printf("DialContext %v \n", "创建连接")
 				//ctx1, _ := context.WithTimeout(ctx, 10*time.Second)
 				opts := ssh.WithServerInfo(serverInfo)
 				opts = append(opts, ssh.WithContext(ctx))
 				sshClient, err := ssh.NewClient(opts...)
 				lock.Unlock()
+				fmt.Printf("DialContext %v \n", "关闭连接")
 				if err != nil {
 					return nil, err
 				}
@@ -232,7 +240,68 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 				return sshconn.New(sshClient, "docker", "system", "dial-stdio")
 			},
 		}
-		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))
+		proxyClient := &http.Client{Transport: transport}
+		self.clientOption = append(self.clientOption, client.WithHTTPClient(proxyClient))
+
+		// 创建代理 sock
+		sockPath := ""
+		if runtime.GOOS == "windows" {
+			sockPath = self.Name
+		} else {
+			localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
+			_ = os.Remove(localProxySock)
+			sockPath = localProxySock
+		}
+		localSock, _, err := listener.New(sockPath)
+		if err != nil {
+			return err
+		}
+		reqLock := sync.Mutex{}
+		go func() {
+			for {
+				localConn, err := localSock.Accept()
+				if err != nil {
+					slog.Debug("local sock", "err", err)
+					return
+				}
+				fmt.Printf("Anonymous function %v \n", "来请求了")
+				err = func() error {
+					reqLock.Lock()
+					defer reqLock.Unlock()
+					req, err := http.ReadRequest(bufio.NewReader(localConn))
+					if err != nil {
+						return err
+					}
+					defer func() {
+						_ = req.Body.Close()
+					}()
+					fmt.Printf("Anonymous function %v \n", req.URL)
+					newReq, err := http.NewRequest(req.Method, req.RequestURI, req.Body)
+					if err != nil {
+						return err
+					}
+					newReq.URL.Scheme = "http"
+					newReq.URL.Host = "proxy.dpanel.cc"
+					resp, err := proxyClient.Do(newReq)
+					if err != nil {
+						return err
+					}
+					defer func() {
+						_ = resp.Body.Close()
+					}()
+					tempWrite := io.MultiWriter(os.Stdout, localConn)
+					err = resp.Write(tempWrite)
+					if err != nil {
+						return err
+					}
+					fmt.Printf("Anonymous function %v \n", "写完了")
+					return nil
+				}()
+				if err != nil {
+					slog.Debug("local sock", "err", err)
+				}
+			}
+		}()
 		return nil
 	}
 }

@@ -13,9 +13,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/sirupsen/logrus"
 )
@@ -59,25 +57,9 @@ func WithYamlContent(content ...string) cli.ProjectOptionsFn {
 	}
 }
 
-func WithDockerEnvItem(envItem ...docker.EnvItem) cli.ProjectOptionsFn {
-	return func(options *cli.ProjectOptions) error {
-		if function.IsEmptyArray(envItem) {
-			return nil
-		}
-		if function.IsEmptyMap(options.Environment) {
-			options.Environment = make(types.Mapping)
-		}
-		for _, item := range envItem {
-			options.Environment[item.Name] = item.Value
-		}
-		return nil
-	}
-}
-
 func NewCompose(opts ...cli.ProjectOptionsFn) (wrapper *Task, warning, err error) {
 	// 自定义解析
 	opts = append(opts,
-		cli.WithExtension(ExtensionName, Ext{}),
 		cli.WithExtension(ExtensionServiceName, ExtService{}),
 	)
 	options, err := cli.NewProjectOptions(
