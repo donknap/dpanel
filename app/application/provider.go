@@ -95,6 +95,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/explorer/get-file-stat", controller.Explorer{}.GetFileStat)
 			cors.POST("/app/explorer/get-user-list", controller.Explorer{}.GetUserList)
 			cors.POST("/app/explorer/mkdir", controller.Explorer{}.MkDir)
+			cors.POST("/app/explorer/copy", controller.Explorer{}.Copy)
 			cors.POST("/app/explorer/attach-volume", controller.Explorer{}.AttachVolume)
 			cors.POST("/app/explorer/destroy-proxy-container", controller.Explorer{}.DestroyProxyContainer)
 

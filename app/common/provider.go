@@ -113,6 +113,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors.POST("/common/explorer/delete", controller.Explorer{}.Delete)
 		cors.POST("/common/explorer/chmod", controller.Explorer{}.Chmod)
 		cors.POST("/common/explorer/mkdir", controller.Explorer{}.MkDir)
+		cors.POST("/common/explorer/copy", controller.Explorer{}.Copy)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

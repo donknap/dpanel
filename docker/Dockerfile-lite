@@ -22,7 +22,7 @@ COPY ./docker/script /app/script
 
 RUN sed -i 's/dl-cdn.alpinelinux1111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update musl docker-cli docker-cli-compose tzdata git openssh-client && \
-  rm /usr/bin/docker-compose
+  rm /usr/bin/docker-compose && mkdir -p /root/.ssh && chmod 700 /root/.ssh
 
 WORKDIR /app/server
 VOLUME [ "/dpanel" ]

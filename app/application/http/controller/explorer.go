@@ -131,6 +131,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		Content  string `json:"content"`
 		Name     string `json:"name" binding:"required"`
 		DestPath string `json:"destPath" binding:"required"`
+		FileMode int    `json:"fileMode"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -140,8 +141,13 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerInvalidFilename), 500)
 		return
 	}
-
-	importFile, err := imports.NewFileImport(params.DestPath, imports.WithImportContent(params.File, []byte(params.Content), 0666))
+	fileMode := os.FileMode(params.FileMode)
+	if params.FileMode == 0 {
+		if pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Name, params.File); err == nil {
+			fileMode = pathStat.Mode.Perm()
+		}
+	}
+	importFile, err := imports.NewFileImport(params.DestPath, imports.WithImportContent(params.File, []byte(params.Content), fileMode))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -421,8 +427,10 @@ func (self Explorer) GetContent(http *gin.Context) {
 	}
 	fileType, _ := filetype.MatchFile(tempFile.Name())
 	if fileType == filetype.Unknown {
+		fileStat, _ := tempFile.Stat()
 		self.JsonResponseWithoutError(http, gin.H{
-			"content": string(content),
+			"content":  string(content),
+			"fileMode": fileStat.Mode().Perm(),
 		})
 		return
 	} else {
@@ -574,6 +582,51 @@ func (self Explorer) MkDir(http *gin.Context) {
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+	self.JsonSuccessResponse(http)
+}
+
+func (self Explorer) Copy(http *gin.Context) {
+	type ParamsValidate struct {
+		Name       string `json:"name" binding:"required"`
+		SourceFile string `json:"sourceFile" binding:"required"`
+		TargetFile string `json:"targetFile" binding:"required"`
+		IsMove     bool   `json:"isMove"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if !filepath.IsAbs(params.TargetFile) {
+		params.TargetFile = filepath.Join(filepath.Dir(params.SourceFile), params.TargetFile)
+	}
+	targetFile, _ := storage.Local{}.CreateTempFile("")
+	defer func() {
+		_ = targetFile.Close()
+		_ = os.Remove(targetFile.Name())
+	}()
+	_, err := docker.Sdk.ContainerReadFile(docker.Sdk.Ctx, params.Name, params.SourceFile, targetFile)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	importFile, err := imports.NewFileImport(filepath.Dir(params.TargetFile), imports.WithImportFile(targetFile, filepath.Base(params.TargetFile)))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.IsMove {
+		afs, err := fs.NewContainerExplorer(params.Name)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_ = afs.RemoveAll(params.SourceFile)
 	}
 	self.JsonSuccessResponse(http)
 }
