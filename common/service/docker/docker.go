@@ -236,7 +236,12 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 			},
 		}
 		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))
+		return WithSockProxy()(self)
+	}
+}
 
+func WithSockProxy() Option {
+	return func(self *Builder) error {
 		// 创建代理 sock
 		sockPath := ""
 		if runtime.GOOS == "windows" {
@@ -250,6 +255,12 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 		if err != nil {
 			return err
 		}
+
+		go func() {
+			<-self.Ctx.Done()
+			_ = localSock.Close()
+		}()
+
 		go func() {
 			for {
 				localConn, err := localSock.Accept()
