@@ -147,6 +147,9 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 			fileMode = pathStat.Mode.Perm()
 		}
 	}
+	if fileMode == 0 {
+		fileMode = os.FileMode(0666)
+	}
 	importFile, err := imports.NewFileImport(params.DestPath, imports.WithImportContent(params.File, []byte(params.Content), fileMode))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

@@ -83,6 +83,7 @@ server {
 
     {{if eq .Type "fpm"}}
     root {{.WWWRoot}};
+    index index.php index.html index.htm;
     location ~ \.php$ {
         try_files $uri =404;
 

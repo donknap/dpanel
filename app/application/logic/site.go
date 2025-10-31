@@ -202,7 +202,6 @@ func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 	if err != nil {
 		return err
 	}
-	setting.WWWRoot = filepath.Join(storage.Local{}.GetDefaultWebsitePath(), setting.WWWRoot)
 	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", setting)
 	if err != nil {
 		return err

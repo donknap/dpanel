@@ -341,7 +341,7 @@ func (self Site) Delete(http *gin.Context) {
 
 func (self Site) Restore(http *gin.Context) {
 	type ParamsValidate struct {
-		SiteName string `json:"siteName"`
+		Name string `json:"name" binding:"required"`
 	}
 
 	params := ParamsValidate{}
@@ -349,7 +349,7 @@ func (self Site) Restore(http *gin.Context) {
 		return
 	}
 
-	siteRow, err := dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Last()
+	siteRow, err := dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.Name)).Last()
 	if err != nil || siteRow.ContainerInfo == nil || siteRow.ContainerInfo.Info.Name == "" {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
@@ -375,7 +375,7 @@ func (self Site) Restore(http *gin.Context) {
 		return
 	}
 
-	_, _ = dao.Site.Unscoped().Unscoped().Where(dao.Site.SiteName.Eq(params.SiteName)).Delete()
+	_, _ = dao.Site.Unscoped().Unscoped().Where(dao.Site.SiteName.Eq(params.Name)).Delete()
 
 	err = dao.Site.Create(&entity.Site{
 		SiteTitle: siteRow.SiteTitle,

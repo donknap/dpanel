@@ -307,7 +307,7 @@ func (self Store) Deploy(http *gin.Context) {
 		Title: params.Title,
 		Setting: &accessor.ComposeSettingOption{
 			Type:        accessor.ComposeTypeStore,
-			Store:       fmt.Sprintf("%s@%s@%s", storeRow.Title, storeRow.Setting.Url, params.AppName),
+			Store:       fmt.Sprintf("%s:%s@%s@%s", storeRow.Title, storeRow.Setting.Type, storeRow.Setting.Url, params.AppName),
 			Environment: params.Environment,
 			Uri: []string{
 				filepath.Join(params.Name, filepath.Base(params.ComposeFile)),
