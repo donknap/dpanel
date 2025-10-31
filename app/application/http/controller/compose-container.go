@@ -156,7 +156,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 	// 这里需要单独适配一下 php 环境的相关扩展安装
 	// 目前只有 php 需要这样处理，暂时先直接进行判断
-	if strings.HasPrefix(composeRow.Setting.Store, accessor.StoreTypeOnePanel) && strings.HasSuffix(composeRow.Setting.Store, "@php") {
+	if strings.Contains(composeRow.Setting.Store, accessor.StoreTypeOnePanel) && strings.HasSuffix(composeRow.Setting.Store, "@php") {
 		_ = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, docker.NetworkItem{
 			Name: define.DPanelProxyNetworkName,
 		}, runCompose.ContainerList[0].Container.Names[0])
