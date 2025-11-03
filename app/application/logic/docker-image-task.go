@@ -30,7 +30,7 @@ func (self DockerTask) ImageBuild(messageId string, task accessor.ImageSettingOp
 		builder.WithDockerFileContent([]byte(task.BuildDockerfileContent)),
 		builder.WithGitUrl(task.BuildGit),
 		builder.WithZipFilePath(task.BuildZip),
-		builder.WithPlatform(task.Platform),
+		builder.WithPlatform(task.PlatformArch),
 		builder.WithTag(task.Tag),
 		builder.WithArgs(task.BuildArgs...),
 	)

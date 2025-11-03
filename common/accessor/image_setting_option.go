@@ -13,7 +13,8 @@ type ImageSettingOption struct {
 	BuildGit               string                `json:"buildGit"`
 	BuildZip               string                `json:"buildZip"`
 	BuildArgs              []docker.EnvItem      `json:"buildArgs,omitempty"`
-	Platform               *docker.ImagePlatform `json:"platform,omitempty"`
+	Platform               string                `json:"platform,omitempty"` // Deprecated: instead PlatformArch
+	PlatformArch           *docker.ImagePlatform `json:"platformArch,omitempty"`
 	BuildDockerfile        string                `json:"buildDockerfile,omitempty,deprecated"` // Deprecated: instead BuildDockerfileContent
 	BuildRoot              string                `json:"buildRoot,omitempty,deprecated"`       // Deprecated: instead BuildDockerfileRoot
 }

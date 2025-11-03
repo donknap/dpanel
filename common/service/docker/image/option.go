@@ -80,7 +80,7 @@ func WithTag(name ...string) Option {
 
 func WithPlatform(item *docker.ImagePlatform) Option {
 	return func(self *Builder) error {
-		if item.Arch == "" || item.Type == "" {
+		if item == nil || item.Arch == "" || item.Type == "" {
 			return nil
 		}
 		self.imageBuildOption.Platform = item.Type

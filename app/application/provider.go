@@ -76,6 +76,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/image/tag-delete", controller.Image{}.TagDelete)
 			cors.POST("/app/image/tag-add", controller.Image{}.TagAdd)
 			cors.POST("/app/image/tag-push-batch", controller.Image{}.TagPushBatch)
+			cors.POST("/app/image/tag-search", controller.Image{}.TagSearch)
 
 			cors.POST("/app/image-build/create", controller.ImageBuild{}.Create)
 			cors.POST("/app/image-build/get-list", controller.ImageBuild{}.GetList)
