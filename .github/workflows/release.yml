@@ -235,8 +235,9 @@ jobs:
           go get .
       - name: Build
         run: |
+          VERSION_TAG=${GITHUB_REF_NAME#v}
           set CGO_ENABLED=1
-          go build -o runtime/dpanel.exe
+          go build -o runtime/dpanel.exe -ldflags '-X main.DPanelVersion=${VERSION_TAG} -s -w'
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
