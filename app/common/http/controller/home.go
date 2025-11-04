@@ -592,10 +592,6 @@ func (self Home) GetStatList(http *gin.Context) {
 func (self Home) UpgradeScript(http *gin.Context) {
 	dpanelContainerInfo := container.InspectResponse{}
 	new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo)
-	if dpanelContainerInfo.ContainerJSONBase == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonNotFoundDPanel), 500)
-		return
-	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"info": dpanelContainerInfo,
 	})

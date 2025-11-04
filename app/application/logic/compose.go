@@ -76,25 +76,6 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 		composeRow.Setting.Status = accessor.ComposeStatusWaiting
 	}
 
-	// @todo 子任务应该放到商城同步的时候
-	//if item, ok := runTaskList[key]; ok {
-	//	return item, nil
-	//}
-	//// 尝试再查询一下子任务
-	//if name, task, ok := strings.Cut(key, "@"); ok {
-	//	if composeRow, err := self.Get(name); err == nil {
-	//		taskList := self.FindPathTask(filepath.Dir(composeRow.Setting.GetUriFilePath()))
-	//		if v, ok := taskList[task]; ok {
-	//			// 目录需要添加上父级目录
-	//			v.Name = fmt.Sprintf("%s@%s", name, v.Name)
-	//			v.Setting.Uri = function.PluckArrayWalk(v.Setting.Uri, func(item string) (string, bool) {
-	//				return filepath.Join(name, item), true
-	//			})
-	//			v.Setting.DockerEnvName = composeRow.Setting.DockerEnvName
-	//			return v, nil
-	//		}
-	//	}
-	//}
 	return composeRow, nil
 }
 
