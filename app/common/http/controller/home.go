@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -372,7 +373,12 @@ func (self Home) CheckNewVersion(http *gin.Context) {
 func (self Home) Usage(http *gin.Context) {
 	// 有些设备的docker获取磁盘占用比较耗时，跑一下后台协程去获取数据
 	go func() {
-		diskUsage, err := docker.Sdk.Client.DiskUsage(docker.Sdk.Ctx, types.DiskUsageOptions{
+		progress, err := ws.NewFdProgressPip(http, ws.MessageTypeDiskUsage)
+		defer func() {
+			progress.Close()
+		}()
+		ctx, _ := context.WithTimeout(docker.Sdk.Ctx, time.Hour)
+		diskUsage, err := docker.Sdk.Client.DiskUsage(ctx, types.DiskUsageOptions{
 			Types: []types.DiskUsageObject{
 				types.ContainerObject,
 				types.ImageObject,
@@ -420,6 +426,11 @@ func (self Home) Usage(http *gin.Context) {
 						UpdatedAt: time.Now(),
 					},
 				},
+			})
+			time.Sleep(time.Second * 3)
+			progress.BroadcastMessage(&accessor.DiskUsage{
+				Usage:     &diskUsage,
+				UpdatedAt: time.Now(),
 			})
 		}
 		return
@@ -578,6 +589,8 @@ func (self Home) GetStatList(http *gin.Context) {
 
 	for {
 		select {
+		case <-docker.Sdk.Ctx.Done():
+			progress.Close()
 		case <-progress.Done():
 			self.JsonResponseWithoutError(http, gin.H{
 				"list": "",

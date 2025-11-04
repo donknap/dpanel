@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
@@ -356,5 +357,17 @@ func initDefaultDocker() error {
 		docker.Sdk.Close()
 	}
 	logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
+
+	// 清除掉统计数据
+	_ = logic.Setting{}.Save(&entity.Setting{
+		GroupName: logic.SettingGroupSetting,
+		Name:      logic.SettingGroupSettingDiskUsage,
+		Value: &accessor.SettingValueOption{
+			DiskUsage: &accessor.DiskUsage{
+				Usage:     &types.DiskUsage{},
+				UpdatedAt: time.Now(),
+			},
+		},
+	})
 	return nil
 }
