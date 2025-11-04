@@ -75,10 +75,6 @@ func (self Local) GetNginxSettingPath() string {
 	return fmt.Sprintf("%s/nginx/proxy_host/", self.GetStorageLocalPath())
 }
 
-func (self Local) GetDefaultWebsitePath() string {
-	return filepath.Join(self.GetStorageLocalPath(), "wwwroot")
-}
-
 func (self Local) GetStorageLocalPath() string {
 	if facade.GetConfig() == nil {
 		slog.Debug("storage local path empty")

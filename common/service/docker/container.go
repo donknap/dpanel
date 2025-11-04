@@ -170,7 +170,7 @@ func (self Builder) ContainerReadFile(ctx context.Context, containerName string,
 	}
 	// 返回的数据是外部是一个 tar 真正的文件 reader 需要先读一次
 	tarReader := tar.NewReader(out)
-	_, err = tarReader.Next()
+	file, err := tarReader.Next()
 	if err != nil {
 		return nil, err
 	}
@@ -187,5 +187,7 @@ func (self Builder) ContainerReadFile(ctx context.Context, containerName string,
 	if err != nil {
 		return nil, err
 	}
+
+	_ = targetFile.Chmod(file.FileInfo().Mode())
 	return nil, nil
 }

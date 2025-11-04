@@ -57,6 +57,7 @@ func New(sshClient *ssh.Client, cmd string, args ...string) (net.Conn, error) {
 
 	// Capture stderr with writer
 	c := &sshConn{
+		client:     sshClient,
 		session:    session,
 		stdin:      stdin,
 		stdout:     stdout,
@@ -81,6 +82,7 @@ func New(sshClient *ssh.Client, cmd string, args ...string) (net.Conn, error) {
 // sshConn implements net.Conn
 type sshConn struct {
 	session *ssh2.Session
+	client  *ssh.Client
 
 	cmdMutex   sync.Mutex // Protects session.Wait() and cmdWaitErr
 	cmdWaitErr error
@@ -192,6 +194,7 @@ func (c *sshConn) Close() error {
 	_ = c.stdin.Close()
 
 	c.kill()
+	c.client.Close()
 	return nil
 }
 

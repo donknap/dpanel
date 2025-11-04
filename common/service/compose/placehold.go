@@ -15,7 +15,6 @@ const (
 	PlaceholderAppName         = "%APP_NAME%"
 	PlaceholderAppVersion      = "%APP_VERSION%"
 	PlaceholderAppTaskName     = "%APP_TASK_NAME%"
-	PlaceholderWebsitePath     = "%WEBSITE_PATH%"
 	PlaceholderCurrentUsername = "%CURRENT_USERNAME%"
 	PlaceholderCurrentDate     = "%CURRENT_DATE%"
 	PlaceholderXkStoragePath   = "%XK_STORAGE_INFO%"
@@ -24,10 +23,6 @@ const (
 var ValueReplaceTable = []function.Replacer[string]{
 	func(v *string) {
 		*v = function.StringReplaceAll(*v, PlaceholderCurrentDate, time.Now().Format(define.DateYmdHis))
-	},
-	func(v *string) {
-		*v = function.StringReplaceAll(*v, PlaceholderWebsitePath, storage.Local{}.GetDefaultWebsitePath())
-		return
 	},
 }
 

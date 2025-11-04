@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -26,6 +28,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/h2non/filetype"
 	"github.com/pkg/sftp"
+	"github.com/spf13/afero"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
@@ -323,31 +326,9 @@ func (self Explorer) Delete(http *gin.Context) {
 	defer func() {
 		sshClient.Close()
 	}()
-	var deleteAll func(path string) error
-	deleteAll = func(path string) error {
-		file, err := afs.Open(path)
-		if err != nil {
-			return err
-		}
-		fileInfo, _ := file.Stat()
-		if fileInfo.IsDir() {
-			files, err := afs.ReadDir(path)
-			if err != nil {
-				return err
-			}
-			for _, item := range files {
-				err = deleteAll(filepath.Join(path, item.Name()))
-				if err != nil {
-					return err
-				}
-			}
-		}
-		_ = afs.Remove(path)
-		return nil
-	}
 
 	for _, path := range params.FileList {
-		err = deleteAll(path)
+		err = self.deleteAll(afs, path)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -485,7 +466,8 @@ func (self Explorer) GetContent(http *gin.Context) {
 			return
 		}
 		self.JsonResponseWithoutError(http, gin.H{
-			"content": string(content),
+			"content":  string(content),
+			"fileMode": fileInfo.Mode().String(),
 		})
 		return
 	} else {
@@ -655,4 +637,144 @@ func (self Explorer) MkDir(http *gin.Context) {
 		return
 	}
 	self.JsonSuccessResponse(http)
+}
+
+func (self Explorer) Copy(http *gin.Context) {
+	type ParamsValidate struct {
+		Name       string `json:"name" binding:"required"`
+		SourceFile string `json:"sourceFile" binding:"required"`
+		TargetFile string `json:"targetFile" binding:"required"`
+		IsMove     bool   `json:"isMove"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if !filepath.IsAbs(params.TargetFile) {
+		params.TargetFile = filepath.Join(filepath.Dir(params.SourceFile), params.TargetFile)
+	}
+
+	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		sshClient.Close()
+	}()
+
+	if ok, _ := afs.Exists(params.TargetFile); ok {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", filepath.Base(params.TargetFile)), 500)
+		return
+	}
+
+	sourceFile, err := afs.Open(params.SourceFile)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		_ = sourceFile.Close()
+	}()
+
+	sourceFileStat, _ := sourceFile.Stat()
+	if sourceFileStat.IsDir() {
+		targetFileRoot := params.TargetFile
+		err = afs.MkdirAll(targetFileRoot, sourceFileStat.Mode())
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		list, err := sourceFile.Readdir(-1)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		var errs []error
+		waitGroup := sync.WaitGroup{}
+		for _, info := range list {
+			go func() {
+				waitGroup.Add(1)
+				defer func() {
+					waitGroup.Done()
+				}()
+				newFileName := filepath.Base(info.Name())
+				if info.IsDir() {
+					err = afs.Mkdir(filepath.Join(targetFileRoot, newFileName), info.Mode())
+					if err != nil {
+						errs = append(errs, err)
+						return
+					}
+				} else {
+					tf, err := afs.OpenFile(filepath.Join(targetFileRoot, newFileName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, info.Mode())
+					if err != nil {
+						errs = append(errs, err)
+						return
+					}
+					defer func() {
+						_ = tf.Close()
+					}()
+					sf, err := afs.Open(filepath.Join(params.SourceFile, info.Name()))
+					if err != nil {
+						errs = append(errs, err)
+						return
+					}
+					defer func() {
+						_ = sf.Close()
+					}()
+					_, err = io.Copy(tf, sf)
+					if err != nil {
+						errs = append(errs, err)
+						return
+					}
+				}
+			}()
+		}
+		waitGroup.Wait()
+		if errs != nil {
+			self.JsonResponseWithError(http, errors.Join(errs...), 500)
+			return
+		}
+	} else {
+		targetFile, err := afs.OpenFile(params.TargetFile, os.O_CREATE|os.O_RDWR, sourceFileStat.Mode())
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_, err = io.Copy(targetFile, sourceFile)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	if params.IsMove {
+		err = self.deleteAll(afs, params.SourceFile)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	self.JsonSuccessResponse(http)
+}
+
+func (self Explorer) deleteAll(afs *afero.Afero, path string) error {
+	file, err := afs.Open(path)
+	if err != nil {
+		return err
+	}
+	fileInfo, _ := file.Stat()
+	if fileInfo.IsDir() {
+		files, err := afs.ReadDir(path)
+		if err != nil {
+			return err
+		}
+		for _, item := range files {
+			err = self.deleteAll(afs, filepath.Join(path, item.Name()))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	_ = afs.Remove(path)
+	return nil
 }

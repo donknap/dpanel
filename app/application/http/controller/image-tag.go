@@ -7,7 +7,9 @@ import (
 	http2 "net/http"
 	"strings"
 
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
@@ -202,20 +204,20 @@ func (self Image) TagPushBatch(http *gin.Context) {
 	}
 
 	for _, id := range params.RegistryId {
-		registry, _ := dao.Registry.Where(dao.Registry.ID.Eq(id)).First()
-		if registry == nil {
+		registryRow, err := dao.Registry.Where(dao.Registry.ID.Eq(id)).First()
+		if err != nil || registryRow == nil {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
 		password := ""
-		if registry.Setting != nil && registry.Setting.Username != "" && registry.Setting.Password != "" {
-			password, _ = function.AseDecode(facade.GetConfig().GetString("app.name"), registry.Setting.Password)
+		if registryRow.Setting != nil && registryRow.Setting.Username != "" && registryRow.Setting.Password != "" {
+			password, _ = function.AseDecode(facade.GetConfig().GetString("app.name"), registryRow.Setting.Password)
 		}
 
 		registryConfig := registry2.Config{
-			Username: registry.Setting.Username,
+			Username: registryRow.Setting.Username,
 			Password: password,
-			Host:     registry.ServerAddress,
+			Host:     registryRow.ServerAddress,
 		}
 
 		for _, md5 := range params.Md5 {
@@ -226,7 +228,7 @@ func (self Image) TagPushBatch(http *gin.Context) {
 			}
 			for _, tag := range imageDetail.RepoTags {
 				newImageName := registry2.GetImageTagDetail(tag)
-				newImageName.Registry = registry.ServerAddress
+				newImageName.Registry = registryRow.ServerAddress
 				newImageName.Namespace = params.NewNamespace
 
 				if !function.InArray(imageDetail.RepoTags, newImageName.Uri()) {
@@ -254,5 +256,29 @@ func (self Image) TagPushBatch(http *gin.Context) {
 	}
 
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Image) TagSearch(http *gin.Context) {
+	type ParamsValidate struct {
+		Keywork string `json:"keywork" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	list, err := docker.Sdk.Client.ImageSearch(docker.Sdk.Ctx, params.Keywork, registry.SearchOptions{
+		RegistryAuth:  "",
+		PrivilegeFunc: nil,
+		Filters:       filters.Args{},
+		Limit:         0,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": list,
+	})
 	return
 }

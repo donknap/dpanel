@@ -12,6 +12,23 @@ import (
 	"time"
 )
 
+func WithImportFile(file *os.File, fileName string) ImportFileOption {
+	return func(self *ImportFile) (err error) {
+		fileInfo, _ := file.Stat()
+		err = self.tarWrite.WriteHeader(&tar.Header{
+			Name:    filepath.Join(self.targetRootPath, fileName),
+			Size:    fileInfo.Size(),
+			Mode:    int64(fileInfo.Mode()),
+			ModTime: fileInfo.ModTime(),
+		})
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(self.tarWrite, file)
+		return nil
+	}
+}
+
 func WithImportFilePath(sourcePath string, fileName string) ImportFileOption {
 	return func(self *ImportFile) (err error) {
 		if _, err = os.Stat(sourcePath); err != nil {

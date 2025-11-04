@@ -258,10 +258,27 @@ func initPath() error {
 func initRSA() error {
 	// 用户可以自行挂载证书，如果没有则自动生成
 	// 证书用于 jwt 签名
+	homeDir, _ := os.UserHomeDir()
+	userRsaIdFiles := []string{
+		filepath.Join(homeDir, ".ssh", define.DefaultIdPubFile),
+		filepath.Join(homeDir, ".ssh", define.DefaultIdKeyFile),
+	}
 
 	rsaIdFiles := []string{
 		filepath.Join(storage.Local{}.GetCertRsaPath(), define.DefaultIdPubFile),
 		filepath.Join(storage.Local{}.GetCertRsaPath(), define.DefaultIdKeyFile),
+	}
+
+	if function.FileExists(userRsaIdFiles...) {
+		// 如果系统已经存在了 id_rsa 系统的 rsa 文件复制过来方便后续使用
+		for _, file := range rsaIdFiles {
+			_ = os.Remove(file)
+		}
+		err := function.CopyFile(storage.Local{}.GetCertRsaPath(), userRsaIdFiles...)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	if !function.FileExists(rsaIdFiles...) {

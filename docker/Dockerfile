@@ -31,7 +31,7 @@ RUN sed -i 's/dl-cdn.alpinelinux1111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/ap
   apk add --no-cache --update nginx musl docker-cli docker-cli-compose curl openssl tzdata git openssh-client && \
   mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
   export ${PROXY} && curl https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh | sh -s -- --install-online --config-home /dpanel/acme && \
-  rm /usr/bin/docker-compose && chmod 755 /docker/*
+  rm /usr/bin/docker-compose && chmod 755 /docker/* && mkdir -p /root/.ssh && chmod 700 /root/.ssh
 
 WORKDIR /app/server
 VOLUME [ "/dpanel" ]

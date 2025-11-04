@@ -29,7 +29,7 @@ var CommonEnv = map[int]docker.EnvItem{
 	},
 	websiteDir: {
 		Name:  "PANEL_WEBSITE_DIR",
-		Value: fmt.Sprintf("%s/%s", compose.PlaceholderWebsitePath, compose.PlaceholderAppTaskName),
+		Value: "./wwwroot",
 		Rule: &docker.EnvValueRule{
 			Kind: docker.EnvValueRuleRequired | docker.EnvValueTypeOnePanel,
 		},
