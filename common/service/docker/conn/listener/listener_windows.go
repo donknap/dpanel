@@ -9,7 +9,7 @@ import (
 import winio "github.com/Microsoft/go-winio"
 
 func New(sockPath string) (net.Listener, string, error) {
-	address := `\\.\pipe\` + sockPath
+	address := `\\.\pipe\dp_` + sockPath
 
 	cleanupOldPipe(address)
 
@@ -17,7 +17,7 @@ func New(sockPath string) (net.Listener, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	return listener, `npipe:////./pipe/` + sockPath, nil
+	return listener, `npipe:////./pipe/dp_` + sockPath, nil
 }
 
 func cleanupOldPipe(address string) {

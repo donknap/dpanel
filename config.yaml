@@ -3,7 +3,7 @@ app:
   version: ${APP_VERSION}
   env: ${APP_ENV-lite}
   family: ${APP_FAMILY-ce}
-  server: http|prof
+  server: ${APP_SERVER-http}
   cors:
     - http://localhost:8000
 server:

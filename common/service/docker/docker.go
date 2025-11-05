@@ -60,7 +60,7 @@ func (self Client) CommandEnv() []string {
 	if self.RemoteType == RemoteTypeSSH {
 		// 还需要将系统的 PATH 环境变量传递进去，否则可能会报找不到 ssh 命令
 		if runtime.GOOS == "windows" {
-			result = append(result, fmt.Sprintf("DOCKER_HOST=npipe:////./pipe/%s", self.Name))
+			result = append(result, fmt.Sprintf("DOCKER_HOST=npipe:////./pipe/dp_%s", self.Name))
 		} else {
 			result = append(result, fmt.Sprintf("DOCKER_HOST=unix://%s/%s.sock", storage.Local{}.GetLocalProxySockPath(), self.Name))
 		}
@@ -81,7 +81,7 @@ func (self Client) CommandParams() []string {
 	result := make([]string, 0)
 	if self.RemoteType == RemoteTypeSSH {
 		if runtime.GOOS == "windows" {
-			result = append(result, "-H", fmt.Sprintf("npipe:////./pipe/%s", self.Name))
+			result = append(result, "-H", fmt.Sprintf("npipe:////./pipe/dp_%s", self.Name))
 		} else {
 			result = append(result, "-H", fmt.Sprintf("unix://%s/%s.sock", storage.Local{}.GetLocalProxySockPath(), self.Name))
 		}

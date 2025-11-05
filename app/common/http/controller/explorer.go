@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -372,7 +373,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 	result := make([]*fsType.FileData, 0)
 	for _, item := range list {
 		fileData := &fsType.FileData{
-			Path:     filepath.Join(params.Path, item.Name()),
+			Path:     path.Join(params.Path, item.Name()),
 			Name:     item.Name(),
 			Mod:      item.Mode(),
 			ModStr:   item.Mode().String(),
@@ -402,7 +403,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		}
 		if fileData.CheckIsSymlink() {
 			fileData.IsSymlink = true
-			if linkName, err := sshClient.SftpConn.ReadLink(filepath.Join(params.Path, item.Name())); err == nil {
+			if linkName, err := sshClient.SftpConn.ReadLink(path.Join(params.Path, item.Name())); err == nil {
 				fileData.LinkName = linkName
 			}
 		}
