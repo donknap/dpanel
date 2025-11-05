@@ -231,7 +231,6 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 				if err != nil {
 					return nil, err
 				}
-				fmt.Printf("DialContext %v \n", time.Now())
 				return sshconn.New(sshClient, "docker", "system", "dial-stdio")
 			},
 		}

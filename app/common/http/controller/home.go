@@ -377,7 +377,8 @@ func (self Home) Usage(http *gin.Context) {
 		defer func() {
 			progress.Close()
 		}()
-		ctx, _ := context.WithTimeout(docker.Sdk.Ctx, time.Hour)
+		// 20 分种后强制终止
+		ctx, _ := context.WithTimeout(docker.Sdk.Ctx, time.Minute*20)
 		diskUsage, err := docker.Sdk.Client.DiskUsage(ctx, types.DiskUsageOptions{
 			Types: []types.DiskUsageObject{
 				types.ContainerObject,
