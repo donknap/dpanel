@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -169,12 +170,12 @@ func (self Fs) Chtimes(name string, atime time.Time, mtime time.Time) error {
 	panic("implement me")
 }
 
-func (self Fs) readDirFromContainer(path string) ([]os.FileInfo, error) {
-	path, err := self.getSafePath(path)
+func (self Fs) readDirFromContainer(rootPath string) ([]os.FileInfo, error) {
+	rootPath, err := self.getSafePath(rootPath)
 	if err != nil {
 		return nil, err
 	}
-	cmd := fmt.Sprintf("ls -AlhX --full-time %s", path)
+	cmd := fmt.Sprintf("ls -AlhX --full-time %s", rootPath)
 	cmd += " | awk 'NR>1 {printf \"{d>%s<d}\", $1;for (i=2; i<=NF; i++) printf \"{v>%s<v}\", $i;}'"
 	out, err := self.sdk.ContainerExecResult(self.sdk.Ctx, self.proxyContainerName, cmd)
 	if err != nil {
@@ -232,8 +233,9 @@ func (self Fs) readDirFromContainer(path string) ([]os.FileInfo, error) {
 					fileData.Name = strings.TrimSpace(name)
 				}
 			}
-			rel, _ := filepath.Rel(self.targetContainerRootPath, path)
-			fileData.Path = filepath.Join("/", rel, fileData.Name)
+			rel, _ := filepath.Rel(self.targetContainerRootPath, rootPath)
+			// 因为路径使终是从 Linux 容器或是系统中获取，不能使用 filepath，使用 path 保持路径 / 分隔
+			fileData.Path = path.Join("/", rel, fileData.Name)
 			fileData.IsDir = fileData.Mod.IsDir()
 			fileData.IsSymlink = fileData.CheckIsSymlink()
 			fileList = append(fileList, fs.NewFileInfo(fileData))
@@ -245,16 +247,16 @@ func (self Fs) readDirFromContainer(path string) ([]os.FileInfo, error) {
 	return fileList, nil
 }
 
-func (self Fs) getSafePath(path string) (string, error) {
+func (self Fs) getSafePath(rootPath string) (string, error) {
 	// 目录必须是以 / 开头
-	if !strings.HasPrefix(path, "/") {
+	if !strings.HasPrefix(rootPath, "/") {
 		return "", errors.New("please use absolute address")
 	}
-	if path == "/" {
+	if rootPath == "/" {
 		// 根目录必须加上 / 表示是目录
 		return fmt.Sprintf("%s/", self.targetContainerRootPath), nil
 	}
-	return filepath.Join(self.targetContainerRootPath, path), nil
+	return path.Join(self.targetContainerRootPath, rootPath), nil
 }
 
 func (self Fs) mod(s string) os.FileMode {
