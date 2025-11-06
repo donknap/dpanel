@@ -31,14 +31,19 @@ func AseEncode(key string, str string) (result string, err error) {
 func AseDecode(key string, str string) (result string, err error) {
 	decodeStr, err := hex.DecodeString(str)
 	key = GetMd5(CommonKey + key)
+
+	return AesStdDecode(key, decodeStr)
+}
+
+func AesStdDecode(key string, originData []byte) (result string, err error) {
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
 		return result, err
 	}
 	blockSize := block.BlockSize()
 	blockMode := cipher.NewCBCDecrypter(block, []byte(key)[:blockSize])
-	origData := make([]byte, len(decodeStr))
-	blockMode.CryptBlocks(origData, decodeStr)
+	origData := make([]byte, len(originData))
+	blockMode.CryptBlocks(origData, originData)
 	origData = PKCS5UnPadding(origData)
 	return string(origData), nil
 }
