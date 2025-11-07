@@ -543,10 +543,10 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		if params.CacheTime > 0 {
 			option = append(option, registry.WithRequestCacheTime(time.Second*time.Duration(params.CacheTime)))
 		}
-		option = append(option, registry.WithCredentialsString(registryConfig.GetRegistryAuthString()))
+		option = append(option, registry.WithCredentials(registryConfig.GetRegistryAuthCredential()))
 		option = append(option, registry.WithRegistryHost(s))
 		reg := registry.New(option...)
-		if digest, err = reg.Repository.GetImageDigest(params.Tag); err == nil {
+		if digest, err = reg.GetImageDigest(params.Tag); err == nil {
 			slog.Debug("image check upgrade", "remote digest", fmt.Sprintf("%s@%s", params.Tag, digest), "local digest", imageInfo.RepoDigests)
 			if !function.InArrayWalk(imageInfo.RepoDigests, func(i string) bool {
 				return strings.HasSuffix(i, digest)

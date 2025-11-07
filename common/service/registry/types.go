@@ -4,21 +4,16 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 
 	"github.com/docker/docker/api/types/registry"
+	"github.com/donknap/dpanel/common/service/registry/types"
 )
 
 const (
 	DefaultRegistryDomain = "docker.io"
 	DefaultRegistryHost   = "index.docker.io"
 )
-
-type TokenResponse struct {
-	Token       string `json:"token"`
-	AccessToken string `json:"access_token"`
-}
 
 // {registryUrl}/{namespace-可能有多个路径}/{imageName}:{version}
 type ImageTagDetail struct {
@@ -62,11 +57,6 @@ func (self ImageTagDetail) FullName() string {
 	}
 }
 
-type ImageTagListResult struct {
-	Name string   `json:"name"`
-	Tags []string `json:"tags"`
-}
-
 type Config struct {
 	Username   string   `json:"username"`
 	Password   string   `json:"password"`
@@ -105,7 +95,13 @@ func (self Config) GetRegistryAuthString() string {
 	)
 }
 
+func (self Config) GetRegistryAuthCredential() types.Credential {
+	return types.Credential{
+		AccessKey:    self.Username,
+		AccessSecret: self.Password,
+	}
+}
+
 type cacheItem struct {
-	header http.Header
-	body   []byte
+	body interface{}
 }

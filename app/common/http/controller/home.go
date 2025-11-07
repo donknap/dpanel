@@ -350,7 +350,7 @@ func (self Home) CheckNewVersion(http *gin.Context) {
 		option = append(option, registry.WithRequestCacheTime(time.Hour*24))
 		option = append(option, registry.WithRegistryHost(s))
 		reg := registry.New(option...)
-		tags, err = reg.Repository.GetImageTagList("dpanel/dpanel")
+		tags, err = reg.GetImageTagList("dpanel/dpanel")
 		if err == nil {
 			break
 		}

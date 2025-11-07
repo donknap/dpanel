@@ -55,7 +55,7 @@ func (self Local) GetLicenseFilePath() string {
 }
 
 func (self Local) GetW7OpenSoftwareLicenseFilePath() string {
-	return filepath.Join(self.GetStorageLocalPath(), "w7_opensoftware.pem")
+	return filepath.Join(self.GetStorageLocalPath(), "w7_opensoftware.enc")
 }
 
 func (self Local) GetScriptTemplatePath() string {

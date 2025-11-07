@@ -1,28 +1,24 @@
 package registry
 
 import (
-	"encoding/base64"
-	"fmt"
 	"strings"
 	"time"
+
+	"github.com/donknap/dpanel/common/service/registry/types"
 )
 
 type Option func(*Registry)
 
-func WithCredentials(username, password string) Option {
+func WithCredentials(credential types.Credential) Option {
 	return func(registry *Registry) {
-		registry.authString = base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("%s:%s",
-				username, password,
-			)),
-		)
+		registry.credential = credential
 	}
 }
 
-func WithCredentialsString(auth string) Option {
+func WithCredentialsToken(token string) Option {
 	return func(registry *Registry) {
-		if auth != "" {
-			registry.authString = auth
+		if token != "" {
+			registry.authToken = token
 		}
 	}
 }
@@ -38,6 +34,7 @@ func WithRegistryHost(host string) Option {
 		if strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(host, "http://"), "https://"), "/") == DefaultRegistryDomain {
 			host = DefaultRegistryHost
 		}
+		host = strings.TrimRight(host, " ")
 		registry.url = GetRegistryUrl(host)
 	}
 }
