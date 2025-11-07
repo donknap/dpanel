@@ -23,7 +23,7 @@ type Provider struct {
 
 func (provider *Provider) Register(httpServer *http_server.Server) {
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
-		cors := engine.Group("/api", common.CorsMiddleware{}.Process)
+		cors := engine.Group(function.RouterRootApi(), common.CorsMiddleware{}.Process)
 
 		cors.POST("/common/attach/upload", controller.Attach{}.Upload)
 		cors.POST("/common/attach/delete", controller.Attach{}.Delete)
@@ -117,7 +117,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
-		wsCors := engine.Group("/ws/", common.CorsMiddleware{}.Process)
+		wsCors := engine.Group(function.RouterRootWs(), common.CorsMiddleware{}.Process)
 
 		wsCors.GET("/common/notice", controller.Home{}.WsNotice)
 		wsCors.GET("/common/console/container/:id", controller.Home{}.WsContainerConsole)

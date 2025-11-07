@@ -4,6 +4,7 @@ package family
 
 import (
 	"log/slog"
+	"path"
 
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/types"
@@ -17,7 +18,7 @@ type Provider struct {
 func (self Provider) Register(httpServer *server.Server) {
 	slog.Debug("provider load community edition")
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
-		engine.POST("/api/pro/*path", notSupportedApi)
+		engine.POST(path.Join(function.RouterRootApi(), "/pro/*path"), notSupportedApi)
 	})
 }
 

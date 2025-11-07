@@ -28,6 +28,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/family"
+	fs2 "github.com/donknap/dpanel/common/service/fs"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-contrib/gzip"
@@ -136,15 +137,23 @@ func main() {
 			func(engine *gin.Engine) {
 				subFs, _ := fs.Sub(Asset, "asset/static")
 				gzipMiddleware := engine.Use(gzip.Gzip(gzip.DefaultCompression))
-				gzipMiddleware.StaticFS("/dpanel/static/asset", http2.FS(subFs))
-				engine.StaticFileFS("/favicon.ico", "dpanel.ico", http2.FS(subFs))
+				gzipMiddleware.StaticFS(function.RouterUri("/dpanel/static/asset"), fs2.NewHttpFs(subFs))
+
+				engine.StaticFileFS(function.RouterUri("/favicon.ico"), "dpanel.ico", http2.FS(subFs))
+				engine.Static(function.RouterUri("/dpanel/static/image"), filepath.Join(storage.Local{}.GetSaveRootPath(), "image"))
+
 				engine.NoRoute(func(http *gin.Context) {
 					slog.Debug("http route not found", "uri", http.Request.URL.String())
 					indexHtml, _ := Asset.ReadFile("asset/static/index.html")
+					for o, n := range map[string]string{
+						"/favicon.ico": function.RouterUri("/favicon.ico"),
+						"/dpanel":      function.RouterUri("/dpanel"),
+					} {
+						indexHtml = bytes.ReplaceAll(indexHtml, []byte(o), []byte(n))
+					}
 					http.Data(http2.StatusOK, "text/html; charset=UTF-8", indexHtml)
 					return
 				})
-				engine.Static("/dpanel/static/image", filepath.Join(storage.Local{}.GetSaveRootPath(), "image"))
 			},
 		)
 

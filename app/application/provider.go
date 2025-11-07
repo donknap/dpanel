@@ -2,6 +2,7 @@ package application
 
 import (
 	"github.com/donknap/dpanel/app/application/http/controller"
+	"github.com/donknap/dpanel/common/function"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/gin-gonic/gin"
 	httpserver "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
@@ -14,7 +15,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 	// 注册一些路由
 	httpServer.RegisterRouters(
 		func(engine *gin.Engine) {
-			cors := engine.Group("/api/", common.CorsMiddleware{}.Process)
+			cors := engine.Group(function.RouterRootApi(), common.CorsMiddleware{}.Process)
 
 			// 站点相关
 			cors.POST("/app/site/create-by-image", controller.Site{}.CreateByImage)

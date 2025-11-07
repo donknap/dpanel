@@ -11,7 +11,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/stats"
-	"github.com/donknap/dpanel/common/types/define"
 )
 
 func (self Builder) ContainerStats(ctx context.Context, option ContainerStatsOption) (<-chan []*stats.Usage, error) {
@@ -22,11 +21,12 @@ func (self Builder) ContainerStats(ctx context.Context, option ContainerStatsOpt
 	if err != nil {
 		return nil, err
 	}
-	if function.IsEmptyArray(containerList) {
-		return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
-	}
-
 	statsChan := make(chan []*stats.Usage)
+
+	if function.IsEmptyArray(containerList) {
+		defer close(statsChan)
+		return statsChan, nil
+	}
 
 	waitFirst := &sync.WaitGroup{}
 	statsCollect := stats.Collect{}

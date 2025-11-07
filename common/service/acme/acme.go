@@ -15,8 +15,8 @@ import (
 
 const (
 	DefaultCommandName     = "/root/.acme.sh/acme.sh"
-	EnvOverrideCommandName = "ACME_OVERRIDE_COMMAND_NAME"
-	EnvOverrideConfigHome  = "ACME_OVERRIDE_CONFIG_HOME"
+	EnvOverrideCommandName = "DP_ACME_COMMAND_NAME"
+	EnvOverrideConfigHome  = "DP_ACME_CONFIG_HOME"
 )
 
 func New(opts ...Option) (*Acme, error) {

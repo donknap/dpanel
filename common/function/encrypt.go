@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
 	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -107,4 +110,23 @@ func ParseRsaPrivateKey(data []byte) (*rsa.PrivateKey, error) {
 		return v, nil
 	}
 	return nil, errors.New("invalid rsa key content")
+}
+
+func GetMd5(str string) string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(str)))
+}
+
+func GetSha256(str []byte) string {
+	hash := sha256.New()
+	hash.Write(str)
+	return fmt.Sprintf("sha256:%x", hash.Sum(nil))
+}
+
+func GetRandomString(n int) string {
+	b := []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789")
+	var result []byte
+	for i := 0; i < n; i++ {
+		result = append(result, b[rand.Intn(len(b))])
+	}
+	return string(result)
 }

@@ -42,7 +42,7 @@ type User struct {
 }
 
 func (self User) GetBuiltInPublicUsername() string {
-	return facade.GetConfig().GetString("common.public_user_name")
+	return facade.GetConfig().GetString("system.permission.default_username")
 }
 
 func (self User) GetMd5Password(password string, key string) string {
