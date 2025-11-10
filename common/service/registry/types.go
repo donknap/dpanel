@@ -1,7 +1,6 @@
 package registry
 
 import (
-	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -82,17 +81,6 @@ func (self Config) GetAuthString() string {
 		return ""
 	}
 	return authString
-}
-
-func (self Config) GetRegistryAuthString() string {
-	if self.Username == "" || self.Password == "" {
-		return ""
-	}
-	return base64.StdEncoding.EncodeToString([]byte(
-		fmt.Sprintf("%s:%s",
-			self.Username, self.Password,
-		)),
-	)
 }
 
 func (self Config) GetRegistryAuthCredential() types.Credential {
