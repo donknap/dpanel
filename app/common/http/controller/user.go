@@ -159,6 +159,9 @@ func (self User) LoginInfo(http *gin.Context) {
 	if err != nil {
 		result["showRegister"] = true
 	}
+	theme := accessor.ThemeConfig{}
+	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingThemeConfig, &theme)
+	result["theme"] = theme
 	self.JsonResponseWithoutError(http, result)
 	return
 }
