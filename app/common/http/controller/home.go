@@ -1,12 +1,15 @@
 package controller
 
 import (
+	"bytes"
 	"context"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	http2 "net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -52,8 +55,32 @@ type Home struct {
 	controller.Abstract
 }
 
-func (self Home) Index(ctx *gin.Context) {
-	self.JsonResponseWithoutError(ctx, "hello world!")
+func (self Home) Index(http *gin.Context) {
+	uri := http.Request.URL.String()
+	slog.Debug("http route not found", "uri", uri)
+	var asset embed.FS
+	if v, ok := http.Get("asset"); !ok {
+		self.JsonResponseWithError(http, errors.New("fatal error, resource file not found, please recompile"), 500)
+		return
+	} else {
+		asset = v.(embed.FS)
+	}
+
+	// 如果没发现语言包返回默认的英文，并提示用户
+	if strings.HasPrefix(uri, "/dpanel/static/asset/i18n") {
+		enUs, _ := asset.ReadFile("asset/static/i18n/en-US.json")
+		http.Data(http2.StatusOK, "application/json; charset=UTF-8", enUs)
+		return
+	}
+
+	indexHtml, _ := asset.ReadFile("asset/static/index.html")
+	for o, n := range map[string]string{
+		"/favicon.ico": function.RouterUri("/favicon.ico"),
+		"/dpanel":      function.RouterUri("/dpanel"),
+	} {
+		indexHtml = bytes.ReplaceAll(indexHtml, []byte(o), []byte(n))
+	}
+	http.Data(http2.StatusOK, "text/html; charset=UTF-8", indexHtml)
 	return
 }
 

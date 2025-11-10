@@ -20,16 +20,17 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/conn/listener"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 var (
-	Sdk                        = &Builder{}
-	BuilderAuthor              = "DPanel"
-	BuildDesc                  = "DPanel is a lightweight Docker web management panel"
-	BuildWebSite               = "https://dpanel.cc"
-	BuildVersion               = "1.0.0"
-	DefaultClientName          = "local"
-	ConnectDockerServerTimeout = time.Second * 10
+	Sdk               = &Builder{}
+	BuilderAuthor     = "DPanel"
+	BuildDesc         = "DPanel is a lightweight Docker web management panel"
+	BuildWebSite      = "https://dpanel.cc"
+	BuildVersion      = "1.0.0"
+	DefaultClientName = "local"
 )
 
 type ClientDockerInfo struct {
@@ -126,7 +127,17 @@ func (self Builder) Close() {
 	}
 }
 
-func NewBuilderWithDockerEnv(dockerEnv *Client) (*Builder, error) {
+// GetTryCtx 获取一个有超时的上下文，用于测试 docker 连接是否正常
+func (self Builder) GetTryCtx() context.Context {
+	timeout := define.DockerConnectServerTimeout
+	if v := facade.Config.GetDuration("system.docker.init_timeout"); v > 0 {
+		timeout = time.Second * v
+	}
+	tryCtx, _ := context.WithTimeout(context.Background(), timeout)
+	return tryCtx
+}
+
+func NewBuilderWithDockerEnv(dockerEnv *Client, opts ...Option) (*Builder, error) {
 	options := make([]Option, 0)
 	options = append(options, WithDockerEnv(dockerEnv))
 	options = append(options, WithName(dockerEnv.Name))
@@ -134,10 +145,11 @@ func NewBuilderWithDockerEnv(dockerEnv *Client) (*Builder, error) {
 		options = append(options, WithTLS(dockerEnv.TlsCa, dockerEnv.TlsCert, dockerEnv.TlsKey))
 	}
 	if dockerEnv.RemoteType == RemoteTypeSSH {
-		options = append(options, WithSSH(dockerEnv.SshServerInfo))
+		options = append(options, WithSSH(dockerEnv.SshServerInfo, define.DockerConnectServerTimeout))
 	} else {
 		options = append(options, WithAddress(dockerEnv.Address))
 	}
+	options = append(options, opts...)
 	return NewBuilder(options...)
 }
 
@@ -151,15 +163,16 @@ func NewBuilder(opts ...Option) (*Builder, error) {
 			client.WithAPIVersionNegotiation(),
 		},
 	}
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	c.Ctx = ctx
-	c.CtxCancelFunc = cancelFunc
 
 	for _, opt := range opts {
 		err := opt(c)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if c.Ctx == nil {
+		c.Ctx, c.CtxCancelFunc = context.WithCancel(context.Background())
 	}
 
 	obj, err := client.NewClientWithOpts(c.clientOption...)
@@ -217,7 +230,7 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 	}
 }
 
-func WithSSH(serverInfo *ssh.ServerInfo) Option {
+func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 	return func(self *Builder) error {
 		lock := sync.Mutex{}
 		transport := &http.Transport{
@@ -226,6 +239,7 @@ func WithSSH(serverInfo *ssh.ServerInfo) Option {
 				lock.Lock()
 				opts := ssh.WithServerInfo(serverInfo)
 				opts = append(opts, ssh.WithContext(ctx))
+				opts = append(opts, ssh.WithTimeout(timeout))
 				sshClient, err := ssh.NewClient(opts...)
 				lock.Unlock()
 				if err != nil {

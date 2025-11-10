@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"embed"
 	_ "embed"
 	"fmt"
@@ -11,12 +10,14 @@ import (
 	http2 "net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
+	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/app/ctrl"
 	"github.com/donknap/dpanel/common/accessor"
@@ -124,6 +125,12 @@ func main() {
 			storage.Cache.Set(storage.CacheKeyCommonServerStartTime, time.Now(), cache.DefaultExpiration)
 		}
 
+		if v, err := Asset.ReadDir("asset/static/i18n"); err == nil {
+			storage.Cache.Set(storage.CacheKeySettingLocale, function.PluckArrayWalk(v, func(item fs.DirEntry) (string, bool) {
+				return strings.TrimSuffix(item.Name(), filepath.Ext(item.Name())), true
+			}), cache.DefaultExpiration)
+		}
+
 		// 业务中需要使用 http server，这里需要先实例化
 		httpServer := new(http.Provider).Register(myApp.GetConfig(), myApp.GetConsole(), myApp.GetServerManager()).Export()
 		// 注册一些全局中间件，路由或是其它一些全局操作
@@ -143,15 +150,8 @@ func main() {
 				engine.Static(function.RouterUri("/dpanel/static/image"), filepath.Join(storage.Local{}.GetSaveRootPath(), "image"))
 
 				engine.NoRoute(func(http *gin.Context) {
-					slog.Debug("http route not found", "uri", http.Request.URL.String())
-					indexHtml, _ := Asset.ReadFile("asset/static/index.html")
-					for o, n := range map[string]string{
-						"/favicon.ico": function.RouterUri("/favicon.ico"),
-						"/dpanel":      function.RouterUri("/dpanel"),
-					} {
-						indexHtml = bytes.ReplaceAll(indexHtml, []byte(o), []byte(n))
-					}
-					http.Data(http2.StatusOK, "text/html; charset=UTF-8", indexHtml)
+					http.Set("asset", Asset)
+					controller.Home{}.Index(http)
 					return
 				})
 			},
@@ -335,9 +335,9 @@ func initDefaultDocker() error {
 		docker.Sdk, err = docker.NewBuilder(docker.WithAddress(defaultDockerEnv.Address), docker.WithDockerEnv(defaultDockerEnv))
 		return nil
 	}
-	// 使用超时上下文，避免 docker 连接地址时间过长卡死程序
-	ctx, _ := context.WithTimeout(context.Background(), docker.ConnectDockerServerTimeout)
-	if dockerInfo, err := docker.Sdk.Client.Info(ctx); err == nil {
+	// 使用超时上下文，避免 docker 连接地址时间过长卡死程序'
+	start := time.Now()
+	if dockerInfo, err := docker.Sdk.Client.Info(docker.Sdk.GetTryCtx()); err == nil {
 		go logic.NewEventLogin().MonitorLoop()
 
 		defaultDockerEnv.DockerInfo = &docker.ClientDockerInfo{
@@ -365,6 +365,7 @@ func initDefaultDocker() error {
 		defaultDockerEnv.DockerInfo = nil
 		docker.Sdk.Close()
 	}
+	slog.Debug("init default docker use time", "time", time.Since(start).Seconds())
 	logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
 
 	// 清除掉统计数据

@@ -43,3 +43,5 @@ system:
       path: ${STORAGE_LOCAL_PATH}
   permission:
     default_username: __public__
+  docker:
+    init_timeout: ${DP_SYSTEM_DOCKER_INIT_TIMEOUT-10}
