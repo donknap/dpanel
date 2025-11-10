@@ -5,10 +5,11 @@ import (
 
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/common"
 	"github.com/donknap/dpanel/common/accessor"
+	"github.com/donknap/dpanel/common/function"
 )
 
 func (self *Client) CommonStoreSync(option *common.StoreSyncOption) (list []accessor.StoreAppItem, err error) {
-	data, err := self.Post("/api/common/store/sync", option)
+	data, err := self.Post(function.RouterApiUri("/common/store/sync"), option)
 	if err != nil {
 		return list, err
 	}

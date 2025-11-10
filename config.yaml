@@ -22,7 +22,7 @@ log:
   file:
     driver: file
     path: ${STORAGE_LOCAL_PATH}/logs/dpanel.log
-    level: info
+    level: warn
   console:
     driver: console
     level: debug
@@ -36,8 +36,10 @@ database:
     prefix: ims_
     options:
       mode: ${DB_MODE}
-storage:
-  local:
-    path: ${STORAGE_LOCAL_PATH}
-common:
-  public_user_name: ${PUBLIC_USERNAME-__public__}
+system:
+  baseurl: ${DP_SYSTEM_BASEURL}
+  storage:
+    local:
+      path: ${STORAGE_LOCAL_PATH}
+  permission:
+    default_username: __public__

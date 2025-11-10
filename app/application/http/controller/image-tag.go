@@ -232,7 +232,6 @@ func (self Image) TagPushBatch(http *gin.Context) {
 				newImageName.Namespace = params.NewNamespace
 
 				if !function.InArray(imageDetail.RepoTags, newImageName.Uri()) {
-					fmt.Printf("%v \n", newImageName.Uri())
 					err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, tag, newImageName.Uri())
 					if err != nil {
 						self.JsonResponseWithError(http, err, 500)

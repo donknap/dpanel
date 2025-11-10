@@ -80,11 +80,11 @@ func (self Local) GetStorageLocalPath() string {
 		slog.Debug("storage local path empty")
 		return ""
 	}
-	path := facade.GetConfig().GetString("storage.local.path")
-	if path == "" {
-		panic("storage.local.path empty")
+	if v := facade.GetConfig().GetString("system.storage.local.path"); v == "" {
+		panic("invalid local storage path")
+	} else {
+		return v
 	}
-	return facade.GetConfig().GetString("storage.local.path")
 }
 
 func (self Local) CreateTempFile(name string) (*os.File, error) {

@@ -25,12 +25,12 @@ var (
 
 func (self AuthMiddleware) Process(http *gin.Context) {
 	currentUrlPath := http.Request.URL.Path
-	if strings.Contains(currentUrlPath, "/api/common/user/login") ||
+	if strings.Contains(currentUrlPath, "/common/user/login") ||
+		strings.Contains(currentUrlPath, "/common/user/create-founder") ||
+		strings.Contains(currentUrlPath, "/common/user/oauth/callback") ||
 		strings.Contains(currentUrlPath, "/pro/home/login-info") ||
-		strings.Contains(currentUrlPath, "/api/common/user/create-founder") ||
 		strings.Contains(currentUrlPath, "/pro/user/reset-info") ||
-		strings.Contains(currentUrlPath, "/api/common/user/oauth/callback") ||
-		(!strings.HasPrefix(currentUrlPath, "/api") && !strings.HasPrefix(currentUrlPath, "/ws")) {
+		(!strings.HasPrefix(currentUrlPath, function.RouterRootApi()) && !strings.HasPrefix(currentUrlPath, function.RouterRootWs())) {
 		http.Next()
 		return
 	}
