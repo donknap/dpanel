@@ -180,7 +180,9 @@ func (self Store) Sync(http *gin.Context) {
 	appList := make([]accessor.StoreAppItem, 0)
 	if params.Type == accessor.StoreTypeOnePanel || params.Type == accessor.StoreTypeOnePanelLocal {
 		if params.Type == accessor.StoreTypeOnePanel {
-			err = logic.Store{}.SyncByGit(storeRootPath, params.Url)
+			err = logic.Store{}.SyncByGit(params.Url, logic.SyncByGitOption{
+				TargetPath: storeRootPath,
+			})
 			if err != nil {
 				_ = notice.Message{}.Error(".gitPullEarlyEOF", "name", params.Name, "url", params.Url)
 				self.JsonResponseWithError(http, err, 500)
@@ -315,10 +317,10 @@ func (self Store) Deploy(http *gin.Context) {
 			DockerEnvName: docker.DefaultClientName,
 		},
 	}
-	targetPath := filepath.Join(storage.Local{}.GetComposePath(), params.Name)
-	if dockerClient, err := new(logic.Setting).GetDockerClient(docker.Sdk.Name); err == nil && dockerClient.EnableComposePath {
-		targetPath = filepath.Join(filepath.Dir(storage.Local{}.GetComposePath()), "compose-"+dockerClient.Name, params.Name)
-		composeNew.Setting.DockerEnvName = dockerClient.Name
+	targetPath := filepath.Join(storage.Local{}.GetComposePath(""), params.Name)
+	if docker.Sdk.DockerEnv.EnableComposePath {
+		targetPath = filepath.Join(storage.Local{}.GetComposePath(docker.Sdk.Name), params.Name)
+		composeNew.Setting.DockerEnvName = docker.Sdk.Name
 	}
 
 	err = dao.Compose.Create(composeNew)

@@ -32,21 +32,30 @@ func (self StoreLogoFileSystem) Open(name string) (fs.File, error) {
 type Store struct {
 }
 
-func (self Store) SyncByGit(path, gitUrl string) error {
+type SyncByGitOption struct {
+	TargetPath       string
+	TempDownloadPath string
+}
+
+func (self Store) SyncByGit(gitUrl string, option SyncByGitOption) error {
 	if _, err := exec2.LookPath("git"); err != nil {
 		return function.ErrorMessage(define.ErrorMessageSystemStoreNotFoundGit)
 	}
 	// 先创建一个临时目录，下载完成后再同步数据，否则失败时原先的数据会被删除
-	tempDownloadPath, _ := storage.Local{}.CreateTempDir("")
-	defer func() {
-		_ = os.RemoveAll(tempDownloadPath)
-	}()
-	slog.Debug("store git download", "path", tempDownloadPath)
+	if option.TempDownloadPath == "" {
+		// 仅当内部生成临时目录的时候才删除，如果是外部传递的，由外部来维护
+		option.TempDownloadPath, _ = storage.Local{}.CreateTempDir("")
+		defer func() {
+			_ = os.RemoveAll(option.TempDownloadPath)
+		}()
+	}
+
+	slog.Debug("store git download", "path", option.TempDownloadPath)
 
 	cmd, err := local.New(
 		local.WithCommandName("git"),
 		local.WithArgs("clone", "--depth", "1",
-			gitUrl, tempDownloadPath),
+			gitUrl, option.TempDownloadPath),
 	)
 	if err != nil {
 		return err
@@ -58,13 +67,15 @@ func (self Store) SyncByGit(path, gitUrl string) error {
 	if err != nil {
 		return err
 	}
-	err = os.RemoveAll(path)
-	if err != nil {
-		return err
-	}
-	err = os.CopyFS(path, os.DirFS(tempDownloadPath))
-	if err != nil {
-		return err
+	if option.TargetPath != "" {
+		err = os.RemoveAll(option.TargetPath)
+		if err != nil {
+			return err
+		}
+		err = os.CopyFS(option.TargetPath, os.DirFS(option.TempDownloadPath))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

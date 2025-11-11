@@ -221,9 +221,9 @@ func (self Compose) LsItem(name string) *compose.ProjectResult {
 func (self Compose) FindPathTask(dockerEnvName string) map[string]*entity.Compose {
 	var rootDir string
 	if dockerEnvName == docker.DefaultClientName {
-		rootDir = storage.Local{}.GetComposePath()
+		rootDir = storage.Local{}.GetComposePath("")
 	} else {
-		rootDir = filepath.Join(filepath.Dir(storage.Local{}.GetComposePath()), "compose-"+dockerEnvName)
+		rootDir = storage.Local{}.GetComposePath(dockerEnvName)
 	}
 
 	if _, err := os.Stat(rootDir); err != nil {
@@ -316,11 +316,17 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 			linkComposePath = filepath.Join(mount.Source, filepath.Base(workingDir))
 		}
 	}
+	// 如果开启了独立目录，获取挂载目录也应该只取对应的的
+	mountComposePath := "/dpanel/compose"
+	if dbRow.Setting.DockerEnvName != docker.DefaultClientName {
+		mountComposePath = filepath.Join("/", "dpanel", "compose-"+dbRow.Setting.DockerEnvName)
+	}
 	for _, mount := range dpanelContainerInfo.Mounts {
-		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel/compose" && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
+		if mount.Type == types.VolumeTypeBind && mount.Destination == mountComposePath && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
 			linkComposePath = mount.Source
 		}
 	}
+
 	if linkComposePath != "" {
 		// 把软连的上级目录创建出来
 		if _, err := os.Stat(linkComposePath); err != nil {

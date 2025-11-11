@@ -1,11 +1,12 @@
 package accessor
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
-	"os"
-	"path/filepath"
 )
 
 const (
@@ -61,9 +62,9 @@ func (self ComposeSettingOption) GetDefaultEnv() (envFile string, envFileContent
 
 func (self ComposeSettingOption) GetWorkingDir() string {
 	if self.DockerEnvName == docker.DefaultClientName {
-		return storage.Local{}.GetComposePath()
+		return storage.Local{}.GetComposePath("")
 	} else {
-		return filepath.Join(filepath.Dir(storage.Local{}.GetComposePath()), "compose-"+self.DockerEnvName)
+		return storage.Local{}.GetComposePath(self.DockerEnvName)
 	}
 }
 

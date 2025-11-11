@@ -8,6 +8,7 @@ import (
 	"io"
 	http2 "net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -23,6 +24,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
@@ -83,7 +85,9 @@ func (self Compose) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDisableStore), 500)
 			return
 		}
-		yamlExist, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).First()
+		yamlExist, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(
+			datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"),
+		)...).First()
 		if yamlExist != nil {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
 			return
@@ -227,19 +231,7 @@ func (self Compose) GetList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	dockerClient, err := logic2.Setting{}.GetDockerClient(docker.Sdk.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	if dockerClient.EnableComposePath {
-		//同步本地目录任务
-		err = logic.Compose{}.Sync(dockerClient.Name)
-	} else {
-		err = logic.Compose{}.Sync(docker.DefaultClientName)
-	}
-
+	err := logic.Compose{}.Sync(docker.Sdk.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -253,13 +245,8 @@ func (self Compose) GetList(http *gin.Context) {
 	if params.Title != "" {
 		query = query.Where(dao.Compose.Title.Like("%" + params.Title + "%"))
 	}
-
-	dockerEnvName := dockerClient.Name
-	if !dockerClient.EnableComposePath {
-		dockerEnvName = docker.DefaultClientName
-	}
 	query.Where(gen.Cond(
-		datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
+		datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"),
 	)...)
 	composeList, _ = query.Find()
 
@@ -391,6 +378,71 @@ func (self Compose) GetFromUri(http *gin.Context) {
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"content": string(content),
+	})
+	return
+}
+
+func (self Compose) GetFromGit(http *gin.Context) {
+	type ParamsValidate struct {
+		Uri   string `json:"uri" binding:"required,url"`
+		Name  string `json:"name" binding:"required"`
+		Title string `json:"title"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	composeRow, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(
+		datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"),
+	)...).First()
+	if composeRow != nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
+		return
+	}
+
+	var targetPath string
+	if docker.Sdk.DockerEnv.EnableComposePath {
+		targetPath = filepath.Join(storage.Local{}.GetComposePath(docker.Sdk.Name), params.Name)
+	} else {
+		targetPath = filepath.Join(storage.Local{}.GetComposePath(""), params.Name)
+	}
+	err := logic2.Store{}.SyncByGit(params.Uri, logic2.SyncByGitOption{
+		TargetPath: targetPath,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	createTime := time.Now().Local().Format(time.DateTime)
+	composeRow = &entity.Compose{
+		Title: params.Title,
+		Name:  params.Name,
+		Setting: &accessor.ComposeSettingOption{
+			Type:          accessor.ComposeTypeStoragePath,
+			Environment:   make([]docker.EnvItem, 0),
+			Uri:           []string{},
+			RemoteUrl:     params.Uri,
+			DockerEnvName: docker.Sdk.Name,
+			CreatedAt:     createTime,
+			UpdatedAt:     createTime,
+		},
+	}
+
+	for _, suffix := range logic.ComposeFileNameSuffix {
+		relYamlFilePath := filepath.Join(targetPath, suffix)
+		if _, err = os.Stat(relYamlFilePath); err == nil {
+			composeRow.Setting.Uri = append(composeRow.Setting.Uri, path.Join(params.Name, suffix))
+			break
+		}
+	}
+	err = dao.Compose.Save(composeRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"id": composeRow.ID,
 	})
 	return
 }

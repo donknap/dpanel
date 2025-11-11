@@ -44,4 +44,4 @@ system:
   permission:
     default_username: __public__
   docker:
-    init_timeout: ${DP_SYSTEM_DOCKER_INIT_TIMEOUT-10}
+    init_timeout: ${DP_SYSTEM_DOCKER_INIT_TIMEOUT}

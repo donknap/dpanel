@@ -42,8 +42,12 @@ func (self Local) GetCertDomainPath() string {
 	return fmt.Sprintf("%s/acme/", self.GetStorageLocalPath())
 }
 
-func (self Local) GetComposePath() string {
-	return filepath.Join(self.GetStorageLocalPath(), "compose")
+func (self Local) GetComposePath(prefix string) string {
+	if prefix == "" {
+		return filepath.Join(self.GetStorageLocalPath(), "compose")
+	} else {
+		return filepath.Join(self.GetStorageLocalPath(), "compose-"+prefix)
+	}
 }
 
 func (self Local) GetStorePath() string {
