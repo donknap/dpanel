@@ -261,7 +261,7 @@ func (c *client) ManifestExist(repository, reference string) (bool, *distributio
 	}
 	resp, err := c.do(req)
 	if err != nil {
-		if errors.As(err, types.NotFoundCode) {
+		if errors.As(err, &types.NotFoundCodeErr) {
 			return false, nil, nil
 		}
 		return false, nil, err
@@ -351,7 +351,7 @@ func (c *client) BlobExist(repository, digest string) (bool, error) {
 	}
 	resp, err := c.do(req)
 	if err != nil {
-		if err.Error() == types.NotFoundCode {
+		if errors.As(err, &types.NotFoundCodeErr) {
 			return false, nil
 		}
 		return false, err
