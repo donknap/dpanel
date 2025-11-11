@@ -176,7 +176,7 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_, err = dockerClient.Client.Info(dockerClient.Ctx)
+	_, err = dockerClient.Client.Info(dockerClient.GetTryCtx())
 	if err != nil {
 		dockerClient.Close()
 		if function.ErrorHasKeyword(err, "Maximum supported") {
@@ -242,7 +242,7 @@ func (self Env) Switch(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	_, err = dockerClient.Client.Info(dockerClient.Ctx)
+	_, err = dockerClient.Client.Info(dockerClient.GetTryCtx())
 	if err != nil {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiFailed, "error", err.Error()), 500)
 		return

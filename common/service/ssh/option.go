@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/pkg/sftp"
@@ -89,6 +90,13 @@ func WithSftpClient() Option {
 func WithContext(ctx context.Context) Option {
 	return func(self *Client) error {
 		self.ctx, self.ctxCancel = context.WithCancel(ctx)
+		return nil
+	}
+}
+
+func WithTimeout(s time.Duration) Option {
+	return func(self *Client) error {
+		self.sshClientConfig.Timeout = s
 		return nil
 	}
 }

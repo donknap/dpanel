@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -14,6 +15,7 @@ var (
 	CacheKeyXkStorageInfo         = "xk:storageInfo"
 	CacheKeyLoginFailed           = "login:failed:%s"
 	CacheKeySetting               = "setting:%s"
+	CacheKeySettingLocale         = fmt.Sprintf(CacheKeySetting, "locale")
 )
 
 var (

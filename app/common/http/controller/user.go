@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/family"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
@@ -107,6 +108,7 @@ func (self User) GetUserInfo(http *gin.Context) {
 	result := gin.H{
 		"menu":      make([]string, 0),
 		"themeUser": make(map[string]string),
+		"locale":    make([]string, 0),
 	}
 
 	data, exists := http.Get("userInfo")
@@ -139,6 +141,9 @@ func (self User) GetUserInfo(http *gin.Context) {
 	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingThemeConfig, &themeConfig)
 	result["theme"] = themeConfig
 
+	if v, ok := storage.Cache.Get(storage.CacheKeySettingLocale); ok {
+		result["locale"] = v.([]string)
+	}
 	self.JsonResponseWithoutError(http, result)
 	return
 }
@@ -159,6 +164,9 @@ func (self User) LoginInfo(http *gin.Context) {
 	if err != nil {
 		result["showRegister"] = true
 	}
+	theme := accessor.ThemeConfig{}
+	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingThemeConfig, &theme)
+	result["theme"] = theme
 	self.JsonResponseWithoutError(http, result)
 	return
 }
