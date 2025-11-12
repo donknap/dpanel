@@ -244,7 +244,7 @@ func (self SiteCert) Import(http *gin.Context) {
 		break
 	}
 	if len(cert.DNSNames) <= 0 {
-		self.JsonResponseWithError(http, errInvalidCertFile, 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSiteDomainCertHasNotDNSName), 500)
 		return
 	}
 	mainDomain := cert.DNSNames[0]

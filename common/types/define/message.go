@@ -32,6 +32,7 @@ const (
 	ErrorMessageSiteDomainCertIssueFailed                   = ".siteDomainCertIssueFailed"
 	ErrorMessageSiteDomainCertAddTxtFailed                  = ".siteDomainCertAddTxtFailed"
 	ErrorMessageSiteDomainCertHasBindDomain                 = ".siteDomainCertHasBindDomain"
+	ErrorMessageSiteDomainCertHasNotDNSName                 = ".siteDomainCertHasNotDNSName"
 	ErrorMessageImagePullTagNotFound                        = ".imagePullTagNotFound"
 	ErrorMessageImagePullServerHttp                         = ".imagePullServerHttp"
 	ErrorMessageImageRemoteTagNoPermission                  = ".imageRemoteTagNoPermission"
