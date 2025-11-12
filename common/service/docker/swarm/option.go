@@ -16,7 +16,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	containerBuilder "github.com/donknap/dpanel/common/service/docker/container"
-	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/types/define"
 )
 
@@ -325,9 +324,9 @@ func WithRestart(value *docker.RestartPolicy) Option {
 	}
 }
 
-func WithRegistry(value registry.Config) Option {
+func WithRegistryAuth(code string) Option {
 	return func(self *Builder) error {
-		self.options.EncodedRegistryAuth = value.GetAuthString()
+		self.options.EncodedRegistryAuth = code
 		return nil
 	}
 }

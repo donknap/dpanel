@@ -23,7 +23,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/backup"
 	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -112,7 +111,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 			imageName := containerInfo.Config.Image
 
 			if params.EnableCommitImage {
-				imageDetail := registry.GetImageTagDetail(containerInfo.Config.Image)
+				imageDetail := function.ImageTag(containerInfo.Config.Image)
 				imageName = fmt.Sprintf("%s-%s", imageDetail.Uri(), backupTime)
 
 				response, err := docker.Sdk.Client.ContainerCommit(progress.Context(), containerInfo.ID, container.CommitOptions{

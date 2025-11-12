@@ -38,6 +38,8 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	ssh2 "golang.org/x/crypto/ssh"
+	"gorm.io/datatypes"
+	"gorm.io/gen"
 )
 
 type command struct {
@@ -366,27 +368,16 @@ func (self Home) Info(http *gin.Context) {
 
 func (self Home) CheckNewVersion(http *gin.Context) {
 	var tags []string
-	var err error
 	currentVersion := facade.GetConfig().GetString("app.version")
 	newVersion := ""
 
-	for _, s := range []string{
-		"registry.cn-hangzhou.aliyuncs.com",
-	} {
-		option := make([]registry.Option, 0)
-		option = append(option, registry.WithRequestCacheTime(time.Hour*24))
-		option = append(option, registry.WithRegistryHost(s))
-		reg := registry.New(option...)
-		tags, err = reg.GetImageTagList("dpanel/dpanel")
-		if err == nil {
-			break
-		}
-	}
-
+	option := make([]registry.Option, 0)
+	option = append(option, registry.WithAddress("registry.cn-hangzhou.aliyuncs.com"))
+	reg := registry.New(option...)
+	tags, _ = reg.Client().ListTags("dpanel/dpanel")
 	for _, ver := range tags {
 		if !strings.Contains(ver, "-") && version.Compare(ver, currentVersion, ">") {
 			newVersion = ver
-			break
 		}
 	}
 
@@ -540,7 +531,9 @@ func (self Home) Usage(http *gin.Context) {
 	}
 
 	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, network.ListOptions{})
-	recycleQuery := dao.Site.Where(dao.Site.DeletedAt.IsNotNull()).Unscoped()
+	recycleQuery := dao.Site.Where(dao.Site.DeletedAt.IsNotNull()).Unscoped().Where(gen.Cond(
+		datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
+	)...)
 	if containerList != nil {
 		names := make([]string, 0)
 		for _, summary := range containerList {

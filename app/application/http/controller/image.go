@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/app/application/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
@@ -51,7 +52,7 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	imageNameDetail := registry.GetImageTagDetail(params.Tag)
+	imageNameDetail := function.ImageTag(params.Tag)
 	if params.Registry != "" {
 		imageNameDetail.Registry = params.Registry
 	}
@@ -454,7 +455,7 @@ func (self Image) Export(http *gin.Context) {
 	}()
 
 	names := function.PluckArrayWalk(params.Md5, func(i string) (string, bool) {
-		imageDetail := registry.GetImageTagDetail(i)
+		imageDetail := function.ImageTag(i)
 		return strings.ReplaceAll(strings.ReplaceAll(imageDetail.BaseName, "-", "_"), "/", "_"), true
 	})
 	fileName := fmt.Sprintf("export/image/%s-%s.tar", strings.Join(names, "-"), time.Now().Format(define.DateYmdHis))
@@ -501,6 +502,10 @@ func (self Image) UpdateTitle(http *gin.Context) {
 			Title:     params.Title,
 			Tag:       params.Tag,
 			BuildType: "pull",
+			Setting: &accessor.ImageSettingOption{
+				Tag:       params.Tag,
+				BuildType: "pull",
+			},
 		})
 	}
 	self.JsonSuccessResponse(http)
@@ -532,41 +537,39 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		return
 	}
 
-	digest := ""
-	upgrade := false
-
-	imageNameDetail := registry.GetImageTagDetail(params.Tag)
-	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Uri())
-
-	for _, s := range registryConfig.Proxy {
-		option := make([]registry.Option, 0)
-		if params.CacheTime > 0 {
-			option = append(option, registry.WithRequestCacheTime(time.Second*time.Duration(params.CacheTime)))
-		}
-		option = append(option, registry.WithCredentials(registryConfig.GetRegistryAuthCredential()))
-		option = append(option, registry.WithRegistryHost(s))
-		reg := registry.New(option...)
-		if digest, err = reg.GetImageDigest(params.Tag); err == nil {
-			slog.Debug("image check upgrade", "remote digest", fmt.Sprintf("%s@%s", params.Tag, digest), "local digest", imageInfo.RepoDigests)
-			if !function.InArrayWalk(imageInfo.RepoDigests, func(i string) bool {
-				return strings.HasSuffix(i, digest)
-			}) {
-				upgrade = true
-			}
-			break
-		} else {
-			slog.Debug("image check upgrade", "err", err.Error())
+	if params.CacheTime > 0 {
+		if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyImageDigest, params.Md5)); ok {
+			self.JsonResponseWithoutError(http, v)
+			return
 		}
 	}
+
 	result := gin.H{
-		"upgrade":     upgrade,
-		"digest":      digest,
+		"upgrade":     false,
+		"digest":      "",
 		"digestLocal": imageInfo.RepoDigests,
 		"error":       "",
 	}
-	if err != nil {
+
+	imageNameDetail := function.ImageTag(params.Tag)
+	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Registry)
+
+	option := make([]registry.Option, 0)
+	option = append(option, registry.WithCredentialsWithBasic(registryConfig.Config.Username, registryConfig.Config.Password))
+	option = append(option, registry.WithAddress(registryConfig.Address...))
+	reg := registry.New(option...)
+	if ok, desc, err := reg.Client().ManifestExist(imageNameDetail.BaseName, imageNameDetail.Version); err == nil && ok {
+		result["digest"] = desc.Digest.String()
+		if !function.InArrayWalk(imageInfo.RepoDigests, func(i string) bool {
+			return strings.HasSuffix(i, desc.Digest.String())
+		}) {
+			result["upgrade"] = true
+		}
+	} else if err != nil {
 		result["error"] = err.Error()
 	}
+
+	storage.Cache.Set(fmt.Sprintf(storage.CacheKeyImageDigest, params.Md5), result, time.Duration(params.CacheTime)*time.Second)
 	self.JsonResponseWithoutError(http, result)
 	return
 }

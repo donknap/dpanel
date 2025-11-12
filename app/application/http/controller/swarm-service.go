@@ -1,25 +1,22 @@
 package controller
 
 import (
-	"fmt"
 	"log/slog"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	swarm2 "github.com/donknap/dpanel/common/service/docker/swarm"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 func (self Swarm) ServiceList(http *gin.Context) {
@@ -121,14 +118,9 @@ func (self Swarm) ServiceScaling(http *gin.Context) {
 
 	if serviceInfo.Spec.Labels != nil {
 		if v, ok := serviceInfo.Spec.Labels[define.SwarmLabelServiceImageRegistry]; ok {
-			id, _ := strconv.Atoi(v)
-			if registryInfo, err := dao.Registry.Where(dao.Registry.ID.Eq(int32(id))).First(); err == nil {
-				password, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registryInfo.Setting.Password)
-				updateOptions.EncodedRegistryAuth = registry.Config{
-					Username:   registryInfo.Setting.Username,
-					Password:   password,
-					ExistsAuth: true,
-				}.GetAuthString()
+			registryConfig := logic.Image{}.GetRegistryConfig(v)
+			if registryConfig != nil && registryConfig.GetAuthString() != "" {
+				updateOptions.EncodedRegistryAuth = registryConfig.GetAuthString()
 			}
 		}
 	}
@@ -206,15 +198,11 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 
 	if buildParams.ImageRegistry > 0 {
 		if registryInfo, err := dao.Registry.Where(dao.Registry.ID.Eq(buildParams.ImageRegistry)).First(); err == nil {
-			password, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registryInfo.Setting.Password)
-			options = append(options, swarm2.WithRegistry(registry.Config{
-				Username:   registryInfo.Setting.Username,
-				Password:   password,
-				ExistsAuth: true,
-			}))
+			registryConfig := logic.Image{}.GetRegistryConfig(registryInfo.ServerAddress)
+			options = append(options, swarm2.WithRegistryAuth(registryConfig.GetAuthString()))
 			options = append(options, swarm2.WithLabel(docker.ValueItem{
 				Name:  define.SwarmLabelServiceImageRegistry,
-				Value: fmt.Sprintf("%d", registryInfo.ID),
+				Value: registryInfo.ServerAddress,
 			}))
 		}
 	}

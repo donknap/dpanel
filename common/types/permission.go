@@ -2,7 +2,7 @@ package types
 
 import (
 	"github.com/docker/docker/api/types/image"
-	"github.com/donknap/dpanel/common/service/registry"
+	"github.com/donknap/dpanel/common/function"
 )
 
 type PermissionDataValue interface {
@@ -12,5 +12,5 @@ type PermissionDataValue interface {
 type ImgList []image.Summary
 
 func (list ImgList) GetPermissionDataValue(item any) interface{} {
-	return registry.GetImageTagDetail(item.(image.Summary).RepoTags[0]).Registry
+	return function.ImageTag(item.(image.Summary).RepoTags[0]).Registry
 }

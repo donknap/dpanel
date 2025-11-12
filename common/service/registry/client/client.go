@@ -80,6 +80,7 @@ func init() {
 
 // Client defines the methods that a registry client should implements
 type Client interface {
+	Address() (u string)
 	// Ping the base API endpoint "/v2/"
 	Ping() (err error)
 	// Catalog the repositories
@@ -144,12 +145,16 @@ type client struct {
 	client       *http.Client
 }
 
+func (c *client) Address() (u string) {
+	return c.url
+}
+
 func (c *client) Ping() error {
 	req, err := http.NewRequest(http.MethodGet, buildPingURL(c.url), nil)
 	if err != nil {
 		return err
 	}
-	resp, err := c.do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -667,7 +672,7 @@ func (c *client) do(req *http.Request) (*http.Response, error) {
 		case http.StatusTooManyRequests:
 			code = types.RateLimitCode
 		}
-		return nil, errors.New(fmt.Sprintf("http status code: %d, body: %s", code, string(body)))
+		return nil, errors.New(fmt.Sprintf("http status code: %s, body: %s", code, string(body)))
 	}
 	return resp, nil
 }

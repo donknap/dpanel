@@ -13,7 +13,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -43,7 +42,7 @@ func (self ImageBuild) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildTypeConflict), 500)
 		return
 	}
-	imageNameDetail := registry.GetImageTagDetail(params.Tag)
+	imageNameDetail := function.ImageTag(params.Tag)
 	if params.Registry != "" {
 		imageNameDetail.Registry = params.Registry
 	}
@@ -105,7 +104,7 @@ func (self ImageBuild) GetDetail(http *gin.Context) {
 	if tag == "" {
 		tag = imageRow.Tag
 	}
-	tagDetail := registry.GetImageTagDetail(tag)
+	tagDetail := function.ImageTag(tag)
 	imageRow.Setting.Tag = tagDetail.BaseName
 	if imageRow.Setting.BuildType == "" {
 		imageRow.Setting.BuildType = imageRow.BuildType

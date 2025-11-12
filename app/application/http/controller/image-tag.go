@@ -4,22 +4,19 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	http2 "net/http"
 	"strings"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/registry"
+	dockerRegistry "github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/app/application/logic"
-	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
-	registry2 "github.com/donknap/dpanel/common/service/registry"
+	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 func (self Image) TagSync(http *gin.Context) {
@@ -32,61 +29,47 @@ func (self Image) TagSync(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	imageNameDetail := registry2.GetImageTagDetail(params.Tag)
-	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Uri())
+	imageNameDetail := function.ImageTag(params.Tag)
+	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Registry)
 
 	var out io.ReadCloser
 	var err error
-	var response *http2.Response
 
 	slog.Debug("image remote", "type", params.Type, "tag", imageNameDetail.Uri())
 
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, params.Tag))
 	defer wsBuffer.Close()
 
-	for i, s := range registryConfig.Proxy {
-		imageNameDetail.Registry = s
+	for _, s := range registryConfig.Address {
 		if params.Type == "pull" {
-			// 仓库地址如果大于1，则表示有代理地址，最后一个为本地址
-			// 仅当是代理地址的时候才检测是否可以访问
-			// 拉取时先检测一下当前仓库地址是否可以访问，并且判断一下是否是 docker hub 的代理地址
-			if i == len(registryConfig.Proxy)-1 {
-				pullOption := image.PullOptions{
-					RegistryAuth: registryConfig.GetAuthString(),
-				}
-				if params.Platform != "" {
-					pullOption.Platform = params.Platform
-				}
-				out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption)
-			} else {
-				url := registry2.GetRegistryUrl(s)
-				if response, err = http2.Get(strings.Replace(url.String(), "https://", "http://", 1)); err != nil {
-					if response != nil {
-						slog.Debug("image remote select registry url", "header", response.Header.Get(registry2.ChallengeHeader))
-					}
-					slog.Debug("image remote select registry url", "error", err)
-					continue
-				}
-				pullOption := image.PullOptions{
-					RegistryAuth: registryConfig.GetAuthString(),
-				}
-				if params.Platform != "" {
-					pullOption.Platform = params.Platform
-				}
-				out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption)
-				if err != nil {
-					slog.Debug("image remote pull", "error", err)
-				}
+			imageNameDetail.Registry = s
+			// 使用代理地址时先尝试发起 http 请求是否可以访问。以便于可以减少直接 pull 的等待时间
+			reg := registry.New(
+				registry.WithAddress(s),
+				registry.WithCredentialsWithBasic(registryConfig.Config.Username, registryConfig.Config.Password),
+			)
+			if err := reg.Client().Ping(); err != nil {
+				slog.Debug("image remote select registry url", "error", err)
+				continue
+			}
+			pullOption := image.PullOptions{
+				RegistryAuth: registryConfig.GetAuthString(),
+			}
+			if params.Platform != "" {
+				pullOption.Platform = params.Platform
+			}
+			out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption)
+			if err != nil {
+				slog.Debug("image remote pull", "error", err)
 			}
 		} else {
 			// 推荐送镜像时保持原样
 			// 自建仓库不需要添加 library
-			// 即使推送 hub 镜像，library 命名空间属于官司方空间，也不应该添加
+			// 即使推送 hub 镜像，library 命名空间属于官方空间，也不应该添加
 			out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, params.Tag, image.PushOptions{
 				RegistryAuth: registryConfig.GetAuthString(),
 			})
 		}
-
 		if err == nil {
 			break
 		}
@@ -105,9 +88,11 @@ func (self Image) TagSync(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	if params.Type == "pull" {
 		_ = notice.Message{}.Info(".imagePull", "name", imageNameDetail.Uri())
 	}
+
 	err = logic.DockerTask{}.ImageRemote(wsBuffer, out)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -194,32 +179,20 @@ func (self Image) TagAdd(http *gin.Context) {
 
 func (self Image) TagPushBatch(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5          []string `json:"md5" binding:"required"`
-		RegistryId   []int32  `json:"registryId" binding:"required"`
-		NewNamespace string   `json:"newNamespace"`
+		Md5                   []string `json:"md5" binding:"required"`
+		RegistryServerAddress []string `json:"registryServerAddress" binding:"required"`
+		NewNamespace          string   `json:"newNamespace"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
-	for _, id := range params.RegistryId {
-		registryRow, err := dao.Registry.Where(dao.Registry.ID.Eq(id)).First()
-		if err != nil || registryRow == nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
-			return
+	for _, address := range params.RegistryServerAddress {
+		registryConfig := logic.Image{}.GetRegistryConfig(address)
+		imagePushOption := image.PushOptions{
+			RegistryAuth: registryConfig.GetAuthString(),
 		}
-		password := ""
-		if registryRow.Setting != nil && registryRow.Setting.Username != "" && registryRow.Setting.Password != "" {
-			password, _ = function.AseDecode(facade.GetConfig().GetString("app.name"), registryRow.Setting.Password)
-		}
-
-		registryConfig := registry2.Config{
-			Username: registryRow.Setting.Username,
-			Password: password,
-			Host:     registryRow.ServerAddress,
-		}
-
 		for _, md5 := range params.Md5 {
 			imageDetail, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, md5)
 			if err != nil {
@@ -227,10 +200,9 @@ func (self Image) TagPushBatch(http *gin.Context) {
 				return
 			}
 			for _, tag := range imageDetail.RepoTags {
-				newImageName := registry2.GetImageTagDetail(tag)
-				newImageName.Registry = registryRow.ServerAddress
+				newImageName := function.ImageTag(tag)
+				newImageName.Registry = address
 				newImageName.Namespace = params.NewNamespace
-
 				if !function.InArray(imageDetail.RepoTags, newImageName.Uri()) {
 					err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, tag, newImageName.Uri())
 					if err != nil {
@@ -238,9 +210,7 @@ func (self Image) TagPushBatch(http *gin.Context) {
 						return
 					}
 				}
-				out, err := docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, newImageName.Uri(), image.PushOptions{
-					RegistryAuth: registryConfig.GetAuthString(),
-				})
+				out, err := docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, newImageName.Uri(), imagePushOption)
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return
@@ -260,13 +230,13 @@ func (self Image) TagPushBatch(http *gin.Context) {
 
 func (self Image) TagSearch(http *gin.Context) {
 	type ParamsValidate struct {
-		Keywork string `json:"keywork" binding:"required"`
+		Keyword string `json:"keyword" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	list, err := docker.Sdk.Client.ImageSearch(docker.Sdk.Ctx, params.Keywork, registry.SearchOptions{
+	list, err := docker.Sdk.Client.ImageSearch(docker.Sdk.Ctx, params.Keyword, dockerRegistry.SearchOptions{
 		RegistryAuth:  "",
 		PrivilegeFunc: nil,
 		Filters:       filters.Args{},

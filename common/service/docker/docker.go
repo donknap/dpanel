@@ -33,6 +33,10 @@ var (
 	DefaultClientName = "local"
 )
 
+func S() *Builder {
+	return Sdk
+}
+
 type ClientDockerInfo struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
