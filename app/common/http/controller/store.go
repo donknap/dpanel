@@ -18,6 +18,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -254,7 +255,7 @@ func (self Store) Deploy(http *gin.Context) {
 
 	storeRow, err := dao.Store.Where(dao.Store.ID.Eq(params.StoreId)).First()
 	if storeRow == nil {
-		slog.Debug("sto deploy get store", "error", err)
+		slog.Debug("store deploy get store", "error", err)
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
@@ -333,6 +334,23 @@ func (self Store) Deploy(http *gin.Context) {
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+
+	// 适配 1panel
+	if storeRow.Setting.Type == accessor.StoreTypeOnePanel || storeRow.Setting.Type == accessor.StoreTypeOnePanelLocal {
+		initScript := filepath.Join(targetPath, "scripts", "init.sh")
+		if _, err := os.Stat(initScript); err == nil {
+			if cmd, err := local.New(
+				local.WithCommandName("sh"),
+				local.WithArgs(initScript),
+				local.WithDir(targetPath),
+			); err == nil {
+				err = cmd.Run()
+				if err != nil {
+					slog.Debug("store deploy run init.sh", "error", err)
+				}
+			}
+		}
 	}
 
 	facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposePayload{

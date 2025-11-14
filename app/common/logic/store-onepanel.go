@@ -3,6 +3,7 @@ package logic
 import (
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -48,7 +49,9 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 
 		content, err := os.ReadFile(filepath.Join(appPath, "data.yml"))
 		if err != nil {
-			return err
+			// 如果找不到 data.yml 文件则直接跳过这个应用
+			slog.Debug("store onepanel sync not found data.yml", "name", appName)
+			return filepath.SkipDir
 		}
 		yamlData := new(function.ConfigMap)
 		err = yaml.Unmarshal(content, &yamlData)
