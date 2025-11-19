@@ -2,6 +2,7 @@
 
 NGINX_CONFIG_DIR="/dpanel/nginx"
 
+mkdir -p /var/run/dpanel
 [ -e /var/run/dpanel/dpanel.sock ] && rm -f /var/run/dpanel/dpanel.sock
 
 chmod 755 /app/server/dpanel && mkdir -p /dpanel/nginx/default_host /dpanel/nginx/proxy_host \
