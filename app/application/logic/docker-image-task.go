@@ -92,6 +92,9 @@ func (self DockerTask) ImageBuild(messageId string, task accessor.ImageSettingOp
 }
 
 func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
+	if r == nil {
+		return function.ErrorMessage(define.ErrorMessageImagePullRegistryBad)
+	}
 	lastSendTime := time.Now()
 	pg := make(map[string]*docker.PullProgress)
 

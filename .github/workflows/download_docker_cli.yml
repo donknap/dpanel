@@ -15,6 +15,8 @@ jobs:
           
           URL=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.assets[] | select(.name == "docker-compose-windows-x86_64.exe") | .browser_download_url')
           wget "$URL"
+          
+          curl -L -o fnpack https://static2.fnnas.com/fnpack/fnpack-1.0.1-linux-amd64
       - name: Create Release
         if: always()
         uses: softprops/action-gh-release@v2
@@ -25,6 +27,7 @@ jobs:
           files: |
             docker-windows-x86_64.exe
             docker-compose-windows-x86_64.exe
+            fnpack
           draft: false
           prerelease: false
           make_latest: false

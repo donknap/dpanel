@@ -55,7 +55,7 @@ func WithForce() Option {
 
 func WithDnsNginx() Option {
 	return func(self *Acme) error {
-		self.argv = append(self.argv, "--nginx")
+		self.argv = append(self.argv, "--webroot", "/var/www/challenges")
 		return nil
 	}
 }

@@ -7,6 +7,7 @@ var (
 	StoreTypeOnePanelLocal = "1panel-local"
 	StoreTypePortainer     = "portainer"
 	StoreTypeCasaOs        = "casaos"
+	StoreTypeBaota         = "baota"
 )
 
 type StoreAppItem struct {

@@ -16,6 +16,7 @@ var (
 	CacheKeySetting               = "setting:%s"
 	CacheKeySettingLocale         = fmt.Sprintf(CacheKeySetting, "locale")
 	CacheKeyImageDigest           = "image:digest:%s"
+	CacheKeyImageRootFs           = "image:rootfs:%s"
 )
 
 var (

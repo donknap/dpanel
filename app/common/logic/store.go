@@ -139,8 +139,9 @@ func (self Store) SyncByZip(path, zipUrl string, root string) error {
 	return nil
 }
 
-func (self Store) SyncByJson(path, jsonUrl string) error {
-	file, err := os.OpenFile(filepath.Join(path, "template.json"), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+func (self Store) SyncByJson(jsonPath, jsonUrl string) error {
+	_ = os.MkdirAll(filepath.Dir(jsonPath), os.ModePerm)
+	file, err := os.OpenFile(jsonPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	defer func() {
 		_ = file.Close()
 	}()

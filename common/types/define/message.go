@@ -35,6 +35,7 @@ const (
 	ErrorMessageSiteDomainCertHasNotDNSName                 = ".siteDomainCertHasNotDNSName"
 	ErrorMessageImagePullTagNotFound                        = ".imagePullTagNotFound"
 	ErrorMessageImagePullServerHttp                         = ".imagePullServerHttp"
+	ErrorMessageImagePullRegistryBad                        = ".imagePullRegistryBad"
 	ErrorMessageImageRemoteTagNoPermission                  = ".imageRemoteTagNoPermission"
 	ErrorMessageImageBuildTypeEmpty                         = ".imageBuildTypeEmpty"
 	ErrorMessageImageBuildTypeConflict                      = ".imageBuildTypeConflict"

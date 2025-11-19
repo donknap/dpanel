@@ -59,7 +59,7 @@ type Home struct {
 
 func (self Home) Index(http *gin.Context) {
 	uri := http.Request.URL.String()
-	slog.Debug("http route not found", "uri", uri)
+	slog.Debug("http route not found", "ip", http.ClientIP(), "user-agent", http.Request.Header.Get("User-Agent"), "uri", uri)
 	var asset embed.FS
 	if v, ok := http.Get("asset"); !ok {
 		self.JsonResponseWithError(http, errors.New("fatal error, resource file not found, please recompile"), 500)

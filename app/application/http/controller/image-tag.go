@@ -12,7 +12,6 @@ import (
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -87,10 +86,6 @@ func (self Image) TagSync(http *gin.Context) {
 		}
 		self.JsonResponseWithError(http, err, 500)
 		return
-	}
-
-	if params.Type == "pull" {
-		_ = notice.Message{}.Info(".imagePull", "name", imageNameDetail.Uri())
 	}
 
 	err = logic.DockerTask{}.ImageRemote(wsBuffer, out)

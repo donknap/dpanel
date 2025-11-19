@@ -207,7 +207,20 @@ func (self Store) Sync(http *gin.Context) {
 			return
 		}
 	} else if params.Type == accessor.StoreTypePortainer {
-		err = logic.Store{}.SyncByJson(storeRootPath, params.Url)
+		jsonPath := filepath.Join(storeRootPath, "template.json")
+		err = logic.Store{}.SyncByJson(jsonPath, params.Url)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	} else if params.Type == accessor.StoreTypeBaota {
+		jsonPath := filepath.Join(storeRootPath, "apps.json")
+		err = logic.Store{}.SyncByJson(jsonPath, params.Url)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		appList, err = logic.Store{}.GetAppByBaoTa(params.Name)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

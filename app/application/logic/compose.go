@@ -218,14 +218,7 @@ func (self Compose) LsItem(name string) *compose.ProjectResult {
 }
 
 // FindPathTask 查询 docker 环境下 compose 目录下的所有任务
-func (self Compose) FindPathTask(dockerEnvName string) map[string]*entity.Compose {
-	var rootDir string
-	if dockerEnvName == docker.DefaultClientName {
-		rootDir = storage.Local{}.GetComposePath("")
-	} else {
-		rootDir = storage.Local{}.GetComposePath(dockerEnvName)
-	}
-
+func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 	if _, err := os.Stat(rootDir); err != nil {
 		slog.Error("compose sync path not found", "error", err)
 		return make(map[string]*entity.Compose)
@@ -265,7 +258,7 @@ func (self Compose) FindPathTask(dockerEnvName string) map[string]*entity.Compos
 						Uri: []string{
 							relYamlFilePath,
 						},
-						DockerEnvName: dockerEnvName,
+						DockerEnvName: docker.Sdk.Name,
 					},
 				}
 				findComposeList[name] = findRow
@@ -278,7 +271,17 @@ func (self Compose) FindPathTask(dockerEnvName string) map[string]*entity.Compos
 
 // Sync 同步当前挂载目录中的 compose
 func (self Compose) Sync(dockerEnvName string) error {
-	findComposeList := self.FindPathTask(dockerEnvName)
+	dockerEnv, err := logic.DockerEnv{}.GetEnvByName(dockerEnvName)
+	if err != nil {
+		return err
+	}
+	var rootDir string
+	if dockerEnv.EnableComposePath {
+		rootDir = storage.Local{}.GetComposePath(dockerEnvName)
+	} else {
+		rootDir = storage.Local{}.GetComposePath("")
+	}
+	findComposeList := self.FindPathTask(rootDir)
 
 	// 循环任务，添加，清理任务
 	composeList, _ := dao.Compose.Find()
