@@ -82,7 +82,12 @@ curl -sSL https://dpanel.cc/quick.sh -o quick.sh && sudo bash quick.sh
 
 如果此项目对你所有帮助，并希望我继续下去，请考虑赞助我为爱发电！感谢所有的爱和支持。
 
-https://afdian.com/a/dpanel
+##### 爱发电平台
+[https://afdian.com/a/dpanel](https://afdian.com/a/dpanel)
+
+##### 微信打赏
+
+<img src="https://github.com/donknap/dpanel-docs/blob/vitepress/storage/image/wx-sponsor.jpg?raw=true" width="300" />
 
 #### 交流群
 
