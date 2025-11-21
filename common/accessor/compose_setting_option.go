@@ -1,6 +1,7 @@
 package accessor
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -61,11 +62,12 @@ func (self ComposeSettingOption) GetDefaultEnv() (envFile string, envFileContent
 }
 
 func (self ComposeSettingOption) GetWorkingDir() string {
-	if self.DockerEnvName == docker.DefaultClientName {
-		return storage.Local{}.GetComposePath("")
-	} else {
-		return storage.Local{}.GetComposePath(self.DockerEnvName)
+	workDir := storage.Local{}.GetComposePath("")
+	if docker.S().DockerEnv.EnableComposePath {
+		workDir = storage.Local{}.GetComposePath(docker.S().DockerEnv.Name)
 	}
+	slog.Debug("compose get container working dir", "dir", workDir)
+	return workDir
 }
 
 func (self ComposeSettingOption) GetYaml() [2]string {

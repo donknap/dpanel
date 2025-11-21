@@ -544,7 +544,7 @@ func (self Home) Usage(http *gin.Context) {
 		recycleQuery = recycleQuery.Where(dao.Site.SiteName.NotIn(names...))
 	}
 	containerTask, _ := recycleQuery.Count()
-	imageTask, _ := dao.Image.Count()
+	imageTask, _ := dao.Image.Where(dao.Image.Setting.IsNotNull()).Count()
 	backupData, _ := dao.Backup.Count()
 
 	self.JsonResponseWithoutError(http, gin.H{

@@ -287,6 +287,11 @@ func (self Compose) Sync(dockerEnvName string) error {
 	composeList, _ := dao.Compose.Find()
 	for _, dbComposeRow := range composeList {
 		if find, ok := findComposeList[dbComposeRow.Name]; ok && find.Setting.DockerEnvName == dbComposeRow.Setting.DockerEnvName {
+			// 如果 uri 中的文件名不在数据库中，则更新
+			if !function.InArrayArray(dbComposeRow.Setting.Uri, find.Setting.Uri...) {
+				dbComposeRow.Setting.Uri = find.Setting.Uri
+				_ = dao.Compose.Save(dbComposeRow)
+			}
 			delete(findComposeList, dbComposeRow.Name)
 		} else {
 			// 除非任务的类型是属于当前的环境才执行删除
@@ -321,9 +326,11 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 	}
 	// 如果开启了独立目录，获取挂载目录也应该只取对应的的
 	mountComposePath := "/dpanel/compose"
-	if dbRow.Setting.DockerEnvName != docker.DefaultClientName {
+
+	if docker.S().DockerEnv.EnableComposePath {
 		mountComposePath = filepath.Join("/", "dpanel", "compose-"+dbRow.Setting.DockerEnvName)
 	}
+
 	for _, mount := range dpanelContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == mountComposePath && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
 			linkComposePath = mount.Source

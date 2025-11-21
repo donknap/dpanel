@@ -280,3 +280,38 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: runtime/*
           prerelease: false
+  push-tags-to-related-repos:
+    needs: [ build ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dpanel-gui
+        uses: actions/checkout@v4
+        with:
+          repository: donknap/dpanel-gui
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
+          path: dpanel-gui
+
+      - name: Push tag to dpanel-gui
+        working-directory: ./dpanel-gui
+        run: |
+          TAG=${{ github.ref_name }}
+          git config user.name "donknap"
+          git config user.email "donknap@gmail.com"
+          git tag -f "$TAG"
+          git push origin "$TAG" --force
+
+      - name: Checkout dpanel-fnnas
+        uses: actions/checkout@v4
+        with:
+          repository: donknap/dpanel-fnnas
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
+          path: dpanel-fnnas
+
+      - name: Push tag to dpanel-fnnas
+        working-directory: ./dpanel-fnnas
+        run: |
+          TAG=${{ github.ref_name }}
+          git config user.name "donknap"
+          git config user.email "donknap@gmail.com"
+          git tag -f "$TAG"
+          git push origin "$TAG" --force

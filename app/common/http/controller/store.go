@@ -328,13 +328,13 @@ func (self Store) Deploy(http *gin.Context) {
 			Uri: []string{
 				filepath.Join(params.Name, filepath.Base(params.ComposeFile)),
 			},
-			DockerEnvName: docker.DefaultClientName,
+			DockerEnvName: docker.Sdk.Name,
 		},
 	}
+
 	targetPath := filepath.Join(storage.Local{}.GetComposePath(""), params.Name)
 	if docker.Sdk.DockerEnv.EnableComposePath {
 		targetPath = filepath.Join(storage.Local{}.GetComposePath(docker.Sdk.Name), params.Name)
-		composeNew.Setting.DockerEnvName = docker.Sdk.Name
 	}
 
 	err = dao.Compose.Create(composeNew)
