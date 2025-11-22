@@ -38,7 +38,9 @@ func (self HttpFs) Open(name string) (http.File, error) {
 			"/ws/common": function.RouterUri("/ws/common"),
 			"/api":       function.RouterUri("/api"),
 		} {
-			content = strings.ReplaceAll(content, o, n)
+			if !strings.Contains(content, n) {
+				content = strings.ReplaceAll(content, o, n)
+			}
 		}
 		memFile := mem.NewFileHandle(mem.CreateFile(name))
 		_, err = memFile.WriteString(content)
