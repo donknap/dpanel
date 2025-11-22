@@ -588,7 +588,8 @@ func (self Home) GetStatList(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	time.AfterFunc(time.Hour, func() {
+
+	closeTimer := time.AfterFunc(time.Hour, func() {
 		progress.Close()
 	})
 
@@ -613,11 +614,18 @@ func (self Home) GetStatList(http *gin.Context) {
 		case <-docker.Sdk.Ctx.Done():
 			progress.Close()
 		case <-progress.Done():
+			slog.Debug("home get stat list progress done")
+			closeTimer.Stop()
 			self.JsonResponseWithoutError(http, gin.H{
 				"list": "",
 			})
 			return
-		case list := <-out:
+		case list, ok := <-out:
+			if !ok {
+				// 关闭通道继续执行，正常回收资源
+				progress.Close()
+				continue
+			}
 			progress.BroadcastMessage(list)
 		}
 	}

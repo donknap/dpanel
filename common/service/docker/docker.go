@@ -253,7 +253,14 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 			},
 		}
 		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))
-		return WithSockProxy()(self)
+		time.AfterFunc(time.Second, func() {
+			// 这里稍微延迟一下，防止 ssh 还没有连接完成
+			err := WithSockProxy()(self)
+			if err != nil {
+				slog.Debug("local sock proxy", "err", err)
+			}
+		})
+		return nil
 	}
 }
 
