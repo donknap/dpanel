@@ -34,9 +34,9 @@ func (self HttpFs) Open(name string) (http.File, error) {
 		}
 		content := buffer.String()
 		for o, n := range map[string]string{
+			"/api":       function.RouterUri("/api"),
 			"/dpanel":    function.RouterUri("/dpanel"),
 			"/ws/common": function.RouterUri("/ws/common"),
-			"/api":       function.RouterUri("/api"),
 		} {
 			if !strings.Contains(content, n) {
 				content = strings.ReplaceAll(content, o, n)
