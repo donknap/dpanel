@@ -232,10 +232,6 @@ func (self Env) Switch(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	if docker.Sdk.Name == dockerEnv.Name {
-		self.JsonSuccessResponse(http)
-		return
-	}
 	oldDockerClient := docker.Sdk
 	dockerClient, err := docker.NewBuilderWithDockerEnv(dockerEnv)
 	if err != nil {

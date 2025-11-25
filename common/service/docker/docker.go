@@ -21,7 +21,6 @@ import (
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 var (
@@ -134,8 +133,9 @@ func (self Builder) Close() {
 // GetTryCtx 获取一个有超时的上下文，用于测试 docker 连接是否正常
 func (self Builder) GetTryCtx() context.Context {
 	timeout := define.DockerConnectServerTimeout
-	if v := facade.Config.GetDuration("system.docker.init_timeout"); v > 0 {
-		timeout = time.Second * v
+	// 如果使用 docker.sock 则不要超时时间，某些系统可能启动慢
+	if self.DockerEnv.RemoteType == RemoteTypeDocker && strings.HasSuffix(self.DockerEnv.Address, "docker.sock") {
+		return self.Ctx
 	}
 	tryCtx, _ := context.WithTimeout(context.Background(), timeout)
 	return tryCtx
