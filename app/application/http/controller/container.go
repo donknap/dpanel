@@ -364,12 +364,13 @@ func (self Container) Delete(http *gin.Context) {
 			Info: containerInfo,
 			Id:   containerInfo.ID,
 		}
-		// 如果存在 site 数据，则只保留最后一条
-		dao.Site.Unscoped().Where(gen.Cond(
-			datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
-		)...).Where(dao.Site.SiteName.Eq(siteRow.SiteName)).Where(dao.Site.DeletedAt.IsNotNull()).Delete()
 	}
 	_ = dao.Site.Save(siteRow)
+
+	// 如果存在 site 数据，则只保留最后一条
+	_, _ = dao.Site.Unscoped().Where(gen.Cond(
+		datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
+	)...).Where(dao.Site.SiteName.Eq(siteRow.SiteName)).Where(dao.Site.DeletedAt.IsNotNull()).Delete()
 
 	// 删除域名、配置、证书
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.Name)).Find()
