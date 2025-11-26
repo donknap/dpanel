@@ -33,14 +33,11 @@ func (self HttpFs) Open(name string) (http.File, error) {
 			return nil, err
 		}
 		content := buffer.String()
-		for o, n := range map[string]string{
-			"/api":       function.RouterUri("/api"),
-			"/dpanel":    function.RouterUri("/dpanel"),
-			"/ws/common": function.RouterUri("/ws/common"),
+		for _, v := range []string{
+			"/dpanel/api", "/dpanel/ws",
+			"/dpanel/ui", "/dpanel/static",
 		} {
-			if !strings.Contains(content, n) {
-				content = strings.ReplaceAll(content, o, n)
-			}
+			content = strings.ReplaceAll(content, v, function.RouterUri(v))
 		}
 		memFile := mem.NewFileHandle(mem.CreateFile(name))
 		_, err = memFile.WriteString(content)

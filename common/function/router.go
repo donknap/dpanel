@@ -19,11 +19,11 @@ func RouterUri(url string) string {
 }
 
 func RouterRootApi() string {
-	return path.Join(RouterBaseurl(), "api")
+	return path.Join(RouterBaseurl(), "/dpanel/api")
 }
 
 func RouterRootWs() string {
-	return path.Join(RouterBaseurl(), "ws")
+	return path.Join(RouterBaseurl(), "/dpanel/ws")
 }
 
 func RouterApiUri(url string) string {
