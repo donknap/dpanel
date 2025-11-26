@@ -134,7 +134,7 @@ func (self Builder) Close() {
 func (self Builder) GetTryCtx() context.Context {
 	timeout := define.DockerConnectServerTimeout
 	// 如果使用 docker.sock 则不要超时时间，某些系统可能启动慢
-	if self.DockerEnv.RemoteType == RemoteTypeDocker && strings.HasSuffix(self.DockerEnv.Address, "docker.sock") {
+	if strings.HasSuffix(self.DockerEnv.Address, "docker.sock") {
 		return self.Ctx
 	}
 	tryCtx, _ := context.WithTimeout(context.Background(), timeout)
