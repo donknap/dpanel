@@ -123,6 +123,14 @@ func (self Site) CreateByImage(http *gin.Context) {
 		Status:        docker.ImageBuildStatusStop,
 		ContainerInfo: &accessor.SiteContainerInfoOption{},
 	}
+	// 获取一下当前是否有容器，出错后，还可以获取到最后一次成功的配置
+	if detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); err == nil {
+		siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
+			Id:   detail.ID,
+			Info: detail,
+		}
+	}
+
 	err = dao.Site.Create(siteRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
