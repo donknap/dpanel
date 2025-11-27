@@ -307,6 +307,7 @@ func WithCommandStr(cmd string) Option {
 func WithCommand(cmd []string) Option {
 	return func(self *Builder) error {
 		if cmd == nil || len(cmd) == 0 {
+			self.containerConfig.Cmd = nil
 			return nil
 		}
 		self.containerConfig.Cmd = cmd
@@ -321,6 +322,7 @@ func WithEntrypointStr(cmd string) Option {
 func WithEntrypoint(cmd []string) Option {
 	return func(self *Builder) error {
 		if cmd == nil || len(cmd) == 0 {
+			self.containerConfig.Entrypoint = nil
 			return nil
 		}
 		self.containerConfig.Entrypoint = cmd
