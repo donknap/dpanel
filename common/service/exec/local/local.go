@@ -106,7 +106,7 @@ func (self *Local) RunInPip() (io.ReadCloser, error) {
 	go func() {
 		err = self.cmd.Wait()
 		if err != nil {
-			slog.Debug("run command wait", "err", "error")
+			slog.Debug("run command wait", "err", err)
 		}
 	}()
 	return readCloser{
@@ -139,7 +139,7 @@ func (self *Local) Kill() error {
 }
 
 func (self *Local) Close() error {
-	slog.Debug("run command kill cmd", "cmd", self.cmd)
+	slog.Debug("run command kill cmd", "cmd", self.cmd, "process", self.cmd.Process)
 	self.ctxCancel()
 	return nil
 }

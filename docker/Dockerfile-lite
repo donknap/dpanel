@@ -19,14 +19,15 @@ ENV DP_ACME_CONFIG_HOME=/dpanel/acme
 COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
+COPY ./docker/task/entrypoint-lite.sh /docker/entrypoint.sh
 
 RUN sed -i 's/dl-cdn.alpinelinux1111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update musl docker-cli docker-cli-compose tzdata git openssh-client && \
-  rm /usr/bin/docker-compose && mkdir -p /root/.ssh && chmod 700 /root/.ssh
+  rm /usr/bin/docker-compose && mkdir -p /root/.ssh && chmod 700 /root/.ssh && chmod 755 /docker/*
 
 WORKDIR /app/server
 VOLUME [ "/dpanel" ]
 
 EXPOSE 8080
 
-ENTRYPOINT [ "sh", "-c", "/app/server/dpanel server:start -f /app/server/config.yaml" ]
+ENTRYPOINT [ "/docker/entrypoint.sh" ]
