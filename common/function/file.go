@@ -17,7 +17,7 @@ func FileExists(file ...string) bool {
 	return true
 }
 
-func CopyFile(targetPath string, sourceFile ...string) error {
+func CopyFileFromPath(targetPath string, sourceFile ...string) error {
 	if stat, err := os.Stat(targetPath); err == nil && !stat.IsDir() {
 		return errors.New("targetPath not dir")
 	}

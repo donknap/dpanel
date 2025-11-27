@@ -139,14 +139,14 @@ func (self Store) SyncByZip(path, zipUrl string, root string) error {
 	return nil
 }
 
-func (self Store) SyncByJson(jsonPath, jsonUrl string) error {
-	_ = os.MkdirAll(filepath.Dir(jsonPath), os.ModePerm)
-	file, err := os.OpenFile(jsonPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+func (self Store) SyncByUrl(targetPath, url string) error {
+	_ = os.MkdirAll(filepath.Dir(targetPath), os.ModePerm)
+	file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	defer func() {
 		_ = file.Close()
 	}()
 
-	response, err := http.Get(jsonUrl)
+	response, err := http.Get(url)
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func (self Store) SyncByJson(jsonPath, jsonUrl string) error {
 	}()
 
 	if response.StatusCode != http.StatusOK {
-		return function.ErrorMessage(define.ErrorMessageSystemStoreDownloadFailed, "url", jsonUrl, "error", response.Status)
+		return function.ErrorMessage(define.ErrorMessageSystemStoreDownloadFailed, "url", url, "error", response.Status)
 	}
 	_, err = io.Copy(file, response.Body)
 	if err != nil {

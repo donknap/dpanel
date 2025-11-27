@@ -284,7 +284,7 @@ func initRSA() error {
 		for _, file := range rsaIdFiles {
 			_ = os.Remove(file)
 		}
-		err := function.CopyFile(storage.Local{}.GetCertRsaPath(), userRsaIdFiles...)
+		err := function.CopyFileFromPath(storage.Local{}.GetCertRsaPath(), userRsaIdFiles...)
 		if err != nil {
 			return err
 		}

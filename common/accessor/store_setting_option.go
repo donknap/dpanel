@@ -7,7 +7,7 @@ var (
 	StoreTypeOnePanelLocal = "1panel-local"
 	StoreTypePortainer     = "portainer"
 	StoreTypeCasaOs        = "casaos"
-	StoreTypeBaota         = "baota"
+	StoreTypeBaota         = "aapanel"
 )
 
 type StoreAppItem struct {
@@ -24,17 +24,13 @@ type StoreAppItem struct {
 }
 
 type StoreAppVersionItem struct {
-	Name        string                   `json:"name"`
-	ComposeFile string                   `json:"composeFile" yaml:"composeFile"`
-	Environment []docker.EnvItem         `json:"environment,omitempty"`
-	Script      map[string]string        `json:"script,omitempty"`
-	Depend      *StoreAppVersionTaskItem `json:"task,omitempty" yaml:"task,omitempty"`
-}
-
-type StoreAppVersionTaskItem struct {
-	Name             string           `json:"name"`
-	Environment      []docker.EnvItem `json:"environment,omitempty"`
-	BuildComposeFile string           `json:"buildComposeFile,omitempty" yaml:"buildComposeFile"`
+	Name        string            `json:"name"`
+	ComposeFile string            `json:"composeFile" yaml:"composeFile"`
+	Environment []docker.EnvItem  `json:"environment,omitempty"`
+	Script      map[string]string `json:"script,omitempty"`
+	Download    string            `json:"download"`
+	Ref         string            `json:"ref"` // 引用某个版本的数据
+	Default     bool              `json:"default"`
 }
 
 type StoreSettingOption struct {

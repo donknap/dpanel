@@ -125,23 +125,6 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 				}
 			}
 
-			if _, err := os.Stat(filepath.Join(versionPath, "build", "docker-compose.yml")); err == nil {
-				task := &accessor.StoreAppVersionTaskItem{
-					Name:             "build",
-					Environment:      nil,
-					BuildComposeFile: filepath.Join(resourcePath, versionName, "build", "docker-compose.yml"),
-				}
-				if v, err := os.ReadFile(filepath.Join(versionPath, "build", "config.json")); err == nil {
-					jsonData := new(function.ConfigMap)
-					err = yaml.Unmarshal(v, &jsonData)
-					if err != nil {
-						return err
-					}
-					task.Environment = self.parseOnePanelSetting(jsonData, "formFields")
-				}
-				storeVersionItem.Depend = task
-			}
-
 			storeItem.Version[versionName] = storeVersionItem
 			// 找到版本目录即可
 			return filepath.SkipDir
