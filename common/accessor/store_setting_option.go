@@ -2,14 +2,6 @@ package accessor
 
 import "github.com/donknap/dpanel/common/service/docker"
 
-var (
-	StoreTypeOnePanel      = "1panel"
-	StoreTypeOnePanelLocal = "1panel-local"
-	StoreTypePortainer     = "portainer"
-	StoreTypeCasaOs        = "casaos"
-	StoreTypeBaota         = "aapanel"
-)
-
 type StoreAppItem struct {
 	Title        string                         `json:"title"`
 	Name         string                         `json:"name"`

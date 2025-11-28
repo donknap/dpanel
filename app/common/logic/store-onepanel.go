@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/donknap/dpanel/app/common/logic/onepanel"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -180,6 +181,14 @@ func (self Store) parseOnePanelSetting(getter *function.ConfigMap, root string) 
 			}
 		})
 		result = append(result, envItem)
+	}
+	// 如果包含了 PANEL_DB_TYPE 附加数据库其它参数
+	if ok, index := function.IndexArrayWalk(result, func(item docker.EnvItem) bool {
+		return item.Name == "PANEL_DB_TYPE"
+	}); ok {
+		result = append(result[:index], append([]docker.EnvItem{
+			onepanel.CommonEnv[define.StoreEnvDBHost], onepanel.CommonEnv[define.StoreEnvDBPort],
+		}, result[index:]...)...)
 	}
 	return result
 }

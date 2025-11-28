@@ -5,43 +5,32 @@ import (
 
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
-)
-
-const (
-	_ = iota
-	ContainerName
-	imageName
-	websiteDir
-	codeDir
-	hostIp
-	hostPort
-	containerPort
-	runScript
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 var CommonEnv = map[int]docker.EnvItem{
-	ContainerName: {
+	define.StoreEnvContainerName: {
 		Name:  "CONTAINER_NAME",
 		Value: compose.PlaceholderAppName,
 		Rule: &docker.EnvValueRule{
 			Kind: docker.EnvValueRuleRequired | docker.EnvValueTypeOnePanel,
 		},
 	},
-	websiteDir: {
+	define.StoreEnvWebsiteDir: {
 		Name:  "PANEL_WEBSITE_DIR",
 		Value: "./wwwroot",
 		Rule: &docker.EnvValueRule{
 			Kind: docker.EnvValueRuleRequired | docker.EnvValueTypeOnePanel,
 		},
 	},
-	codeDir: {
+	define.StoreEnvCodeDir: {
 		Name:  "CODE_DIR",
 		Value: "./www",
 		Rule: &docker.EnvValueRule{
 			Kind: docker.EnvValueRuleRequired | docker.EnvValueTypeOnePanel,
 		},
 	},
-	hostIp: {
+	define.StoreEnvHostIp: {
 		Name:  "HOST_IP",
 		Value: "0.0.0.0",
 		Rule: &docker.EnvValueRule{
@@ -49,32 +38,46 @@ var CommonEnv = map[int]docker.EnvItem{
 			Option: docker.NewValueItemWithArray("0.0.0.0", "127.0.0.1"),
 		},
 	},
-	hostPort: {
+	define.StoreEnvHostPort: {
 		Name:  "PANEL_APP_PORT_HTTP",
 		Value: "0",
 		Rule: &docker.EnvValueRule{
 			Kind: docker.EnvValueRuleRequired | docker.EnvValueTypeOnePanel,
 		},
 	},
-	containerPort: {
+	define.StoreEnvContainerPort: {
 		Name: "APP_PORT",
 		Rule: &docker.EnvValueRule{
 			Kind: docker.EnvValueRuleRequired | docker.EnvValueTypeOnePanel,
 		},
 	},
-	runScript: {
+	define.StoreEnvRunScript: {
 		Name:  "EXEC_SCRIPT",
 		Value: "",
 		Rule: &docker.EnvValueRule{
 			Kind: docker.EnvValueRuleRequired | docker.EnvValueTypeOnePanel,
 		},
 	},
+	define.StoreEnvDBHost: {
+		Name:  "PANEL_DB_HOST",
+		Value: "",
+		Rule: &docker.EnvValueRule{
+			Kind: docker.EnvValueRuleRequired | docker.EnvValueTypeOnePanel,
+		},
+	},
+	define.StoreEnvDBPort: {
+		Name:  "PANEL_DB_PORT",
+		Value: "3306",
+		Rule: &docker.EnvValueRule{
+			Kind: docker.EnvValueRuleRequired | docker.EnvValueTypeNumber | docker.EnvValueTypeOnePanel,
+		},
+	},
 }
 
 var DefaultEnv = map[string][]docker.EnvItem{
 	"node": {
-		CommonEnv[codeDir],
-		CommonEnv[hostIp], CommonEnv[hostPort], CommonEnv[containerPort], CommonEnv[runScript],
+		CommonEnv[define.StoreEnvCodeDir],
+		CommonEnv[define.StoreEnvHostIp], CommonEnv[define.StoreEnvHostPort], CommonEnv[define.StoreEnvContainerPort], CommonEnv[define.StoreEnvRunScript],
 		{
 			Name:  "NODE_VERSION",
 			Value: compose.PlaceholderAppVersion,
@@ -103,7 +106,7 @@ var DefaultEnv = map[string][]docker.EnvItem{
 		},
 	},
 	"php": {
-		CommonEnv[websiteDir], CommonEnv[hostPort],
+		CommonEnv[define.StoreEnvWebsiteDir], CommonEnv[define.StoreEnvHostPort],
 		{
 			Name:  "IMAGE_NAME",
 			Value: fmt.Sprintf("%s-%s:%s", compose.PlaceholderAppName, compose.PlaceholderAppTaskName, compose.PlaceholderAppVersion),
@@ -113,8 +116,8 @@ var DefaultEnv = map[string][]docker.EnvItem{
 		},
 	},
 	"go": {
-		CommonEnv[codeDir],
-		CommonEnv[hostIp], CommonEnv[hostPort], CommonEnv[containerPort], CommonEnv[runScript],
+		CommonEnv[define.StoreEnvCodeDir],
+		CommonEnv[define.StoreEnvHostIp], CommonEnv[define.StoreEnvHostPort], CommonEnv[define.StoreEnvContainerPort], CommonEnv[define.StoreEnvRunScript],
 		{
 			Name:  "GO_VERSION",
 			Value: compose.PlaceholderAppVersion,
@@ -124,8 +127,8 @@ var DefaultEnv = map[string][]docker.EnvItem{
 		},
 	},
 	"java": {
-		CommonEnv[codeDir],
-		CommonEnv[hostIp], CommonEnv[hostPort], CommonEnv[containerPort], CommonEnv[runScript],
+		CommonEnv[define.StoreEnvCodeDir],
+		CommonEnv[define.StoreEnvHostIp], CommonEnv[define.StoreEnvHostPort], CommonEnv[define.StoreEnvContainerPort], CommonEnv[define.StoreEnvRunScript],
 		{
 			Name:  "JAVA_VERSION",
 			Value: compose.PlaceholderAppVersion,

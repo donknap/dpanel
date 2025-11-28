@@ -49,3 +49,14 @@ func PluckMapWalk[K cmp.Ordered, U interface{}](m map[K]U, walk func(k K, v U) b
 	}
 	return result
 }
+
+func PluckMapItemWalk[K cmp.Ordered, U interface{}](v map[K]U, walk func(k K, v U) bool) (U, K, bool) {
+	var item U
+	var key K
+	for key, item = range v {
+		if ok := walk(key, item); ok {
+			return item, key, true
+		}
+	}
+	return item, key, false
+}

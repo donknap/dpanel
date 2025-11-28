@@ -97,6 +97,7 @@ const (
 	EnvValueTypeSelect
 	EnvValueTypeSelectMultiple
 	EnvValueTypeOnePanel
+	EnvValueTypeBaoTa
 )
 
 type EnvValueRule struct {

@@ -80,6 +80,8 @@ func (self Store) SyncByGit(gitUrl string, option SyncByGitOption) error {
 	return nil
 }
 
+// SyncByZip 同步远程 zip
+// root 只同步 root 目录下的内容
 func (self Store) SyncByZip(path, zipUrl string, root string) error {
 	zipTempFile, _ := storage.Local{}.CreateTempFile("")
 	defer func() {
