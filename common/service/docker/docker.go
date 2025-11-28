@@ -18,6 +18,7 @@ import (
 	"github.com/docker/docker/client"
 	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
 	"github.com/donknap/dpanel/common/service/docker/conn/listener"
+	"github.com/donknap/dpanel/common/service/exec/remote"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -236,6 +237,15 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 
 func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 	return func(self *Builder) error {
+		cmdName := "docker"
+		if sshClient, err := ssh.NewClient(ssh.WithServerInfo(serverInfo)...); err == nil {
+			if content, err := remote.QuickRun(sshClient, "podman version"); err == nil && strings.Contains(string(content), "Podman Engine") {
+				slog.Debug("docker with ssh podman", "version", string(content))
+				cmdName = "podman"
+			}
+		} else {
+			return err
+		}
 		lock := sync.Mutex{}
 		transport := &http.Transport{
 			DisableKeepAlives: false,
@@ -249,7 +259,7 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 				if err != nil {
 					return nil, err
 				}
-				return sshconn.New(sshClient, "docker", "system", "dial-stdio")
+				return sshconn.New(sshClient, cmdName, "system", "dial-stdio")
 			},
 		}
 		self.clientOption = append(self.clientOption, client.WithHTTPClient(&http.Client{Transport: transport}))

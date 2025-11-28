@@ -47,4 +47,5 @@ type SiteEnvOption struct {
 	Scheduling      *docker.Scheduling        `json:"scheduling,omitempty"`
 	Restart         string                    `json:"restart,omitempty"` // Deprecated: instead RestartPolicy
 	GroupAdd        []string                  `json:"groupAdd,omitempty"`
+	Init            bool                      `json:"init,omitempty"`
 }

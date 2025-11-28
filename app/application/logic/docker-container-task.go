@@ -77,6 +77,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		builder.WithHealthcheck(task.BuildParams.Healthcheck),
 		builder.WithCap(task.BuildParams.CapAdd...),
 		builder.WithGroupAdd(task.BuildParams.GroupAdd...),
+		builder.WithInit(task.BuildParams.Init),
 	}...)
 
 	if task.BuildParams.HostPid {

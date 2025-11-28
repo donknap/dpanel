@@ -24,6 +24,8 @@ func WithContainerInfo(containerInfo container.InspectResponse) Option {
 	return func(self *Builder) error {
 		self.containerConfig = containerInfo.Config
 		self.hostConfig = containerInfo.HostConfig
+		// compatible cgroup v2 不支持配置 MemorySwappiness，podman 在 crun 下会严格报错
+		self.hostConfig.MemorySwappiness = nil
 		return nil
 	}
 }
@@ -36,7 +38,7 @@ func WithContainerName(name string) Option {
 		self.containerConfig.AttachStdin = true
 		self.containerConfig.AttachStdout = true
 		self.containerConfig.AttachStderr = true
-		self.containerConfig.Tty = true
+		//self.containerConfig.Tty = true
 		return nil
 	}
 }
@@ -500,6 +502,13 @@ func WithGroupAdd(gid ...string) Option {
 			return nil
 		}
 		self.hostConfig.GroupAdd = gid
+		return nil
+	}
+}
+
+func WithInit(enable bool) Option {
+	return func(self *Builder) error {
+		self.hostConfig.Init = function.Ptr(enable)
 		return nil
 	}
 }
