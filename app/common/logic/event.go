@@ -104,8 +104,8 @@ func (self *EventLogic) MonitorLoop() {
 				self.mu.Unlock()
 			}
 		case err := <-errorChan:
+			slog.Debug("Event monitor catch", "err", err)
 			if err != nil {
-				slog.Debug("Event monitor catch", "err", err)
 				self.mu.Lock()
 				self.dataPool = append(self.dataPool, &entity.Event{
 					Type:      "error",
