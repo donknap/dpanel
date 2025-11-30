@@ -119,12 +119,13 @@ func (self *EventLogic) MonitorLoop() {
 }
 
 func (self *EventLogic) commit() {
-	self.mu.Lock()
-	defer self.mu.Unlock()
-
+	slog.Debug("Event monitor commit start", "length", len(self.dataPool))
 	if len(self.dataPool) == 0 {
 		return
 	}
+
+	self.mu.Lock()
+	defer self.mu.Unlock()
 
 	db, err := facade.GetDbFactory().Channel("default")
 	if err != nil {
