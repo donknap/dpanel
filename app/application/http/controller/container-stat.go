@@ -41,7 +41,12 @@ func (self Container) GetStatInfo(http *gin.Context) {
 		case <-progress.Done():
 			self.JsonSuccessResponse(http)
 			return
-		case list := <-response:
+		case list, ok := <-response:
+			if !ok {
+				// 关闭通道继续执行，正常回收资源
+				progress.Close()
+				continue
+			}
 			if !function.IsEmptyArray(list) {
 				progress.BroadcastMessage(list[0])
 			}
