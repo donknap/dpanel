@@ -56,8 +56,11 @@ func (self *EventLogic) MonitorLoop() {
 			slog.Debug("Event monitor close")
 			self.Close()
 			return
-		case message := <-messageChan:
-			slog.Debug("Event monitor catch", "message", message)
+		case message, ok := <-messageChan:
+			slog.Debug("Event monitor catch", "message", message, "quick", ok)
+			if !ok {
+				return
+			}
 			var msg []string
 			switch string(message.Type) + "/" + string(message.Action) {
 			case "image/tag", "image/save", "image/push", "image/pull", "image/load",
@@ -103,8 +106,11 @@ func (self *EventLogic) MonitorLoop() {
 				})
 				self.mu.Unlock()
 			}
-		case err := <-errorChan:
-			slog.Debug("Event monitor catch", "err", err)
+		case err, ok := <-errorChan:
+			slog.Debug("Event monitor catch", "err", err, "quick", ok)
+			if !ok {
+				return
+			}
 			if err != nil {
 				self.mu.Lock()
 				self.dataPool = append(self.dataPool, &entity.Event{
@@ -119,10 +125,10 @@ func (self *EventLogic) MonitorLoop() {
 }
 
 func (self *EventLogic) commit() {
-	slog.Debug("Event monitor commit start", "length", len(self.dataPool))
 	if len(self.dataPool) == 0 {
 		return
 	}
+	slog.Debug("Event monitor commit start", "length", len(self.dataPool))
 
 	self.mu.Lock()
 	defer self.mu.Unlock()
@@ -138,8 +144,6 @@ func (self *EventLogic) commit() {
 		slog.Debug("Event monitor commit", "len", len(self.dataPool), "err", err)
 		return
 	}
-
-	slog.Debug("Event monitor commit finish", "len", len(self.dataPool))
 	self.dataPool = []*entity.Event{}
 	return
 }
