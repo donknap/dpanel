@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -51,11 +50,21 @@ func (self Attach) Delete(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	if !filepath.IsLocal(params.Path) {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		return
+	}
+	params.Path = filepath.Clean(params.Path)
 	path := storage.Local{}.GetSaveRealPath(params.Path)
-	fmt.Printf("%v \n", path)
 	_, err := os.Stat(path)
-	if err == nil {
-		os.Remove(path)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	err = os.Remove(path)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 	self.JsonSuccessResponse(http)
 	return
