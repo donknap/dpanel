@@ -6,8 +6,10 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 )
 
-var ComposeCreateEvent = "compose_create"
-var ComposeDeleteEvent = "compose_delete"
+const (
+	ComposeCreateEvent = "compose_create"
+	ComposeDeleteEvent = "compose_delete"
+)
 
 type ComposePayload struct {
 	Compose *entity.Compose

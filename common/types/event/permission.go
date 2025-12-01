@@ -2,9 +2,11 @@ package event
 
 import "github.com/donknap/dpanel/common/accessor"
 
-var DataPermissionAddEvent = "data_permission_add"
-var DataPermissionDeleteEvent = "data_permission_delete"
-var DataPermissionEditEvent = "data_permission_edit"
+const (
+	DataPermissionAddEvent    = "data_permission_add"
+	DataPermissionDeleteEvent = "data_permission_delete"
+	DataPermissionEditEvent   = "data_permission_edit"
+)
 
 type DataPermissionAddPayload struct {
 	Usernames      []string

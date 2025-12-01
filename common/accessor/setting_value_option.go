@@ -1,10 +1,11 @@
 package accessor
 
 import (
+	"time"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/service/docker"
-	"time"
 )
 
 type SettingValueOption struct {
@@ -32,8 +33,9 @@ type SettingValueOption struct {
 type ContainerCheckIgnoreUpgrade []string
 
 type DiskUsage struct {
-	Usage     *types.DiskUsage `json:"usage,omitempty"`
-	UpdatedAt time.Time        `json:"updatedAt,omitempty"`
+	DockerEnvName string           `json:"dockerEnvName"`
+	Usage         *types.DiskUsage `json:"usage,omitempty"`
+	UpdatedAt     time.Time        `json:"updatedAt,omitempty"`
 }
 
 type TwoFa struct {

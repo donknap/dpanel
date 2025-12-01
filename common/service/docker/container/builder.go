@@ -5,7 +5,9 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/define"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 func New(opts ...Option) (*Builder, error) {
@@ -14,9 +16,10 @@ func New(opts ...Option) (*Builder, error) {
 		containerConfig: &container.Config{
 			ExposedPorts: make(nat.PortSet),
 			Labels: map[string]string{
-				"maintainer":             docker.BuilderAuthor,
-				"com.dpanel.description": docker.BuildDesc,
-				"com.dpanel.website":     docker.BuildWebSite,
+				"maintainer":             define.PanelAuthor,
+				"com.dpanel.description": define.PanelDesc,
+				"com.dpanel.website":     define.PanelWebSite,
+				"com.dpanel.version":     facade.GetConfig().GetString("app.version"),
 			},
 		},
 		hostConfig: &container.HostConfig{

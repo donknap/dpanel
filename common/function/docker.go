@@ -9,7 +9,6 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/types/define"
 )
 
@@ -86,9 +85,43 @@ func DefaultCapabilities() []string {
 	}
 }
 
-func ImageTag(tag string) *types.Tag {
+// Tag {registry}/{{namespace-可能有多个路径}/{imageName}basename}:{version}
+type Tag struct {
+	Registry  string
+	Namespace string
+	ImageName string
+	Version   string
+	BaseName  string
+}
+
+func (self Tag) Uri() string {
+	if self.Registry == "" {
+		self.Registry = define.RegistryDefaultName
+	}
+	self.Registry = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(self.Registry, "http://"), "https://"), "/")
+	split := ":"
+	if self.Namespace == "" {
+		return fmt.Sprintf("%s/%s%s%s", self.Registry, self.ImageName, split, self.Version)
+	} else {
+		return fmt.Sprintf("%s/%s/%s%s%s", self.Registry, self.Namespace, self.ImageName, split, self.Version)
+	}
+}
+
+func (self Tag) Name() string {
+	version := self.Version
+	if strings.Contains(self.Version, "@") {
+		version = strings.Split(version, "@")[0]
+	}
+	if self.Namespace == "" || self.Namespace == "library" {
+		return fmt.Sprintf("%s:%s", self.ImageName, version)
+	} else {
+		return fmt.Sprintf("%s/%s:%s", self.Namespace, self.ImageName, version)
+	}
+}
+
+func ImageTag(tag string) *Tag {
 	tag = strings.TrimPrefix(strings.TrimPrefix(tag, "http://"), "https://")
-	result := &types.Tag{}
+	result := &Tag{}
 
 	// 如果没有指定仓库地址，则默认为 docker.io
 	noRegistryUrl := false

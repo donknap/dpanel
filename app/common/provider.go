@@ -15,13 +15,13 @@ import (
 	"github.com/donknap/dpanel/common/types"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
-	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
+	httpserver "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
 
 type Provider struct {
 }
 
-func (provider *Provider) Register(httpServer *http_server.Server) {
+func (provider *Provider) Register(httpServer *httpserver.Server) {
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		cors := engine.Group(function.RouterRootApi(), common.CorsMiddleware{}.Process)
 

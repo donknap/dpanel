@@ -6,6 +6,8 @@ import (
 
 	"github.com/docker/docker/api/types/build"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/define"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 func New(opts ...Option) (*Builder, error) {
@@ -16,10 +18,10 @@ func New(opts ...Option) (*Builder, error) {
 			Remove:     true,
 			NoCache:    true,
 			Labels: map[string]string{
-				"BuildAuthor":  docker.BuilderAuthor,
-				"BuildDesc":    docker.BuildDesc,
-				"BuildWebSite": docker.BuildWebSite,
-				"buildVersion": docker.BuildVersion,
+				"maintainer":             define.PanelAuthor,
+				"com.dpanel.description": define.PanelDesc,
+				"com.dpanel.website":     define.PanelWebSite,
+				"com.dpanel.version":     facade.GetConfig().GetString("app.version"),
 			},
 			BuildArgs: map[string]*string{},
 		},

@@ -26,16 +26,8 @@ import (
 
 var (
 	Sdk               = &Builder{}
-	BuilderAuthor     = "DPanel"
-	BuildDesc         = "DPanel is a lightweight Docker web management panel"
-	BuildWebSite      = "https://dpanel.cc"
-	BuildVersion      = "1.0.0"
 	DefaultClientName = "local"
 )
-
-func S() *Builder {
-	return Sdk
-}
 
 type ClientDockerInfo struct {
 	ID   string `json:"id"`

@@ -63,8 +63,8 @@ func (self ComposeSettingOption) GetDefaultEnv() (envFile string, envFileContent
 
 func (self ComposeSettingOption) GetWorkingDir() string {
 	workDir := storage.Local{}.GetComposePath("")
-	if docker.S().DockerEnv.EnableComposePath {
-		workDir = storage.Local{}.GetComposePath(docker.S().DockerEnv.Name)
+	if docker.Sdk.DockerEnv.EnableComposePath {
+		workDir = storage.Local{}.GetComposePath(docker.Sdk.DockerEnv.Name)
 	}
 	slog.Debug("compose get container working dir", "dir", workDir)
 	return workDir

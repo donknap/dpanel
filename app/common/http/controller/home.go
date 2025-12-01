@@ -339,8 +339,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
-	dpanelContainerInfo := container.InspectResponse{}
-	new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo)
+	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
 
 	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err == nil && info.ID != "" {
@@ -441,11 +440,13 @@ func (self Home) Usage(http *gin.Context) {
 				Name:      logic.SettingGroupSettingDiskUsage,
 				Value: &accessor.SettingValueOption{
 					DiskUsage: &accessor.DiskUsage{
-						Usage:     &diskUsage,
-						UpdatedAt: time.Now(),
+						DockerEnvName: docker.Sdk.Name,
+						Usage:         &diskUsage,
+						UpdatedAt:     time.Now(),
 					},
 				},
 			})
+
 			time.Sleep(time.Second * 3)
 			progress.BroadcastMessage(&accessor.DiskUsage{
 				Usage:     &diskUsage,
@@ -459,14 +460,19 @@ func (self Home) Usage(http *gin.Context) {
 		Usage: &types.DiskUsage{},
 	}
 	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDiskUsage, &diskUsage)
+	if diskUsage.DockerEnvName != docker.Sdk.Name {
+		// 用量统计如果不是当前环境的变清空掉，等待获取
+		diskUsage = accessor.DiskUsage{
+			Usage: &types.DiskUsage{},
+		}
+	}
+
 	type portItem struct {
 		Port docker.PortItem `json:"port"`
 		Name string          `json:"name"`
 	}
 	ports := make([]*portItem, 0)
-	containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
-		All: true,
-	})
+
 	containerRunningTotal := struct {
 		Stop      int `json:"stop"`
 		Pause     int `json:"pause"`
@@ -476,7 +482,13 @@ func (self Home) Usage(http *gin.Context) {
 		Pause:     0,
 		Unhealthy: 0,
 	}
-	if err == nil {
+
+	var containerList []container.Summary
+	var err error
+
+	if containerList, err = docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+		All: true,
+	}); err == nil {
 		for _, item := range containerList {
 			if item.State == "exited" {
 				containerRunningTotal.Stop += 1
@@ -632,8 +644,7 @@ func (self Home) GetStatList(http *gin.Context) {
 }
 
 func (self Home) UpgradeScript(http *gin.Context) {
-	dpanelContainerInfo := container.InspectResponse{}
-	new(logic.Setting).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo, &dpanelContainerInfo)
+	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
 	self.JsonResponseWithoutError(http, gin.H{
 		"info": dpanelContainerInfo,
 	})

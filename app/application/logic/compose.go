@@ -327,7 +327,7 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 	// 如果开启了独立目录，获取挂载目录也应该只取对应的的
 	mountComposePath := "/dpanel/compose"
 
-	if docker.S().DockerEnv.EnableComposePath {
+	if docker.Sdk.DockerEnv.EnableComposePath {
 		mountComposePath = filepath.Join("/", "dpanel", "compose-"+dbRow.Setting.DockerEnvName)
 	}
 
