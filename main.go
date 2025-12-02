@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/app/application"
 	"github.com/donknap/dpanel/app/common"
@@ -27,9 +26,11 @@ import (
 	common2 "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/migrate"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/family"
 	fs2 "github.com/donknap/dpanel/common/service/fs"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-contrib/gzip"
@@ -114,7 +115,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		err = initDefaultDocker()
+		err = initDocker()
 		if err != nil {
 			panic(err)
 		}
@@ -298,8 +299,8 @@ func initRSA() error {
 		_, err := local.QuickRun(fmt.Sprintf(
 			`ssh-keygen -t rsa -b 4096 -f %s -N "" -C "%s@%s"`,
 			filepath.Join(storage.Local{}.GetCertRsaPath(), define.DefaultIdKeyFile),
-			docker.BuilderAuthor,
-			docker.BuildWebSite,
+			define.PanelAuthor,
+			define.PanelWebSite,
 		))
 		if err != nil {
 			return err
@@ -309,75 +310,30 @@ func initRSA() error {
 	return nil
 }
 
-func initDefaultDocker() error {
+func initDocker() error {
 	// 当前如果有连接，则添加一条docker环境数据
 	defaultDockerHost := client.DefaultDockerHost
 	if e := os.Getenv(client.EnvOverrideHost); e != "" {
 		defaultDockerHost = e
 	}
-	var defaultDockerEnv *docker.Client
-	var err error
-
-	if v, err := (logic.DockerEnv{}).GetDefaultEnv(); err == nil {
+	var defaultDockerEnv *types.DockerEnv
+	if v, err := (logic.Env{}).GetDefaultEnv(); err == nil {
 		defaultDockerEnv = v
 	} else {
-		defaultDockerEnv = &docker.Client{
-			Name:    docker.DefaultClientName,
-			Title:   docker.DefaultClientName,
+		defaultDockerEnv = &types.DockerEnv{
+			Name:    define.DockerDefaultClientName,
+			Title:   define.DockerDefaultClientName,
 			Address: defaultDockerHost,
 			Default: true,
 		}
+		logic.Env{}.UpdateEnv(defaultDockerEnv)
 	}
+	docker.Sdk, _ = docker.NewClientWithDockerEnv(defaultDockerEnv)
 
-	docker.Sdk, err = docker.NewBuilderWithDockerEnv(defaultDockerEnv)
-	if err != nil {
-		// 如果无法连接，创建一个默认 docker.sdk 期待用户在面板中修改连接配置
-		docker.Sdk, err = docker.NewBuilder(docker.WithAddress(defaultDockerEnv.Address), docker.WithDockerEnv(defaultDockerEnv))
-		return nil
+	dockerEnvList := make(map[string]*types.DockerEnv)
+	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDocker, &dockerEnvList)
+	for _, env := range dockerEnvList {
+		notice.Monitor.Join(env)
 	}
-	// 使用超时上下文，避免 docker 连接地址时间过长卡死程序'
-	start := time.Now()
-	if dockerInfo, err := docker.Sdk.Client.Info(docker.Sdk.GetTryCtx()); err == nil {
-		go logic.NewEventLogin().MonitorLoop()
-
-		defaultDockerEnv.DockerInfo = &docker.ClientDockerInfo{
-			Name: dockerInfo.Name,
-			ID:   dockerInfo.ID,
-		}
-
-		// 面板信息总是从默认环境中获取
-		if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
-			info.ExecIDs = make([]string, 0)
-			_ = logic.Setting{}.Save(&entity.Setting{
-				GroupName: logic.SettingGroupSetting,
-				Name:      logic.SettingGroupSettingDPanelInfo,
-				Value: &accessor.SettingValueOption{
-					DPanelInfo: &info,
-				},
-			})
-		} else {
-			_ = logic.Setting{}.Delete(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo)
-			slog.Warn("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err)
-		}
-	} else {
-		// 获取信息失败，期待用户在面板中修改默认连接的配置
-		slog.Warn("connect default docker server failed", "name", defaultDockerEnv.Name, "address", defaultDockerEnv.Address, "error", err)
-		defaultDockerEnv.DockerInfo = nil
-		docker.Sdk.Close()
-	}
-	slog.Debug("init default docker use time", "time", time.Since(start).Seconds())
-	logic.DockerEnv{}.UpdateEnv(defaultDockerEnv)
-
-	// 清除掉统计数据
-	_ = logic.Setting{}.Save(&entity.Setting{
-		GroupName: logic.SettingGroupSetting,
-		Name:      logic.SettingGroupSettingDiskUsage,
-		Value: &accessor.SettingValueOption{
-			DiskUsage: &accessor.DiskUsage{
-				Usage:     &types.DiskUsage{},
-				UpdatedAt: time.Now(),
-			},
-		},
-	})
 	return nil
 }

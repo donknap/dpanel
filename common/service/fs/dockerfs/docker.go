@@ -22,7 +22,7 @@ import (
 )
 
 type Fs struct {
-	sdk                     *docker.Builder
+	sdk                     *docker.Client
 	targetContainerName     string // 目标容器名称
 	targetContainerRootPath string // 目标容器的起始根目录
 	proxyContainerName      string

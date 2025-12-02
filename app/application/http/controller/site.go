@@ -120,7 +120,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		SiteName:      params.SiteName,
 		SiteTitle:     params.SiteTitle,
 		Env:           &buildParams,
-		Status:        docker.ImageBuildStatusStop,
+		Status:        define.DockerImageBuildStatusStop,
 		ContainerInfo: &accessor.SiteContainerInfoOption{},
 	}
 	// 获取一下当前是否有容器，出错后，还可以获取到最后一次成功的配置
@@ -151,7 +151,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			}
 		}
 		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(entity.Site{
-			Status:  docker.ImageBuildStatusError,
+			Status:  define.DockerImageBuildStatusError,
 			Message: err.Error(),
 		})
 		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
@@ -170,7 +170,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			Id:   containerId,
 			Info: detail,
 		},
-		Status:  docker.ImageBuildStatusSuccess,
+		Status:  define.DockerImageBuildStatusSuccess,
 		Message: "",
 	})
 

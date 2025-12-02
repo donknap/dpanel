@@ -1,8 +1,10 @@
 package common
 
-import "github.com/donknap/dpanel/common/service/docker"
+import (
+	"github.com/donknap/dpanel/common/service/docker/types"
+)
 
 type EnvListResult struct {
-	CurrentName string           `json:"currentName"`
-	List        []*docker.Client `json:"list"`
+	CurrentName string             `json:"currentName"`
+	List        []*types.DockerEnv `json:"list"`
 }

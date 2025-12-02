@@ -7,25 +7,26 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/types/define"
 	"golang.org/x/exp/maps"
 )
 
-type DockerEnv struct {
+type Env struct {
 }
 
-func (self DockerEnv) UpdateEnv(data *docker.Client) {
+func (self Env) UpdateEnv(data *types.DockerEnv) {
 	setting, err := Setting{}.GetValue(SettingGroupSetting, SettingGroupSettingDocker)
 	if err != nil || setting.Value == nil || setting.Value.Docker == nil {
 		setting = &entity.Setting{
 			GroupName: SettingGroupSetting,
 			Name:      SettingGroupSettingDocker,
 			Value: &accessor.SettingValueOption{
-				Docker: make(map[string]*docker.Client, 0),
+				Docker: make(map[string]*types.DockerEnv, 0),
 			},
 		}
 	}
-	dockerList := map[string]*docker.Client{
+	dockerList := map[string]*types.DockerEnv{
 		data.Name: data,
 	}
 	maps.Copy(setting.Value.Docker, dockerList)
@@ -33,7 +34,7 @@ func (self DockerEnv) UpdateEnv(data *docker.Client) {
 	return
 }
 
-func (self DockerEnv) GetEnvByName(name string) (*docker.Client, error) {
+func (self Env) GetEnvByName(name string) (*types.DockerEnv, error) {
 	dockerEnvSetting, err := Setting{}.GetValue(SettingGroupSetting, SettingGroupSettingDocker)
 	if err != nil {
 		return nil, err
@@ -45,14 +46,14 @@ func (self DockerEnv) GetEnvByName(name string) (*docker.Client, error) {
 	}
 }
 
-func (self DockerEnv) GetDefaultEnv() (*docker.Client, error) {
-	dockerEnvList := make(map[string]*docker.Client)
+func (self Env) GetDefaultEnv() (*types.DockerEnv, error) {
+	dockerEnvList := make(map[string]*types.DockerEnv)
 	Setting{}.GetByKey(SettingGroupSetting, SettingGroupSettingDocker, &dockerEnvList)
 	if v, ok := dockerEnvList[os.Getenv("DP_DEFAULT_DOCKER_ENV")]; ok {
 		return v, nil
 	}
 
-	if v := function.PluckMapWalkArray(dockerEnvList, func(k string, v *docker.Client) (*docker.Client, bool) {
+	if v := function.PluckMapWalkArray(dockerEnvList, func(k string, v *types.DockerEnv) (*types.DockerEnv, bool) {
 		if v.Default {
 			return v, true
 		}
@@ -61,8 +62,8 @@ func (self DockerEnv) GetDefaultEnv() (*docker.Client, error) {
 		return v[0], nil
 	}
 
-	if v := function.PluckMapWalkArray(dockerEnvList, func(k string, v *docker.Client) (*docker.Client, bool) {
-		if v.Name == docker.DefaultClientName {
+	if v := function.PluckMapWalkArray(dockerEnvList, func(k string, v *types.DockerEnv) (*types.DockerEnv, bool) {
+		if v.Name == define.DockerDefaultClientName {
 			return v, true
 		}
 		return nil, false

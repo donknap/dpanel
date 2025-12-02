@@ -14,8 +14,8 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
 	containerBuilder "github.com/donknap/dpanel/common/service/docker/container"
+	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/types/define"
 )
 
@@ -149,7 +149,7 @@ func WithName(name string) Option {
 	}
 }
 
-func WithLabel(values ...docker.ValueItem) Option {
+func WithLabel(values ...types2.ValueItem) Option {
 	return func(self *Builder) error {
 		if self.serviceSpec.Labels == nil {
 			self.serviceSpec.Labels = make(map[string]string)
@@ -196,12 +196,12 @@ func WithContainerSpec(option *accessor.SiteEnvOption) Option {
 		}
 		self.serviceSpec.TaskTemplate.ContainerSpec = &swarm.ContainerSpec{
 			Image: option.ImageName,
-			Labels: function.PluckArrayMapWalk(option.Label, func(item docker.ValueItem) (string, string, bool) {
+			Labels: function.PluckArrayMapWalk(option.Label, func(item types2.ValueItem) (string, string, bool) {
 				return item.Name, item.Value, true
 			}),
 			Command:  function.SplitCommandArray(option.Command),
 			Hostname: option.Hostname,
-			Env: function.PluckArrayWalk(option.Environment, func(item docker.EnvItem) (string, bool) {
+			Env: function.PluckArrayWalk(option.Environment, func(item types2.EnvItem) (string, bool) {
 				return fmt.Sprintf("%s=%s", item.Name, item.Value), true
 			}),
 			Dir:       option.WorkDir,
@@ -230,7 +230,7 @@ func WithContainerSpec(option *accessor.SiteEnvOption) Option {
 	}
 }
 
-func WithScheduling(value *docker.Scheduling) Option {
+func WithScheduling(value *types2.Scheduling) Option {
 	return func(self *Builder) error {
 		self.serviceSpec.UpdateConfig = &swarm.UpdateConfig{
 			Parallelism:   uint64(value.Update.Parallelism),
@@ -256,7 +256,7 @@ func WithScheduling(value *docker.Scheduling) Option {
 	}
 }
 
-func WithConstraint(value *docker.Constraint) Option {
+func WithConstraint(value *types2.Constraint) Option {
 	return func(self *Builder) error {
 		if value == nil {
 			return nil
@@ -295,7 +295,7 @@ func WithConstraint(value *docker.Constraint) Option {
 	}
 }
 
-func WithPlacement(values ...docker.ValueItem) Option {
+func WithPlacement(values ...types2.ValueItem) Option {
 	return func(self *Builder) error {
 		if self.serviceSpec.TaskTemplate.Placement == nil {
 			self.serviceSpec.TaskTemplate.Placement = &swarm.Placement{}
@@ -312,7 +312,7 @@ func WithPlacement(values ...docker.ValueItem) Option {
 	}
 }
 
-func WithRestart(value *docker.RestartPolicy) Option {
+func WithRestart(value *types2.RestartPolicy) Option {
 	return func(self *Builder) error {
 		self.serviceSpec.TaskTemplate.RestartPolicy = &swarm.RestartPolicy{
 			Condition:   swarm.RestartPolicyCondition(value.Name),
@@ -331,7 +331,7 @@ func WithRegistryAuth(code string) Option {
 	}
 }
 
-func WithPort(values ...docker.PortItem) Option {
+func WithPort(values ...types2.PortItem) Option {
 	return func(self *Builder) error {
 		ports := make([]swarm.PortConfig, 0)
 		for _, portItem := range values {
@@ -353,9 +353,9 @@ func WithPort(values ...docker.PortItem) Option {
 	}
 }
 
-func WithVolume(values ...docker.VolumeItem) Option {
+func WithVolume(values ...types2.VolumeItem) Option {
 	return func(self *Builder) error {
-		self.serviceSpec.TaskTemplate.ContainerSpec.Mounts = function.PluckArrayWalk(values, func(item docker.VolumeItem) (mount.Mount, bool) {
+		self.serviceSpec.TaskTemplate.ContainerSpec.Mounts = function.PluckArrayWalk(values, func(item types2.VolumeItem) (mount.Mount, bool) {
 			return mount.Mount{
 				Type:     mount.Type(item.Type),
 				Source:   item.Host,

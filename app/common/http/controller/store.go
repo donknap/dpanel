@@ -19,6 +19,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -283,13 +284,13 @@ func (self Store) Deploy(http *gin.Context) {
 
 	// 适配 bt
 	if storeRow.Setting.Type == define.StoreTypeBaoTa {
-		params.VersionInfo.Environment = function.PluckArrayWalk(params.VersionInfo.Environment, func(item docker.EnvItem) (docker.EnvItem, bool) {
-			if find, _, ok := function.PluckMapItemWalk(baota.CommonEnv, func(k int, v docker.EnvItem) bool {
+		params.VersionInfo.Environment = function.PluckArrayWalk(params.VersionInfo.Environment, func(item types.EnvItem) (types.EnvItem, bool) {
+			if find, _, ok := function.PluckMapItemWalk(baota.CommonEnv, func(k int, v types.EnvItem) bool {
 				return v.Name == item.Name
 			}); ok {
 				item.Value = find.Value
 				if item.Rule == nil {
-					item.Rule = &docker.EnvValueRule{}
+					item.Rule = &types.EnvValueRule{}
 				}
 				item.Rule.Kind |= find.Rule.Kind
 				item.Rule.Option = find.Rule.Option
@@ -325,7 +326,7 @@ func (self Store) Deploy(http *gin.Context) {
 	function.Placeholder(&params.TaskName, valueReplaceTable...)
 
 	envReplaceTable := function.NewReplacerTable(compose.EnvItemReplaceTable...)
-	envReplaceTable = append(envReplaceTable, func(v *docker.EnvItem) {
+	envReplaceTable = append(envReplaceTable, func(v *types.EnvItem) {
 		function.Placeholder(&v.Value, valueReplaceTable...)
 		return
 	})

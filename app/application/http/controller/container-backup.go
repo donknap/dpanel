@@ -61,10 +61,10 @@ func (self ContainerBackup) Create(http *gin.Context) {
 	backupRow := &entity.Backup{
 		ContainerID: params.Id,
 		Setting: &accessor.BackupSettingOption{
-			BackupTargetType: docker.ContainerBackupTypeSnapshot,
+			BackupTargetType: define.DockerContainerBackupTypeSnapshot,
 			BackupTar:        backupRelTar,
 			VolumePathList:   make([]string, 0),
-			Status:           docker.ImageBuildStatusProcess,
+			Status:           define.DockerImageBuildStatusProcess,
 		},
 	}
 	_ = dao.Backup.Save(backupRow)
@@ -88,7 +88,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		case <-progress.Done():
 			_ = notice.Message{}.Info(".containerBackupFinish", "name", containerInfo.Name)
 			if closeErr := b.Close(); closeErr != nil {
-				backupRow.Setting.Status = docker.ImageBuildStatusError
+				backupRow.Setting.Status = define.DockerImageBuildStatusError
 				backupRow.Setting.Error = closeErr.Error()
 				_ = dao.Backup.Save(backupRow)
 			}
@@ -190,7 +190,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		return nil
 	}()
 
-	backupRow.Setting.Status = docker.ImageBuildStatusError
+	backupRow.Setting.Status = define.DockerImageBuildStatusError
 	if err != nil {
 		backupRow.Setting.Error = err.Error()
 	} else {
@@ -199,7 +199,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		backupRow.Setting.Status = docker.ImageBuildStatusSuccess
+		backupRow.Setting.Status = define.DockerImageBuildStatusSuccess
 		if info, err := os.Stat(backupTar); err == nil {
 			backupRow.Setting.Size = info.Size()
 		}

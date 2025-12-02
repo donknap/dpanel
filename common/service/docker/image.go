@@ -18,7 +18,7 @@ import (
 	"github.com/mcuadros/go-version"
 )
 
-func (self Builder) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*fs.FileData, path []string, err error) {
+func (self Client) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*fs.FileData, path []string, err error) {
 	imageInfo, err := self.Client.ImageInspect(ctx, imageID)
 	if err != nil {
 		return nil, nil, err

@@ -4,6 +4,7 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,7 +25,7 @@ func (self Swarm) NodeUpdate(http *gin.Context) {
 		NodeId       string                 `json:"nodeId" binding:"required"`
 		Availability swarm.NodeAvailability `json:"availability" binding:"omitempty,oneof=active pause drain"`
 		Role         swarm.NodeRole         `json:"role" binding:"omitempty,oneof=worker manager"`
-		Labels       []docker.ValueItem     `json:"labels"`
+		Labels       []types.ValueItem      `json:"labels"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -42,7 +43,7 @@ func (self Swarm) NodeUpdate(http *gin.Context) {
 		node.Spec.Role = params.Role
 	}
 	if !function.IsEmptyArray(params.Labels) {
-		node.Spec.Labels = function.PluckArrayMapWalk(params.Labels, func(item docker.ValueItem) (string, string, bool) {
+		node.Spec.Labels = function.PluckArrayMapWalk(params.Labels, func(item types.ValueItem) (string, string, bool) {
 			return item.Name, item.Value, true
 		})
 	}

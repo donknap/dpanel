@@ -24,7 +24,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/acme"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -164,7 +164,7 @@ func (self SiteCert) Apply(http *gin.Context) {
 			if exists, i := function.IndexArrayWalk(dnsApiList, func(i accessor.DnsApi) bool {
 				return i.ServerName == params.DnsApi
 			}); exists {
-				env := function.PluckArrayWalk(dnsApiList[i].Env, func(i docker.EnvItem) (string, bool) {
+				env := function.PluckArrayWalk(dnsApiList[i].Env, func(i types.EnvItem) (string, bool) {
 					return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 				})
 				options = append(options, acme.WithDnsApi(dnsApiList[i].ServerName, env))

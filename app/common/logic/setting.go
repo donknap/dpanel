@@ -9,7 +9,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/types/define"
 )
 
@@ -88,15 +88,6 @@ func (self Setting) GetValueById(id int32) (*entity.Setting, error) {
 	return setting, nil
 }
 
-func (self Setting) GetDockerClient(name string) (*docker.Client, error) {
-	if setting, err := self.GetValue(SettingGroupSetting, SettingGroupSettingDocker); err == nil {
-		if item, ok := setting.Value.Docker[name]; ok {
-			return item, nil
-		}
-	}
-	return nil, errors.New("docker client not found " + name)
-}
-
 func (self Setting) GetDPanelInfo() (container.InspectResponse, error) {
 	result := container.InspectResponse{}
 	if exists := self.GetByKey(SettingGroupSetting, SettingGroupSettingDPanelInfo, &result); exists {
@@ -120,7 +111,7 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 	}
 	if value != nil {
 		switch v := value.(type) {
-		case *map[string]*docker.Client:
+		case *map[string]*types.DockerEnv:
 			if setting.Value.Docker != nil {
 				exists = true
 				*v = setting.Value.Docker

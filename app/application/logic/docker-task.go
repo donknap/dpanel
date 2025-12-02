@@ -22,5 +22,5 @@ type ImageRemoteOption struct {
 }
 
 type DockerTask struct {
-	sdk *docker.Builder
+	sdk *docker.Client
 }

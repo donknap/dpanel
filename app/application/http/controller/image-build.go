@@ -62,7 +62,7 @@ func (self ImageBuild) Create(http *gin.Context) {
 		BuildType: "",
 		Title:     params.Title,
 		Setting:   &params.ImageSettingOption,
-		Status:    docker.ImageBuildStatusStop,
+		Status:    define.DockerImageBuildStatusStop,
 		Message:   "",
 	}
 	if imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First(); imageRow != nil {
@@ -72,13 +72,13 @@ func (self ImageBuild) Create(http *gin.Context) {
 
 	log, err := logic.DockerTask{}.ImageBuild(fmt.Sprintf(ws.MessageTypeImageBuild, params.Id), params.ImageSettingOption)
 	if err != nil {
-		imageNew.Status = docker.ImageBuildStatusError
+		imageNew.Status = define.DockerImageBuildStatusError
 		imageNew.Message = log + "\n" + err.Error()
 		_ = dao.Image.Save(imageNew)
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	imageNew.Status = docker.ImageBuildStatusSuccess
+	imageNew.Status = define.DockerImageBuildStatusSuccess
 	imageNew.Message = log
 	_ = dao.Image.Save(imageNew)
 	self.JsonResponseWithoutError(http, gin.H{

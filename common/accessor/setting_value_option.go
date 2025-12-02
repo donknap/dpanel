@@ -5,29 +5,29 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/donknap/dpanel/common/service/docker"
+	types2 "github.com/donknap/dpanel/common/service/docker/types"
 )
 
 type SettingValueOption struct {
-	Username                    string                      `json:"username,omitempty"`
-	Password                    string                      `json:"password,omitempty"`
-	Email                       string                      `json:"email,omitempty"`
-	UserStatus                  uint8                       `json:"userStatus,omitempty"`
-	UserRemark                  string                      `json:"userRemark,omitempty"`
-	RegisterAt                  *time.Time                  `json:"registerAt,omitempty"`
-	Docker                      map[string]*docker.Client   `json:"docker,omitempty"`
-	DiskUsage                   *DiskUsage                  `json:"diskUsage,omitempty"`
-	TwoFa                       *TwoFa                      `json:"twoFa,omitempty"`
-	ContainerCheckIgnoreUpgrade ContainerCheckIgnoreUpgrade `json:"containerCheckIgnoreUpgrade,omitempty"`
-	ContainerCheckAllUpgrade    *ContainerCheckAllUpgrade   `json:"containerCheckAllUpgrade,omitempty"`
-	DPanelInfo                  *container.InspectResponse  `json:"DPanelInfo,omitempty"`
-	ThemeConfig                 *ThemeConfig                `json:"themeConfig,omitempty"`
-	ThemeUserConfig             *ThemeUserConfig            `json:"themeUserConfig,omitempty"`
-	ThemeConsoleConfig          *ThemeConsoleConfig         `json:"themeConsoleConfig,omitempty"`
-	DnsApi                      []DnsApi                    `json:"dnsApi,omitempty"`
-	Notification                *Notification               `json:"notification,omitempty"`
-	Tag                         []Tag                       `json:"tag,omitempty"`
-	Login                       *Login                      `json:"login,omitempty"`
+	Username                    string                       `json:"username,omitempty"`
+	Password                    string                       `json:"password,omitempty"`
+	Email                       string                       `json:"email,omitempty"`
+	UserStatus                  uint8                        `json:"userStatus,omitempty"`
+	UserRemark                  string                       `json:"userRemark,omitempty"`
+	RegisterAt                  *time.Time                   `json:"registerAt,omitempty"`
+	Docker                      map[string]*types2.DockerEnv `json:"docker,omitempty"`
+	DiskUsage                   *DiskUsage                   `json:"diskUsage,omitempty"`
+	TwoFa                       *TwoFa                       `json:"twoFa,omitempty"`
+	ContainerCheckIgnoreUpgrade ContainerCheckIgnoreUpgrade  `json:"containerCheckIgnoreUpgrade,omitempty"`
+	ContainerCheckAllUpgrade    *ContainerCheckAllUpgrade    `json:"containerCheckAllUpgrade,omitempty"`
+	DPanelInfo                  *container.InspectResponse   `json:"DPanelInfo,omitempty"`
+	ThemeConfig                 *ThemeConfig                 `json:"themeConfig,omitempty"`
+	ThemeUserConfig             *ThemeUserConfig             `json:"themeUserConfig,omitempty"`
+	ThemeConsoleConfig          *ThemeConsoleConfig          `json:"themeConsoleConfig,omitempty"`
+	DnsApi                      []DnsApi                     `json:"dnsApi,omitempty"`
+	Notification                *Notification                `json:"notification,omitempty"`
+	Tag                         []Tag                        `json:"tag,omitempty"`
+	Login                       *Login                       `json:"login,omitempty"`
 }
 
 type ContainerCheckIgnoreUpgrade []string
@@ -69,7 +69,7 @@ type ThemeUserConfig struct {
 type DnsApi struct {
 	Title      string           `json:"title,omitempty"`
 	ServerName string           `json:"serverName,omitempty"`
-	Env        []docker.EnvItem `json:"env,omitempty"`
+	Env        []types2.EnvItem `json:"env,omitempty"`
 }
 
 type ContainerCheckAllUpgrade struct {

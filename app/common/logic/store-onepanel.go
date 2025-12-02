@@ -11,7 +11,7 @@ import (
 	"github.com/donknap/dpanel/app/common/logic/onepanel"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"gopkg.in/yaml.v3"
@@ -99,7 +99,7 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 
 			storeVersionItem := accessor.StoreAppVersionItem{
 				Script:      map[string]string{},
-				Environment: make([]docker.EnvItem, 0),
+				Environment: make([]types.EnvItem, 0),
 				Name:        versionName,
 			}
 
@@ -143,8 +143,8 @@ func (self Store) GetAppByOnePanel(storePath string) ([]accessor.StoreAppItem, e
 	return result, nil
 }
 
-func (self Store) parseOnePanelSetting(getter *function.ConfigMap, root string) []docker.EnvItem {
-	result := make([]docker.EnvItem, 0)
+func (self Store) parseOnePanelSetting(getter *function.ConfigMap, root string) []types.EnvItem {
+	result := make([]types.EnvItem, 0)
 	fields := getter.GetSliceStringMapString(root)
 
 	for index, field := range fields {
@@ -154,7 +154,7 @@ func (self Store) parseOnePanelSetting(getter *function.ConfigMap, root string) 
 			}, k)
 		})
 
-		envItem := docker.EnvItem{
+		envItem := types.EnvItem{
 			Label: field["labelZh"],
 			Labels: map[string]string{
 				define.LangZh: labels["zh"],
@@ -162,17 +162,17 @@ func (self Store) parseOnePanelSetting(getter *function.ConfigMap, root string) 
 			},
 			Name:  field["envKey"],
 			Value: field["default"],
-			Rule: &docker.EnvValueRule{
+			Rule: &types.EnvValueRule{
 				Kind:   0,
-				Option: make([]docker.ValueItem, 0),
+				Option: make([]types.ValueItem, 0),
 			},
 		}
-		envItem.Rule = self.ParseSettingField(field, func(item *docker.EnvValueRule) {
-			if (item.Kind&docker.EnvValueTypeSelect) != 0 || (item.Kind&docker.EnvValueTypeSelectMultiple) != 0 {
+		envItem.Rule = self.ParseSettingField(field, func(item *types.EnvValueRule) {
+			if (item.Kind&types.EnvValueTypeSelect) != 0 || (item.Kind&types.EnvValueTypeSelectMultiple) != 0 {
 				item.Option = function.PluckArrayWalk(
 					getter.GetSliceStringMapString(fmt.Sprintf("%s.%d.values", root, index)),
-					func(i map[string]string) (docker.ValueItem, bool) {
-						return docker.ValueItem{
+					func(i map[string]string) (types.ValueItem, bool) {
+						return types.ValueItem{
 							Name:  i["label"],
 							Value: i["value"],
 						}, true
@@ -183,10 +183,10 @@ func (self Store) parseOnePanelSetting(getter *function.ConfigMap, root string) 
 		result = append(result, envItem)
 	}
 	// 如果包含了 PANEL_DB_TYPE 附加数据库其它参数
-	if ok, index := function.IndexArrayWalk(result, func(item docker.EnvItem) bool {
+	if ok, index := function.IndexArrayWalk(result, func(item types.EnvItem) bool {
 		return item.Name == "PANEL_DB_TYPE"
 	}); ok {
-		result = append(result[:index], append([]docker.EnvItem{
+		result = append(result[:index], append([]types.EnvItem{
 			onepanel.CommonEnv[define.StoreEnvDBHost], onepanel.CommonEnv[define.StoreEnvDBPort],
 		}, result[index:]...)...)
 	}

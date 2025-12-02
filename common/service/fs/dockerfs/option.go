@@ -19,7 +19,7 @@ func WithProxyContainer(name string) Option {
 	}
 }
 
-func WithDockerSdk(sdk *docker.Builder) Option {
+func WithDockerSdk(sdk *docker.Client) Option {
 	return func(self *Fs) error {
 		self.sdk = sdk
 		return nil

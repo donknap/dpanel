@@ -127,7 +127,7 @@ func (self User) GetUserInfo(http *gin.Context) {
 		feature = append(feature, types.FeatureVersionEnvStandard)
 	}
 
-	if docker.Sdk.Name == docker.DefaultClientName {
+	if docker.Sdk.Name == define.DockerDefaultClientName {
 		feature = append(feature, types.FeatureDockerEnvLocal)
 	}
 

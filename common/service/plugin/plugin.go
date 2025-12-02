@@ -17,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
@@ -114,15 +115,15 @@ func (self plugin) Create() (string, error) {
 	options := []builder.Option{
 		builder.WithImage(imageUrl, imageTryPull),
 		builder.WithContainerName(service.ContainerName),
-		builder.WithLabel(function.PluckMapWalkArray(service.Labels, func(key string, value string) (docker.ValueItem, bool) {
-			return docker.ValueItem{
+		builder.WithLabel(function.PluckMapWalkArray(service.Labels, func(key string, value string) (types.ValueItem, bool) {
+			return types.ValueItem{
 				Name:  key,
 				Value: value,
 			}, true
 		})...),
 		builder.WithPrivileged(service.Privileged),
 		builder.WithAutoRemove(serviceExt.AutoRemove),
-		builder.WithRestartPolicy(&docker.RestartPolicy{
+		builder.WithRestartPolicy(&types.RestartPolicy{
 			Name: service.Restart,
 		}),
 		builder.WithPid(service.Pid),
@@ -131,7 +132,7 @@ func (self plugin) Create() (string, error) {
 	}
 
 	for _, item := range service.Volumes {
-		options = append(options, builder.WithVolume(docker.VolumeItem{
+		options = append(options, builder.WithVolume(types.VolumeItem{
 			Host:       item.Source,
 			Dest:       item.Target,
 			Permission: "write",
@@ -139,7 +140,7 @@ func (self plugin) Create() (string, error) {
 	}
 	for _, item := range serviceExt.External.Volumes {
 		path := strings.Split(item, ":")
-		options = append(options, builder.WithVolume(docker.VolumeItem{
+		options = append(options, builder.WithVolume(types.VolumeItem{
 			Host:       path[0],
 			Dest:       path[1],
 			Permission: "write",
@@ -208,7 +209,7 @@ func (self plugin) importImage(imageName string, imagePath string) error {
 			Force:         true,
 			PruneChildren: true,
 		})
-		slog.Debug("plugin", "create-explorer", "delete old image", imageName)
+		slog.Debug("plugin create explorer", "delete old image", imageName)
 		if err != nil {
 			return err
 		}

@@ -25,6 +25,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/registry"
@@ -245,7 +246,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 		return
 	}
 	if params.Name == "" {
-		params.Name = docker.DefaultClientName
+		params.Name = define.DockerDefaultClientName
 	}
 	var err error
 	var sshClient *ssh.Client
@@ -281,7 +282,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 	}
 
 	err = func() error {
-		dockerEnv, err := logic.Setting{}.GetDockerClient(params.Name)
+		dockerEnv, err := logic.Env{}.GetEnvByName(params.Name)
 		if err != nil {
 			return err
 		}
@@ -468,7 +469,7 @@ func (self Home) Usage(http *gin.Context) {
 	}
 
 	type portItem struct {
-		Port docker.PortItem `json:"port"`
+		Port types2.PortItem `json:"port"`
 		Name string          `json:"name"`
 	}
 	ports := make([]*portItem, 0)
@@ -510,7 +511,7 @@ func (self Home) Usage(http *gin.Context) {
 							}
 							usePort = append(usePort, &portItem{
 								Name: item.Names[0],
-								Port: docker.PortItem{
+								Port: types2.PortItem{
 									Host:     strconv.Itoa(hostPort),
 									Dest:     strconv.Itoa(port.Int()),
 									HostIp:   binding.HostIP,
@@ -527,7 +528,7 @@ func (self Home) Usage(http *gin.Context) {
 					}
 					usePort = append(usePort, &portItem{
 						Name: item.Names[0],
-						Port: docker.PortItem{
+						Port: types2.PortItem{
 							Host:   strconv.Itoa(int(port.PublicPort)),
 							Dest:   strconv.Itoa(int(port.PrivatePort)),
 							HostIp: port.IP,
@@ -613,7 +614,7 @@ func (self Home) GetStatList(http *gin.Context) {
 	}
 	defer progress.Close()
 
-	out, err := docker.Sdk.ContainerStats(progress.Context(), docker.ContainerStatsOption{
+	out, err := docker.Sdk.ContainerStats(progress.Context(), types2.ContainerStatsOption{
 		Stream: true,
 	})
 	if err != nil {

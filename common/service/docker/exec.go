@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"fmt"
 	"os"
 	exec2 "os/exec"
 
@@ -9,7 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/service/exec/local"
 )
 
-func (self Builder) Run(command ...string) (exec.Executor, error) {
+func (self Client) Run(command ...string) (exec.Executor, error) {
 	var cmd exec.Executor
 	var err error
 	options := make([]local.Option, 0)
@@ -24,7 +23,7 @@ func (self Builder) Run(command ...string) (exec.Executor, error) {
 	return cmd, nil
 }
 
-func (self Builder) Compose(command ...string) (exec.Executor, error) {
+func (self Client) Compose(command ...string) (exec.Executor, error) {
 	var cmd exec.Executor
 	var err error
 	options := make([]local.Option, 0)
@@ -46,26 +45,4 @@ func (self Builder) Compose(command ...string) (exec.Executor, error) {
 		return nil, err
 	}
 	return cmd, nil
-}
-
-// CmdProxy Proxy 如果是 ssh 连接运行命令时需要先创建代理 sock
-// 执行完成命令后，需要将整个上下文关闭
-func (self Builder) CmdProxy() (*Builder, error) {
-	return NewBuilderWithDockerEnv(&Client{
-		Name:              fmt.Sprintf("%s-%s", self.DockerEnv.Name, "proxy"),
-		Title:             self.DockerEnv.Title,
-		Address:           self.DockerEnv.Address,
-		Default:           false,
-		DockerInfo:        self.DockerEnv.DockerInfo,
-		ServerUrl:         self.DockerEnv.ServerUrl,
-		EnableTLS:         self.DockerEnv.EnableTLS,
-		TlsCa:             self.DockerEnv.TlsCa,
-		TlsCert:           self.DockerEnv.TlsCert,
-		TlsKey:            self.DockerEnv.TlsKey,
-		EnableComposePath: self.DockerEnv.EnableComposePath,
-		ComposePath:       self.DockerEnv.ComposePath,
-		EnableSSH:         self.DockerEnv.EnableSSH,
-		SshServerInfo:     self.DockerEnv.SshServerInfo,
-		RemoteType:        self.DockerEnv.RemoteType,
-	})
 }

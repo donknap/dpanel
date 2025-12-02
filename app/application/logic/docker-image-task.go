@@ -14,8 +14,8 @@ import (
 
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/image"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 )
@@ -57,7 +57,7 @@ func (self DockerTask) ImageBuild(messageId string, task accessor.ImageSettingOp
 			if err == io.EOF {
 				break
 			}
-			msg := docker.BuildMessage{}
+			msg := types.BuildMessage{}
 			if err = json.Unmarshal(line, &msg); err == nil {
 				if msg.ErrorDetail.Message != "" {
 					buffer.WriteString(msg.ErrorDetail.Message)
@@ -96,7 +96,7 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 		return function.ErrorMessage(define.ErrorMessageImagePullRegistryBad)
 	}
 	lastSendTime := time.Now()
-	pg := make(map[string]*docker.PullProgress)
+	pg := make(map[string]*types.PullProgress)
 
 	lastJsonStr := new(bytes.Buffer)
 
@@ -107,7 +107,7 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 		}
 		slog.Debug("image pull task", "data", p)
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
-		pd := docker.BuildMessage{}
+		pd := types.BuildMessage{}
 		for {
 			line, _, err := newReader.ReadLine()
 			if err == io.EOF {
@@ -118,7 +118,7 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 					return errors.New(pd.ErrorDetail.Message)
 				}
 				if pd.Status == "Pulling fs layer" {
-					pg[pd.Id] = &docker.PullProgress{
+					pg[pd.Id] = &types.PullProgress{
 						Extracting:  0,
 						Downloading: 0,
 					}

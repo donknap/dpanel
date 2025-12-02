@@ -19,7 +19,7 @@ import (
 )
 
 // ContainerByField 获取单条容器 field 支持 id,name
-func (self Builder) ContainerByField(ctx context.Context, field string, name ...string) (result map[string]*container.Summary, err error) {
+func (self Client) ContainerByField(ctx context.Context, field string, name ...string) (result map[string]*container.Summary, err error) {
 	if len(name) == 0 {
 		return nil, errors.New("please specify a container name")
 	}
@@ -37,7 +37,7 @@ func (self Builder) ContainerByField(ctx context.Context, field string, name ...
 	filtersArgs.Add("status", "exited")
 	filtersArgs.Add("status", "dead")
 
-	containerList, err := Sdk.Client.ContainerList(ctx, container.ListOptions{
+	containerList, err := self.Client.ContainerList(ctx, container.ListOptions{
 		Filters: filtersArgs,
 	})
 	if err != nil {
@@ -63,7 +63,7 @@ func (self Builder) ContainerByField(ctx context.Context, field string, name ...
 	return result, nil
 }
 
-func (self Builder) ContainerImport(ctx context.Context, containerName string, importFile *imports.ImportFile) error {
+func (self Client) ContainerImport(ctx context.Context, containerName string, importFile *imports.ImportFile) error {
 	err := self.Client.CopyToContainer(ctx,
 		containerName,
 		"/",
@@ -80,16 +80,16 @@ func (self Builder) ContainerImport(ctx context.Context, containerName string, i
 }
 
 // ContainerCopyInspect 获取复制容器信息，兼容低版本的配置情况
-func (self Builder) ContainerCopyInspect(ctx context.Context, containerName string) (info container.InspectResponse, err error) {
-	info, err = Sdk.Client.ContainerInspect(ctx, containerName)
+func (self Client) ContainerCopyInspect(ctx context.Context, containerName string) (info container.InspectResponse, err error) {
+	info, err = self.Client.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return info, err
 	}
 	return self.ContainerInspectCompat(info)
 }
 
-func (self Builder) ContainerInspectCompat(info container.InspectResponse) (container.InspectResponse, error) {
-	if versions.LessThanOrEqualTo(Sdk.Client.ClientVersion(), "1.44") {
+func (self Client) ContainerInspectCompat(info container.InspectResponse) (container.InspectResponse, error) {
+	if versions.LessThanOrEqualTo(self.Client.ClientVersion(), "1.44") {
 		macAddress := ""
 		for name, settings := range info.NetworkSettings.Networks {
 			if settings.MacAddress != "" {
@@ -106,7 +106,7 @@ func (self Builder) ContainerInspectCompat(info container.InspectResponse) (cont
 }
 
 // ExecResult 在容器中执行一条命令，返回结果
-func (self Builder) ContainerExecResult(ctx context.Context, containerName string, cmd string) (string, error) {
+func (self Client) ContainerExecResult(ctx context.Context, containerName string, cmd string) (string, error) {
 	execConfig := container.ExecOptions{
 		Privileged:   true,
 		Tty:          false,
@@ -124,7 +124,7 @@ func (self Builder) ContainerExecResult(ctx context.Context, containerName strin
 		"-c",
 		cmd,
 	})
-	response, err := Sdk.ContainerExec(ctx, containerName, execConfig)
+	response, err := self.ContainerExec(ctx, containerName, execConfig)
 	if err != nil {
 		return "", err
 	}
@@ -141,7 +141,7 @@ func (self Builder) ContainerExecResult(ctx context.Context, containerName strin
 }
 
 // ContainerExec 在容器内执行一条 shell 命令
-func (self Builder) ContainerExec(ctx context.Context, containerName string, option container.ExecOptions) (types.HijackedResponse, error) {
+func (self Client) ContainerExec(ctx context.Context, containerName string, option container.ExecOptions) (types.HijackedResponse, error) {
 	slog.Debug("docker exec", "command", option)
 	exec, err := self.Client.ContainerExecCreate(ctx, containerName, option)
 	if err != nil {
@@ -156,7 +156,7 @@ func (self Builder) ContainerExec(ctx context.Context, containerName string, opt
 }
 
 // ContainerReadFile 读取容器内的一个文件内容，传入 targetFile 则写入文件 否则返回一个 reader
-func (self Builder) ContainerReadFile(ctx context.Context, containerName string, inContainerPath string, targetFile *os.File) (io.ReadCloser, error) {
+func (self Client) ContainerReadFile(ctx context.Context, containerName string, inContainerPath string, targetFile *os.File) (io.ReadCloser, error) {
 	pathStat, err := self.Client.ContainerStatPath(ctx, containerName, inContainerPath)
 	if err != nil {
 		return nil, err

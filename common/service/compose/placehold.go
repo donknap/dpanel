@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 )
@@ -26,15 +26,15 @@ var ValueReplaceTable = []function.Replacer[string]{
 	},
 }
 
-var EnvItemReplaceTable = []function.Replacer[docker.EnvItem]{
-	func(item *docker.EnvItem) {
+var EnvItemReplaceTable = []function.Replacer[types.EnvItem]{
+	func(item *types.EnvItem) {
 		if !strings.Contains(item.Value, PlaceholderXkStoragePath) {
 			return
 		}
 		item.Value = ""
 		if v, ok := storage.Cache.Get(storage.CacheKeyXkStorageInfo); ok {
-			item.Rule.Option = function.PluckArrayWalk(v.([]string), func(item string) (docker.ValueItem, bool) {
-				return docker.ValueItem{
+			item.Rule.Option = function.PluckArrayWalk(v.([]string), func(item string) (types.ValueItem, bool) {
+				return types.ValueItem{
 					Name:  item,
 					Value: item,
 				}, true

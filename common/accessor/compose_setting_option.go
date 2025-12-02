@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 )
@@ -23,18 +24,18 @@ const (
 )
 
 type ComposeSettingOption struct {
-	Status            string           `json:"status,omitempty"`
-	Type              string           `json:"type"`
-	Uri               []string         `json:"uri,omitempty"`
-	RemoteUrl         string           `json:"remoteUrl,omitempty"`
-	Store             string           `json:"store,omitempty"`
-	Environment       []docker.EnvItem `json:"environment,omitempty"`
-	DockerEnvName     string           `json:"dockerEnvName,omitempty"`
-	DeployServiceName []string         `json:"deployServiceName,omitempty"`
-	CreatedAt         string           `json:"createdAt,omitempty"`
-	UpdatedAt         string           `json:"updatedAt,omitempty"`
-	Message           string           `json:"message,omitempty"`
-	RunName           string           `json:"-"` // Deprecated: 兼容旧版有前缀的名称
+	Status            string          `json:"status,omitempty"`
+	Type              string          `json:"type"`
+	Uri               []string        `json:"uri,omitempty"`
+	RemoteUrl         string          `json:"remoteUrl,omitempty"`
+	Store             string          `json:"store,omitempty"`
+	Environment       []types.EnvItem `json:"environment,omitempty"`
+	DockerEnvName     string          `json:"dockerEnvName,omitempty"`
+	DeployServiceName []string        `json:"deployServiceName,omitempty"`
+	CreatedAt         string          `json:"createdAt,omitempty"`
+	UpdatedAt         string          `json:"updatedAt,omitempty"`
+	Message           string          `json:"message,omitempty"`
+	RunName           string          `json:"-"` // Deprecated: 兼容旧版有前缀的名称
 }
 
 func (self ComposeSettingOption) GetUriFilePath() string {

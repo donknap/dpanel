@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 )
 
@@ -87,7 +88,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		options = append(options, builder.WithHostNetwork())
 	}
 
-	useBridgeNetwork := function.InArrayWalk(task.BuildParams.Network, func(i docker.NetworkItem) bool {
+	useBridgeNetwork := function.InArrayWalk(task.BuildParams.Network, func(i types.NetworkItem) bool {
 		if i.Name == network.NetworkBridge {
 			return true
 		}
@@ -118,7 +119,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	// 当前如果新建了容器自身网络，创建完后加入
 	// 如果在创建时加入，则会丢失 bridge 网络
 	if containerOwnerNetwork != "" {
-		o := docker.NetworkItem{
+		o := types.NetworkItem{
 			Name: containerOwnerNetwork,
 		}
 		if task.BuildParams.IpV6 != nil {
@@ -141,7 +142,7 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 			if value.Alise == "" {
 				value.Alise = value.Name
 			}
-			err = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, docker.NetworkItem{
+			err = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, types.NetworkItem{
 				Name: containerOwnerNetwork,
 				Alise: []string{
 					value.Alise,

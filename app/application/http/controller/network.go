@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
@@ -248,7 +249,7 @@ func (self Network) Connect(http *gin.Context) {
 	for _, item := range params.ContainerAlise {
 		alise = append(alise, strings.TrimPrefix(item, "/"))
 	}
-	err := docker.Sdk.NetworkConnect(docker.Sdk.Ctx, docker.NetworkItem{
+	err := docker.Sdk.NetworkConnect(docker.Sdk.Ctx, types.NetworkItem{
 		Name:  params.Name,
 		Alise: alise,
 		IpV4:  params.IpV4,

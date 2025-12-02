@@ -4,7 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/define"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
 )
@@ -21,7 +21,7 @@ func (self Upgrade20250106) Upgrade() error {
 		if compose.Setting == nil || compose.Setting.DockerEnvName != "" {
 			continue
 		}
-		compose.Setting.DockerEnvName = docker.DefaultClientName
+		compose.Setting.DockerEnvName = define.DockerDefaultClientName
 		err := dao.Compose.Save(compose)
 		if err != nil {
 			return err

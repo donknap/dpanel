@@ -2,7 +2,7 @@ package migrate
 
 import (
 	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 type Upgrade20250113 struct{}
@@ -17,7 +17,7 @@ func (self Upgrade20250113) Upgrade() error {
 		if item.Setting == nil || item.Setting.DockerEnvName != "" {
 			continue
 		}
-		item.Setting.DockerEnvName = docker.DefaultClientName
+		item.Setting.DockerEnvName = define.DockerDefaultClientName
 		err := dao.Cron.Save(item)
 		if err != nil {
 			return err

@@ -7,9 +7,10 @@ import (
 
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
-func (self Builder) NetworkRemove(ctx context.Context, networkName string) error {
+func (self Client) NetworkRemove(ctx context.Context, networkName string) error {
 	if networkRow, err := self.Client.NetworkInspect(ctx, networkName, network.InspectOptions{}); err == nil {
 		for _, item := range networkRow.Containers {
 			err = self.Client.NetworkDisconnect(ctx, networkName, item.Name, true)
@@ -22,7 +23,7 @@ func (self Builder) NetworkRemove(ctx context.Context, networkName string) error
 	return nil
 }
 
-func (self Builder) NetworkCreate(ctx context.Context, networkName string, ipV4, ipV6 *NetworkCreateItem) (string, error) {
+func (self Client) NetworkCreate(ctx context.Context, networkName string, ipV4, ipV6 *types.NetworkCreateItem) (string, error) {
 	option := network.CreateOptions{
 		Driver: "bridge",
 		Options: map[string]string{
@@ -55,7 +56,7 @@ func (self Builder) NetworkCreate(ctx context.Context, networkName string, ipV4,
 	return response.ID, nil
 }
 
-func (self Builder) NetworkConnect(ctx context.Context, networkRow NetworkItem, containerName string) error {
+func (self Client) NetworkConnect(ctx context.Context, networkRow types.NetworkItem, containerName string) error {
 	// 关联网络时，重新退出加入
 	_ = self.Client.NetworkDisconnect(ctx, networkRow.Name, containerName, true)
 

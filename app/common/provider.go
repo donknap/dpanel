@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/donknap/dpanel/app/common/events"
 	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/dao"
@@ -13,8 +14,10 @@ import (
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/family"
 	"github.com/donknap/dpanel/common/types"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	httpserver "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
 
@@ -123,6 +126,10 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		wsCors.GET("/common/console/container/:id", controller.Home{}.WsContainerConsole)
 		wsCors.GET("/common/console/host/:name", controller.Home{}.WsHostConsole)
 	})
+
+	_ = facade.GetEvent().Subscribe(event.DockerStartEvent, events.Docker{}.Start)
+	_ = facade.GetEvent().Subscribe(event.DockerStopEvent, events.Docker{}.Stop)
+	_ = facade.GetEvent().Subscribe(event.DockerMessageEvent, events.Docker{}.Message)
 
 	// 启动时，初始化计划任务
 	if cronList, err := dao.Cron.Order(dao.Cron.ID.Desc()).Find(); err == nil {

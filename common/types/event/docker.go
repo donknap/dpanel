@@ -1,11 +1,19 @@
 package event
 
+import "github.com/donknap/dpanel/common/service/docker/types"
+
 const (
 	DockerStartEvent   = "docker_start"
-	DockerDieEvent     = "docker_die"
+	DockerStopEvent    = "docker_stop"
 	DockerMessageEvent = "docker_message"
 )
 
 type DockerPayload struct {
-	Name string
+	DockerEnv *types.DockerEnv
+	Error     error
+}
+
+type DockerMessagePayload struct {
+	Type    string
+	Message []string
 }

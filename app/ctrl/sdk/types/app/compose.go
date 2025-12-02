@@ -3,15 +3,15 @@ package app
 import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/service/compose"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
 type ComposeDeployOption struct {
-	Id                string           `json:"id" binding:"required"`
-	Environment       []docker.EnvItem `json:"environment"`
-	DeployServiceName []string         `json:"deployServiceName"`
-	CreatePath        bool             `json:"createPath"`
-	RemoveOrphans     bool             `json:"removeOrphans"`
+	Id                string          `json:"id" binding:"required"`
+	Environment       []types.EnvItem `json:"environment"`
+	DeployServiceName []string        `json:"deployServiceName"`
+	CreatePath        bool            `json:"createPath"`
+	RemoveOrphans     bool            `json:"removeOrphans"`
 }
 
 type ComposeDetailResult struct {

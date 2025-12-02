@@ -49,7 +49,7 @@ func NewContainerExplorer(containerName string) (*afero.Afero, error) {
 }
 
 func NewSshExplorer(dockerEnvName string) (*ssh.Client, *afero.Afero, error) {
-	dockerEnv, err := logic2.DockerEnv{}.GetEnvByName(dockerEnvName)
+	dockerEnv, err := logic2.Env{}.GetEnvByName(dockerEnvName)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -17,6 +17,7 @@ var (
 	CacheKeySettingLocale         = fmt.Sprintf(CacheKeySetting, "locale")
 	CacheKeyImageDigest           = "image:digest:%s"
 	CacheKeyImageRootFs           = "image:rootfs:%s"
+	CacheKeyDockerStatus          = "docker:status:%s"
 )
 
 var (

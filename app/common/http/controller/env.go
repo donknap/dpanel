@@ -16,6 +16,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -38,7 +39,7 @@ func (self Env) GetList(http *gin.Context) {
 		return
 	}
 
-	result := make([]*docker.Client, 0)
+	result := make([]*types2.DockerEnv, 0)
 	if setting, err := (logic.Setting{}).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDocker); err == nil {
 		for _, item := range setting.Value.Docker {
 			if params.EnableCertContent && item.EnableTLS {
@@ -66,14 +67,24 @@ func (self Env) GetList(http *gin.Context) {
 	})
 	self.JsonResponseWithoutError(http, gin.H{
 		"currentName": docker.Sdk.Name,
-		"list":        result,
+		"list": function.PluckArrayWalk(result, func(item *types2.DockerEnv) (*types2.DockerEnv, bool) {
+			status := types2.DockerStatus{
+				Available: true,
+				Message:   "",
+			}
+			if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyDockerStatus, item.Name)); ok {
+				status = v.(types2.DockerStatus)
+			}
+			item.DockerStatus = &status
+			return item, true
+		}),
 	})
 	return
 }
 
 func (self Env) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		docker.Client
+		types2.DockerEnv
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -115,7 +126,7 @@ func (self Env) Create(http *gin.Context) {
 	}
 	_ = os.MkdirAll(filepath.Join(storage.Local{}.GetStorageLocalPath(), params.ComposePath), 0755)
 
-	client := &docker.Client{
+	dockerEnv := &types2.DockerEnv{
 		Name:              params.Name,
 		Title:             params.Title,
 		Address:           params.Address,
@@ -154,7 +165,7 @@ func (self Env) Create(http *gin.Context) {
 			if s.content == "" {
 				continue
 			}
-			path := filepath.Join(storage.Local{}.GetCertPath(), client.CertRoot(), s.name)
+			path := filepath.Join(storage.Local{}.GetCertPath(), dockerEnv.CertRoot(), s.name)
 			err := os.MkdirAll(filepath.Dir(path), os.ModePerm)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
@@ -166,12 +177,12 @@ func (self Env) Create(http *gin.Context) {
 				return
 			}
 		}
-		client.TlsCa = filepath.Join(client.CertRoot(), "ca.pem")
-		client.TlsCert = filepath.Join(client.CertRoot(), "cert.pem")
-		client.TlsKey = filepath.Join(client.CertRoot(), "key.pem")
+		dockerEnv.TlsCa = filepath.Join(dockerEnv.CertRoot(), "ca.pem")
+		dockerEnv.TlsCert = filepath.Join(dockerEnv.CertRoot(), "cert.pem")
+		dockerEnv.TlsKey = filepath.Join(dockerEnv.CertRoot(), "key.pem")
 	}
 
-	dockerClient, err := docker.NewBuilderWithDockerEnv(client)
+	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -199,14 +210,14 @@ func (self Env) Create(http *gin.Context) {
 			})
 		}
 		if defaultDockerInfo, err := dockerClient.Client.Info(dockerClient.Ctx); err == nil {
-			client.DockerInfo = &docker.ClientDockerInfo{
+			dockerEnv.DockerInfo = &types2.DockerInfo{
 				Name: defaultDockerInfo.Name,
 				ID:   defaultDockerInfo.ID,
 			}
 		}
 	}
 
-	logic.DockerEnv{}.UpdateEnv(client)
+	logic.Env{}.UpdateEnv(dockerEnv)
 	// 如果修改的是当前客户端的连接地址，则更新 docker sdk
 	if docker.Sdk.Name == params.Name && docker.Sdk.Client.DaemonHost() != params.Address {
 		docker.Sdk.Close()
@@ -227,13 +238,13 @@ func (self Env) Switch(http *gin.Context) {
 		return
 	}
 
-	dockerEnv, err := logic.DockerEnv{}.GetEnvByName(params.Name)
+	dockerEnv, err := logic.Env{}.GetEnvByName(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	oldDockerClient := docker.Sdk
-	dockerClient, err := docker.NewBuilderWithDockerEnv(dockerEnv)
+	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -250,7 +261,6 @@ func (self Env) Switch(http *gin.Context) {
 	}
 
 	docker.Sdk = dockerClient
-	go logic.NewEventLogin().MonitorLoop()
 
 	// 清除掉统计数据
 	_ = logic.Setting{}.Save(&entity.Setting{
@@ -318,7 +328,7 @@ func (self Env) GetDetail(http *gin.Context) {
 		params.Name = docker.Sdk.Name
 	}
 
-	dockerEnv, err := logic.DockerEnv{}.GetEnvByName(params.Name)
+	dockerEnv, err := logic.Env{}.GetEnvByName(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -332,7 +342,7 @@ func (self Env) GetDetail(http *gin.Context) {
 			}
 		}
 	}
-	if dockerEnv.EnableSSH && dockerEnv.Name != docker.DefaultClientName && dockerEnv.ServerUrl == "" {
+	if dockerEnv.EnableSSH && dockerEnv.Name != define.DockerDefaultClientName && dockerEnv.ServerUrl == "" {
 		dockerEnv.ServerUrl = dockerEnv.SshServerInfo.Address
 	}
 	if dockerEnv.ServerUrl == "" {

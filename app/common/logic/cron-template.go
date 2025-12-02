@@ -8,17 +8,17 @@ import (
 	"strings"
 
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"gopkg.in/yaml.v3"
 )
 
 type CronTemplateItem struct {
-	Name        string           `json:"name"`
-	Environment []docker.EnvItem `json:"environment"`
-	Script      string           `json:"script"`
-	Description string           `json:"description"`
-	Tag         []string         `json:"tag"`
-	Project     string           `json:"project"`
+	Name        string          `json:"name"`
+	Environment []types.EnvItem `json:"environment"`
+	Script      string          `json:"script"`
+	Description string          `json:"description"`
+	Tag         []string        `json:"tag"`
+	Project     string          `json:"project"`
 }
 
 type CronTemplate struct {
@@ -40,7 +40,7 @@ func (self CronTemplate) Template(dir string) ([]CronTemplateItem, error) {
 			item := CronTemplateItem{
 				Name:        yamlData.GetString("task.name"),
 				Script:      yamlData.GetString("task.script"),
-				Environment: make([]docker.EnvItem, 0),
+				Environment: make([]types.EnvItem, 0),
 				Description: yamlData.GetString("task.descriptionZh"),
 				Tag:         yamlData.GetStringSlice("task.tag"),
 				Project:     "dpanel",
@@ -52,16 +52,16 @@ func (self CronTemplate) Template(dir string) ([]CronTemplateItem, error) {
 			}
 			fields := yamlData.GetSliceStringMapString("task.environment")
 			for index, field := range fields {
-				envItem := docker.EnvItem{
+				envItem := types.EnvItem{
 					Name:  field["name"],
 					Label: field["labelZh"],
 				}
-				envItem.Rule = Store{}.ParseSettingField(field, func(item *docker.EnvValueRule) {
-					if (item.Kind & docker.EnvValueTypeSelect) != 0 {
+				envItem.Rule = Store{}.ParseSettingField(field, func(item *types.EnvValueRule) {
+					if (item.Kind & types.EnvValueTypeSelect) != 0 {
 						item.Option = function.PluckArrayWalk(
 							yamlData.GetSliceStringMapString(fmt.Sprintf("task.environment.%d.values", index)),
-							func(i map[string]string) (docker.ValueItem, bool) {
-								return docker.ValueItem{
+							func(i map[string]string) (types.ValueItem, bool) {
+								return types.ValueItem{
 									Name:  i["label"],
 									Value: i["value"],
 								}, true

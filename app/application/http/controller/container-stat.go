@@ -6,6 +6,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
 )
@@ -28,7 +29,7 @@ func (self Container) GetStatInfo(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	response, err := docker.Sdk.ContainerStats(progress.Context(), docker.ContainerStatsOption{
+	response, err := docker.Sdk.ContainerStats(progress.Context(), types.ContainerStatsOption{
 		Stream:  true,
 		Filters: filters.NewArgs(filters.Arg("id", params.Id)),
 	})

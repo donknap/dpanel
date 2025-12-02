@@ -14,7 +14,7 @@ import (
 
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"gopkg.in/yaml.v3"
@@ -105,10 +105,10 @@ func (self Store) GetAppByBaoTa(storePath string, downloadUrl string) ([]accesso
 			}
 		}
 
-		environment := make([]docker.EnvItem, 0)
+		environment := make([]types.EnvItem, 0)
 		if envList := config.GetSliceStringMapString("env"); !function.IsEmptyArray(envList) {
 			for _, field := range envList {
-				envItem := docker.EnvItem{
+				envItem := types.EnvItem{
 					Label: "",
 					Labels: map[string]string{
 						define.LangZh: field["desc"],

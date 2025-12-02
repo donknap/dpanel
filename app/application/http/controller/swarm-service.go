@@ -14,6 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	swarm2 "github.com/donknap/dpanel/common/service/docker/swarm"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
@@ -183,7 +184,7 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 	}
 	options = append(options, swarm2.WithContainerSpec(&buildParams))
 	options = append(options, swarm2.WithName(params.SiteName),
-		swarm2.WithLabel(docker.ValueItem{
+		swarm2.WithLabel(types.ValueItem{
 			Name:  define.SwarmLabelServiceDescription,
 			Value: params.SiteTitle,
 		}),
@@ -200,7 +201,7 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 		if registryInfo, err := dao.Registry.Where(dao.Registry.ID.Eq(buildParams.ImageRegistry)).First(); err == nil {
 			registryConfig := logic.Image{}.GetRegistryConfig(registryInfo.ServerAddress)
 			options = append(options, swarm2.WithRegistryAuth(registryConfig.GetAuthString()))
-			options = append(options, swarm2.WithLabel(docker.ValueItem{
+			options = append(options, swarm2.WithLabel(types.ValueItem{
 				Name:  define.SwarmLabelServiceImageRegistry,
 				Value: registryInfo.ServerAddress,
 			}))

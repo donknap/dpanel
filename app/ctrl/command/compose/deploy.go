@@ -8,7 +8,7 @@ import (
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/app"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
@@ -85,14 +85,14 @@ func (self Deploy) Handle(cmd *cobra.Command, args []string) {
 
 	err = proxyClient.AppComposeDeploy(&app.ComposeDeployOption{
 		Id: fmt.Sprintf("%d", composeTask.Detail.ID),
-		Environment: function.PluckArrayWalk(environment, func(item string) (docker.EnvItem, bool) {
+		Environment: function.PluckArrayWalk(environment, func(item string) (types.EnvItem, bool) {
 			if k, v, ok := strings.Cut(item, "="); ok {
-				return docker.EnvItem{
+				return types.EnvItem{
 					Name:  k,
 					Value: v,
 				}, true
 			} else {
-				return docker.EnvItem{}, false
+				return types.EnvItem{}, false
 			}
 		}),
 		DeployServiceName: serviceName,

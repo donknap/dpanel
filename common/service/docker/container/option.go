@@ -16,6 +16,7 @@ import (
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
 type Option func(builder *Builder) error
@@ -38,7 +39,7 @@ func WithContainerName(name string) Option {
 		self.containerConfig.AttachStdin = true
 		self.containerConfig.AttachStdout = true
 		self.containerConfig.AttachStderr = true
-		//self.containerConfig.Tty = true
+		self.containerConfig.OpenStdin = true
 		return nil
 	}
 }
@@ -59,9 +60,9 @@ func WithDomainName(name string) Option {
 	}
 }
 
-func WithEnv(item ...docker.EnvItem) Option {
+func WithEnv(item ...types.EnvItem) Option {
 	return func(self *Builder) error {
-		self.containerConfig.Env = function.PluckArrayWalk(item, func(i docker.EnvItem) (string, bool) {
+		self.containerConfig.Env = function.PluckArrayWalk(item, func(i types.EnvItem) (string, bool) {
 			if i.Name == "" {
 				return "", false
 			}
@@ -92,7 +93,7 @@ func WithImage(imageName string, tryPullImage bool) Option {
 	}
 }
 
-func WithRestartPolicy(restartPolicy *docker.RestartPolicy) Option {
+func WithRestartPolicy(restartPolicy *types.RestartPolicy) Option {
 	return func(self *Builder) error {
 		if restartPolicy.Name == "" {
 			restartPolicy.Name = "no"
@@ -113,7 +114,7 @@ func WithPrivileged(b bool) Option {
 	}
 }
 
-func WithVolume(item ...docker.VolumeItem) Option {
+func WithVolume(item ...types.VolumeItem) Option {
 	return func(self *Builder) error {
 		self.hostConfig.Binds = make([]string, 0)
 
@@ -138,7 +139,7 @@ func WithVolume(item ...docker.VolumeItem) Option {
 	}
 }
 
-func WithVolumesFrom(item ...docker.LinkItem) Option {
+func WithVolumesFrom(item ...types.LinkItem) Option {
 	containerList := make([]string, 0)
 	for _, linkItem := range item {
 		if linkItem.Volume {
@@ -162,7 +163,7 @@ func WithVolumesFromContainerName(item ...string) Option {
 	}
 }
 
-func WithPort(item ...docker.PortItem) Option {
+func WithPort(item ...types.PortItem) Option {
 	return func(self *Builder) error {
 		self.containerConfig.ExposedPorts = make(nat.PortSet)
 		self.hostConfig.PortBindings = make(nat.PortMap)
@@ -191,7 +192,7 @@ func WithPublishAllPorts(b bool) Option {
 	}
 }
 
-func WithLink(item ...docker.LinkItem) Option {
+func WithLink(item ...types.LinkItem) Option {
 	return func(self *Builder) error {
 		for _, linkItem := range item {
 			if linkItem.Alise == "" {
@@ -213,7 +214,7 @@ func WithLink(item ...docker.LinkItem) Option {
 }
 
 // WithNetwork 不在构建时加入网络，会导致 bridge 网络无法加入
-func WithNetwork(item ...docker.NetworkItem) Option {
+func WithNetwork(item ...types.NetworkItem) Option {
 	return func(self *Builder) error {
 		if self.networkingConfig == nil {
 			self.networkingConfig = &network.NetworkingConfig{
@@ -361,7 +362,7 @@ func WithContainerNetwork(containerName string) Option {
 	}
 }
 
-func WithLog(item *docker.LogDriverItem) Option {
+func WithLog(item *types.LogDriverItem) Option {
 	return func(self *Builder) error {
 		if item == nil || item.Driver == "" {
 			return nil
@@ -389,7 +390,7 @@ func WithDns(ip []string) Option {
 	}
 }
 
-func WithLabel(item ...docker.ValueItem) Option {
+func WithLabel(item ...types.ValueItem) Option {
 	return func(self *Builder) error {
 		if self.containerConfig.Labels == nil {
 			self.containerConfig.Labels = make(map[string]string)
@@ -401,7 +402,7 @@ func WithLabel(item ...docker.ValueItem) Option {
 	}
 }
 
-func WithExtraHosts(item ...docker.ValueItem) Option {
+func WithExtraHosts(item ...types.ValueItem) Option {
 	return func(self *Builder) error {
 		self.hostConfig.ExtraHosts = make([]string, 0)
 
@@ -415,7 +416,7 @@ func WithExtraHosts(item ...docker.ValueItem) Option {
 	}
 }
 
-func WithDevice(item ...docker.DeviceItem) Option {
+func WithDevice(item ...types.DeviceItem) Option {
 	return func(self *Builder) error {
 		self.hostConfig.Devices = make([]container.DeviceMapping, 0)
 
@@ -430,7 +431,7 @@ func WithDevice(item ...docker.DeviceItem) Option {
 	}
 }
 
-func WithGpus(item *docker.GpusItem) Option {
+func WithGpus(item *types.GpusItem) Option {
 	return func(self *Builder) error {
 		if item == nil || !item.Enable {
 			return nil
@@ -458,7 +459,7 @@ func WithGpus(item *docker.GpusItem) Option {
 	}
 }
 
-func WithHealthcheck(item *docker.HealthcheckItem) Option {
+func WithHealthcheck(item *types.HealthcheckItem) Option {
 	return func(self *Builder) error {
 		if item == nil || item.Cmd == "" {
 			return nil

@@ -1,63 +1,12 @@
-package docker
+package types
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/docker/docker/api/types/filters"
-	"github.com/donknap/dpanel/common/function"
 )
-
-const (
-	ImageBuildStatusStop    = 0  // 未开始
-	ImageBuildStatusProcess = 10 // 进行中
-	ImageBuildStatusError   = 20 // 有错误
-	ImageBuildStatusSuccess = 30 // 部署成功
-)
-
-const (
-	StepImagePull           = "imagePull"      // 拉取镜像中
-	StepImageBuild          = "imageBuild"     // 开始构建镜像
-	StepImageBuildUploadTar = "uploadTar"      // 上传构建 tar 包
-	StepImageBuildRun       = "imageBuildRun"  // 开始执行dockerfile
-	StepContainerBuild      = "containerBuild" // 创建容器
-	StepContainerRun        = "containerRun"   // 运行容器
-)
-
-const (
-	ContainerBackupTypeSnapshot = "snapshot"
-)
-
-const (
-	RemoteTypeDocker = "docker"
-	RemoteTypeSSH    = "ssh"
-)
-
-type PullMessage struct {
-	Id             string `json:"id"`
-	Status         string `json:"status"`
-	Progress       string `json:"progress"`
-	ProgressDetail struct {
-		Current float64 `json:"current"`
-		Total   float64 `json:"total"`
-	} `json:"progressDetail"`
-}
-
-type BuildMessage struct {
-	Stream      string `json:"stream"`
-	ErrorDetail struct {
-		Message string `json:"message"`
-	} `json:"errorDetail"`
-	PullMessage
-}
-
-type PullProgress struct {
-	Downloading float64 `json:"downloading"`
-	Extracting  float64 `json:"extracting"`
-}
 
 // 容器相关
-
 type VolumeItem struct {
 	Host       string `json:"host"`
 	Dest       string `json:"dest"`
@@ -79,76 +28,6 @@ type NetworkItem struct {
 	IpV6       string   `json:"ipV6"`
 	MacAddress string   `json:"macAddress"`
 	DnsName    []string `json:"dnsName"`
-}
-
-const (
-	EnvValueRuleRequired = 1 << iota
-	EnvValueRuleDisabled
-	EnvValueRuleInEnvFile
-	_
-	_
-	_
-	_
-	_
-	_
-	_
-	EnvValueTypeNumber
-	EnvValueTypeText
-	EnvValueTypeSelect
-	EnvValueTypeSelectMultiple
-	EnvValueTypeOnePanel
-	EnvValueTypeBaoTa
-)
-
-type EnvValueRule struct {
-	Kind   int         `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Option []ValueItem `json:"option,omitempty" yaml:"option,omitempty"`
-}
-
-func (self EnvValueRule) IsInEnvFile() bool {
-	return self.Kind&EnvValueRuleInEnvFile != 0
-}
-
-func NewEnvItemFromString(s string) EnvItem {
-	if k, v, ok := strings.Cut(s, "="); ok {
-		return EnvItem{
-			Name:  k,
-			Value: v,
-		}
-	} else {
-		return EnvItem{
-			Name:  s,
-			Value: "",
-		}
-	}
-}
-
-func NewEnvItemFromKV(k, v string) EnvItem {
-	return EnvItem{
-		Name:  k,
-		Value: v,
-	}
-}
-
-type EnvItem struct {
-	Label  string            `json:"label,omitempty" yaml:"label,omitempty"` // Deprecated: instead Labels["zh"]
-	Labels map[string]string `json:"labels,omitempty"`
-	Name   string            `json:"name"`
-	Value  string            `json:"value"`
-	Rule   *EnvValueRule     `json:"rule,omitempty"`
-}
-
-func (self EnvItem) String() string {
-	return fmt.Sprintf("%s=%s", self.Name, self.Value)
-}
-
-func NewValueItemWithArray(s ...string) []ValueItem {
-	return function.PluckArrayWalk(s, func(item string) (ValueItem, bool) {
-		return ValueItem{
-			Name:  item,
-			Value: item,
-		}, true
-	})
 }
 
 type ValueItem struct {

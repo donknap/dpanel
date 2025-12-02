@@ -24,6 +24,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 )
@@ -52,7 +53,7 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 			Setting: &accessor.ComposeSettingOption{
 				Type:          accessor.ComposeTypeOutPath,
 				DockerEnvName: docker.Sdk.Name,
-				Environment:   make([]docker.EnvItem, 0),
+				Environment:   make([]types2.EnvItem, 0),
 			},
 		}
 	}
@@ -271,7 +272,7 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 
 // Sync 同步当前挂载目录中的 compose
 func (self Compose) Sync(dockerEnvName string) error {
-	dockerEnv, err := logic.DockerEnv{}.GetEnvByName(dockerEnvName)
+	dockerEnv, err := logic.Env{}.GetEnvByName(dockerEnvName)
 	if err != nil {
 		return err
 	}
@@ -416,7 +417,7 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 	}
 	options = append(options, cli.WithDotEnv)
 	// 始终以提交上来的环境变量（包含 .env 文件），.env 的内容仅在编辑任务的时候会覆盖写入
-	globalEnv := function.PluckArrayWalk(dbRow.Setting.Environment, func(i docker.EnvItem) (string, bool) {
+	globalEnv := function.PluckArrayWalk(dbRow.Setting.Environment, func(i types2.EnvItem) (string, bool) {
 		if i.Rule != nil && i.Rule.IsInEnvFile() {
 			// 如果变量属于 .env 文件，则不主动附加，而是通过上面的 withEnvFile 进行附加
 			return "", false
@@ -461,14 +462,14 @@ func (self Compose) getDPanelProjectName(name string) string {
 	return fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(name, "@", "-"))
 }
 
-func (self Compose) ParseEnvItemValue(env []docker.EnvItem) ([]docker.EnvItem, error) {
-	envMap, err := dotenv.UnmarshalWithLookup(strings.Join(function.PluckArrayWalk(env, func(item docker.EnvItem) (string, bool) {
+func (self Compose) ParseEnvItemValue(env []types2.EnvItem) ([]types2.EnvItem, error) {
+	envMap, err := dotenv.UnmarshalWithLookup(strings.Join(function.PluckArrayWalk(env, func(item types2.EnvItem) (string, bool) {
 		return item.String(), true
 	}), "\n"), nil)
 	if err != nil {
 		return nil, err
 	}
-	return function.PluckArrayWalk(env, func(item docker.EnvItem) (docker.EnvItem, bool) {
+	return function.PluckArrayWalk(env, func(item types2.EnvItem) (types2.EnvItem, bool) {
 		if v, ok := envMap[item.Name]; ok {
 			item.Value = v
 		}

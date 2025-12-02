@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
@@ -31,7 +32,7 @@ func (self Cron) Create(http *gin.Context) {
 		Expression       []accessor.CronSettingExpression `json:"expression" binding:"required"`
 		ContainerName    string                           `json:"containerName"`
 		Script           string                           `json:"script" binding:"required"`
-		Environment      []docker.EnvItem                 `json:"environment"`
+		Environment      []types.EnvItem                  `json:"environment"`
 		EnableRunBlock   bool                             `json:"enableRunBlock"`
 		KeepLogTotal     int                              `json:"keepLogTotal"`
 		Disable          bool                             `json:"disable"`

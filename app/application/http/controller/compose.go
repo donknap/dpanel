@@ -24,6 +24,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
@@ -47,13 +48,13 @@ func (self Compose) Create(http *gin.Context) {
 		Yaml         string           `json:"yaml" binding:"required_without=Id"`
 		YamlOverride string           `json:"yamlOverride"`
 		RemoteUrl    string           `json:"remoteUrl"`
-		Environment  []docker.EnvItem `json:"environment"`
+		Environment  []types2.EnvItem `json:"environment"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	dockerClient, err := logic2.Setting{}.GetDockerClient(docker.Sdk.Name)
+	dockerClient, err := logic2.Env{}.GetEnvByName(docker.Sdk.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -64,7 +65,7 @@ func (self Compose) Create(http *gin.Context) {
 	if dockerClient.EnableComposePath {
 		dockerEnvName = dockerClient.Name
 	} else {
-		dockerEnvName = docker.DefaultClientName
+		dockerEnvName = define.DockerDefaultClientName
 	}
 
 	if params.Id != "" {
@@ -176,11 +177,11 @@ func (self Compose) Create(http *gin.Context) {
 			}); ok {
 				envLines[i] = fmt.Sprintf("%s=%s", item.Name, strconv.Quote(item.Value))
 				if composeRow.Setting.Environment[j].Rule == nil {
-					composeRow.Setting.Environment[j].Rule = &docker.EnvValueRule{
-						Kind: docker.EnvValueRuleInEnvFile,
+					composeRow.Setting.Environment[j].Rule = &types2.EnvValueRule{
+						Kind: types2.EnvValueRuleInEnvFile,
 					}
 				} else {
-					composeRow.Setting.Environment[j].Rule.Kind |= docker.EnvValueRuleInEnvFile
+					composeRow.Setting.Environment[j].Rule.Kind |= types2.EnvValueRuleInEnvFile
 				}
 			}
 		}
@@ -276,7 +277,7 @@ func (self Compose) GetList(http *gin.Context) {
 				Uri:           runItem.ConfigFileList,
 				Type:          accessor.ComposeTypeOutPath,
 				DockerEnvName: docker.Sdk.Name,
-				Environment:   make([]docker.EnvItem, 0),
+				Environment:   make([]types2.EnvItem, 0),
 				UpdatedAt:     runItem.UpdatedAt.Local().Format(time.DateTime),
 			},
 		}
@@ -327,18 +328,18 @@ func (self Compose) GetTask(http *gin.Context) {
 	if tasker, _, err := (logic.Compose{}).GetTasker(composeRow); err == nil {
 		data["project"] = tasker.Project
 		// 获取环境变量时，需要从 .env 文件中拿到最新值和新增的变量
-		composeRow.Setting.Environment = function.PluckMapWalkArray(tasker.Project.Environment, func(k string, v string) (docker.EnvItem, bool) {
-			if dbItem, _, ok := function.PluckArrayItemWalk(composeRow.Setting.Environment, func(item docker.EnvItem) bool {
+		composeRow.Setting.Environment = function.PluckMapWalkArray(tasker.Project.Environment, func(k string, v string) (types2.EnvItem, bool) {
+			if dbItem, _, ok := function.PluckArrayItemWalk(composeRow.Setting.Environment, func(item types2.EnvItem) bool {
 				return item.Name == k
 			}); ok {
 				dbItem.Value = v
 				return dbItem, true
 			}
-			return docker.EnvItem{
+			return types2.EnvItem{
 				Name:  k,
 				Value: v,
-				Rule: &docker.EnvValueRule{
-					Kind: docker.EnvValueRuleInEnvFile,
+				Rule: &types2.EnvValueRule{
+					Kind: types2.EnvValueRuleInEnvFile,
 				},
 			}, true
 		})
@@ -420,7 +421,7 @@ func (self Compose) GetFromGit(http *gin.Context) {
 		Name:  params.Name,
 		Setting: &accessor.ComposeSettingOption{
 			Type:          accessor.ComposeTypeStoragePath,
-			Environment:   make([]docker.EnvItem, 0),
+			Environment:   make([]types2.EnvItem, 0),
 			Uri:           []string{},
 			RemoteUrl:     params.Uri,
 			DockerEnvName: docker.Sdk.Name,
@@ -501,7 +502,7 @@ func (self Compose) Download(http *gin.Context) {
 	}
 
 	if !function.IsEmptyArray(yamlRow.Setting.Environment) {
-		content := strings.Join(function.PluckArrayWalk(yamlRow.Setting.Environment, func(item docker.EnvItem) (string, bool) {
+		content := strings.Join(function.PluckArrayWalk(yamlRow.Setting.Environment, func(item types2.EnvItem) (string, bool) {
 			return item.String(), true
 		}), "\n")
 		zipHeader := &zip.FileHeader{

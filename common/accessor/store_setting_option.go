@@ -1,6 +1,8 @@
 package accessor
 
-import "github.com/donknap/dpanel/common/service/docker"
+import (
+	"github.com/donknap/dpanel/common/service/docker/types"
+)
 
 type StoreAppItem struct {
 	Title        string                         `json:"title"`
@@ -18,7 +20,7 @@ type StoreAppItem struct {
 type StoreAppVersionItem struct {
 	Name        string            `json:"name"`
 	ComposeFile string            `json:"composeFile" yaml:"composeFile"`
-	Environment []docker.EnvItem  `json:"environment,omitempty"`
+	Environment []types.EnvItem   `json:"environment,omitempty"`
 	Script      map[string]string `json:"script,omitempty"`
 	Download    string            `json:"download"`
 	Ref         string            `json:"ref"` // 引用某个版本的数据

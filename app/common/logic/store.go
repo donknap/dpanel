@@ -14,7 +14,7 @@ import (
 
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -218,7 +218,7 @@ func (self Store) GetAppByCasaos(storePath string) ([]accessor.StoreAppItem, err
 		storeItem.Version["latest"] = accessor.StoreAppVersionItem{
 			Name:        "latest",
 			ComposeFile: filepath.Join(resourcePath, "docker-compose.yml"),
-			Environment: make([]docker.EnvItem, 0),
+			Environment: make([]types.EnvItem, 0),
 		}
 		if err == nil {
 			result = append(result, storeItem)
@@ -232,28 +232,28 @@ func (self Store) GetAppByCasaos(storePath string) ([]accessor.StoreAppItem, err
 	return result, nil
 }
 
-func (self Store) ParseSettingField(field map[string]string, call func(item *docker.EnvValueRule)) *docker.EnvValueRule {
-	valueRule := &docker.EnvValueRule{}
+func (self Store) ParseSettingField(field map[string]string, call func(item *types.EnvValueRule)) *types.EnvValueRule {
+	valueRule := &types.EnvValueRule{}
 
 	if field["required"] == "true" {
-		valueRule.Kind |= docker.EnvValueRuleRequired
+		valueRule.Kind |= types.EnvValueRuleRequired
 	}
 	if field["disabled"] == "true" {
-		valueRule.Kind |= docker.EnvValueRuleDisabled
+		valueRule.Kind |= types.EnvValueRuleDisabled
 	}
 
 	switch field["type"] {
 	case "text":
-		valueRule.Kind |= docker.EnvValueTypeText
+		valueRule.Kind |= types.EnvValueTypeText
 		break
 	case "number":
-		valueRule.Kind |= docker.EnvValueTypeNumber
+		valueRule.Kind |= types.EnvValueTypeNumber
 		break
 	case "select":
 		if field["multiple"] == "true" {
-			valueRule.Kind |= docker.EnvValueTypeSelectMultiple
+			valueRule.Kind |= types.EnvValueTypeSelectMultiple
 		} else {
-			valueRule.Kind |= docker.EnvValueTypeSelect
+			valueRule.Kind |= types.EnvValueTypeSelect
 		}
 	}
 

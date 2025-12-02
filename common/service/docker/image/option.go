@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
 type Option func(builder *Builder) error
@@ -78,7 +78,7 @@ func WithTag(name ...string) Option {
 	}
 }
 
-func WithPlatform(item *docker.ImagePlatform) Option {
+func WithPlatform(item *types.ImagePlatform) Option {
 	return func(self *Builder) error {
 		if item == nil || item.Arch == "" || item.Type == "" {
 			return nil
@@ -142,7 +142,7 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
-func WithArgs(args ...docker.EnvItem) Option {
+func WithArgs(args ...types.EnvItem) Option {
 	return func(self *Builder) error {
 		self.imageBuildOption.BuildArgs = make(map[string]*string)
 		for _, arg := range args {

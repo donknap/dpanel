@@ -68,12 +68,12 @@ func (self Swarm) InfoJoin(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	dockerEnv, err := logic.DockerEnv{}.GetEnvByName(params.DockerEnvName)
+	dockerEnv, err := logic.Env{}.GetEnvByName(params.DockerEnvName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	dockerClient, err := docker.NewBuilderWithDockerEnv(dockerEnv)
+	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -81,7 +81,7 @@ func (self Swarm) InfoJoin(http *gin.Context) {
 	defer func() {
 		dockerClient.Close()
 	}()
-	var swarmDockerClient *docker.Builder
+	var swarmDockerClient *docker.Client
 	if params.Type == "join" {
 		// join 是将当前环境添加到目标集群节点
 		swarmDockerClient = dockerClient

@@ -17,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -27,13 +28,13 @@ import (
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
 	type ParamsValidate struct {
-		Id                string           `json:"id" binding:"required"`
-		Environment       []docker.EnvItem `json:"environment"`
-		DeployServiceName []string         `json:"deployServiceName"`
-		CreatePath        bool             `json:"createPath"`
-		RemoveOrphans     bool             `json:"removeOrphans"`
-		PullImage         bool             `json:"pullImage"`
-		Build             bool             `json:"build"`
+		Id                string          `json:"id" binding:"required"`
+		Environment       []types.EnvItem `json:"environment"`
+		DeployServiceName []string        `json:"deployServiceName"`
+		CreatePath        bool            `json:"createPath"`
+		RemoveOrphans     bool            `json:"removeOrphans"`
+		PullImage         bool            `json:"pullImage"`
+		Build             bool            `json:"build"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -157,12 +158,12 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	// 这里需要单独适配一下 php 环境的相关扩展安装
 	// 目前只有 php 需要这样处理，暂时先直接进行判断
 	if strings.HasPrefix(composeRow.Setting.Store, define.StoreTypeOnePanel) && strings.HasSuffix(composeRow.Setting.Store, "@php") {
-		_ = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, docker.NetworkItem{
+		_ = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, types.NetworkItem{
 			Name: define.DPanelProxyNetworkName,
 		}, runCompose.ContainerList[0].Container.Names[0])
 
 		_, _ = progress.Write([]byte("Start install PHP_EXTENSIONS \n"))
-		if phpExt, _, ok := function.PluckArrayItemWalk(params.Environment, func(item docker.EnvItem) bool {
+		if phpExt, _, ok := function.PluckArrayItemWalk(params.Environment, func(item types.EnvItem) bool {
 			return item.Name == "PHP_EXTENSIONS"
 		}); ok {
 			_, _ = progress.Write([]byte("Install PHP_EXTENSIONS " + phpExt.String() + "\n"))

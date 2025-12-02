@@ -23,6 +23,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -208,9 +209,9 @@ func (self Container) GetDetail(http *gin.Context) {
 
 func (self Container) Update(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5     string                `json:"md5" binding:"required"`
-		Restart *docker.RestartPolicy `json:"restart"`
-		Name    string                `json:"name"`
+		Md5     string               `json:"md5" binding:"required"`
+		Restart *types.RestartPolicy `json:"restart"`
+		Name    string               `json:"name"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

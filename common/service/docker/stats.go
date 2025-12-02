@@ -11,9 +11,10 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/stats"
+	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
-func (self Builder) ContainerStats(ctx context.Context, option ContainerStatsOption) (<-chan []*stats.Usage, error) {
+func (self Client) ContainerStats(ctx context.Context, option types.ContainerStatsOption) (<-chan []*stats.Usage, error) {
 	containerList, err := self.Client.ContainerList(ctx, container.ListOptions{
 		Filters: option.Filters,
 		All:     true,
@@ -99,8 +100,8 @@ func (self Builder) ContainerStats(ctx context.Context, option ContainerStatsOpt
 	return statsChan, nil
 }
 
-func (self Builder) ContainerStatsOneShot(ctx context.Context) ([]*stats.Usage, error) {
-	result, err := self.ContainerStats(ctx, ContainerStatsOption{
+func (self Client) ContainerStatsOneShot(ctx context.Context) ([]*stats.Usage, error) {
+	result, err := self.ContainerStats(ctx, types.ContainerStatsOption{
 		Stream: false,
 	})
 	if err != nil {

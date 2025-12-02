@@ -14,6 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/robfig/cron/v3"
 )
@@ -49,13 +50,13 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 		startTime := time.Now()
 		containerName := task.Setting.ContainerName
 
-		defaultDockerEnv, err := Setting{}.GetDockerClient(task.Setting.DockerEnvName)
+		defaultDockerEnv, err := Env{}.GetEnvByName(task.Setting.DockerEnvName)
 		if err != nil {
 			return err
 		}
 		globalEnv := make([]string, 0)
 		globalEnv = append(globalEnv, defaultDockerEnv.CommandEnv()...)
-		globalEnv = append(globalEnv, function.PluckArrayWalk(task.Setting.Environment, func(i docker.EnvItem) (string, bool) {
+		globalEnv = append(globalEnv, function.PluckArrayWalk(task.Setting.Environment, func(i types.EnvItem) (string, bool) {
 			return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 		})...)
 
@@ -63,7 +64,7 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 		var script string
 
 		if containerName != "" {
-			dockerClient, err := docker.NewBuilderWithDockerEnv(defaultDockerEnv)
+			dockerClient, err := docker.NewClientWithDockerEnv(defaultDockerEnv)
 			if err != nil {
 				return err
 			}

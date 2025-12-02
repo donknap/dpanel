@@ -24,6 +24,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -126,7 +127,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 			if err == io.EOF {
 				break
 			}
-			msg := docker.BuildMessage{}
+			msg := types.BuildMessage{}
 			if err = json.Unmarshal(line, &msg); err == nil {
 				if msg.Stream != "" && strings.Contains(msg.Stream, "Loaded image:") {
 					if _, after, exists := strings.Cut(msg.Stream, "Loaded image: "); exists {
