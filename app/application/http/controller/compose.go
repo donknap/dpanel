@@ -54,16 +54,12 @@ func (self Compose) Create(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	dockerClient, err := logic2.Env{}.GetEnvByName(docker.Sdk.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+
 	var dockerEnvName string
 	var composeRow *entity.Compose
 
-	if dockerClient.EnableComposePath {
-		dockerEnvName = dockerClient.Name
+	if docker.Sdk.DockerEnv.EnableComposePath {
+		dockerEnvName = docker.Sdk.DockerEnv.Name
 	} else {
 		dockerEnvName = define.DockerDefaultClientName
 	}
@@ -87,7 +83,7 @@ func (self Compose) Create(http *gin.Context) {
 			return
 		}
 		yamlExist, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(
-			datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"),
+			datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
 		)...).First()
 		if yamlExist != nil {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
@@ -232,7 +228,14 @@ func (self Compose) GetList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	err := logic.Compose{}.Sync(docker.Sdk.Name)
+	var dockerEnvName string
+	if docker.Sdk.DockerEnv.EnableComposePath {
+		dockerEnvName = docker.Sdk.DockerEnv.Name
+	} else {
+		dockerEnvName = define.DockerDefaultClientName
+	}
+
+	err := logic.Compose{}.Sync(dockerEnvName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -246,8 +249,9 @@ func (self Compose) GetList(http *gin.Context) {
 	if params.Title != "" {
 		query = query.Where(dao.Compose.Title.Like("%" + params.Title + "%"))
 	}
+
 	query.Where(gen.Cond(
-		datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"),
+		datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
 	)...)
 	composeList, _ = query.Find()
 
@@ -393,20 +397,22 @@ func (self Compose) GetFromGit(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	var dockerEnvName string
+	if docker.Sdk.DockerEnv.EnableComposePath {
+		dockerEnvName = docker.Sdk.DockerEnv.Name
+	} else {
+		dockerEnvName = define.DockerDefaultClientName
+	}
+
 	composeRow, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(
-		datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"),
+		datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
 	)...).First()
 	if composeRow != nil {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
 		return
 	}
 
-	var targetPath string
-	if docker.Sdk.DockerEnv.EnableComposePath {
-		targetPath = filepath.Join(storage.Local{}.GetComposePath(docker.Sdk.Name), params.Name)
-	} else {
-		targetPath = filepath.Join(storage.Local{}.GetComposePath(""), params.Name)
-	}
+	targetPath := filepath.Join(storage.Local{}.GetComposePath(dockerEnvName), params.Name)
 	err := logic2.Store{}.SyncByGit(params.Uri, logic2.SyncByGitOption{
 		TargetPath: targetPath,
 	})
@@ -424,7 +430,7 @@ func (self Compose) GetFromGit(http *gin.Context) {
 			Environment:   make([]types2.EnvItem, 0),
 			Uri:           []string{},
 			RemoteUrl:     params.Uri,
-			DockerEnvName: docker.Sdk.Name,
+			DockerEnvName: dockerEnvName,
 			CreatedAt:     createTime,
 			UpdatedAt:     createTime,
 		},

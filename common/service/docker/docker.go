@@ -98,17 +98,17 @@ type Client struct {
 }
 
 func (self Client) Close() {
-	if self.DockerEnv.RemoteType == define.DockerRemoteTypeSSH {
-		localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
-		if strings.Contains(self.Client.DaemonHost(), self.Client.DaemonHost()) {
-			_ = os.Remove(localProxySock)
-		}
-	}
 	if self.CtxCancelFunc != nil {
 		self.CtxCancelFunc()
 	}
 	if self.Client != nil {
 		_ = self.Client.Close()
+	}
+	if self.DockerEnv.RemoteType == define.DockerRemoteTypeSSH {
+		localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
+		if strings.Contains(self.Client.DaemonHost(), self.Client.DaemonHost()) {
+			_ = os.Remove(localProxySock)
+		}
 	}
 }
 
@@ -175,6 +175,7 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 	return func(self *Client) error {
 		cmdName := "docker"
 		if sshClient, err := ssh.NewClient(ssh.WithServerInfo(serverInfo)...); err == nil {
+			defer sshClient.Close()
 			if content, err := remote.QuickRun(sshClient, "podman version"); err == nil && strings.Contains(string(content), "Podman Engine") {
 				slog.Debug("docker with ssh podman", "version", string(content))
 				cmdName = "podman"
@@ -195,6 +196,19 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 				if err != nil {
 					return nil, err
 				}
+				go func() {
+					defer func() {
+						sshClient.Close()
+					}()
+					select {
+					case <-ctx.Done():
+						return
+					case <-sshClient.Ctx().Done():
+						return
+					case <-self.Ctx.Done():
+						return
+					}
+				}()
 				return sshconn.New(sshClient, cmdName, "system", "dial-stdio")
 			},
 		}
@@ -263,6 +277,13 @@ func WithSockProxy() Option {
 						}
 						defer func() {
 							_ = resp.Body.Close()
+						}()
+						go func() {
+							buf := make([]byte, 1)
+							_, err = localConn.Read(buf)
+							if err != nil {
+								_ = resp.Body.Close()
+							}
 						}()
 						err = resp.Write(localConn)
 						if err != nil {

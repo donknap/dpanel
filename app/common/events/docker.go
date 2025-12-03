@@ -3,10 +3,15 @@ package events
 import (
 	"fmt"
 	"log/slog"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
+	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -16,6 +21,45 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
+var (
+	dataPool = make([]*entity.Event, 0)
+	mu       = sync.Mutex{}
+	ticker   = time.NewTicker(time.Second * 10)
+)
+
+func init() {
+	go func() {
+		for {
+			<-ticker.C
+			commit()
+		}
+	}()
+}
+
+func commit() {
+	if len(dataPool) == 0 {
+		return
+	}
+	slog.Debug("Event monitor commit start", "length", len(dataPool))
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	db, err := facade.GetDbFactory().Channel("default")
+	if err != nil {
+		slog.Debug("Event monitor commit", "err", err)
+		return
+	}
+
+	err = db.CreateInBatches(dataPool, len(dataPool)).Error
+	if err != nil {
+		slog.Debug("Event monitor commit", "len", len(dataPool), "err", err)
+		return
+	}
+	dataPool = []*entity.Event{}
+	return
+}
+
 type Docker struct {
 }
 
@@ -23,6 +67,14 @@ func (self Docker) Start(e event.DockerPayload) {
 	if e.DockerEnv == nil {
 		return
 	}
+	_ = dao.Event.Save(&entity.Event{
+		Type:   e.DockerEnv.Name,
+		Action: "daemon/start",
+		Message: strings.Join([]string{
+			e.DockerEnv.Address,
+		}, " "),
+		CreatedAt: time.Now().Format("2006-01-02 15:04:05.000"),
+	})
 	storage.Cache.Delete(fmt.Sprintf(storage.CacheKeyDockerStatus, e.DockerEnv.Name))
 
 	if e.DockerEnv.Name != define.DockerDefaultClientName {
@@ -77,5 +129,15 @@ func (self Docker) Stop(e event.DockerPayload) {
 func (self Docker) Message(e event.DockerMessagePayload) {
 	if e.Type == "container/stop" {
 		fmt.Printf("Message %v \n", e.Message[0])
+	}
+	if !function.IsEmptyArray(e.Message) {
+		mu.Lock()
+		defer mu.Unlock()
+		dataPool = append(dataPool, &entity.Event{
+			Type:      e.Type,
+			Action:    e.Action,
+			Message:   strings.Join(e.Message, " "),
+			CreatedAt: time.UnixMilli(e.Time / 1000000).Format("2006-01-02 15:04:05.000"),
+		})
 	}
 }

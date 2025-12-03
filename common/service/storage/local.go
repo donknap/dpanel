@@ -8,6 +8,7 @@ import (
 
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/acme"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
@@ -43,7 +44,7 @@ func (self Local) GetCertDomainPath() string {
 }
 
 func (self Local) GetComposePath(prefix string) string {
-	if prefix == "" {
+	if prefix == "" || prefix == define.DockerDefaultClientName {
 		return filepath.Join(self.GetStorageLocalPath(), "compose")
 	} else {
 		return filepath.Join(self.GetStorageLocalPath(), "compose-"+prefix)

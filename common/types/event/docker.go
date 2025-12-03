@@ -1,6 +1,8 @@
 package event
 
-import "github.com/donknap/dpanel/common/service/docker/types"
+import (
+	"github.com/donknap/dpanel/common/service/docker/types"
+)
 
 const (
 	DockerStartEvent   = "docker_start"
@@ -15,5 +17,7 @@ type DockerPayload struct {
 
 type DockerMessagePayload struct {
 	Type    string
+	Action  string
+	Time    int64
 	Message []string
 }

@@ -500,6 +500,9 @@ func (self Home) Usage(http *gin.Context) {
 			if strings.Contains(item.Status, "unhealthy") {
 				containerRunningTotal.Unhealthy += 1
 			}
+			if strings.Contains(item.Status, "Restarting") {
+				containerRunningTotal.Unhealthy += 1
+			}
 			usePort := make([]*portItem, 0)
 			if function.IsEmptyArray(item.Ports) {
 				if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID); err == nil && info.HostConfig != nil && !function.IsEmptyMap(info.HostConfig.PortBindings) {
