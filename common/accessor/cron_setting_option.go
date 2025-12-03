@@ -55,6 +55,12 @@ func (self CronSettingExpression) ToString() string {
 	return "0 0 0 * * *"
 }
 
+const (
+	CronTriggerTypeCron   = "cron"
+	CronTriggerTypeManual = "manual"
+	ContTriggerTypeEvent  = "event"
+)
+
 type CronSettingOption struct {
 	NextRunTime      []time.Time             `json:"nextRunTime,omitempty"`
 	Expression       []CronSettingExpression `json:"expression,omitempty"`
@@ -68,4 +74,7 @@ type CronSettingOption struct {
 	DockerEnvName    string                  `json:"dockerEnvName,omitempty"`
 	EntryShell       string                  `json:"entryShell,omitempty"`
 	ScriptRunTimeout int                     `json:"scriptRunTimeout,omitempty"`
+	TriggerType      string                  `json:"triggerType,omitempty"`
+	EventType        string                  `json:"eventType,omitempty"`
+	EventContainer   string                  `json:"eventContainer,omitempty"`
 }

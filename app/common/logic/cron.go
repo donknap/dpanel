@@ -33,8 +33,19 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 	for _, item := range task.Setting.Expression {
 		expression = append(expression, item.ToString())
 	}
-
+	option = append(option, crontab.WithRunFunc(self.GetJobCallback(task)))
 	option = append(option, crontab.WithRunFunc(func() error {
+		task.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(task.Setting.JobIds...)
+		err := dao.Cron.Save(task)
+		return err
+	}))
+
+	cronJob := crontab.New(option...)
+	return crontab.Wrapper.AddJob(cronJob, expression...)
+}
+
+func (self Cron) GetJobCallback(task *entity.Cron) func() error {
+	return func() error {
 		if task.Setting.EnableRunBlock {
 			if lock.TryLock() {
 				defer lock.Unlock()
@@ -131,14 +142,5 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 			_, _ = dao.CronLog.Where(dao.CronLog.CronID.Eq(task.ID)).Where(dao.CronLog.ID.NotIn(logIds...)).Delete()
 		}
 		return nil
-	}))
-
-	option = append(option, crontab.WithRunFunc(func() error {
-		task.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(task.Setting.JobIds...)
-		err := dao.Cron.Save(task)
-		return err
-	}))
-
-	cronJob := crontab.New(option...)
-	return crontab.Wrapper.AddJob(cronJob, expression...)
+	}
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
@@ -27,31 +26,26 @@ type Cron struct {
 
 func (self Cron) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id               int32                            `json:"id"`
-		Title            string                           `json:"title" binding:"required"`
-		Expression       []accessor.CronSettingExpression `json:"expression" binding:"required"`
-		ContainerName    string                           `json:"containerName"`
-		Script           string                           `json:"script" binding:"required"`
-		Environment      []types.EnvItem                  `json:"environment"`
-		EnableRunBlock   bool                             `json:"enableRunBlock"`
-		KeepLogTotal     int                              `json:"keepLogTotal"`
-		Disable          bool                             `json:"disable"`
-		EntryShell       string                           `json:"entryShell"`
-		ScriptRunTimeout int                              `json:"ScriptRunTimeout"`
+		Id    int32  `json:"id"`
+		Title string `json:"title" binding:"required"`
+		accessor.CronSettingOption
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
-	allExpression := make([]string, 0)
-	for _, expression := range params.Expression {
-		allExpression = append(allExpression, expression.ToString())
-	}
-	err := crontab.Wrapper.CheckExpression(allExpression)
-	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerCronExpressionInCorrect, "message", err.Error()), 500)
-		return
+	var err error
+	if params.TriggerType == accessor.CronTriggerTypeCron {
+		allExpression := make([]string, 0)
+		for _, expression := range params.Expression {
+			allExpression = append(allExpression, expression.ToString())
+		}
+		err = crontab.Wrapper.CheckExpression(allExpression)
+		if err != nil {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerCronExpressionInCorrect, "message", err.Error()), 500)
+			return
+		}
 	}
 
 	var taskRow *entity.Cron
@@ -62,50 +56,34 @@ func (self Cron) Create(http *gin.Context) {
 			return
 		}
 		crontab.Wrapper.RemoveJob(taskRow.Setting.JobIds...)
+		taskRow.Setting = &params.CronSettingOption
 		taskRow.Title = params.Title
 		taskRow.Setting.NextRunTime = make([]time.Time, 0)
 		taskRow.Setting.JobIds = make([]cron.EntryID, 0)
-		taskRow.Setting.Expression = params.Expression
-		taskRow.Setting.Script = params.Script
-		taskRow.Setting.ContainerName = params.ContainerName
-		taskRow.Setting.EnableRunBlock = params.EnableRunBlock
-		taskRow.Setting.Environment = params.Environment
-		taskRow.Setting.KeepLogTotal = params.KeepLogTotal
-		taskRow.Setting.Disable = params.Disable
 		taskRow.Setting.DockerEnvName = docker.Sdk.Name
-		taskRow.Setting.EntryShell = params.EntryShell
-		taskRow.Setting.ScriptRunTimeout = params.ScriptRunTimeout
 	} else {
 		if _, err := dao.Cron.Where(dao.Cron.Title.Like(params.Title)).First(); err == nil {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Title), 500)
 			return
 		}
 		taskRow = &entity.Cron{
-			Title: params.Title,
-			Setting: &accessor.CronSettingOption{
-				NextRunTime:    make([]time.Time, 0),
-				Expression:     params.Expression,
-				ContainerName:  params.ContainerName,
-				Script:         params.Script,
-				JobIds:         make([]cron.EntryID, 0),
-				EnableRunBlock: params.EnableRunBlock,
-				Environment:    params.Environment,
-				KeepLogTotal:   params.KeepLogTotal,
-				Disable:        params.Disable,
-				DockerEnvName:  docker.Sdk.Name,
-				EntryShell:     params.EntryShell,
-			},
+			Title:   params.Title,
+			Setting: &params.CronSettingOption,
 		}
-		err = dao.Cron.Create(taskRow)
+		taskRow.Setting.NextRunTime = make([]time.Time, 0)
+		taskRow.Setting.JobIds = make([]cron.EntryID, 0)
+		taskRow.Setting.DockerEnvName = docker.Sdk.Name
+		_ = dao.Cron.Create(taskRow)
 	}
-	if !params.Disable {
+	if !params.Disable && params.TriggerType == accessor.CronTriggerTypeCron {
 		jobIds, err := logic.Cron{}.AddJob(taskRow)
 		if err == nil {
 			taskRow.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(jobIds...)
 			taskRow.Setting.JobIds = jobIds
 		}
 	}
-	_ = dao.Cron.Save(taskRow)
+
+	err = dao.Cron.Save(taskRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -167,11 +145,17 @@ func (self Cron) RunOnce(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	if cronRow.Setting.JobIds == nil || len(cronRow.Setting.Expression) == 0 {
+	if cronRow.Setting.TriggerType == accessor.CronTriggerTypeCron && (cronRow.Setting.JobIds == nil || len(cronRow.Setting.Expression) == 0) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerCronTaskEmpty), 500)
 		return
 	}
-	crontab.Wrapper.Cron.Entry(cronRow.Setting.JobIds[0]).Job.Run()
+	if callback := (logic.Cron{}).GetJobCallback(cronRow); callback != nil {
+		err := callback()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
 	self.JsonSuccessResponse(http)
 	return
 }
