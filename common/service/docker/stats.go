@@ -33,6 +33,9 @@ func (self Client) ContainerStats(ctx context.Context, option types.ContainerSta
 	statsCollect := stats.Collect{}
 
 	for _, containerInfo := range containerList {
+		if function.IsEmptyArray(containerInfo.Names) {
+			continue
+		}
 		s := &stats.Container{
 			Usage: &stats.Usage{
 				Container: containerInfo.ID,

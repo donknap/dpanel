@@ -621,7 +621,10 @@ func (self Home) GetStatList(http *gin.Context) {
 		Stream: true,
 	})
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		slog.Debug("home get stat list", "error", err)
+		self.JsonResponseWithoutError(http, gin.H{
+			"list": "",
+		})
 		return
 	}
 

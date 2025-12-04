@@ -167,6 +167,9 @@ func (self Container) GetList(http *gin.Context) {
 	siteList, _ := query.Find()
 
 	sort.Slice(list, func(i, j int) bool {
+		if function.IsEmptyArray(list[i].Names) || function.IsEmptyArray(list[j].Names) {
+			return false
+		}
 		return list[i].Names[0] < list[j].Names[0]
 	})
 
@@ -334,7 +337,22 @@ func (self Container) Delete(http *gin.Context) {
 	var err error
 	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		// 如果查找不到容器信息，可能是有错误的容器，强制删除
+		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, params.Md5, container.StopOptions{})
+		if err != nil {
+			slog.Debug("container delete not info container", "error", err)
+		}
+		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, params.Md5, container.RemoveOptions{
+			Force: true,
+		})
+		if err != nil {
+			slog.Debug("container delete not info container", "error", err)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+			return
+		}
+		self.JsonResponseWithoutError(http, gin.H{
+			"md5": params.Md5,
+		})
 		return
 	}
 	runOption, err := logic.Site{}.GetEnvOptionByContainer(params.Md5)
