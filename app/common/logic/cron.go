@@ -16,6 +16,8 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
+	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/patrickmn/go-cache"
 	"github.com/robfig/cron/v3"
 )
 
@@ -26,7 +28,7 @@ var (
 type Cron struct {
 }
 
-func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
+func (self Cron) AddCronJob(task *entity.Cron) ([]cron.EntryID, error) {
 	option := make([]crontab.Option, 0)
 	option = append(option, crontab.WithName(task.Title))
 	expression := make([]string, 0)
@@ -44,7 +46,12 @@ func (self Cron) AddJob(task *entity.Cron) ([]cron.EntryID, error) {
 	return crontab.Wrapper.AddJob(cronJob, expression...)
 }
 
-func (self Cron) GetJobCallback(task *entity.Cron) func() error {
+func (self Cron) AddEventJob(task *entity.Cron) {
+	cacheKey := fmt.Sprintf(storage.CacheKeyDockerEventJob, task.Setting.DockerEnvName, task.Setting.EventType, task.Setting.EventContainer)
+	storage.Cache.Set(cacheKey, self.GetJobCallback(task), cache.DefaultExpiration)
+}
+
+func (self Cron) GetJobCallback(task *entity.Cron) crontab.RunFunc {
 	return func() error {
 		if task.Setting.EnableRunBlock {
 			if lock.TryLock() {

@@ -58,7 +58,7 @@ func (self CronSettingExpression) ToString() string {
 const (
 	CronTriggerTypeCron   = "cron"
 	CronTriggerTypeManual = "manual"
-	ContTriggerTypeEvent  = "event"
+	CronTriggerTypeEvent  = "event"
 )
 
 type CronSettingOption struct {

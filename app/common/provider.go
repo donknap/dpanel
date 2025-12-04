@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/app/common/events"
 	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	common "github.com/donknap/dpanel/common/middleware"
@@ -137,16 +138,20 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			if task.Setting.Disable {
 				continue
 			}
-			jobIds, err := logic.Cron{}.AddJob(task)
-			if err != nil {
-				task.Setting.NextRunTime = make([]time.Time, 0)
-				task.Setting.JobIds = make([]cron.EntryID, 0)
-				slog.Debug("init crontab task error", "error", err.Error())
-			} else {
-				task.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(jobIds...)
-				task.Setting.JobIds = jobIds
+			if task.Setting.TriggerType == accessor.CronTriggerTypeCron {
+				jobIds, err := logic.Cron{}.AddCronJob(task)
+				if err != nil {
+					task.Setting.NextRunTime = make([]time.Time, 0)
+					task.Setting.JobIds = make([]cron.EntryID, 0)
+					slog.Debug("init crontab task error", "error", err.Error())
+				} else {
+					task.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(jobIds...)
+					task.Setting.JobIds = jobIds
+				}
+				_ = dao.Cron.Save(task)
+			} else if task.Setting.TriggerType == accessor.CronTriggerTypeEvent {
+				logic.Cron{}.AddEventJob(task)
 			}
-			_ = dao.Cron.Save(task)
 		}
 	}
 }

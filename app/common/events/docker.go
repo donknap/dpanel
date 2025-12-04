@@ -12,6 +12,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -122,14 +123,11 @@ func (self Docker) Stop(e event.DockerPayload) {
 	}
 	storage.Cache.Set(fmt.Sprintf(storage.CacheKeyDockerStatus, e.DockerEnv.Name), types.DockerStatus{
 		Available: false,
-		Message:   e.Error.Error(),
+		Message:   fmt.Sprintf("%s, at %s", e.Error.Error(), time.Now().Format(define.DateShowYmdHis)),
 	}, cache.DefaultExpiration)
 }
 
 func (self Docker) Message(e event.DockerMessagePayload) {
-	if e.Type == "container/stop" {
-		fmt.Printf("Message %v \n", e.Message[0])
-	}
 	if !function.IsEmptyArray(e.Message) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -139,5 +137,20 @@ func (self Docker) Message(e event.DockerMessagePayload) {
 			Message:   strings.Join(e.Message, " "),
 			CreatedAt: time.UnixMilli(e.Time / 1000000).Format("2006-01-02 15:04:05.000"),
 		})
+	}
+
+	if function.InArray([]string{
+		define.DockerEventContainerDestroy, define.DockerEventContainerCreate,
+		define.DockerEventContainerDie, define.DockerEventContainerStart,
+	}, e.Action) {
+		cacheKey := fmt.Sprintf(storage.CacheKeyDockerEventJob, e.Type, e.Action, e.Message[0])
+		if v, ok := storage.Cache.Get(cacheKey); ok {
+			if job, ok := v.(crontab.RunFunc); ok {
+				err := job()
+				if err != nil {
+					slog.Debug("docker event job", "event", e.Action, "task", cacheKey, "error", err)
+				}
+			}
+		}
 	}
 }

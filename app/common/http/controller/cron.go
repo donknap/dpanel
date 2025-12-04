@@ -76,7 +76,7 @@ func (self Cron) Create(http *gin.Context) {
 		_ = dao.Cron.Create(taskRow)
 	}
 	if !params.Disable && params.TriggerType == accessor.CronTriggerTypeCron {
-		jobIds, err := logic.Cron{}.AddJob(taskRow)
+		jobIds, err := logic.Cron{}.AddCronJob(taskRow)
 		if err == nil {
 			taskRow.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(jobIds...)
 			taskRow.Setting.JobIds = jobIds

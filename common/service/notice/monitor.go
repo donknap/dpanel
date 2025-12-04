@@ -3,6 +3,7 @@ package notice
 import (
 	"context"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -89,8 +90,7 @@ func (self *monitor) listen(c *client) {
 	var initErr error
 
 	for {
-		slog.Debug("Monitor start client", "name", c.dockerEnv.Name, "error", initErr)
-		time.Sleep(5 * time.Second)
+		time.Sleep(10 * time.Second)
 		if initErr != nil {
 			facade.GetEvent().Publish(event.DockerStopEvent, event.DockerPayload{
 				DockerEnv: c.dockerEnv,
@@ -129,7 +129,9 @@ func (self *monitor) listen(c *client) {
 				self.Close()
 				return
 			case message, ok := <-eventChan:
-				slog.Debug("Monitor message", "name", c.dockerEnv.Name, "message", message)
+				if os.Getenv("APP_ENV") == "debug" {
+					slog.Debug("Monitor message", "name", c.dockerEnv.Name, "message", message)
+				}
 				if !ok {
 					break
 				}
