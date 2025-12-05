@@ -440,6 +440,9 @@ func (self Compose) GetFromGit(http *gin.Context) {
 		relYamlFilePath := filepath.Join(targetPath, suffix)
 		if _, err = os.Stat(relYamlFilePath); err == nil {
 			composeRow.Setting.Uri = append(composeRow.Setting.Uri, path.Join(params.Name, suffix))
+			if _, err = os.Stat(filepath.Join(targetPath, define.ComposeProjectDeployOverrideFileName)); err == nil {
+				composeRow.Setting.Uri = append(composeRow.Setting.Uri, path.Join(params.Name, define.ComposeProjectDeployOverrideFileName))
+			}
 			break
 		}
 	}

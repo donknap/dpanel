@@ -137,8 +137,8 @@ func (self *monitor) listen(c *client) {
 				}
 				self.processor(c.dockerEnv.Name, message)
 			case err, ok := <-errChan:
-				slog.Debug("Monitor error", "name", c.dockerEnv.Name, "err", err)
 				if !ok {
+					slog.Debug("Monitor error", "name", c.dockerEnv.Name, "error", err)
 					break
 				}
 			}

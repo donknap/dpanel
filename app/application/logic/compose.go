@@ -262,6 +262,10 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 						DockerEnvName: docker.Sdk.Name,
 					},
 				}
+				relOverrideYamlPath := filepath.Join(path.Name(), define.ComposeProjectDeployOverrideFileName)
+				if _, err = os.Stat(filepath.Join(rootDir, relOverrideYamlPath)); err == nil {
+					findRow.Setting.Uri = append(findRow.Setting.Uri, relOverrideYamlPath)
+				}
 				findComposeList[name] = findRow
 				break
 			}
@@ -272,27 +276,16 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 
 // Sync 同步当前挂载目录中的 compose
 func (self Compose) Sync(dockerEnvName string) error {
-	dockerEnv, err := logic.Env{}.GetEnvByName(dockerEnvName)
-	if err != nil {
-		return err
-	}
-	var rootDir string
-	if dockerEnv.EnableComposePath {
-		rootDir = storage.Local{}.GetComposePath(dockerEnvName)
-	} else {
-		rootDir = storage.Local{}.GetComposePath("")
-	}
+	rootDir := storage.Local{}.GetComposePath(dockerEnvName)
 	findComposeList := self.FindPathTask(rootDir)
 
 	// 循环任务，添加，清理任务
 	composeList, _ := dao.Compose.Find()
 	for _, dbComposeRow := range composeList {
 		if find, ok := findComposeList[dbComposeRow.Name]; ok && find.Setting.DockerEnvName == dbComposeRow.Setting.DockerEnvName {
-			// 如果 uri 中的文件名不在数据库中，则更新
-			if !function.InArrayArray(dbComposeRow.Setting.Uri, find.Setting.Uri...) {
-				dbComposeRow.Setting.Uri = find.Setting.Uri
-				_ = dao.Compose.Save(dbComposeRow)
-			}
+			// 终始以目录下的实际文件为准
+			dbComposeRow.Setting.Uri = find.Setting.Uri
+			_ = dao.Compose.Save(dbComposeRow)
 			delete(findComposeList, dbComposeRow.Name)
 		} else {
 			// 除非任务的类型是属于当前的环境才执行删除
@@ -395,7 +388,7 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 		}
 
 		// 查找当前目录下是否有 dpanel-override 文件
-		overrideFilePath := filepath.Join(taskFileDir, fmt.Sprintf("dpanel-%s-override.yaml", dbRow.Name))
+		overrideFilePath := filepath.Join(taskFileDir, fmt.Sprintf(define.ComposeProjectDeployOverrideOutPathFileName, dbRow.Name))
 		if len(yamlFilePath) > 0 && !function.InArray(yamlFilePath, overrideFilePath) {
 			if _, err := os.Stat(overrideFilePath); err == nil {
 				yamlFilePath = append(yamlFilePath, overrideFilePath)
