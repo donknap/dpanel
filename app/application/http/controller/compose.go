@@ -107,7 +107,7 @@ func (self Compose) Create(http *gin.Context) {
 			accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl,
 		}, params.Type) {
 			composeRow.Setting.Uri = []string{
-				filepath.Join(params.Name, define.ComposeProjectDeployFileName),
+				filepath.Join(params.Name, define.ComposeProjectDeployComposeFileName),
 			}
 		}
 	}

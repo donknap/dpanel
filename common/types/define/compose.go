@@ -13,8 +13,9 @@ const (
 	ComposeProjectPrefix = "dpanel-c-"                 // Deprecated
 	ComposeProjectName   = ComposeProjectPrefix + "%s" // Deprecated
 
-	ComposeProjectDeployFileName                = "dpanel-deploy.yaml" // Deprecated instead ComposeProjectDeployComposeFileName
+	ComposeProjectDeployFileName                = "dpanel-deploy.yaml" // Deprecated
 	ComposeProjectDeployOverrideFileName        = "dpanel-override.yaml"
 	ComposeProjectDeployOverrideOutPathFileName = "dpanel-%s-override.yaml"
+	ComposeProjectDeployComposeFileName         = "docker-compose.yaml"
 	ComposeDefaultEnvFileName                   = ".env"
 )
