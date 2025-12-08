@@ -16,6 +16,7 @@ import (
 	"github.com/donknap/dpanel/app/ctrl/sdk/types"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
@@ -41,13 +42,14 @@ type Client struct {
 
 func (self *Client) Post(uri string, payload any) (data io.Reader, err error) {
 	postData := new(bytes.Buffer)
-	if payload != nil {
-		jsonData, err := json.Marshal(payload)
-		if err != nil {
-			return nil, err
-		}
-		postData.Write(jsonData)
+	if payload == nil {
+		payload = gin.H{}
 	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	postData.Write(jsonData)
 	uri, err = url.JoinPath(self.apiUrl, uri)
 	if err != nil {
 		return nil, err

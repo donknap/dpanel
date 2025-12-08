@@ -88,6 +88,7 @@ func (self DockerTask) ImageBuild(messageId string, task accessor.ImageSettingOp
 	if err != nil {
 		return log.String(), err
 	}
+	wsBuffer.BroadcastMessage(buffer.String())
 	return log.String(), nil
 }
 
@@ -117,7 +118,7 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 				if pd.ErrorDetail.Message != "" {
 					return errors.New(pd.ErrorDetail.Message)
 				}
-				if pd.Status == "Pulling fs layer" {
+				if pd.Status == "Pulling fs layer" || pd.Status == "Preparing" {
 					pg[pd.Id] = &types.PullProgress{
 						Extracting:  0,
 						Downloading: 0,
@@ -129,10 +130,17 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 				if pd.ProgressDetail.Total > 0 && pd.Status == "Extracting" {
 					pg[pd.Id].Extracting = math.Floor((pd.ProgressDetail.Current / pd.ProgressDetail.Total) * 100)
 				}
+				if pd.ProgressDetail.Total > 0 && pd.Status == "Pushing" {
+					pg[pd.Id].Downloading = math.Floor((pd.ProgressDetail.Current / pd.ProgressDetail.Total) * 100)
+				}
 				if pd.Status == "Download complete" {
 					pg[pd.Id].Downloading = 100
 				}
 				if pd.Status == "Pull complete" {
+					pg[pd.Id].Extracting = 100
+				}
+				if pd.Status == "Pushed" || pd.Status == "Layer already exists" {
+					pg[pd.Id].Downloading = 100
 					pg[pd.Id].Extracting = 100
 				}
 			} else {
@@ -152,5 +160,6 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 	if err != nil {
 		return err
 	}
+	w.BroadcastMessage(pg)
 	return nil
 }

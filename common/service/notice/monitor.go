@@ -91,19 +91,19 @@ func (self *monitor) listen(c *client) {
 
 	for {
 		time.Sleep(10 * time.Second)
-		if initErr != nil {
-			facade.GetEvent().Publish(event.DockerStopEvent, event.DockerPayload{
-				DockerEnv: c.dockerEnv,
-				Error:     initErr,
-			})
-		}
 		if _, ok := self.clients.Load(c.dockerEnv.Name); !ok {
 			c.Close()
 			return
 		}
-		initErr = nil
 		c.dockerClient, initErr = docker.NewClientWithDockerEnv(c.dockerEnv)
 		if initErr != nil {
+			if os.Getenv("APP_ENV") == "debug" {
+				slog.Debug("Monitor start", "name", c.dockerEnv.Name, "error", initErr)
+			}
+			facade.GetEvent().Publish(event.DockerStopEvent, event.DockerPayload{
+				DockerEnv: c.dockerEnv,
+				Error:     initErr,
+			})
 			continue
 		}
 
@@ -118,6 +118,7 @@ func (self *monitor) listen(c *client) {
 
 		eventChan, errChan := c.dockerClient.Client.Events(context.Background(), events.ListOptions{})
 
+	eventLoop:
 		for {
 			select {
 			case <-c.ctx.Done():
@@ -133,13 +134,13 @@ func (self *monitor) listen(c *client) {
 					slog.Debug("Monitor message", "name", c.dockerEnv.Name, "message", message)
 				}
 				if !ok {
-					break
+					break eventLoop
 				}
 				self.processor(c.dockerEnv.Name, message)
 			case err, ok := <-errChan:
 				if !ok {
 					slog.Debug("Monitor error", "name", c.dockerEnv.Name, "error", err)
-					break
+					break eventLoop
 				}
 			}
 		}

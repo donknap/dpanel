@@ -138,7 +138,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			if task.Setting.Disable {
 				continue
 			}
-			if task.Setting.TriggerType == accessor.CronTriggerTypeCron {
+			if task.Setting.TriggerType == "" || task.Setting.TriggerType == accessor.CronTriggerTypeCron {
 				jobIds, err := logic.Cron{}.AddCronJob(task)
 				if err != nil {
 					task.Setting.NextRunTime = make([]time.Time, 0)
