@@ -28,6 +28,9 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 		if err != nil {
 			return "", err
 		}
+		if task.BuildParams.BindIpV6 && task.BuildParams.IpV6 == nil {
+			task.BuildParams.IpV6 = &types.NetworkCreateItem{}
+		}
 		containerOwnerNetwork, err = docker.Sdk.NetworkCreate(docker.Sdk.Ctx, task.SiteName, task.BuildParams.IpV4, task.BuildParams.IpV6)
 		if err != nil {
 			return "", err

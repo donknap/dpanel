@@ -42,12 +42,14 @@ func (self Client) NetworkCreate(ctx context.Context, networkName string, ipV4, 
 			Gateway: ipV4.Gateway,
 		})
 	}
-	if ipV6 != nil && ipV6.Gateway != "" && ipV6.Subnet != "" {
+	if ipV6 != nil {
 		option.EnableIPv6 = function.Ptr(true)
-		option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
-			Subnet:  ipV6.Subnet,
-			Gateway: ipV6.Gateway,
-		})
+		if ipV6.Gateway != "" && ipV6.Subnet != "" {
+			option.IPAM.Config = append(option.IPAM.Config, network.IPAMConfig{
+				Subnet:  ipV6.Subnet,
+				Gateway: ipV6.Gateway,
+			})
+		}
 	}
 	response, err := self.Client.NetworkCreate(ctx, networkName, option)
 	if err != nil {

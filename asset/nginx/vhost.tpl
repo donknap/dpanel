@@ -11,6 +11,7 @@ upstream {{.TargetName}} {
 {{if .EnableSSL}}
 server {
     listen 80;
+    listen [::]:80;
     server_name {{.ServerName}} {{range $index, $value := .ServerNameAlias}}{{$value}} {{end}};
 
     location / {
@@ -23,6 +24,7 @@ server {
     set $forward_scheme {{.ServerProtocol}};
     {{if .EnableSSL}}
     listen 443 ssl;
+    listen [::]:443 ssl;
     {{else}}
     listen 80;
     {{end}}
