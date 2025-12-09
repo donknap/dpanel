@@ -7,6 +7,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.11.0
 	github.com/compose-spec/compose-go/v2 v2.9.1
 	github.com/creack/pty v1.1.24
+	github.com/distribution/reference v0.6.0
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
@@ -33,7 +34,7 @@ require (
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/we7coreteam/w7-rangine-go/v2 v2.0.5
+	github.com/we7coreteam/w7-rangine-go/v2 v2.0.6
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
 	go.uber.org/zap v1.27.1
 	go.uber.org/zap/exp v0.3.0
@@ -66,7 +67,6 @@ require (
 	github.com/creasty/defaults v1.8.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect

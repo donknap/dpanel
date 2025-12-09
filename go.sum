@@ -267,8 +267,8 @@ github.com/ugorji/go/codec v1.3.1 h1:waO7eEiFDwidsBN6agj1vJQ4AG7lh2yqXyOXqhgQuyY
 github.com/ugorji/go/codec v1.3.1/go.mod h1:pRBVtBSKl77K30Bv8R2P+cLSGaTtex6fsA2Wjqmfxj4=
 github.com/we7coreteam/gorm-gen-yaml v1.0.10 h1:K3QfHfv5uEZOfg/Z/x4eZpuReyLw50FeHCqib7RtYPE=
 github.com/we7coreteam/gorm-gen-yaml v1.0.10/go.mod h1:tNGeJOZuMo3sNFW24WMRXm6Eydx1wRlA8Z5PCT2Gd8c=
-github.com/we7coreteam/w7-rangine-go/v2 v2.0.5 h1:tFhk5mQuCr5mhMiIlh2Vj2WDWDYgn3lJqmzX9cg697I=
-github.com/we7coreteam/w7-rangine-go/v2 v2.0.5/go.mod h1:zgZuzT5l7+i9IGtbr/3RIqwmRJp+BS7SExH/ymNSxs0=
+github.com/we7coreteam/w7-rangine-go/v2 v2.0.6 h1:FWPWF8IFuJJgNUk8NS0d4equTb+RlLNDsYCyTiTjxDY=
+github.com/we7coreteam/w7-rangine-go/v2 v2.0.6/go.mod h1:zgZuzT5l7+i9IGtbr/3RIqwmRJp+BS7SExH/ymNSxs0=
 github.com/xhit/go-str2duration/v2 v2.1.0 h1:lxklc02Drh6ynqX+DdPyp5pCKLUQpRT8bp8Ydu2Bstc=
 github.com/xhit/go-str2duration/v2 v2.1.0/go.mod h1:ohY8p+0f07DiV6Em5LKB0s2YpLtXVyJfNt1+BlmyAsU=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=

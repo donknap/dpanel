@@ -14,6 +14,6 @@ type DebugMiddleware struct {
 }
 
 func (self DebugMiddleware) Process(ctx *gin.Context) {
-	slog.Info("runtime info", "goroutine", runtime.NumGoroutine(), "client total", ws.GetCollect().Total(), "progress total", ws.GetCollect().ProgressTotal())
+	slog.Info("runtime info", "url", ctx.Request.URL, "goroutine", runtime.NumGoroutine(), "client total", ws.GetCollect().Total(), "progress total", ws.GetCollect().ProgressTotal())
 	ctx.Next()
 }

@@ -236,7 +236,7 @@ jobs:
       - name: Build
         run: |
           VERSION_TAG=${GITHUB_REF_NAME#v}
-          CGO_ENABLED=1 go build -o runtime/dpanel.exe -ldflags "-X main.DPanelVersion=$VERSION_TAG -s -w"
+          CGO_ENABLED=1 go build -o runtime/dpanel.exe -tags ce,w7_rangine_release -ldflags "-X main.DPanelVersion=$VERSION_TAG -s -w"
         shell: bash
       - name: upload artifact
         uses: softprops/action-gh-release@v2

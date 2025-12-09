@@ -106,7 +106,7 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 			p = lastJsonStr.String() + p
 			lastJsonStr.Reset()
 		}
-		slog.Debug("image pull task", "data", p)
+		//slog.Debug("image pull task", "data", p)
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
 		pd := types.BuildMessage{}
 		for {
