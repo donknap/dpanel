@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"os"
 	exec2 "os/exec"
 
 	"github.com/donknap/dpanel/common/service/exec"
@@ -37,7 +36,7 @@ func (self Client) Compose(command ...string) (exec.Executor, error) {
 		options = append(options,
 			local.WithCommandName("docker"),
 			local.WithArgs(append(append(self.DockerEnv.CommandParams(), "compose"), command...)...),
-			local.WithEnv(os.Environ()),
+			local.WithEnv(self.DockerEnv.CommandEnv()),
 		)
 	}
 	cmd, err = local.New(options...)

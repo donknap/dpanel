@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -49,6 +51,25 @@ func (self DockerEnv) CommandEnv() []string {
 			"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetCertPath(), self.TlsCa)),
 		)
 	}
+	// 只获取指定的系统环境变量，避免其它的污染
+	systemEnvList := []string{
+		"LANG", "PATH", "HOME", "USER",
+		"SHELL", "TERM", "TZ", "PWD",
+		"HOSTNAME", "LOGNAME",
+		"OLDPWD", "TMPDIR", "TERMINFO_DIRS",
+		"COLORTERM", "PAGER", "_",
+		"HTTP_PROXY", "HTTPS_PROXY",
+	}
+	result = append(result, function.PluckArrayWalk(os.Environ(), func(item string) (string, bool) {
+		ok := false
+		for _, s := range systemEnvList {
+			if strings.HasPrefix(item, s+"=") {
+				ok = true
+				break
+			}
+		}
+		return item, ok
+	})...)
 	return result
 }
 
