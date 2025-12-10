@@ -118,7 +118,7 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 				if pd.ErrorDetail.Message != "" {
 					return errors.New(pd.ErrorDetail.Message)
 				}
-				if pd.Status == "Pulling fs layer" || pd.Status == "Preparing" {
+				if pg[pd.Id] == nil {
 					pg[pd.Id] = &types.PullProgress{
 						Extracting:  0,
 						Downloading: 0,
