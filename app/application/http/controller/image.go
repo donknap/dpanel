@@ -235,7 +235,8 @@ func (self Image) GetList(http *gin.Context) {
 
 	var result []image.Summary
 	imageList, err := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, image.ListOptions{
-		All: false,
+		All:       false,
+		Manifests: true,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

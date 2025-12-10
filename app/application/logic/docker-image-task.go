@@ -138,6 +138,7 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 				}
 				if pd.Status == "Pull complete" {
 					pg[pd.Id].Extracting = 100
+					pg[pd.Id].Downloading = 100
 				}
 				if pd.Status == "Pushed" || pd.Status == "Layer already exists" {
 					pg[pd.Id].Downloading = 100

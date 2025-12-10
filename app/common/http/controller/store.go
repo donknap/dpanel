@@ -280,6 +280,8 @@ func (self Store) Deploy(http *gin.Context) {
 		if v, ok := onepanel.DefaultEnv[params.AppName]; ok {
 			params.VersionInfo.Environment = append(params.VersionInfo.Environment, v...)
 		}
+		// docker 29 容器名称变量变为严格判断不能为空
+		params.VersionInfo.Environment = append(params.VersionInfo.Environment, onepanel.CommonEnv[define.StoreEnvContainerName])
 	}
 
 	// 适配 bt
