@@ -47,9 +47,6 @@ func NewClientWithDockerEnv(dockerEnv *types.DockerEnv, opts ...Option) (*Client
 
 func NewDefaultClient() *Client {
 	defaultDockerHost := dockerclient.DefaultDockerHost
-	if e := os.Getenv(dockerclient.EnvOverrideHost); e != "" {
-		defaultDockerHost = e
-	}
 	v, _ := NewClient(WithAddress(defaultDockerHost), WithDockerEnv(&types.DockerEnv{
 		Name:    define.DockerDefaultClientName,
 		Title:   define.DockerDefaultClientName,

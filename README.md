@@ -22,7 +22,7 @@
 ------------------------------
 
 [**官网**](https://dpanel.cc/) &nbsp; |
-&nbsp; [**演示**](https://demo.dpanel.cc) &nbsp; |
+&nbsp; [**演示**](https://demo.deepanel.com) &nbsp; |
 &nbsp; [**文档**](https://dpanel.cc/#/zh-cn/install/docker) &nbsp; |
 &nbsp; [**Pro版**](https://dpanel.cc/#/zh-cn/manual/pro) &nbsp; |
 &nbsp; [**交流群**](https://qm.qq.com/q/2v4x9x8q4k) &nbsp; |

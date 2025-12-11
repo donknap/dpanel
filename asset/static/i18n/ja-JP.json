@@ -1518,7 +1518,7 @@
   "user.registerTitle": "管理者ユーザー名とパスワードを設定",
   "user.registerUserTitle": "ユーザー登録またはリセット",
   "user.tipShowBuildName": "パネルコンテナ名がデフォルトのdpanelではありません。再作成しAPP_NAME環境変数で新しいコンテナ名を指定",
-  "user.tipShowDemo": "デモサイトです。docker機能は無効化されています。アカウント: admin 123456",
+  "user.tipShowDemo": "本サイトはデモ用であり、管理機能は含まれません。DPanel Standard Edition で構築されています。ユーザー名: admin パスワード: 123456",
   "user.title": "アカウントパスワードログイン",
   "user.userAgreement": "利用規約",
   "user.userAgreementUrl": "https://dpanel.cc/license",

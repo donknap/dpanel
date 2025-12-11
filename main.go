@@ -328,7 +328,11 @@ func initDocker() error {
 		}
 		logic.Env{}.UpdateEnv(defaultDockerEnv)
 	}
-	docker.Sdk, _ = docker.NewClientWithDockerEnv(defaultDockerEnv)
+	if dockerClient, err := docker.NewClientWithDockerEnv(defaultDockerEnv); err == nil {
+		docker.Sdk = dockerClient
+	} else {
+		slog.Debug("init docker", "error", err, "env", defaultDockerEnv)
+	}
 
 	dockerEnvList := make(map[string]*types.DockerEnv)
 	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDocker, &dockerEnvList)

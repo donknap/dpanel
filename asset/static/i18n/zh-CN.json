@@ -1518,7 +1518,7 @@
   "user.registerTitle": "配置管理员用户名及密码",
   "user.registerUserTitle": "用户注册或重置",
   "user.tipShowBuildName": "您创建的面板容器名称非默认的 dpanel，请重建并通过环境变量 -e APP_NAME= 指定新的容器名称。",
-  "user.tipShowDemo": "当前为演示站，禁用 docker 相关功能。帐号密码为 admin 123456",
+  "user.tipShowDemo": "当前站点仅供演示，不提管理功能；由 DPanel 标准版搭建。帐号: admin 密码: 123456",
   "user.title": "账号密码登录",
   "user.userAgreement": "《用户协议》",
   "user.userAgreementUrl": "https://dpanel.cc/license",

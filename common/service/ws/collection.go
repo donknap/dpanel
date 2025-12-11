@@ -92,8 +92,9 @@ func (self *Collection) Leave(c *Client) {
 		//docker.Sdk.Ctx = ctx
 		//docker.Sdk.CtxCancelFunc = cancelFunc
 		//go logic.EventLogic{}.MonitorLoop()
-		explorer, _ := plugin.NewPlugin(plugin.PluginExplorer, nil)
-		_ = explorer.Destroy()
+		if explorer, err := plugin.NewPlugin(plugin.PluginExplorer, nil); err == nil {
+			_ = explorer.Destroy()
+		}
 	}
 }
 

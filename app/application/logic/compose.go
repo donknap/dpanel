@@ -310,9 +310,24 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 	workingDir := dbRow.Setting.GetWorkingDir()
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
-	// windows 下无法使用 link 目录对齐到宿主机目录
 	linkComposePath := ""
 	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
+
+	for i, mount := range dpanelContainerInfo.Mounts {
+		if mount.Type != types.VolumeTypeBind {
+			continue
+		}
+		// windows 路径需要先对齐到 linux 目录上
+		if strings.Contains(mount.Source, define.WinSeparator) {
+			target := "/"
+			segments := strings.Split(filepath.Clean(mount.Source), define.WinSeparator)
+			for _, segment := range segments {
+				target = filepath.Join(target, strings.ToLower(strings.Trim(strings.TrimSpace(segment), ":")))
+			}
+			dpanelContainerInfo.Mounts[i].Source = filepath.Join("/", "mnt", "host", target)
+		}
+	}
+
 	for _, mount := range dpanelContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
 			linkComposePath = filepath.Join(mount.Source, filepath.Base(workingDir))

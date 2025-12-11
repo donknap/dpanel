@@ -21,7 +21,7 @@
 ------------------------------
 
 [**Home**](https://dpanel.cc/) &nbsp; |
-&nbsp; [**Demo**](https://demo.dpanel.cc/) &nbsp; |
+&nbsp; [**Demo**](https://demo.deepanel.com) &nbsp; |
 &nbsp; [**Docs**](https://dpanel.cc/#/en-us/README) &nbsp; |
 &nbsp; [**Pro Edition**](https://dpanel.cc/#/zh-cn/manual/pro) &nbsp; |
 &nbsp; [**Sponsor**](https://afdian.com/a/dpanel) &nbsp;

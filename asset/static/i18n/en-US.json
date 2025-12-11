@@ -1518,7 +1518,7 @@
   "user.registerTitle": "Configure admin username and password",
   "user.registerUserTitle": "User registration or reset",
   "user.tipShowBuildName": "Panel container name not default dpanel, recreate with APP_NAME env",
-  "user.tipShowDemo": "Demo site, docker functions disabled. Account: admin 123456",
+  "user.tipShowDemo": "This site is for demo only and does not include admin features. Built with DPanel Standard Edition.Username: admin Password: 123456",
   "user.title": "Account password login",
   "user.userAgreement": "User Agreement",
   "user.userAgreementUrl": "https://dpanel.cc/license",
