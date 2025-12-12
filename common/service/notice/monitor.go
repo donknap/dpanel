@@ -36,6 +36,8 @@ func (self *client) Close() {
 	if self.dockerClient != nil {
 		self.dockerClient.Close()
 	}
+	// 因为需要重复的使用监控 client，关掉旧的后，还需要再新建一个新的上下文
+	self.ctx, self.ctxCancel = context.WithCancel(context.Background())
 }
 
 type monitor struct {
@@ -90,20 +92,25 @@ func (self *monitor) listen(c *client) {
 	var initErr error
 
 	for {
-		time.Sleep(10 * time.Second)
-		if _, ok := self.clients.Load(c.dockerEnv.Name); !ok {
-			c.Close()
-			return
-		}
-		c.dockerClient, initErr = docker.NewClientWithDockerEnv(c.dockerEnv)
 		if initErr != nil {
-			if os.Getenv("APP_ENV") == "debug" {
-				slog.Debug("Monitor start", "name", c.dockerEnv.Name, "error", initErr)
-			}
 			facade.GetEvent().Publish(event.DockerStopEvent, event.DockerPayload{
 				DockerEnv: c.dockerEnv,
 				Error:     initErr,
 			})
+		}
+		time.Sleep(10 * time.Second)
+		if _, ok := self.clients.Load(c.dockerEnv.Name); !ok {
+			slog.Debug("Monitor client not found", "name", c.dockerEnv.Name, "error", initErr)
+			c.Close()
+			return
+		}
+
+		if os.Getenv("APP_ENV") == "debug" {
+			slog.Debug("Monitor start", "name", c.dockerEnv.Name, "error", initErr)
+		}
+
+		if c.dockerClient, initErr = docker.NewClientWithDockerEnv(c.dockerEnv); initErr != nil {
+			c.Close()
 			continue
 		}
 
@@ -124,7 +131,7 @@ func (self *monitor) listen(c *client) {
 			case <-c.ctx.Done():
 				slog.Debug("Monitor closed by monitor", "name", c.dockerEnv.Name)
 				c.Close()
-				return
+				break eventLoop
 			case <-self.ctx.Done():
 				slog.Debug("Monitor closed")
 				self.Close()
