@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"os"
 	"strings"
 	"time"
 
@@ -106,7 +107,9 @@ func (self DockerTask) ImageRemote(w *ws.ProgressPip, r io.ReadCloser) error {
 			p = lastJsonStr.String() + p
 			lastJsonStr.Reset()
 		}
-		//slog.Debug("image pull task", "data", p)
+		if os.Getenv("APP_ENV") == "debug" {
+			slog.Debug("image pull task", "data", p)
+		}
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
 		pd := types.BuildMessage{}
 		for {

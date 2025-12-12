@@ -1,11 +1,14 @@
 package logic
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/donknap/dpanel/common/accessor"
@@ -92,7 +95,15 @@ func (self Cron) GetJobCallback(task *entity.Cron) crontab.RunFunc {
 			defer func() {
 				dockerClient.Close()
 			}()
-			script = fmt.Sprintf(`docker exec %s %s -c "%s"`, containerName, task.Setting.EntryShell, task.Setting.Script)
+			script, err = self.scriptTemplate(&scriptTemplateParams{
+				Container:     containerName,
+				ScriptName:    fmt.Sprintf("%s-%d.sh", strings.Trim(containerName, "/"), task.ID),
+				ScriptContent: task.Setting.Script,
+				EntryShell:    task.Setting.EntryShell,
+			})
+			if err != nil {
+				return err
+			}
 		} else {
 			script = task.Setting.Script
 		}
@@ -150,4 +161,26 @@ func (self Cron) GetJobCallback(task *entity.Cron) crontab.RunFunc {
 		}
 		return nil
 	}
+}
+
+type scriptTemplateParams struct {
+	Container     string
+	ScriptContent string
+	EntryShell    string
+	ScriptName    string
+}
+
+const scriptTemplateStr = `docker exec {{ .Container }} {{ .EntryShell }} -c 'cat > /{{ .ScriptName }} << "EOF"
+{{ .ScriptContent }}
+EOF
+chmod +x /{{ .ScriptName }}
+/{{ .ScriptName }}
+rm -f /{{ .ScriptName }}'
+`
+
+func (self Cron) scriptTemplate(params *scriptTemplateParams) (string, error) {
+	buffer := new(bytes.Buffer)
+	tmpl := template.Must(template.New("docker-exec-script").Parse(scriptTemplateStr))
+	err := tmpl.Execute(buffer, params)
+	return buffer.String(), err
 }
