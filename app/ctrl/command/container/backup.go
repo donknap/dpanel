@@ -17,13 +17,13 @@ func (self Backup) GetName() string {
 }
 
 func (self Backup) GetDescription() string {
-	return "生成容器快照"
+	return "Create a container backup snapshot"
 }
 
 func (self Backup) Configure(command *cobra.Command) {
-	command.Flags().String("name", "", "容器名称")
-	command.Flags().Int("enable-image", 0, "是否快照容器镜像")
-	command.Flags().String("docker-env", "", "指定 docker 环境")
+	command.Flags().String("name", "", "Container name")
+	command.Flags().Int("enable-image", 0, `Backup container image? ("1"|"0")`)
+	command.Flags().String("docker-env", "local", "Specify the Docker Server")
 	_ = command.MarkFlagRequired("name")
 }
 

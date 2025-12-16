@@ -19,6 +19,7 @@ var (
 	CacheKeyImageRootFs           = "image:rootfs:%s"
 	CacheKeyDockerStatus          = "docker:status:%s"
 	CacheKeyDockerEventJob        = "docker:event:%s:%s:%s"
+	CacheKeyConsoleData           = "console:data:%s"
 )
 
 var (

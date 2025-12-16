@@ -67,6 +67,8 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/setting/save-config", controller.Setting{}.SaveConfig)
 		cors.POST("/common/setting/delete", controller.Setting{}.Delete)
 		cors.POST("/common/setting/notification-email-test", controller.Home{}.NotificationEmailTest)
+		cors.POST("/common/setting/cache", controller.Home{}.Cache)
+		cors.POST("/common/setting/notification", controller.Home{}.Notification)
 
 		cors.POST("/common/home/info", controller.Home{}.Info)
 		cors.POST("/common/home/check-new-version", controller.Home{}.CheckNewVersion)
@@ -128,8 +130,6 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		wsCors.GET("/common/console/host/:name", controller.Home{}.WsHostConsole)
 	})
 
-	_ = facade.GetEvent().Subscribe(event.DockerStartEvent, events.Docker{}.Start)
-	_ = facade.GetEvent().Subscribe(event.DockerStopEvent, events.Docker{}.Stop)
 	_ = facade.GetEvent().Subscribe(event.DockerMessageEvent, events.Docker{}.Message)
 
 	// 启动时，初始化计划任务

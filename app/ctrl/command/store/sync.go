@@ -19,11 +19,11 @@ func (self Sync) GetName() string {
 }
 
 func (self Sync) GetDescription() string {
-	return "同步应用商店数据"
+	return "Sync appstore data"
 }
 
 func (self Sync) Configure(command *cobra.Command) {
-	command.Flags().String("name", "", "商店标识")
+	command.Flags().String("name", "", "Store name")
 	_ = command.MarkFlagRequired("name")
 }
 
@@ -32,7 +32,7 @@ func (self Sync) Handle(cmd *cobra.Command, args []string) {
 
 	store, _ := dao.Store.Where(dao.Store.Name.Eq(name)).First()
 	if store == nil {
-		utils.Result{}.Errorf("%s 商店不存在，请先添加", name)
+		utils.Result{}.Errorf("%s store does not exist. Please add it first.", name)
 		return
 	}
 	proxyClient, err := proxy.NewProxyClient()

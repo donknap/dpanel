@@ -48,9 +48,10 @@ var (
 	//go:embed config.yaml
 	ConfigFile []byte
 	//go:embed asset
-	Asset         embed.FS
-	DPanelVersion = ""
+	Asset embed.FS
 )
+
+var DPanelVersion string
 
 func main() {
 	// 兼容没有配置存储目录的情况
@@ -81,12 +82,9 @@ func main() {
 			},
 		},
 	)
-
-	slog.Debug("config", "env", facade.GetConfig().GetString("app.env"))
-	slog.Debug("config", "version", DPanelVersion)
-	slog.Debug("config", "storage", storage.Local{}.GetStorageLocalPath())
-	slog.Debug("config", "db", facade.GetConfig().GetString("database.default.db_name"))
-	if DPanelVersion != "" {
+	if DPanelVersion == "" {
+		DPanelVersion = facade.GetConfig().GetString("app.version")
+	} else {
 		facade.GetConfig().Set("app.version", DPanelVersion)
 	}
 
@@ -103,6 +101,10 @@ func main() {
 	})
 
 	if isAppServer() {
+		slog.Debug("config", "env", facade.GetConfig().GetString("app.env"))
+		slog.Debug("config", "version", DPanelVersion)
+		slog.Debug("config", "storage", storage.Local{}.GetStorageLocalPath())
+
 		err = initDb()
 		if err != nil {
 			panic(err)

@@ -84,7 +84,13 @@ func (self *Client) Post(uri string, payload any) (data io.Reader, err error) {
 			return nil, errors.New("invalid auth token, please configure the DP_JWT_SECRET environment variable of the dpanel container")
 		case 200:
 			buffer := new(bytes.Buffer)
-			err = json.NewEncoder(buffer).Encode(responseMessage.Data)
+			// 如果是 success 返回整个结构，如果有具体的数据，则返回数据
+			switch responseMessage.Data.(type) {
+			case string:
+				err = json.NewEncoder(buffer).Encode(responseMessage)
+			default:
+				err = json.NewEncoder(buffer).Encode(responseMessage.Data)
+			}
 			return buffer, err
 		}
 	} else {

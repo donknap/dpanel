@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -202,4 +203,66 @@ func (self Home) NotificationEmailTest(http *gin.Context) {
 		return
 	}
 	self.JsonSuccessResponse(http)
+}
+
+func (self Home) Notification(http *gin.Context) {
+	type ParamsValidate struct {
+		Channel string `json:"channel"`
+		Subject string `json:"subject"`
+		Content string `json:"content" binding:"required"`
+		Target  string `json:"target" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	setting := accessor.Notification{}
+	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingNotification, &setting)
+
+	if params.Subject == "" {
+		params.Subject = "DPanel Notification"
+	}
+
+	if params.Channel == "email" {
+		err := logic.Notice{}.Send(setting.EmailServer, params.Target, params.Subject, params.Content)
+		if err != nil {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSettingBasicEmailInvalid, err.Error()), 500)
+			return
+		}
+	}
+	self.JsonSuccessResponse(http)
+}
+
+func (self Home) Cache(http *gin.Context) {
+	type ParamsValidate struct {
+		Key   string `json:"key" binding:"required"`
+		Value string `json:"value"`
+		Keep  int    `json:"keep"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	cacheKey := fmt.Sprintf(storage.CacheKeyConsoleData, params.Key)
+	if params.Value == "" {
+		v, ok := storage.Cache.Get(cacheKey)
+		self.JsonResponseWithoutError(http, gin.H{
+			"value": v,
+			"found": ok,
+		})
+		return
+	}
+
+	exp := cache.DefaultExpiration
+	if params.Keep > -1 {
+		exp = time.Duration(params.Keep) * time.Second
+	}
+	storage.Cache.Set(cacheKey, params.Value, exp)
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"value": params.Value,
+		"found": true,
+	})
+	return
 }

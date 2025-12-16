@@ -17,13 +17,13 @@ func (self Upgrade) GetName() string {
 }
 
 func (self Upgrade) GetDescription() string {
-	return "检测当前容器更新"
+	return "Checking for container updates"
 }
 
 func (self Upgrade) Configure(command *cobra.Command) {
-	command.Flags().String("name", "", "容器名称")
-	command.Flags().String("docker-env", "", "指定 docker 环境")
-	command.Flags().Int("upgrade", 0, "是否升级容器")
+	command.Flags().String("name", "", "Container name")
+	command.Flags().String("docker-env", "local", "Specify the Docker Server")
+	command.Flags().Int("upgrade", 0, `Want to upgrade the container? ("1"|"0")`)
 	_ = command.MarkFlagRequired("name")
 }
 

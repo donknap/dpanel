@@ -20,12 +20,12 @@ func (self Reset) GetName() string {
 }
 
 func (self Reset) GetDescription() string {
-	return "重置面板用户名或是密码"
+	return "Reset the Admin username or password."
 }
 
 func (self Reset) Configure(command *cobra.Command) {
-	command.Flags().String("password", "", "重置管理员密码")
-	command.Flags().String("username", "", "重置管理员用户名")
+	command.Flags().String("password", "", "Reset password")
+	command.Flags().String("username", "", "Reset username")
 }
 
 func (self Reset) Handle(cmd *cobra.Command, args []string) {
@@ -44,12 +44,12 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	}
 	username, err := cmd.Flags().GetString("username")
 	if err != nil {
-		color.Errorln("重置失败，", err.Error())
+		color.Errorln("Error: ", err.Error())
 		return
 	}
 	password, err := cmd.Flags().GetString("password")
 	if err != nil {
-		color.Errorln("重置失败，", err.Error())
+		color.Errorln("Error: ", err.Error())
 		return
 	}
 	if username == "" && password == "" {
@@ -58,7 +58,7 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	}
 
 	if username != "" && password == "" {
-		color.Errorln("重置用户名时必须指定密码")
+		color.Errorln("When resetting the username, the password must also be reset.")
 		return
 	}
 
@@ -70,10 +70,10 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 
 	err = dao.Setting.Save(founder)
 	if err != nil {
-		color.Errorln("重置失败，", err.Error())
+		color.Errorln("Error: ", err.Error())
 		return
 	}
-	color.Println("用户名: ", username)
-	color.Println("密  码: ", password)
-	color.Successln("用户名或是密码重置成功")
+	color.Println("用户名 (Username): ", username)
+	color.Println("密  码 (Password): ", password)
+	color.Successln("Success")
 }
