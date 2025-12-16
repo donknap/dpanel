@@ -317,14 +317,8 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 		if mount.Type != types.VolumeTypeBind {
 			continue
 		}
-		// windows 路径需要先对齐到 linux 目录上
-		if strings.Contains(mount.Source, define.WinSeparator) {
-			target := "/"
-			segments := strings.Split(filepath.Clean(mount.Source), define.WinSeparator)
-			for _, segment := range segments {
-				target = filepath.Join(target, strings.ToLower(strings.Trim(strings.TrimSpace(segment), ":")))
-			}
-			dpanelContainerInfo.Mounts[i].Source = filepath.Join("/", "mnt", "host", target)
+		if v, ok := function.PathConvertWinPath2Unix(mount.Source); ok {
+			dpanelContainerInfo.Mounts[i].Source = filepath.Join("/", "mnt", "host", v)
 		}
 	}
 
