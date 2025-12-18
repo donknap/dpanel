@@ -31,4 +31,6 @@ const (
 	DockerEventContainerDie     = "container/die"
 	DockerEventContainerCreate  = "container/create"
 	DockerEventContainerDestroy = "container/destroy"
+	DockerEventDaemonStart      = "daemon/start"
+	DockerEventDaemonDie        = "daemon/die"
 )

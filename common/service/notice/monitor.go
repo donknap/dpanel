@@ -2,6 +2,7 @@ package notice
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/events"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
@@ -60,6 +62,7 @@ func (self *monitor) Close() {
 func (self *monitor) Join(dockerEnv *types.DockerEnv) {
 	self.Leave(dockerEnv.Name)
 
+	dockerEnv.DisabledSockProxy = true
 	c := &client{
 		dockerEnv: dockerEnv,
 	}
@@ -93,9 +96,12 @@ func (self *monitor) listen(c *client) {
 
 	for {
 		if initErr != nil {
-			facade.GetEvent().Publish(event.DockerStopEvent, event.DockerPayload{
+			facade.GetEvent().Publish(event.DockerDaemonEvent, event.DockerDaemonPayload{
 				DockerEnv: c.dockerEnv,
-				Error:     initErr,
+				Status: types.DockerStatus{
+					Message:   fmt.Sprintf("%s, at %s", initErr.Error(), time.Now().Format(define.DateShowYmdHis)),
+					Available: false,
+				},
 			})
 		}
 		time.Sleep(10 * time.Second)
@@ -119,8 +125,12 @@ func (self *monitor) listen(c *client) {
 			continue
 		}
 
-		facade.GetEvent().Publish(event.DockerStartEvent, event.DockerPayload{
+		facade.GetEvent().Publish(event.DockerDaemonEvent, event.DockerDaemonPayload{
 			DockerEnv: c.dockerEnv,
+			Status: types.DockerStatus{
+				Message:   "",
+				Available: true,
+			},
 		})
 
 		eventChan, errChan := c.dockerClient.Client.Events(context.Background(), events.ListOptions{})

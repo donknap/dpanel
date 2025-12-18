@@ -5,14 +5,13 @@ import (
 )
 
 const (
-	DockerStartEvent   = "docker_start"
-	DockerStopEvent    = "docker_stop"
+	DockerDaemonEvent  = "docker_daemon"
 	DockerMessageEvent = "docker_message"
 )
 
-type DockerPayload struct {
+type DockerDaemonPayload struct {
 	DockerEnv *types.DockerEnv
-	Error     error
+	Status    types.DockerStatus
 }
 
 type DockerMessagePayload struct {

@@ -13,7 +13,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
-	"github.com/donknap/dpanel/common/service/notice"
+	event2 "github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -195,7 +195,7 @@ func (self Env) Create(http *gin.Context) {
 		return
 	}
 	logic.Env{}.UpdateEnv(dockerEnv)
-	notice.Monitor.Join(dockerEnv)
+	event2.Monitor.Join(dockerEnv)
 
 	// 如果修改的是当前客户端的连接地址，则更新 docker sdk
 	if docker.Sdk.Name == params.Name && docker.Sdk.Client.DaemonHost() != params.Address {
@@ -270,7 +270,7 @@ func (self Env) Delete(http *gin.Context) {
 			}
 			delete(setting.Value.Docker, name)
 
-			notice.Monitor.Leave(name)
+			event2.Monitor.Leave(name)
 
 			facade.GetEvent().Publish(event.EnvDeleteEvent, event.EnvPayload{
 				Name: name,

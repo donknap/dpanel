@@ -101,12 +101,6 @@ func (self Client) Close() {
 	if self.Client != nil {
 		_ = self.Client.Close()
 	}
-	if self.DockerEnv.RemoteType == define.DockerRemoteTypeSSH {
-		localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
-		if strings.Contains(self.Client.DaemonHost(), self.Client.DaemonHost()) {
-			_ = os.Remove(localProxySock)
-		}
-	}
 }
 
 // GetTryCtx 获取一个有超时的上下文，用于测试 docker 连接是否正常
@@ -210,13 +204,17 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 			},
 		}
 		self.Option = append(self.Option, dockerclient.WithHTTPClient(&http.Client{Transport: transport}))
-		time.AfterFunc(time.Second, func() {
-			// 这里稍微延迟一下，防止 ssh 还没有连接完成
-			err := WithSockProxy()(self)
-			if err != nil {
-				slog.Debug("local sock proxy", "err", err)
-			}
-		})
+
+		if !self.DockerEnv.DisabledSockProxy {
+			time.AfterFunc(time.Second, func() {
+				// 这里稍微延迟一下，防止 ssh 还没有连接完成
+				err := WithSockProxy()(self)
+				if err != nil {
+					slog.Debug("local sock proxy", "err", err)
+				}
+			})
+		}
+
 		return nil
 	}
 }
