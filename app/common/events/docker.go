@@ -9,7 +9,6 @@ import (
 
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
-	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/crontab"
@@ -64,22 +63,35 @@ func commit() {
 type Docker struct {
 }
 
-func (self Docker) Start(e event.DockerPayload) {
+func (self Docker) Daemon(e event.DockerDaemonPayload) {
 	if e.DockerEnv == nil {
 		return
 	}
-	_ = dao.Event.Save(&entity.Event{
-		Type:   e.DockerEnv.Name,
-		Action: "daemon/start",
-		Message: strings.Join([]string{
-			e.DockerEnv.Address,
-		}, " "),
-		CreatedAt: time.Now().Format("2006-01-02 15:04:05.000"),
-	})
-	storage.Cache.Delete(fmt.Sprintf(storage.CacheKeyDockerStatus, e.DockerEnv.Name))
+	dockerStatusCacheKey := fmt.Sprintf(storage.CacheKeyDockerStatus, e.DockerEnv.Name)
+	// 如果有错误记录缓存返回
+	if !e.Status.Available {
+		storage.Cache.Set(dockerStatusCacheKey, e.Status, cache.DefaultExpiration)
+		return
+	}
+
+	storage.Cache.Delete(dockerStatusCacheKey)
+
+	cacheKey := fmt.Sprintf(storage.CacheKeyDockerEventJob, e.DockerEnv.Name, define.DockerEventDaemonStart, e.DockerEnv.Name)
+	if v, ok := storage.Cache.Get(cacheKey); ok {
+		if job, ok := v.(crontab.RunFunc); ok {
+			err := job()
+			if err != nil {
+				slog.Debug("docker event job", "event", define.DockerEventDaemonStart, "task", cacheKey, "error", err)
+			}
+		}
+	}
 
 	if e.DockerEnv.Name != define.DockerDefaultClientName {
 		return
+	}
+	// 默认环境的配置可能会被更改，重新获取最新的配置再填充 DPanel 容器数据
+	if v, err := (logic.Env{}).GetDefaultEnv(); err == nil {
+		e.DockerEnv = v
 	}
 
 	sdk, err := docker.NewClientWithDockerEnv(e.DockerEnv)
@@ -115,16 +127,6 @@ func (self Docker) Start(e event.DockerPayload) {
 		}
 		logic.Env{}.UpdateEnv(e.DockerEnv)
 	}
-}
-
-func (self Docker) Stop(e event.DockerPayload) {
-	if e.DockerEnv == nil {
-		return
-	}
-	storage.Cache.Set(fmt.Sprintf(storage.CacheKeyDockerStatus, e.DockerEnv.Name), types.DockerStatus{
-		Available: false,
-		Message:   fmt.Sprintf("%s, at %s", e.Error.Error(), time.Now().Format(define.DateShowYmdHis)),
-	}, cache.DefaultExpiration)
 }
 
 func (self Docker) Message(e event.DockerMessagePayload) {

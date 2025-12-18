@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
@@ -35,17 +36,21 @@ func (self Cron) Create(http *gin.Context) {
 		return
 	}
 
-	var err error
-	if params.TriggerType == accessor.CronTriggerTypeCron {
-		allExpression := make([]string, 0)
-		for _, expression := range params.Expression {
-			allExpression = append(allExpression, expression.ToString())
+	if params.TriggerType != accessor.CronTriggerTypeCron {
+		params.Expression = []accessor.CronSettingExpression{
+			{
+				Unit: "code",
+				Code: "@manual",
+			},
 		}
-		err = crontab.Wrapper.CheckExpression(allExpression)
-		if err != nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerCronExpressionInCorrect, "message", err.Error()), 500)
-			return
-		}
+	}
+
+	err := crontab.Client.CheckExpression(function.PluckArrayWalk(params.Expression, func(item accessor.CronSettingExpression) (string, bool) {
+		return item.ToString(), true
+	})...)
+	if err != nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerCronExpressionInCorrect, "message", err.Error()), 500)
+		return
 	}
 
 	var taskRow *entity.Cron
@@ -55,7 +60,7 @@ func (self Cron) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
-		crontab.Wrapper.RemoveJob(taskRow.Setting.JobIds...)
+		crontab.Client.RemoveJob(taskRow.Setting.JobIds...)
 		taskRow.Setting = &params.CronSettingOption
 		taskRow.Title = params.Title
 		taskRow.Setting.NextRunTime = make([]time.Time, 0)
@@ -75,12 +80,10 @@ func (self Cron) Create(http *gin.Context) {
 		taskRow.Setting.DockerEnvName = docker.Sdk.Name
 		_ = dao.Cron.Create(taskRow)
 	}
-	if !params.Disable && params.TriggerType == accessor.CronTriggerTypeCron {
-		jobIds, err := logic.Cron{}.AddCronJob(taskRow)
-		if err == nil {
-			taskRow.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(jobIds...)
-			taskRow.Setting.JobIds = jobIds
-		}
+
+	if jobIds, err := (logic.Cron{}).AddCronJob(taskRow); err == nil {
+		taskRow.Setting.NextRunTime = crontab.Client.GetNextRunTime(jobIds...)
+		taskRow.Setting.JobIds = jobIds
 	}
 
 	err = dao.Cron.Save(taskRow)
@@ -88,6 +91,8 @@ func (self Cron) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
+	fmt.Printf("Create %v \n", crontab.Client)
 	self.JsonSuccessResponse(http)
 	return
 }
@@ -123,7 +128,7 @@ func (self Cron) Delete(http *gin.Context) {
 	}
 	if list, err := dao.Cron.Where(dao.Cron.ID.In(params.Id...)).Find(); err == nil {
 		for _, item := range list {
-			crontab.Wrapper.RemoveJob(item.Setting.JobIds...)
+			crontab.Client.RemoveJob(item.Setting.JobIds...)
 			_, _ = dao.Cron.Delete(item)
 			_, _ = dao.CronLog.Where(dao.CronLog.CronID.Eq(item.ID)).Delete()
 		}

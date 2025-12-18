@@ -74,7 +74,6 @@ type CronSettingOption struct {
 	DockerEnvName    string                  `json:"dockerEnvName,omitempty"`
 	EntryShell       string                  `json:"entryShell,omitempty"`
 	ScriptRunTimeout int                     `json:"scriptRunTimeout,omitempty"`
-	TriggerType      string                  `json:"triggerType,omitempty"`
+	TriggerType      string                  `json:"triggerType,omitempty" binding:"oneof=cron event manual"`
 	EventType        string                  `json:"eventType,omitempty"`
-	EventContainer   string                  `json:"eventContainer,omitempty"`
 }

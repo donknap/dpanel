@@ -3,9 +3,9 @@ package logic
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"sync"
 	"text/template"
@@ -19,8 +19,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
-	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/patrickmn/go-cache"
 	"github.com/robfig/cron/v3"
 )
 
@@ -31,27 +29,28 @@ var (
 type Cron struct {
 }
 
-func (self Cron) AddCronJob(task *entity.Cron) ([]cron.EntryID, error) {
+func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 	option := make([]crontab.Option, 0)
 	option = append(option, crontab.WithName(task.Title))
-	expression := make([]string, 0)
-	for _, item := range task.Setting.Expression {
-		expression = append(expression, item.ToString())
-	}
 	option = append(option, crontab.WithRunFunc(self.GetJobCallback(task)))
 	option = append(option, crontab.WithRunFunc(func() error {
-		task.Setting.NextRunTime = crontab.Wrapper.GetNextRunTime(task.Setting.JobIds...)
+		task.Setting.NextRunTime = crontab.Client.GetNextRunTime(task.Setting.JobIds...)
 		err := dao.Cron.Save(task)
 		return err
 	}))
-
 	cronJob := crontab.New(option...)
-	return crontab.Wrapper.AddJob(cronJob, expression...)
-}
 
-func (self Cron) AddEventJob(task *entity.Cron) {
-	cacheKey := fmt.Sprintf(storage.CacheKeyDockerEventJob, task.Setting.DockerEnvName, task.Setting.EventType, task.Setting.EventContainer)
-	storage.Cache.Set(cacheKey, self.GetJobCallback(task), cache.DefaultExpiration)
+	ids = make([]cron.EntryID, 0)
+	for _, exp := range task.Setting.Expression {
+		if id, err1 := crontab.Client.AddJob(exp.ToString(), cronJob); err1 == nil {
+			ids = append(ids, id)
+		} else {
+			err = errors.Join(err1)
+			crontab.Client.RemoveJob(ids...)
+		}
+	}
+
+	return ids, err
 }
 
 func (self Cron) GetJobCallback(task *entity.Cron) crontab.RunFunc {
@@ -80,7 +79,6 @@ func (self Cron) GetJobCallback(task *entity.Cron) crontab.RunFunc {
 		globalEnv = append(globalEnv, function.PluckArrayWalk(task.Setting.Environment, func(i types.EnvItem) (string, bool) {
 			return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 		})...)
-
 		var out []byte
 		var script string
 
@@ -109,8 +107,6 @@ func (self Cron) GetJobCallback(task *entity.Cron) crontab.RunFunc {
 		}
 
 		// 如果没有指定容器，则直接在面板 shell 中执行
-		// 在面板容器中执行还需要把 env 注入到命令中
-		globalEnv = append(globalEnv, os.Environ()...)
 		options := []local.Option{
 			local.WithCommandName("/bin/sh"),
 			local.WithArgs("-c", script),
