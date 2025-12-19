@@ -295,9 +295,6 @@ func WithWorkDir(path string) Option {
 
 func WithUser(user string) Option {
 	return func(self *Builder) error {
-		if user == "" {
-			return nil
-		}
 		self.containerConfig.User = user
 		return nil
 	}

@@ -140,6 +140,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 		SiteName:    siteRow.SiteName,
 		SiteId:      siteRow.ID,
 		BuildParams: &buildParams,
+		ContainerId: params.ContainerId,
 	}
 	containerId, err := logic.DockerTask{}.ContainerCreate(runTaskRow)
 	if err != nil {

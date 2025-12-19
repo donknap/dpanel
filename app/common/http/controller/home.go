@@ -10,6 +10,9 @@ import (
 	"io"
 	"log/slog"
 	http2 "net/http"
+	"os"
+	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -654,6 +657,62 @@ func (self Home) UpgradeScript(http *gin.Context) {
 	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
 	self.JsonResponseWithoutError(http, gin.H{
 		"info": dpanelContainerInfo,
+	})
+	return
+}
+
+func (self Home) Prune(http *gin.Context) {
+	type ParamsValidate struct {
+		EnableNotice   bool `json:"enableNotice"`
+		EnableTempFile bool `json:"enableTempFile"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	total := 0
+	var eventTotal int64
+	var noticeTotal int64
+
+	if params.EnableNotice {
+		if oldRow, _ := dao.Event.Last(); oldRow != nil {
+			query := dao.Event.Where(dao.Event.ID.Lte(oldRow.ID))
+			eventTotal, _ = query.Count()
+			_, _ = query.Delete()
+		}
+		if oldRow, _ := dao.Notice.Last(); oldRow != nil {
+			query := dao.Notice.Where(dao.Notice.ID.Lte(oldRow.ID))
+			noticeTotal, _ = query.Count()
+			_, _ = query.Delete()
+		}
+		if db, err := facade.GetDbFactory().Channel("default"); err == nil {
+			db.Exec("vacuum")
+		}
+	}
+
+	if params.EnableTempFile {
+		if v := (storage.Local{}).GetSaveRootPath(); v != "" {
+			if list, err := os.ReadDir(v); err == nil {
+				for _, entry := range list {
+					if strings.HasPrefix(entry.Name(), "dpanel-temp-") {
+						if err := os.Remove(storage.Local{}.GetSaveRealPath(entry.Name())); err == nil {
+							total++
+						}
+					}
+
+				}
+			}
+		}
+	}
+
+	runtime.GC()
+	debug.FreeOSMemory()
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"gc":     true,
+		"temp":   total,
+		"events": eventTotal,
+		"notice": noticeTotal,
 	})
 	return
 }

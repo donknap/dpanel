@@ -22,7 +22,6 @@ func (provider *Provider) Register(console console.Console) {
 
 	console.RegisterCommand(new(compose.Deploy))
 
-	console.RegisterCommand(new(system.Prune))
 	console.RegisterCommand(new(system.Cache))
 	console.RegisterCommand(new(system.Notice))
 }

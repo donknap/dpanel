@@ -38,8 +38,12 @@ func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, err
 	}
 	options := make([]builder.Option, 0)
 
-	if oldContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, task.SiteName); err == nil {
-		_ = notice.Message{}.Info(".containerRemove", task.SiteName)
+	oldContainerName := task.SiteName
+	if task.ContainerId != "" {
+		oldContainerName = task.ContainerId
+	}
+	if oldContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, oldContainerName); err == nil {
+		_ = notice.Message{}.Info(".containerRemove", oldContainerName)
 		if oldContainerInfo.State.Running {
 			err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, oldContainerInfo.ID, container.StopOptions{})
 			if err != nil {
