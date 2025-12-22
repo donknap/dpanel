@@ -3,6 +3,7 @@ package image
 import (
 	"context"
 	"io"
+	"log/slog"
 
 	"github.com/docker/docker/api/types/build"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -42,6 +43,7 @@ type Builder struct {
 }
 
 func (self *Builder) Execute() (response build.ImageBuildResponse, err error) {
+	slog.Debug("image build", "dockerfile", self.imageBuildOption.Dockerfile)
 	response, err = docker.Sdk.Client.ImageBuild(
 		self.ctx,
 		self.buildContext,

@@ -75,14 +75,14 @@ func (self ImageBuild) Create(http *gin.Context) {
 		imageNew.Status = define.DockerImageBuildStatusError
 		imageNew.Message = log + "\n" + err.Error()
 		_ = dao.Image.Save(imageNew)
-		self.JsonResponseWithError(http, err, 500)
-		return
+	} else {
+		imageNew.Status = define.DockerImageBuildStatusSuccess
+		imageNew.Message = log
 	}
-	imageNew.Status = define.DockerImageBuildStatusSuccess
-	imageNew.Message = log
 	_ = dao.Image.Save(imageNew)
 	self.JsonResponseWithoutError(http, gin.H{
-		"imageId": imageNew.ID,
+		"id":    imageNew.ID,
+		"error": err,
 	})
 	return
 }
@@ -147,6 +147,8 @@ func (self ImageBuild) GetList(http *gin.Context) {
 	list = function.PluckArrayWalk(list, func(item *entity.Image) (*entity.Image, bool) {
 		if imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.Setting.Tag); err == nil {
 			item.Setting.ImageId = imageInfo.ID
+		} else {
+			item.Setting.ImageId = ""
 		}
 		return item, true
 	})

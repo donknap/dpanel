@@ -7,8 +7,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -50,20 +50,16 @@ func WithGitUrl(url string) Option {
 			return nil
 		}
 		self.imageBuildOption.RemoteContext = url
-		self.imageBuildOption.Dockerfile = filepath.Base(self.imageBuildOption.Dockerfile)
 		return nil
 	}
 }
 
-func WithDockerFilePath(root, name string) Option {
+func WithDockerFilePath(path string) Option {
 	return func(self *Builder) error {
-		if root == "" {
-			root = "/"
+		if path == "" {
+			path = "Dockerfile"
 		}
-		if name == "" {
-			name = "Dockerfile"
-		}
-		self.imageBuildOption.Dockerfile = filepath.Join(root, name)
+		self.imageBuildOption.Dockerfile = path
 		return nil
 	}
 }
@@ -89,7 +85,7 @@ func WithPlatform(item *types.ImagePlatform) Option {
 	}
 }
 
-func WithZipFilePath(path string) Option {
+func WithZipFilePath(trimPath string, path string) Option {
 	return func(self *Builder) error {
 		if path == "" {
 			return nil
@@ -108,18 +104,25 @@ func WithZipFilePath(path string) Option {
 		defer func() {
 			_ = tarWriter.Close()
 		}()
-		trimPath := filepath.Dir(self.imageBuildOption.Dockerfile)
-		self.imageBuildOption.Dockerfile = filepath.Base(self.imageBuildOption.Dockerfile)
+		first := false
 		for _, zipFile := range zipArchive.File {
 			if strings.HasPrefix(zipFile.Name, "__MACOSX") {
 				continue
 			}
+			if !first {
+				first = true
+				slog.Debug("image build zip path", "root", zipFile.Name)
+			}
+			// zip 文件只获取指定根目录下的文件
+			if !strings.HasPrefix(zipFile.Name, trimPath) {
+				continue
+			}
 			fileInfoHeader, err := tar.FileInfoHeader(zipFile.FileInfo(), "")
-			fileInfoHeader.Name = strings.TrimPrefix(zipFile.Name, trimPath)
-
 			if err != nil {
 				return err
 			}
+			fileInfoHeader.Name = strings.TrimPrefix(zipFile.Name, trimPath)
+
 			err = tarWriter.WriteHeader(fileInfoHeader)
 			if err != nil {
 				return err

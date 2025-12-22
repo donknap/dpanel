@@ -25,12 +25,22 @@ func (self DockerTask) ImageBuild(messageId string, task accessor.ImageSettingOp
 	wsBuffer := ws.NewProgressPip(messageId)
 	defer wsBuffer.Close()
 
+	var err error
+	defer func() {
+		if wsBuffer != nil && err != nil {
+			wsBuffer.BroadcastMessage(err.Error())
+		}
+	}()
+
+	// 如果是 git 指定根目录后在仓库中体现 url#branch:path，Dockerfile 无需要再拼接
+	// 如果是 zip 指定根目录后在解包的时候会只保存根目录下的文件，无需要再拼接
+
 	b, err := builder.New(
 		builder.WithContext(wsBuffer.Context()),
-		builder.WithDockerFilePath(task.BuildDockerfileRoot, task.BuildDockerfileName),
+		builder.WithDockerFilePath(task.BuildDockerfileName),
 		builder.WithDockerFileContent([]byte(task.BuildDockerfileContent)),
 		builder.WithGitUrl(task.BuildGit),
-		builder.WithZipFilePath(task.BuildZip),
+		builder.WithZipFilePath(task.BuildDockerfileRoot, task.BuildZip),
 		builder.WithPlatform(task.PlatformArch),
 		builder.WithTag(task.Tag),
 		builder.WithArgs(task.BuildArgs...),
