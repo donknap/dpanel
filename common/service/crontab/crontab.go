@@ -4,8 +4,10 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/robfig/cron/v3"
 )
 
@@ -75,9 +77,19 @@ func (self client) GetNextRunTime(ids ...cron.EntryID) []time.Time {
 	return result
 }
 
-func (self client) Run(id cron.EntryID) {
+func (self client) RunById(id cron.EntryID) {
 	job := self.Cron.Entry(id).Job
-	if v, ok := job.(Job); ok && v.Name != "" && v.runFunc != nil {
+	v, ok := job.(*Job)
+	if ok && v.Name != "" && v.runFunc != nil {
 		v.Run()
+	}
+}
+
+func (self client) RunByEvent(event string, env []types.EnvItem) {
+	for _, entry := range self.Cron.Entries() {
+		if v, ok := entry.Job.(*Job); ok && v.Name != "" && strings.HasPrefix(v.Name, "event:"+event) {
+			v.SetEnvironment(env)
+			v.Run()
+		}
 	}
 }

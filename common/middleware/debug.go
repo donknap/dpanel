@@ -18,7 +18,7 @@ func (self DebugMiddleware) Process(ctx *gin.Context) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	slog.Info("rt",
+	slog.Info("runtime",
 		"url", ctx.Request.URL,
 		"goroutine", fmt.Sprintf("%d", runtime.NumGoroutine()),
 		"client", ws.GetCollect().Total(),

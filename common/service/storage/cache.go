@@ -18,8 +18,9 @@ var (
 	CacheKeyImageDigest           = "image:digest:%s"
 	CacheKeyImageRootFs           = "image:rootfs:%s"
 	CacheKeyDockerStatus          = "docker:status:%s"
-	CacheKeyDockerEventJob        = "docker:event:%s:%s"
 	CacheKeyConsoleData           = "console:data:%s" // 用于脚本存储一些自定义数据
+	CacheKeyCronTaskStatus        = "cron:task:status:%d"
+	// CacheKeyDockerEventJob        = "docker:event:%s:%s"
 )
 
 var (

@@ -30,7 +30,6 @@ type DockerEnv struct {
 	RemoteType        string          `json:"remoteType"` // 远程客户端类型，支持 docker ssh
 	DockerInfo        *DockerInfo     `json:"dockerInfo,omitempty"`
 	DockerStatus      *DockerStatus   `json:"dockerStatus,omitempty"`
-	DisabledSockProxy bool            `json:"-"` // 监控进程不需要创建代理 sock
 }
 
 func (self DockerEnv) CommandEnv() []string {

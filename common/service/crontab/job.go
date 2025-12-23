@@ -1,10 +1,27 @@
 package crontab
 
 import (
+	"errors"
 	"log/slog"
+	"sync"
+	"time"
+
+	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
-type RunFunc func() error
+var (
+	SkipRun = errors.New("skip this tasks")
+)
+
+type RunFuncContext struct {
+	mu          sync.Mutex
+	StartTime   time.Time
+	Output      string
+	Err         error
+	Environment []types.EnvItem
+}
+
+type RunFunc func(ctx *RunFuncContext)
 
 type Option func(job *Job)
 
@@ -31,19 +48,40 @@ func New(opts ...Option) *Job {
 }
 
 type Job struct {
-	Name    string
-	runFunc []RunFunc
+	Name        string
+	runFunc     []RunFunc
+	environment []types.EnvItem
 }
 
-func (self Job) Run() {
-	if self.runFunc != nil {
-		for _, runFunc := range self.runFunc {
-			err := runFunc()
-			if err != nil {
-				slog.Debug("crontab crash ", "err", err.Error())
-			}
-		}
-	} else {
+func (self *Job) SetEnvironment(env []types.EnvItem) {
+	self.environment = env
+}
+
+func (self *Job) Run() {
+	if self.runFunc == nil {
 		slog.Debug("invalid crontab job")
+		return
+	}
+
+	ctx := &RunFuncContext{
+		Output:      "",
+		Err:         nil,
+		StartTime:   time.Now(),
+		Environment: self.environment,
+	}
+
+	for _, runFunc := range self.runFunc {
+		func() {
+			ctx.mu.Lock()
+			defer ctx.mu.Unlock()
+			runFunc(ctx)
+			if ctx.Err != nil {
+				slog.Debug("crontab crash", "err", ctx.Err.Error())
+			}
+		}()
+
+		if ctx.Err != nil && errors.Is(ctx.Err, SkipRun) {
+			break
+		}
 	}
 }

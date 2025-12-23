@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -63,7 +62,6 @@ func (self Cron) Create(http *gin.Context) {
 		crontab.Client.RemoveJob(taskRow.Setting.JobIds...)
 		taskRow.Setting = &params.CronSettingOption
 		taskRow.Title = params.Title
-		taskRow.Setting.NextRunTime = make([]time.Time, 0)
 		taskRow.Setting.JobIds = make([]cron.EntryID, 0)
 		taskRow.Setting.DockerEnvName = docker.Sdk.Name
 	} else {
@@ -75,15 +73,15 @@ func (self Cron) Create(http *gin.Context) {
 			Title:   params.Title,
 			Setting: &params.CronSettingOption,
 		}
-		taskRow.Setting.NextRunTime = make([]time.Time, 0)
 		taskRow.Setting.JobIds = make([]cron.EntryID, 0)
 		taskRow.Setting.DockerEnvName = docker.Sdk.Name
 		_ = dao.Cron.Create(taskRow)
 	}
-
-	if jobIds, err := (logic.Cron{}).AddCronJob(taskRow); err == nil {
-		taskRow.Setting.NextRunTime = crontab.Client.GetNextRunTime(jobIds...)
-		taskRow.Setting.JobIds = jobIds
+	// 仅当任务非手动触发的时候，才有暂停和恢复功能
+	if taskRow.Setting.TriggerType == accessor.CronTriggerTypeManual || !params.Disable {
+		if jobIds, err := (logic.Cron{}).AddCronJob(taskRow); err == nil {
+			taskRow.Setting.JobIds = jobIds
+		}
 	}
 
 	err = dao.Cron.Save(taskRow)
@@ -113,7 +111,12 @@ func (self Cron) GetList(http *gin.Context) {
 	}
 	list, _ := query.Find()
 	self.JsonResponseWithoutError(http, gin.H{
-		"list": list,
+		"list": function.PluckArrayWalk(list, func(item *entity.Cron) (*entity.Cron, bool) {
+			if item.Setting.TriggerType == accessor.CronTriggerTypeCron {
+				item.Setting.NextRunTime = crontab.Client.GetNextRunTime(item.Setting.JobIds...)
+			}
+			return item, true
+		}),
 	})
 	return
 }
@@ -150,17 +153,15 @@ func (self Cron) RunOnce(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	if cronRow.Setting.TriggerType == accessor.CronTriggerTypeCron && (cronRow.Setting.JobIds == nil || len(cronRow.Setting.Expression) == 0) {
+	if cronRow.Setting.JobIds == nil {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerCronTaskEmpty), 500)
 		return
 	}
-	if callback := (logic.Cron{}).GetJobCallback(cronRow); callback != nil {
-		err := callback()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
+
+	for _, id := range cronRow.Setting.JobIds {
+		crontab.Client.RunById(id)
 	}
+
 	self.JsonSuccessResponse(http)
 	return
 }

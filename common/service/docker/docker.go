@@ -204,29 +204,24 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 			},
 		}
 		self.Option = append(self.Option, dockerclient.WithHTTPClient(&http.Client{Transport: transport}))
-
-		if !self.DockerEnv.DisabledSockProxy {
-			time.AfterFunc(time.Second, func() {
-				// 这里稍微延迟一下，防止 ssh 还没有连接完成
-				err := WithSockProxy()(self)
-				if err != nil {
-					slog.Debug("local sock proxy", "err", err)
-				}
-			})
-		}
-
 		return nil
 	}
 }
 
 func WithSockProxy() Option {
 	return func(self *Client) error {
+		if self.DockerEnv.RemoteType != define.DockerRemoteTypeSSH {
+			return nil
+		}
+		// 这里稍微延迟一下，防止 ssh 还没有连接完成
+		time.Sleep(time.Second * 2)
 		// 创建代理 sock
 		sockPath := ""
 		if runtime.GOOS == "windows" {
 			sockPath = self.Name
 		} else {
 			localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
+			slog.Debug("local sock path remove", "path", localProxySock)
 			_ = os.Remove(localProxySock)
 			sockPath = localProxySock
 		}

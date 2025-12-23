@@ -105,7 +105,7 @@ func (self ImageBuild) GetDetail(http *gin.Context) {
 		tag = imageRow.Tag
 	}
 	tagDetail := function.ImageTag(tag)
-	imageRow.Setting.Tag = tagDetail.BaseName
+	imageRow.Setting.Tag = tagDetail.Name()
 	if imageRow.Setting.BuildType == "" {
 		imageRow.Setting.BuildType = imageRow.BuildType
 	}

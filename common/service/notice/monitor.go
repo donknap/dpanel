@@ -62,7 +62,6 @@ func (self *monitor) Close() {
 func (self *monitor) Join(dockerEnv *types.DockerEnv) {
 	self.Leave(dockerEnv.Name)
 
-	dockerEnv.DisabledSockProxy = true
 	c := &client{
 		dockerEnv: dockerEnv,
 	}

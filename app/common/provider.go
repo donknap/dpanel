@@ -3,7 +3,6 @@ package common
 import (
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/donknap/dpanel/app/common/events"
 	"github.com/donknap/dpanel/app/common/http/controller"
@@ -142,10 +141,8 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 				continue
 			}
 			if jobIds, err := (logic.Cron{}).AddCronJob(task); err == nil && jobIds != nil && len(jobIds) > 0 {
-				task.Setting.NextRunTime = crontab.Client.GetNextRunTime(jobIds...)
 				task.Setting.JobIds = jobIds
 			} else {
-				task.Setting.NextRunTime = make([]time.Time, 0)
 				task.Setting.JobIds = make([]cron.EntryID, 0)
 				if err != nil {
 					slog.Debug("init crontab task error", "error", err.Error())

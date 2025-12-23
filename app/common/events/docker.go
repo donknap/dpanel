@@ -76,16 +76,6 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 
 	storage.Cache.Delete(dockerStatusCacheKey)
 
-	cacheKey := fmt.Sprintf(storage.CacheKeyDockerEventJob, e.DockerEnv.Name, define.DockerEventDaemonStart, e.DockerEnv.Name)
-	if v, ok := storage.Cache.Get(cacheKey); ok {
-		if job, ok := v.(crontab.RunFunc); ok {
-			err := job()
-			if err != nil {
-				slog.Debug("docker event job", "event", define.DockerEventDaemonStart, "task", cacheKey, "error", err)
-			}
-		}
-	}
-
 	if e.DockerEnv.Name != define.DockerDefaultClientName {
 		return
 	}
@@ -145,14 +135,9 @@ func (self Docker) Message(e event.DockerMessagePayload) {
 		define.DockerEventContainerDestroy, define.DockerEventContainerCreate,
 		define.DockerEventContainerDie, define.DockerEventContainerStart,
 	}, e.Action) {
-		cacheKey := fmt.Sprintf(storage.CacheKeyDockerEventJob, e.Type, e.Action, e.Message[0])
-		if v, ok := storage.Cache.Get(cacheKey); ok {
-			if job, ok := v.(crontab.RunFunc); ok {
-				err := job()
-				if err != nil {
-					slog.Debug("docker event job", "event", e.Action, "task", cacheKey, "error", err)
-				}
-			}
-		}
+		crontab.Client.RunByEvent(e.Action, []types.EnvItem{
+			types.NewEnvItemFromKV("DP_DOCKER_ENV_NAME", e.Type),
+			types.NewEnvItemFromKV("DP_CONTAINER_NAME", e.Message[0]),
+		})
 	}
 }

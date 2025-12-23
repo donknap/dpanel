@@ -330,7 +330,7 @@ func initDocker() error {
 		}
 		logic.Env{}.UpdateEnv(defaultDockerEnv)
 	}
-	if dockerClient, err := docker.NewClientWithDockerEnv(defaultDockerEnv); err == nil {
+	if dockerClient, err := docker.NewClientWithDockerEnv(defaultDockerEnv, docker.WithSockProxy()); err == nil {
 		docker.Sdk = dockerClient
 	} else {
 		slog.Debug("init docker", "error", err, "env", defaultDockerEnv)
