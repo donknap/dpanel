@@ -37,10 +37,10 @@ type ContainerBackup struct {
 
 func (self ContainerBackup) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id                string   `json:"id" binding:"required"`
-		EnableImage       bool     `json:"enableImage"`
-		EnableCommitImage bool     `json:"enableCommitImage"`
-		Volume            []string `json:"volume"`
+		Id               string   `json:"id" binding:"required"`
+		BackupImage      string   `json:"backupImage"`
+		BackupVolume     string   `json:"backupVolume"`
+		BackupVolumeList []string `json:"backupVolumeList"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -104,13 +104,12 @@ func (self ContainerBackup) Create(http *gin.Context) {
 
 	manifest := make([]backup.Manifest, 0)
 	err = func() error {
-
 		item := backup.Manifest{}
-		if params.EnableImage {
+		if params.BackupImage != define.ContainerBackupImageNone {
 			imageId := containerInfo.Image
 			imageName := containerInfo.Config.Image
-
-			if params.EnableCommitImage {
+			// 提交容器为新镜像
+			if params.BackupImage == define.ContainerBackupImageContainer {
 				imageDetail := function.ImageTag(containerInfo.Config.Image)
 				imageName = fmt.Sprintf("%s-%s", imageDetail.Uri(), backupTime)
 
@@ -148,23 +147,25 @@ func (self ContainerBackup) Create(http *gin.Context) {
 			item.Image = imagePath
 		}
 
-		if !function.IsEmptyArray(containerInfo.Mounts) {
-			for _, mount := range containerInfo.Mounts {
-				if !function.IsEmptyArray(params.Volume) && !function.InArray(params.Volume, mount.Destination) {
-					continue
-				}
-				backupRow.Setting.VolumePathList = append(backupRow.Setting.VolumePathList, mount.Destination)
+		if params.BackupVolume != define.ContainerBackupVolumeNone {
+			if !function.IsEmptyArray(containerInfo.Mounts) {
+				for _, mount := range containerInfo.Mounts {
+					if !function.IsEmptyArray(params.BackupVolumeList) && !function.InArray(params.BackupVolumeList, mount.Destination) {
+						continue
+					}
+					backupRow.Setting.VolumePathList = append(backupRow.Setting.VolumePathList, mount.Destination)
 
-				out, info, err := docker.Sdk.Client.CopyFromContainer(progress.Context(), params.Id, mount.Destination)
-				if err != nil {
-					return err
-				}
-				if info.Size > 0 {
-					path, err := b.Writer.WriteBlobReader(function.GetSha256([]byte(mount.Destination)), out)
+					out, info, err := docker.Sdk.Client.CopyFromContainer(progress.Context(), params.Id, mount.Destination)
 					if err != nil {
 						return err
 					}
-					item.Volume = append(item.Volume, path)
+					if info.Size > 0 {
+						path, err := b.Writer.WriteBlobReader(function.GetSha256([]byte(mount.Destination)), out)
+						if err != nil {
+							return err
+						}
+						item.Volume = append(item.Volume, path)
+					}
 				}
 			}
 		}

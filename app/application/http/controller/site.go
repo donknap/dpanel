@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -405,4 +406,34 @@ func (self Site) Restore(http *gin.Context) {
 	self.JsonResponseWithoutError(http, gin.H{
 		"containerId": out.ID,
 	})
+}
+
+func (self Site) Prune(http *gin.Context) {
+	query := dao.Site.Order(dao.Site.ID.Desc()).Where(gen.Cond(
+		datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
+	)...)
+	if containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+		All: true,
+	}); err == nil {
+		names := make([]string, 0)
+		for _, summary := range containerList {
+			for _, name := range summary.Names {
+				names = append(names, strings.TrimPrefix(name, "/"))
+			}
+		}
+		query = query.Where(dao.Site.SiteName.NotIn(names...))
+	}
+	_, err := query.Unscoped().Where(
+		dao.Site.DeletedAt.IsNotNull(),
+		dao.Site.DeletedAt.Lte(gorm.DeletedAt{
+			Time:  time.Now().AddDate(0, 0, -15),
+			Valid: true,
+		}),
+	).Delete()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
+	return
 }

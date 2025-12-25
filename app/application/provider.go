@@ -23,6 +23,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/site/get-detail", controller.Site{}.GetDetail)
 			cors.POST("/app/site/delete", controller.Site{}.Delete)
 			cors.POST("/app/site/restore", controller.Site{}.Restore)
+			cors.POST("/app/site/prune", controller.Site{}.Prune)
 
 			cors.POST("/app/site-domain/create", controller.SiteDomain{}.Create)
 			cors.POST("/app/site-domain/delete", controller.SiteDomain{}.Delete)
