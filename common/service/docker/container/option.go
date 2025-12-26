@@ -461,10 +461,9 @@ func WithHealthcheck(item *types.HealthcheckItem) Option {
 		if item == nil || item.Cmd == "" {
 			return nil
 		}
-		command := function.SplitCommandArray(item.Cmd)
-		if len(command) > 1 && (strings.ToUpper(command[0]) == "CMD" || strings.ToUpper(command[0]) == "CMD-SHELL") {
-			item.ShellType = command[0]
-			command = command[1:]
+		if v := function.SplitCommandArray(item.Cmd); len(v) > 1 && (strings.ToUpper(v[0]) == "CMD" || strings.ToUpper(v[0]) == "CMD-SHELL") {
+			item.ShellType = v[0]
+			item.Cmd = strings.TrimPrefix(item.Cmd, v[0])
 		}
 		self.containerConfig.Healthcheck = &container.HealthConfig{
 			Timeout:  time.Duration(item.Timeout) * time.Second,
@@ -472,7 +471,14 @@ func WithHealthcheck(item *types.HealthcheckItem) Option {
 			Interval: time.Duration(item.Interval) * time.Second,
 			Test: append([]string{
 				item.ShellType,
-			}, command...),
+				item.Cmd,
+			}),
+		}
+		// cmd 模式需要拆分参数
+		if item.ShellType == "CMD" {
+			self.containerConfig.Healthcheck.Test = append([]string{
+				item.ShellType,
+			}, function.SplitCommandArray(item.Cmd)...)
 		}
 		return nil
 	}

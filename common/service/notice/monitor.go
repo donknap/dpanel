@@ -5,16 +5,23 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types/events"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
+
+var skipActionLog = []string{
+	"exec_create",
+	"exec_die",
+}
 
 var Monitor = NewMonitor()
 
@@ -147,7 +154,12 @@ func (self *monitor) listen(c *client) {
 				return
 			case message, ok := <-eventChan:
 				if os.Getenv("APP_ENV") == "debug" {
-					slog.Debug("Monitor message", "name", c.dockerEnv.Name, "message", message)
+					if _, _, ok := function.PluckArrayItemWalk(skipActionLog, func(item string) bool {
+						return strings.HasPrefix(string(message.Action), item)
+					}); !ok {
+						message.Actor = events.Actor{}
+						slog.Debug("Monitor message", "name", c.dockerEnv.Name, "message", message)
+					}
 				}
 				if !ok {
 					break eventLoop
