@@ -17,7 +17,7 @@ func (self *Client) AppImageCheckUpgrade(params *app.ImageCheckUpgradeOption) (r
 }
 
 func (self *Client) AppImageTagRemote(params *app.ImageTagRemoteOption) (result app.ImageTagRemoteResult, err error) {
-	data, err := self.Post(function.RouterApiUri("/app/image/tag-remote"), params)
+	data, err := self.Post(function.RouterApiUri("/app/image/tag-sync"), params)
 	if err != nil {
 		return result, err
 	}

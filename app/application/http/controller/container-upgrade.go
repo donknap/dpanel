@@ -51,7 +51,7 @@ func (self Container) Upgrade(http *gin.Context) {
 
 	// 更新容器时可以更改镜像 tag
 	if params.ImageTag != "" {
-		containerInfo.Image = params.ImageTag
+		containerInfo.Config.Image = params.ImageTag
 	}
 
 	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, containerInfo.Config.Image)

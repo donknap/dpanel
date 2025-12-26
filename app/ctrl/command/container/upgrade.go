@@ -21,16 +21,24 @@ func (self Upgrade) GetDescription() string {
 }
 
 func (self Upgrade) Configure(command *cobra.Command) {
-	command.Flags().String("name", "", "Container name")
-	command.Flags().String("docker-env", "local", "Specify the Docker Server")
-	command.Flags().Int("upgrade", 0, `Want to upgrade the container? ("1"|"0")`)
+	command.Flags().String("name", "", "Name of the container")
+	command.Flags().String("docker-env", "local", "Docker server name")
+	command.Flags().Bool("upgrade", false, "Upgrade the container to the latest version")
+	command.Flags().Bool("enable-bak", true, "Enable backup for the old container")
+	command.Flags().Bool("disable-bak", false, "Disable backup for the old container")
+	command.Flags().String("image-tag", "", "New image tag to apply")
 	_ = command.MarkFlagRequired("name")
 }
 
 func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 	name, _ := cmd.Flags().GetString("name")
 	dockerEnv, _ := cmd.Flags().GetString("docker-env")
-	isUpgrade, _ := cmd.Flags().GetInt("upgrade")
+	isUpgrade, _ := cmd.Flags().GetBool("upgrade")
+	enableBak, _ := cmd.Flags().GetBool("enable-bak")
+	if v, err := cmd.Flags().GetBool("disable-bak"); err == nil && v {
+		enableBak = false
+	}
+	imageName, _ := cmd.Flags().GetString("image-tag")
 
 	proxyClient, err := proxy.NewProxyClient()
 	if err != nil {
@@ -66,12 +74,15 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 		utils.Result{}.Error(err)
 		return
 	}
-	if isUpgrade <= 0 {
+	if !isUpgrade {
 		utils.Result{}.Success(result)
 		return
 	}
+	if imageName == "" {
+		imageName = containerInfo.Info.Config.Image
+	}
 	_, err = proxyClient.AppImageTagRemote(&app.ImageTagRemoteOption{
-		Tag:  containerInfo.Info.Config.Image,
+		Tag:  imageName,
 		Type: "pull",
 	})
 	if err != nil {
@@ -80,7 +91,8 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 	}
 	containerUpgradeResult, err := proxyClient.AppContainerUpgrade(&app.ContainerUpgradeOption{
 		Md5:       containerInfo.Info.ID,
-		EnableBak: true,
+		EnableBak: enableBak,
+		ImageTag:  imageName,
 	})
 
 	if err != nil {

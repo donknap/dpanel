@@ -16,7 +16,6 @@ func (provider *Provider) Register(console console.Console) {
 	console.RegisterCommand(new(user.Reset))
 	console.RegisterCommand(new(store.Sync))
 
-	// 容器相关
 	console.RegisterCommand(new(container.Upgrade))
 	console.RegisterCommand(new(container.Backup))
 
@@ -24,4 +23,5 @@ func (provider *Provider) Register(console console.Console) {
 
 	console.RegisterCommand(new(system.Cache))
 	console.RegisterCommand(new(system.Notice))
+	console.RegisterCommand(new(system.Prune))
 }

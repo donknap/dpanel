@@ -21,10 +21,10 @@ type ContainerUpgradeResult struct {
 }
 
 type ContainerBackupOption struct {
-	Id                string   `json:"id"`
-	EnableImage       bool     `json:"enableImage"`
-	EnableCommitImage bool     `json:"enableCommitImage"`
-	Volume            []string `json:"volume"`
+	Id               string   `json:"id"`
+	BackupImage      string   `json:"backupImage"`
+	BackupVolume     string   `json:"backupVolume"`
+	BackupVolumeList []string `json:"backupVolumeList"`
 }
 
 type ContainerBackupResult struct {

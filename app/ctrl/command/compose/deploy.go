@@ -27,7 +27,7 @@ func (self Deploy) GetDescription() string {
 }
 
 func (self Deploy) Configure(command *cobra.Command) {
-	command.Flags().String("docker-env", "", "Specify the Docker Server, default: local")
+	command.Flags().String("docker-env", "local", "Docker server name")
 	command.Flags().String("name", "", "Compose task name")
 	command.Flags().StringArrayP("environment", "", make([]string, 0), "Compose task environment, eg: TEST=1")
 	command.Flags().String("pull-image", "command", `Methods for pulling images ("dpanel"|"command")`)

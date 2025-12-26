@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -41,6 +43,9 @@ type Client struct {
 }
 
 func (self *Client) Post(uri string, payload any) (data io.Reader, err error) {
+	if os.Getenv("APP_ENV") == "debug" {
+		slog.Debug("ctrl command", "uri", uri, "data", payload)
+	}
 	postData := new(bytes.Buffer)
 	if payload == nil {
 		payload = gin.H{}
