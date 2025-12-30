@@ -15,6 +15,7 @@ ENV STORAGE_LOCAL_PATH=/dpanel
 ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
 ENV TZ=Asia/Shanghai
 ENV DP_ACME_CONFIG_HOME=/dpanel/acme
+ENV PATH="/app/server:${PATH}"
 
 COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml

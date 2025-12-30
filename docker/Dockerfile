@@ -16,6 +16,7 @@ ENV STORAGE_LOCAL_PATH=/dpanel
 ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
 ENV TZ=Asia/Shanghai
 ENV DP_ACME_CONFIG_HOME=/dpanel/acme
+ENV PATH="/app/server:${PATH}"
 
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/nginx/default.conf /etc/nginx/http.d/default.conf

@@ -15,19 +15,47 @@ import (
 func SplitCommandArray(cmd string) []string {
 	result := make([]string, 0)
 	field := ""
-	ignoreSpace := false
-	for _, s := range strings.Split(cmd, "") {
-		if s == " " && !ignoreSpace {
-			result = append(result, field)
-			field = ""
-			continue
+	// quoteChar 记录当前开启的引号类型 (单引 或 双引)
+	// 只有当它为 0 时，空格才起分隔作用
+	var quoteChar rune
+
+	// 将字符串转为 rune 数组，处理中文字符更安全
+	runes := []rune(cmd)
+
+	for i := 0; i < len(runes); i++ {
+		char := runes[i]
+
+		if quoteChar == 0 {
+			// 当前不在引号内
+			if char == ' ' {
+				if field != "" {
+					result = append(result, field)
+					field = ""
+				}
+				continue
+			}
+			if char == '"' || char == '\'' {
+				// 开启引号模式
+				quoteChar = char
+				continue
+			}
+		} else {
+			// 当前在引号内
+			if char == quoteChar {
+				// 遇到配对的引号，结束模式
+				quoteChar = 0
+				continue
+			}
+			// 处理转义字符 (如 \")
+			if char == '\\' && i+1 < len(runes) && rune(runes[i+1]) == quoteChar {
+				field += string(runes[i+1])
+				i++ // 跳过下一个
+				continue
+			}
 		}
-		if s == "\"" || s == "'" {
-			ignoreSpace = !ignoreSpace
-			continue
-		}
-		field += s
+		field += string(char)
 	}
+
 	if field != "" {
 		result = append(result, field)
 	}

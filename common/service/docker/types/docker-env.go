@@ -59,6 +59,9 @@ func (self DockerEnv) CommandEnv() []string {
 		"OLDPWD", "TMPDIR", "TERMINFO_DIRS",
 		"COLORTERM", "PAGER", "_",
 		"HTTP_PROXY", "HTTPS_PROXY",
+		// @todo dpanel 要用到的环境变量，期待以后修正为以 DP_ 开头
+		"STORAGE_LOCAL_PATH", "DP_ACME_CONFIG_HOME", "DB_DATABASE",
+		"APP_ENV", "APP_NAME", "APP_FAMILY", "APP_SERVER_PORT", "APP_VERSION",
 	}
 	result = append(result, function.PluckArrayWalk(os.Environ(), func(item string) (string, bool) {
 		ok := false

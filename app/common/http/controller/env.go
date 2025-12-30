@@ -264,7 +264,7 @@ func (self Env) Delete(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		} else {
-			if docker.Sdk.Client.DaemonHost() == row.Address {
+			if docker.Sdk.DockerEnv.Name == row.Name {
 				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvCurrentCanNotDelete), 500)
 				return
 			}

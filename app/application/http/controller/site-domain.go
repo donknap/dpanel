@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/application/logic"
+	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -268,6 +269,19 @@ func (self SiteDomain) Delete(http *gin.Context) {
 }
 
 func (self SiteDomain) RestartNginx(http *gin.Context) {
+	if dpanelContainerInfo, err := (logic2.Setting{}).GetDPanelInfo(); err == nil {
+		if _, ok := dpanelContainerInfo.NetworkSettings.Networks[define.DPanelProxyNetworkName]; !ok {
+			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, define.DPanelProxyNetworkName, dpanelContainerInfo.ID, &network.EndpointSettings{
+				Aliases: []string{
+					fmt.Sprintf(define.DPanelNetworkHostName, strings.Trim(dpanelContainerInfo.Name, "/")),
+				},
+			})
+			if err != nil {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSiteDomainJoinDefaultNetworkFailed, err.Error()), 500)
+				return
+			}
+		}
+	}
 	out, err := local.QuickRun("nginx -t")
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -279,6 +293,21 @@ func (self SiteDomain) RestartNginx(http *gin.Context) {
 	}
 	_, err = local.QuickRun("nginx -s reload")
 	if err != nil {
+		if function.ErrorHasKeyword(err, "invalid PID number") {
+			// 尝试启动 nginx
+			if cmd, err := local.New(
+				local.WithCommandName("nginx"),
+				local.WithArgs("-g", "daemon on;"),
+			); err == nil {
+				err = cmd.Run()
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+				self.JsonSuccessResponse(http)
+				return
+			}
+		}
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}

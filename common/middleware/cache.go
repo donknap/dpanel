@@ -1,7 +1,6 @@
 package common
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -15,8 +14,9 @@ type CacheMiddleware struct {
 func (self CacheMiddleware) Process(http *gin.Context) {
 	url := http.Request.URL.Path
 	if strings.HasPrefix(url, "/dpanel/static") || strings.HasPrefix(url, "/favicon.ico") {
-		defaultMaxAge := 3600
-		http.Header("Cache-Control", "public, max-age="+strconv.Itoa(defaultMaxAge))
+		http.Header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0")
+		http.Header("Pragma", "no-cache")
+		http.Header("Expires", "0")
 	}
 	http.Next()
 	return

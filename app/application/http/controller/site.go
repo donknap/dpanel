@@ -328,6 +328,11 @@ func (self Site) GetDetail(http *gin.Context) {
 		_ = dao.Site.Save(siteRow)
 	}
 
+	if siteRow.ContainerInfo != nil && siteRow.ContainerInfo.Info.Config.Image != "" {
+		imageNameDetail := function.ImageTag(siteRow.ContainerInfo.Info.Config.Image)
+		siteRow.ContainerInfo.Info.Config.Image = imageNameDetail.Uri()
+	}
+
 	self.JsonResponseWithoutError(http, siteRow)
 	return
 }

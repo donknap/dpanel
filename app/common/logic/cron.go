@@ -84,13 +84,13 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 		}()
 
 		containerName := task.Setting.ContainerName
-		defaultDockerEnv, err := Env{}.GetEnvByName(task.Setting.DockerEnvName)
+		dockerEnv, err := Env{}.GetEnvByName(task.Setting.DockerEnvName)
 		if err != nil {
 			return
 		}
 
 		globalEnv := make([]string, 0)
-		globalEnv = append(globalEnv, defaultDockerEnv.CommandEnv()...)
+		globalEnv = append(globalEnv, dockerEnv.CommandEnv()...)
 		globalEnv = append(globalEnv, function.PluckArrayWalk(task.Setting.Environment, func(i types.EnvItem) (string, bool) {
 			// 这里需要根据传入的环境变量，再展开一次
 			return fmt.Sprintf("%s=%s", i.Name, os.Expand(i.Value, func(s string) string {
@@ -109,7 +109,7 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 
 		var script string
 		if containerName != "" {
-			dockerClient, err := docker.NewClientWithDockerEnv(defaultDockerEnv)
+			dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv)
 			if err != nil {
 				return
 			}
