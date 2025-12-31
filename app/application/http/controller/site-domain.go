@@ -276,10 +276,6 @@ func (self SiteDomain) RestartNginx(http *gin.Context) {
 					fmt.Sprintf(define.DPanelNetworkHostName, strings.Trim(dpanelContainerInfo.Name, "/")),
 				},
 			})
-			if err != nil {
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSiteDomainJoinDefaultNetworkFailed, err.Error()), 500)
-				return
-			}
 		}
 	}
 	out, err := local.QuickRun("nginx -t")

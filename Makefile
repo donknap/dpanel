@@ -53,6 +53,7 @@ test: amd64 arm64
 	docker buildx use dpanel-builder
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta \
+	-t dpanel/dpanel:beta \
 	--platform linux/amd64 \
 	--build-arg APP_VERSION=${VERSION} \
 	--build-arg APP_FAMILY=ce \
@@ -61,6 +62,7 @@ test: amd64 arm64
 	. --push
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite \
+	-t dpanel/dpanel:beta-lite \
 	--platform linux/amd64,linux/arm64 \
 	--build-arg APP_VERSION=${VERSION} \
 	--build-arg APP_FAMILY=ce \
