@@ -143,6 +143,25 @@ jobs:
           -f ./docker/Dockerfile \
           . --push
           
+          #debian 
+          docker buildx build \
+          -t dpanel/dpanel:lite-debian \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite-debian \
+          --platform linux/arm64,linux/amd64,linux/arm/v7 \
+          --build-arg APP_VERSION=${VERSION_TAG} \
+          --build-arg APP_FAMILY=ce \
+          -f ./docker/Dockerfile-debian-lite \
+          . --push
+
+          docker buildx build \
+          -t dpanel/dpanel:debian \
+          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:debian \
+          --platform linux/arm64,linux/amd64,linux/arm/v7 \
+          --build-arg APP_VERSION=${VERSION_TAG} \
+          --build-arg APP_FAMILY=ce \
+          -f ./docker/Dockerfile-debian \
+          . --push
+          
           # pe
           
           docker buildx build \

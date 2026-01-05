@@ -1,0 +1,45 @@
+FROM debian:bookworm-slim
+
+ARG APP_VERSION
+ARG TARGETARCH
+ARG APP_FAMILY
+
+ENV APP_NAME=dpanel
+ENV APP_ENV=lite
+ENV APP_VERSION=$APP_VERSION
+ENV APP_FAMILY=$APP_FAMILY
+ENV APP_SERVER_PORT=8080
+
+ENV DOCKER_HOST=unix:///var/run/docker.sock
+ENV STORAGE_LOCAL_PATH=/dpanel
+ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
+ENV TZ=Asia/Shanghai
+ENV DP_ACME_CONFIG_HOME=/dpanel/acme
+ENV PATH="/app/server:${PATH}"
+
+COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-${TARGETARCH} /app/server/dpanel
+COPY ./runtime/config.yaml /app/server/config.yaml
+COPY ./docker/script /app/script
+COPY ./docker/task/entrypoint-lite.sh /docker/entrypoint.sh
+
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    gnupg \
+    procps \
+    tzdata \
+    git \
+    openssh-client \
+    libc6 && \
+    apt-get install -y --no-install-recommends docker.io docker-compose-v2 || true && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
+    mkdir -p /docker && chmod 755 /docker/*
+
+WORKDIR /app/server
+VOLUME [ "/dpanel" ]
+
+EXPOSE 8080
+
+ENTRYPOINT [ "/docker/entrypoint.sh" ]
