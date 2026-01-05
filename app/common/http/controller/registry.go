@@ -65,30 +65,21 @@ func (self Registry) Create(http *gin.Context) {
 	}
 
 	var response registry.AuthenticateOKBody
-	var loginErr error
+	authConfig := registry.AuthConfig{
+		Username:      params.Username,
+		Password:      params.Password,
+		ServerAddress: params.ServerAddress,
+		Email:         params.Email,
+	}
 
-	if params.Username != "" && params.Password != "" {
-		response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, registry.AuthConfig{
-			Username:      params.Username,
-			Password:      params.Password,
-			ServerAddress: params.ServerAddress,
-			Email:         params.Email,
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
+	response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, authConfig)
+	if err != nil {
+		if function.ErrorHasKeyword(err, "server gave HTTP response to HTTPS client") {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImagePullServerHttp, "name", params.ServerAddress), 500)
 			return
 		}
-	} else {
-		if !function.InArray([]string{
-			"docker.io",
-			"quay.io",
-			"ghcr.io",
-		}, params.ServerAddress) {
-			response, loginErr = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, registry.AuthConfig{
-				ServerAddress: params.ServerAddress,
-				Email:         params.Email,
-			})
-		}
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 
 	registryNew := &entity.Registry{
@@ -117,11 +108,6 @@ func (self Registry) Create(http *gin.Context) {
 
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	if loginErr != nil {
-		self.JsonResponseWithError(http, loginErr, 500)
 		return
 	}
 

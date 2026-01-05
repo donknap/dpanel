@@ -47,7 +47,7 @@ func (self Image) TagSync(http *gin.Context) {
 				registry.WithAddress(s),
 				registry.WithCredentialsWithBasic(registryConfig.Config.Username, registryConfig.Config.Password),
 			)
-			if err := reg.Client().Ping(); err != nil {
+			if err = reg.Client().Ping(); err != nil {
 				slog.Debug("image remote select registry url", "error", err)
 				continue
 			}
@@ -74,14 +74,13 @@ func (self Image) TagSync(http *gin.Context) {
 		}
 	}
 
-	// 可能最后循环后还包含错误
 	if err != nil {
 		if function.ErrorHasKeyword(err, "not found:", "repository does not exist") {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImagePullTagNotFound, "tag", params.Tag), 500)
 			return
 		}
 		if function.ErrorHasKeyword(err, "server gave HTTP response to HTTPS client") {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImagePullServerHttp), 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImagePullServerHttp, "name", imageNameDetail.Registry), 500)
 			return
 		}
 		self.JsonResponseWithError(http, err, 500)
@@ -89,6 +88,7 @@ func (self Image) TagSync(http *gin.Context) {
 	}
 
 	err = logic.DockerTask{}.ImageRemote(wsBuffer, out)
+	// 可能最后循环后还包含错误
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
