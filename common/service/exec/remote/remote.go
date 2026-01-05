@@ -62,6 +62,10 @@ type Remote struct {
 	ctxCancel context.CancelFunc
 }
 
+func (self *Remote) WorkDir(path string) {
+	self.Dir = path
+}
+
 func (self *Remote) AppendEnv(env []string) {
 	self.Env = append(self.Env, env...)
 }

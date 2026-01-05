@@ -118,36 +118,37 @@ func (self Task) Logs(tail int, showTime, follow bool) (io.ReadCloser, error) {
 }
 
 func (self Task) runCommand(command []string) (io.ReadCloser, error) {
-	command = append(self.getBaseCommand(), command...)
-	cmd, err := docker.Sdk.Compose(command...)
+	// dpanel 运行环境和远程 docker 可能环境不同，这里的命令统一采用相对目录的形式来处理
+	// 如果当前是 windows 系统，则强制使用 /home/dpanel/ 做为数据目录
+	cmd := make([]string, 0)
+	cmd = append(cmd, "--project-directory", self.Project.WorkingDir)
+	for _, file := range self.Project.ComposeFiles {
+		if v, err := filepath.Rel(self.Project.WorkingDir, file); err == nil {
+			cmd = append(cmd, "-f", v)
+		}
+	}
+	cmd = append(cmd, "-p", self.Project.Name)
+	for _, envFileName := range []string{
+		".env",
+	} {
+		envFilePath := filepath.Join(self.Project.WorkingDir, envFileName)
+		_, err := os.Stat(envFilePath)
+		if err == nil {
+			cmd = append(cmd, "--env-file", envFileName)
+		}
+	}
+	cmd = append(cmd, command...)
+	exec, err := docker.Sdk.Compose(cmd...)
 	if err != nil {
 		return nil, err
 	}
 	if self.Project != nil && self.Project.Environment != nil {
-		cmd.AppendEnv(function.PluckMapWalkArray(self.Project.Environment, func(k string, v string) (string, bool) {
+		exec.AppendEnv(function.PluckMapWalkArray(self.Project.Environment, func(k string, v string) (string, bool) {
 			return fmt.Sprintf("%s=%s", k, v), true
 		}))
 	}
-	return cmd.RunInPip()
-}
-
-func (self Task) getBaseCommand() []string {
-	project := self.Project
-	cmd := make([]string, 0)
-	for _, file := range self.Project.ComposeFiles {
-		cmd = append(cmd, "-f", file)
-	}
-	cmd = append(cmd, "-p", project.Name)
-	for _, envFileName := range []string{
-		".env",
-	} {
-		envFilePath := filepath.Join(project.WorkingDir, envFileName)
-		_, err := os.Stat(envFilePath)
-		if err == nil {
-			cmd = append(cmd, "--env-file", envFilePath)
-		}
-	}
-	return cmd
+	exec.WorkDir(self.Project.WorkingDir)
+	return exec.RunInPip()
 }
 
 // GetService 区别于 Project.GetService 方法，此方法会将扩展信息一起返回

@@ -143,3 +143,7 @@ func (self *Local) Close() error {
 	self.ctxCancel()
 	return nil
 }
+
+func (self *Local) WorkDir(path string) {
+	self.cmd.Dir = path
+}

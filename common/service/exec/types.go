@@ -17,4 +17,5 @@ type Executor interface {
 	String() string
 	AppendEnv(env []string)
 	AppendSystemEnv()
+	WorkDir(path string)
 }
