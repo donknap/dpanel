@@ -6,6 +6,11 @@ chmod 755 /app/server/dpanel && mkdir -p /dpanel/nginx/default_host /dpanel/ngin
   /dpanel/nginx/redirection_host /dpanel/nginx/dead_host /dpanel/nginx/temp \
   /dpanel/cert /dpanel/storage
 
-crond
-nginx -g "daemon off;" &
+if command -v crond >/dev/null 2>&1; then
+    crond
+elif command -v cron >/dev/null 2>&1; then
+    service cron start
+fi
+
+mkdir -p /var/log/nginx && nginx -g "daemon off;" &
 /app/server/dpanel server:start -f /app/server/config.yaml

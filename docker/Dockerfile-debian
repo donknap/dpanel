@@ -1,26 +1,54 @@
-FROM dpanel/dpanel:lite-debian
+FROM debian:bookworm-slim
 
-ARG PROXY="proxy=0"
+ARG APP_VERSION
+ARG TARGETARCH
+ARG APP_FAMILY
+
+ENV APP_NAME=dpanel
 ENV APP_ENV=production
+ENV APP_FAMILY=$APP_FAMILY
+ENV APP_VERSION=$APP_VERSION
+ENV APP_SERVER_PORT=8080
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    nginx \
-    openssl \
-    curl && \
-    mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private /var/www/challenges && \
-    export ${PROXY} && \
-    curl https://raw.githubusercontent.com/acmesh-official/acme.sh/dev/acme.sh | sh -s -- --install-online --config-home /dpanel/acme && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+ENV DOCKER_HOST=unix:///var/run/docker.sock
+ENV STORAGE_LOCAL_PATH=/dpanel
+ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
+ENV TZ=Asia/Shanghai
+ENV DP_ACME_CONFIG_HOME=/dpanel/acme
+ENV PATH="/app/server:${PATH}"
+
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+      printf '#!/bin/sh\nexit 101' > /usr/sbin/policy-rc.d && chmod +x /usr/sbin/policy-rc.d && \
+      apt-get update && apt-get install -y --no-install-recommends  tzdata git curl ca-certificates gnupg openssh-client nginx cron && \
+      printf "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list && \
+      curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+      apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin && \
+      useradd -r -s /sbin/nologin nginx || true && \
+      rm /usr/sbin/policy-rc.d && \
+      ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/bin/docker-compose && \
+      mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
+      ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+      apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY ./docker/nginx/default.conf /etc/nginx/http.d/default.conf
+COPY ./docker/nginx/default.conf /etc/nginx/sites-enabled/default
 COPY ./docker/nginx/include /etc/nginx/conf.d/include
-COPY ./docker/task/entrypoint.sh /docker/entrypoint.sh
+COPY ./docker/script /app/script
+COPY ./docker/task /docker
 
-RUN chmod 755 /docker/entrypoint.sh
+COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-${TARGETARCH} /app/server/dpanel
+COPY ./runtime/config.yaml /app/server/config.yaml
 
-EXPOSE 80 443
+RUN chmod 755 /docker/* && \
+      mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
+      cd /docker && ./acme.sh --install --config-home /dpanel/acme && \
+      mkdir -p /var/www/challenges
 
 WORKDIR /app/server
+VOLUME [ "/dpanel" ]
+
+EXPOSE 443
+EXPOSE 80
+EXPOSE 8080
 
 ENTRYPOINT [ "/docker/entrypoint.sh" ]

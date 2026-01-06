@@ -73,6 +73,22 @@ test: amd64 arm64
 	--build-arg APP_FAMILY=ce \
 	-f ./docker/Dockerfile \
 	. --push
+test-debian:
+	docker buildx use dpanel-builder
+	docker buildx build \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-debian-lite \
+	--platform linux/amd64 \
+	--build-arg APP_VERSION=${VERSION} \
+	--build-arg APP_FAMILY=ce \
+	-f ./docker/Dockerfile-debian-lite \
+	. --push
+	docker buildx build \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-debian \
+	--platform linux/amd64 \
+	--build-arg APP_VERSION=${VERSION} \
+	--build-arg APP_FAMILY=ce \
+	-f ./docker/Dockerfile-debian \
+	. --push
 
 test-pe: amd64 arm64
 	docker buildx use dpanel-builder

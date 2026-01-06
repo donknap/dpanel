@@ -23,19 +23,14 @@ COPY ./docker/script /app/script
 COPY ./docker/task/entrypoint-lite.sh /docker/entrypoint.sh
 
 RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
-    gnupg \
-    procps \
-    tzdata \
-    git \
-    openssh-client \
-    libc6 && \
-    apt-get install -y --no-install-recommends docker.io docker-compose-v2 || true && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
-    mkdir -p /docker && chmod 755 /docker/*
+      apt-get update && apt-get install -y --no-install-recommends tzdata git curl ca-certificates gnupg openssh-client && \
+      printf "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list && \
+      curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+      apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin && \
+      ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/bin/docker-compose && \
+      mkdir -p /root/.ssh && chmod 700 /root/.ssh && chmod 755 /docker/* && \
+      ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+      apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/server
 VOLUME [ "/dpanel" ]
