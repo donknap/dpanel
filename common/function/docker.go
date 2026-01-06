@@ -5,59 +5,21 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
+	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/mattn/go-shellwords"
 )
 
 func SplitCommandArray(cmd string) []string {
 	result := make([]string, 0)
-	field := ""
-	// quoteChar 记录当前开启的引号类型 (单引 或 双引)
-	// 只有当它为 0 时，空格才起分隔作用
-	var quoteChar rune
-
-	// 将字符串转为 rune 数组，处理中文字符更安全
-	runes := []rune(cmd)
-
-	for i := 0; i < len(runes); i++ {
-		char := runes[i]
-
-		if quoteChar == 0 {
-			// 当前不在引号内
-			if char == ' ' {
-				if field != "" {
-					result = append(result, field)
-					field = ""
-				}
-				continue
-			}
-			if char == '"' || char == '\'' {
-				// 开启引号模式
-				quoteChar = char
-				continue
-			}
-		} else {
-			// 当前在引号内
-			if char == quoteChar {
-				// 遇到配对的引号，结束模式
-				quoteChar = 0
-				continue
-			}
-			// 处理转义字符 (如 \")
-			if char == '\\' && i+1 < len(runes) && rune(runes[i+1]) == quoteChar {
-				field += string(runes[i+1])
-				i++ // 跳过下一个
-				continue
-			}
-		}
-		field += string(char)
-	}
-
-	if field != "" {
-		result = append(result, field)
+	result, err := shellwords.Parse(cmd)
+	if err != nil {
+		slog.Debug("function split command array ", "error", err)
 	}
 	return result
 }
@@ -151,41 +113,26 @@ func ImageTag(tag string) *Tag {
 	tag = strings.TrimPrefix(strings.TrimPrefix(tag, "http://"), "https://")
 	result := &Tag{}
 
-	// 如果没有指定仓库地址，则默认为 docker.io
-	noRegistryUrl := false
-	temp := strings.Split(tag, "/")
-	if !strings.Contains(temp[0], ".") || len(temp) == 1 {
-		noRegistryUrl = true
-		tag = define.RegistryDefaultName + "/" + tag
+	ref, err := reference.ParseNormalizedNamed(tag)
+	if err != nil {
+		return result
 	}
-	temp = strings.Split(tag, "/")
-	// 先补齐 registry 地址后再判断是否有标签，仓库地址中可能包含端口号
-	if !strings.Contains(strings.Join(temp[1:], "/"), ":") {
-		tag += ":latest"
-	}
-	temp = strings.Split(tag, "/")
-	result.Registry = temp[0]
+	result.Registry = reference.Domain(ref)
+	result.BaseName = reference.Path(ref)
 
-	name := strings.Split(temp[len(temp)-1], ":")
-	result.ImageName, result.Version = name[0], strings.Join(name[1:], ":")
-
-	// 兼容使用 digest 标识版本号的情况
-	if strings.Contains(result.Version, "@") {
-		//result.Version = strings.Split(result.Version, "@")[1]
+	// .String() docker.io/test/phpmyadmin:latest@sha256
+	// .Name() docker.io/test/phpmyadmin
+	tagName := reference.TagNameOnly(ref)
+	if i := strings.LastIndex(tagName.String(), result.BaseName); i > -1 {
+		result.Version = tagName.String()[i+len(result.BaseName)+1:]
 	}
 
-	if len(temp) <= 2 {
-		if noRegistryUrl {
-			result.Namespace = "library"
-		}
+	// 假如 basename 包含 / 再进一步的分割 namespace 和 imageName
+	if i := strings.LastIndex(result.BaseName, "/"); i > -1 {
+		result.Namespace = result.BaseName[:i]
+		result.ImageName = result.BaseName[i+1:]
 	} else {
-		result.Namespace = strings.Join(temp[1:len(temp)-1], "/")
+		result.ImageName = result.BaseName
 	}
-	if result.Namespace != "" {
-		result.BaseName = fmt.Sprintf("%s/%s", result.Namespace, result.ImageName)
-	} else {
-		result.BaseName = result.ImageName
-	}
-
 	return result
 }

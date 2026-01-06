@@ -65,7 +65,7 @@ test: amd64 arm64
 	-f ./docker/Dockerfile-lite \
 	. --push
 
-    docker buildx build \
+	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta \
 	-t dpanel/dpanel:beta \
 	--platform linux/amd64 \

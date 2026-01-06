@@ -22,7 +22,7 @@ COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
 COPY ./docker/task/entrypoint-lite.sh /docker/entrypoint.sh
 
-RUN sed -i 's/dl-cdn.alpinelinux1111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update musl docker-cli docker-cli-compose tzdata git openssh-client && \
   rm /usr/bin/docker-compose && mkdir -p /root/.ssh && chmod 700 /root/.ssh && chmod 755 /docker/*
 

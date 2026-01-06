@@ -31,8 +31,13 @@ func WithAddress(address ...string) Option {
 			if strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(s, "http://"), "https://"), "/") == define.RegistryDefaultName {
 				s = define.RegistryDefaultHost
 			}
+			// 本地地址默认可以不检测 https
 			if !strings.HasPrefix(s, "http") {
-				s = "https://" + s
+				if function.IpIsLocalhost(s) {
+					s = "http://" + s
+				} else {
+					s = "https://" + s
+				}
 			}
 			u, err := url.Parse(s)
 			if err != nil {

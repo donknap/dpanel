@@ -19,7 +19,6 @@ import (
 	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
 	"github.com/donknap/dpanel/common/service/docker/conn/listener"
 	"github.com/donknap/dpanel/common/service/docker/types"
-	"github.com/donknap/dpanel/common/service/exec/remote"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -165,14 +164,8 @@ func WithTLS(caPath, certPath, keyPath string) Option {
 func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 	return func(self *Client) error {
 		cmdName := "docker"
-		if sshClient, err := ssh.NewClient(ssh.WithServerInfo(serverInfo)...); err == nil {
-			defer sshClient.Close()
-			if content, err := remote.QuickRun(sshClient, "podman version"); err == nil && strings.Contains(string(content), "Podman Engine") {
-				slog.Debug("docker with ssh podman", "version", string(content))
-				cmdName = "podman"
-			}
-		} else {
-			return err
+		if self.DockerEnv.DockerType == "podman" {
+			cmdName = "podman"
 		}
 		lock := sync.Mutex{}
 		transport := &http.Transport{

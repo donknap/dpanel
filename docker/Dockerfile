@@ -1,4 +1,5 @@
-FROM dpanel/dpanel:lite
+ARG IMAGE=dpanel/dpanel:lite
+FROM ${IMAGE}
 
 ARG APP_FAMILY
 
@@ -10,7 +11,7 @@ COPY ./docker/nginx/default.conf /etc/nginx/http.d/default.conf
 COPY ./docker/nginx/include /etc/nginx/conf.d/include
 COPY ./docker/task /docker
 
-RUN sed -i 's/dl-cdn.alpinelinux1111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update nginx curl openssl && \
   mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
   sh -s -- /docker/acme.sh --install-online --config-home /dpanel/acme && \

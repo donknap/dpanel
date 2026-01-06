@@ -3,6 +3,7 @@ package function
 import (
 	"errors"
 	"net"
+	"strings"
 )
 
 func IpInSubnet(ipAddress, subnetAddress string) (bool, error) {
@@ -22,4 +23,20 @@ func IpInSubnet(ipAddress, subnetAddress string) (bool, error) {
 		return false, errors.New("ip address does not match the subnet address")
 	}
 	return true, nil
+}
+
+func IpIsLocalhost(address string) bool {
+	host := address
+	if h, _, err := net.SplitHostPort(address); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if strings.ToLower(host) == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
 }

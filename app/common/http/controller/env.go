@@ -138,6 +138,7 @@ func (self Env) Create(http *gin.Context) {
 		EnableSSH:         params.EnableSSH,
 		SshServerInfo:     params.SshServerInfo,
 		RemoteType:        params.RemoteType,
+		DockerType:        params.DockerType,
 	}
 
 	if params.EnableTLS {
