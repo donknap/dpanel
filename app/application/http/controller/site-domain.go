@@ -12,7 +12,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/application/logic"
-	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -269,15 +268,6 @@ func (self SiteDomain) Delete(http *gin.Context) {
 }
 
 func (self SiteDomain) RestartNginx(http *gin.Context) {
-	if dpanelContainerInfo, err := (logic2.Setting{}).GetDPanelInfo(); err == nil {
-		if _, ok := dpanelContainerInfo.NetworkSettings.Networks[define.DPanelProxyNetworkName]; !ok {
-			err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, define.DPanelProxyNetworkName, dpanelContainerInfo.ID, &network.EndpointSettings{
-				Aliases: []string{
-					fmt.Sprintf(define.DPanelNetworkHostName, strings.Trim(dpanelContainerInfo.Name, "/")),
-				},
-			})
-		}
-	}
 	out, err := local.QuickRun("nginx -t")
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

@@ -1,22 +1,41 @@
-ARG IMAGE=dpanel/dpanel:lite
-FROM ${IMAGE}
+FROM alpine
 
+ARG APP_VERSION
+ARG TARGETARCH
 ARG APP_FAMILY
 
+ENV APP_NAME=dpanel
 ENV APP_ENV=production
+ENV APP_VERSION=$APP_VERSION
+ENV APP_FAMILY=$APP_FAMILY
 ENV APP_SERVER_PORT=8080
 
+ENV DOCKER_HOST=unix:///var/run/docker.sock
+ENV STORAGE_LOCAL_PATH=/dpanel
+ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
+ENV TZ=Asia/Shanghai
+ENV DP_ACME_CONFIG_HOME=/dpanel/acme
+ENV PATH="/app/server:${PATH}"
+
+COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
+COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/nginx/default.conf /etc/nginx/http.d/default.conf
 COPY ./docker/nginx/include /etc/nginx/conf.d/include
+COPY ./docker/script /app/script
 COPY ./docker/task /docker
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-  apk add --no-cache --update nginx curl openssl && \
+  apk add --no-cache --update musl docker-cli docker-cli-compose tzdata git openssh-client nginx curl openssl && \
+  rm /usr/bin/docker-compose && mkdir -p /root/.ssh && chmod 700 /root/.ssh && chmod 755 /docker/* && \
   mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
-  sh -s -- /docker/acme.sh --install-online --config-home /dpanel/acme && \
-  chmod 755 /docker/* && mkdir -p /var/www/challenges
+  chmod 755 /docker/* && mkdir -p /var/www/challenges && \
+  cd /docker && ./acme.sh --install --config-home /dpanel/acme
 
+WORKDIR /app/server
+VOLUME [ "/dpanel" ]
+
+EXPOSE 8080
 EXPOSE 443
 EXPOSE 80
 

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
@@ -110,6 +111,14 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 					DPanelInfo: &info,
 				},
 			})
+
+			if _, err := sdk.Client.NetworkInspect(sdk.Ctx, define.DPanelProxyNetworkName, network.InspectOptions{}); err == nil {
+				_ = sdk.Client.NetworkConnect(sdk.Ctx, define.DPanelProxyNetworkName, info.ID, &network.EndpointSettings{
+					Aliases: []string{
+						fmt.Sprintf(define.DPanelNetworkHostName, strings.Trim(info.Name, "/")),
+					},
+				})
+			}
 		} else {
 			e.DockerEnv.DockerInfo.InDPanel = false
 			_ = logic.Setting{}.Delete(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo)
