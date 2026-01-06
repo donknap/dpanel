@@ -6,6 +6,10 @@ TRIM_PATH=/Users/renchao
 JS_SOURCE_DIR=$(GO_SOURCE_DIR)/../../js/d-panel
 COMMON_PARAMS=-ldflags '-X main.DPanelVersion=${VERSION} -s -w' -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}"
 FAMILY=ce
+AMD64_CC=x86_64-linux-musl-gcc
+AMD64_CXX=x86_64-linux-musl-g++
+ARM64_CC=aarch64-unknown-linux-musl-gcc
+ARM64_CXX=aarch64-unknown-linux-musl-g++
 
 help:
 	@echo "make build"
@@ -16,13 +20,13 @@ help:
 amd64:
 	# brew tap messense/macos-cross-toolchains && brew install x86_64-linux-musl
 	# apk add musl
-	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ \
+	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=${AMD64_CC} CXX=${AMD64_CXX} \
 	go build ${COMMON_PARAMS} -tags ${FAMILY},w7_rangine_release -o ${GO_TARGET_DIR}/${PROJECT_NAME}-musl-amd64 ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 arm64:
 	# brew tap messense/macos-cross-toolchains && brew install aarch64-unknown-linux-musl
 	# apk add musl
-	CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux CC=aarch64-unknown-linux-musl-gcc CXX=aarch64-unknown-linux-musl-g++ \
+	CGO_ENABLED=1 GOARM=7 GOARCH=arm64 GOOS=linux CC=${ARM64_CC} CXX=${ARM64_CXX} \
 	go build ${COMMON_PARAMS} -tags ${FAMILY},w7_rangine_release -o ${GO_TARGET_DIR}/${PROJECT_NAME}-musl-arm64 ${GO_SOURCE_DIR}/*.go
 	cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 armv7:
@@ -51,15 +55,7 @@ clean:
 all: clean-source js amd64 arm64 armv7
 test: amd64 arm64
 	docker buildx use dpanel-builder
-	docker buildx build \
-	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta \
-	-t dpanel/dpanel:beta \
-	--platform linux/amd64 \
-	--build-arg APP_VERSION=${VERSION} \
-	--build-arg APP_FAMILY=ce \
-	--build-arg PROXY="https_proxy=http://172.16.1.198:7890 http_proxy=http://172.16.1.198:7890" \
-	-f ./docker/Dockerfile \
-	. --push
+
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite \
 	-t dpanel/dpanel:beta-lite \
@@ -68,6 +64,16 @@ test: amd64 arm64
 	--build-arg APP_FAMILY=ce \
 	-f ./docker/Dockerfile-lite \
 	. --push
+
+    docker buildx build \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta \
+	-t dpanel/dpanel:beta \
+	--platform linux/amd64 \
+	--build-arg APP_VERSION=${VERSION} \
+	--build-arg APP_FAMILY=ce \
+	-f ./docker/Dockerfile \
+	. --push
+
 test-pe: amd64 arm64
 	docker buildx use dpanel-builder
 	docker buildx build \
@@ -77,6 +83,7 @@ test-pe: amd64 arm64
 	--build-arg APP_FAMILY=pe \
 	-f ./docker/Dockerfile-pe-lite \
 	. --push
+
 	docker buildx build \
 	-t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:beta \
 	--platform linux/amd64,linux/arm64 \
@@ -84,6 +91,7 @@ test-pe: amd64 arm64
 	--build-arg APP_FAMILY=pe \
 	-f ./docker/Dockerfile-pe \
 	. --push
+
 test-ee: amd64
 	docker buildx use dpanel-builder
 	docker buildx build \

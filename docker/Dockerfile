@@ -1,7 +1,6 @@
 FROM dpanel/dpanel:lite
 
 ARG APP_FAMILY
-ARG PROXY="proxy=0"
 
 ENV APP_ENV=production
 ENV APP_SERVER_PORT=8080
@@ -14,7 +13,7 @@ COPY ./docker/task /docker
 RUN sed -i 's/dl-cdn.alpinelinux1111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
   apk add --no-cache --update nginx curl openssl && \
   mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
-  export ${PROXY} && curl https://raw.githubusercontent.com/acmesh-official/acme.sh/dev/acme.sh | sh -s -- --install-online --config-home /dpanel/acme && \
+  sh -s -- /docker/acme.sh --install-online --config-home /dpanel/acme && \
   chmod 755 /docker/* && mkdir -p /var/www/challenges
 
 EXPOSE 443
