@@ -44,156 +44,45 @@ jobs:
           registry: registry.cn-hangzhou.aliyuncs.com
           username: ${{ secrets.ALIYUN_USERNAME }}
           password: ${{ secrets.ALIYUN_TOKEN }}
-      - name: Build
+      - name: Prepare Toolchains
+        run: |
+          # GNU Toolchains
+          curl -Lo arm64.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64.tar.xz && tar -xf arm64.tar.xz
+          curl -Lo arm.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm.tar.xz && tar -xf arm.tar.xz
+          # Musl Toolchains
+          curl -Lo amd64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-musl.tgz && tar xzf amd64-musl.tgz
+          curl -Lo arm64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64-musl.tgz && tar xzf arm64-musl.tgz
+          curl -Lo arm-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm-musl.tgz && tar zxf arm-musl.tgz
+          # Synology Toolchains
+          curl -Lo armv8-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/armv8-synology.txz && tar -Jvxf armv8-synology.txz
+          curl -Lo amd64-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-synology.txz && tar -Jvxf amd64-synology.txz
+      - name: Docker Release & Binary Build
         run: |
           VERSION_TAG=${GITHUB_REF_NAME#v}
-          
-          make clean-source 
-          make build PROJECT_NAME=dpanel-amd64 CGO_ENABLED=1 VERSION=${VERSION_TAG}
-          
-          # arm64
-          curl -Lo arm64.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64.tar.xz
-          tar -xf arm64.tar.xz
-          make build PROJECT_NAME=dpanel-arm64 CGO_ENABLED=1 VERSION=${VERSION_TAG} GOARM=7 GOARCH=arm64 GOOS=linux \
-          CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc \
-          CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-g++
 
-          # armv7
-          curl -Lo arm.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm.tar.xz
-          tar -xf arm.tar.xz
-          make build PROJECT_NAME=dpanel-arm CGO_ENABLED=1 VERSION=${VERSION_TAG} GOARM=7 GOARCH=arm GOOS=linux \
-          CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc \
-          CXX=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-g++
-          
-          # amd64-musl
-          curl -Lo amd64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-musl.tgz
-          tar xzf amd64-musl.tgz
-          make build PROJECT_NAME=dpanel-ce-musl-amd64 CGO_ENABLED=1 VERSION=${VERSION_TAG}  \
-          CC=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc \
-          CXX=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-g++
-          
-          make build PROJECT_NAME=dpanel-pe-musl-amd64 CGO_ENABLED=1 VERSION=${VERSION_TAG} FAMILY=pe  \
-          CC=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc \
-          CXX=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-g++
-          
-          # arm64-musl
-          curl -Lo arm64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64-musl.tgz
-          tar xzf arm64-musl.tgz
-          make build PROJECT_NAME=dpanel-ce-musl-arm64 CGO_ENABLED=1 VERSION=${VERSION_TAG}  GOARM=7 GOARCH=arm64 GOOS=linux  \
-          CC=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
-          CXX=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-g++
-          
-          make build PROJECT_NAME=dpanel-pe-musl-arm64 CGO_ENABLED=1 VERSION=${VERSION_TAG} FAMILY=pe  GOARM=7 GOARCH=arm64 GOOS=linux  \
-          CC=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
-          CXX=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-g++
-          
-          # arm-musl 
-          curl -Lo arm-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm-musl.tgz
-          tar zxf arm-musl.tgz
-          make build PROJECT_NAME=dpanel-ce-musl-arm CGO_ENABLED=1 VERSION=${VERSION_TAG}  GOARM=7 GOARCH=arm GOOS=linux \
-          CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc \
-          CXX=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-g++
-          
-          make build PROJECT_NAME=dpanel-pe-musl-arm CGO_ENABLED=1 VERSION=${VERSION_TAG} FAMILY=pe  GOARM=7 GOARCH=arm GOOS=linux \
-          CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc \
-          CXX=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-g++
-          
-          # 群辉 arm
-          curl -Lo armv8-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/armv8-synology.txz
-          tar -Jvxf armv8-synology.txz
-          make build PROJECT_NAME=dpanel-synology-arm64 CGO_ENABLED=1 VERSION=${VERSION_TAG}  GOARM=7 GOARCH=arm64 GOOS=linux \
-          CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc \
-          CXX=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-g++
-          
-          # 群辉 amd64
-          curl -Lo amd64-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-synology.txz
-          tar -Jvxf amd64-synology.txz
-          make build PROJECT_NAME=dpanel-synology-amd64 CGO_ENABLED=1 VERSION=${VERSION_TAG} \
-          CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc \
-          CXX=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-g++
+          # 1. 发布 CE 版 (Musl/Alpine)
+          make release FAMILY=ce VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0 \
+            MUSL_AMD64_CC=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc \
+            MUSL_ARM64_CC=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
+            MUSL_ARMV7_CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc
 
-      - name: Docker BuildX
-        run: |
-          VERSION_TAG=${GITHUB_REF_NAME#v}
-          VERSION_GROUP_TAG=${VERSION_TAG%.*.*}
-          
-          docker buildx build \
-          -t dpanel/dpanel:lite \
-          -t dpanel/dpanel:${VERSION_TAG}-lite \
-          -t dpanel/dpanel:${VERSION_GROUP_TAG}-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_TAG}-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG}-lite \
-          --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${VERSION_TAG} \
-          --build-arg APP_FAMILY=ce \
-          -f ./docker/Dockerfile-lite \
-          . --push
+          # 2. 发布 PE 版 (Musl/Alpine)
+          make release FAMILY=pe VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0 \
+            MUSL_AMD64_CC=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc \
+            MUSL_ARM64_CC=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
+            MUSL_ARMV7_CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc
 
-          docker buildx build \
-          -t dpanel/dpanel:latest \
-          -t dpanel/dpanel:${VERSION_TAG} \
-          -t dpanel/dpanel:${VERSION_GROUP_TAG} \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:latest \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_TAG} \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:${VERSION_GROUP_TAG} \
-          --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${VERSION_TAG} \
-          --build-arg APP_FAMILY=ce \
-          -f ./docker/Dockerfile \
-          . --push
-          
-          #debian 
-          docker buildx build \
-          -t dpanel/dpanel:lite-debian \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:lite-debian \
-          --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${VERSION_TAG} \
-          --build-arg APP_FAMILY=ce \
-          -f ./docker/Dockerfile-debian-lite \
-          . --push
+          # 3. 发布 Debian 版 (GNU)
+          make release FAMILY=ce GNU=y VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0 \
+            GNU_AMD64_CC=gcc \
+            GNU_ARM64_CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc \
+            GNU_ARMV7_CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc
 
-          docker buildx build \
-          -t dpanel/dpanel:debian \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:debian \
-          --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${VERSION_TAG} \
-          --build-arg APP_FAMILY=ce \
-          -f ./docker/Dockerfile-debian \
-          . --push
-          
-          # pe
-          
-          docker buildx build \
-          -t dpanel/dpanel:pe-lite \
-          -t dpanel/dpanel-pe:lite \
-          -t dpanel/dpanel-pe:${VERSION_TAG}-lite \
-          -t dpanel/dpanel-pe:${VERSION_GROUP_TAG}-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:pe-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:${VERSION_TAG}-lite \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:${VERSION_GROUP_TAG}-lite \
-          --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${VERSION_TAG} \
-          --build-arg APP_FAMILY=pe \
-          -f ./docker/Dockerfile-pe-lite \
-          . --push
-
-          docker buildx build \
-          -t dpanel/dpanel:pe-latest \
-          -t dpanel/dpanel-pe:latest \
-          -t dpanel/dpanel-pe:${VERSION_TAG} \
-          -t dpanel/dpanel-pe:${VERSION_GROUP_TAG} \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:pe-latest \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:latest \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:${VERSION_TAG} \
-          -t registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel-pe:${VERSION_GROUP_TAG} \
-          --platform linux/arm64,linux/amd64,linux/arm/v7 \
-          --build-arg APP_VERSION=${VERSION_TAG} \
-          --build-arg APP_FAMILY=pe \
-          -f ./docker/Dockerfile-pe \
-          . --push
-
+          # 4. 补充特定平台的二进制（如群晖），只需 build 不需要 release 镜像
+          make build VERSION=${VERSION_TAG} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 \
+            ARM64_CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
+          make build VERSION=${VERSION_TAG} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 \
+            AMD64_CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
@@ -223,8 +112,12 @@ jobs:
           go get .
       - name: Build
         run: |
-          make clean-source 
-          make build PROJECT_NAME=dpanel-darwin-${{runner.arch}} CGO_ENABLED=1
+          VERSION_TAG=${GITHUB_REF_NAME#v}
+          if [ "${{ runner.arch }}" = "X64" ]; then
+            make build VERSION=${VERSION_TAG} AMD64=1 PROJECT_NAME=dpanel-darwin-amd64 CGO_ENABLED=1
+          else
+            make build VERSION=${VERSION_TAG} ARM64=1 PROJECT_NAME=dpanel-darwin-arm64 CGO_ENABLED=1
+          fi
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
@@ -292,7 +185,7 @@ jobs:
           VERSION_TAG=${GITHUB_REF_NAME#v}
           make -C app/pro/tests/xk_open clean libxksssopen.so
           make clean-source 
-          make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 VERSION=${VERSION_TAG}
+          make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 VERSION=${VERSION_TAG} AMD64=1
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
