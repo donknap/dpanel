@@ -78,14 +78,15 @@ IMAGE_REPO  := dpanel$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)
 DOCKER_FILE := ./docker/Dockerfile$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)$(D_SFX)
 
 # --- Core Build Macros ---
+# Arguments: 1:OS, 2:Arch, 3:ArmVersion, 4:Compiler, 5:FilenameAlias
 define go_build
-	@echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] (LIBC: $(LIBC)) Version: $(APP_VER)..."
-	@CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
-	go build -ldflags '-X main.DPanelVersion=${APP_VER} -s -w' \
-	-gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" \
-	-tags ${FAMILY},w7_rangine_release \
-	-o ${GO_TARGET_DIR}/${PROJECT_NAME}-$(FAMILY)-$(LIBC)-$(2)$(if $(3),v$(3),) ${GO_SOURCE_DIR}/*.go
-	@cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
+    @echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)$(if $(3),v$(3),)] (LIBC: $(LIBC)) Version: $(APP_VER)..."
+    @CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
+    go build -ldflags '-X main.DPanelVersion=${APP_VER} -s -w' \
+    -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" \
+    -tags ${FAMILY},w7_rangine_release \
+    -o ${GO_TARGET_DIR}/${PROJECT_NAME}-$(FAMILY)-$(LIBC)-$(5) ${GO_SOURCE_DIR}/*.go
+    @cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 endef
 
 define get_tags
@@ -120,22 +121,21 @@ help:
 	@echo  "    \033[33mGNU_ARM64_CC \033[0m : $(GNU_ARM64_CC)"
 	@echo  ""
 	@echo  "  \033[1mCOMMANDS:\033[0m"
-	@echo  "    make build          Compile binaries with CGO enabled"
+	@echo  "    make build          Compile binaries (Result: dpanel-<family>-<libc>-<arch>)"
 	@echo  "    make release        Multi-arch Docker build & push"
 	@echo  "  ----------------------------------------------------------------"
 	@echo  "  \033[1mCROSS-COMPILATION GUIDE:\033[0m"
-	@echo  "  1. Ensure the relevant Cross-Compiler (CC) is installed in your PATH."
-	@echo  "  2. For Alpine-based Docker images, use the default Musl toolchain."
-	@echo  "  3. Example to override CC path on the fly:"
-	@echo  "     \033[90mmake build ARM64=1 MUSL_ARM64_CC=/path/to/your-gcc\033[0m"
+	@echo  "    1. Filenames are unified to match Docker platforms (e.g., ARMv7 -> 'arm')."
+	@echo  "    2. Ensure CC toolchains are installed and matched with LIBC type."
+	@echo  "    3. Example: make build ARM7=1 (Produces dpanel-ce-musl-arm)"
 	@echo  ""
 
 build:
 	@mkdir -p ${GO_TARGET_DIR}
-	$(if $(filter 1,$(AMD64)),$(call go_build,linux,amd64,,$(AMD64_CC)),)
-	$(if $(filter 1,$(ARM64)),$(call go_build,linux,arm64,,$(ARM64_CC)),)
-	$(if $(filter 1,$(ARM7)),$(call go_build,linux,arm,7,$(ARMV7_CC)),)
-	$(if $(strip $(D_PLAT_LIST)),,$(call go_build,linux,amd64,,$(AMD64_CC)))
+	$(if $(filter 1,$(AMD64)),$(call go_build,linux,amd64,,$(AMD64_CC),amd64),)
+	$(if $(filter 1,$(ARM64)),$(call go_build,linux,arm64,,$(ARM64_CC),arm64),)
+	$(if $(filter 1,$(ARM7)),$(call go_build,linux,arm,7,$(ARMV7_CC),arm),)
+	$(if $(strip $(D_PLAT_LIST)),,$(call go_build,linux,amd64,,$(AMD64_CC),amd64))
 
 build-js:
 	@echo ">> Building frontend assets..."
