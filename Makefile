@@ -89,11 +89,17 @@ define go_build
     @cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 endef
 
+# Dynamic Tagging Logic
+# Argument 1: base tag suffix (e.g., beta or beta-lite)
 define get_tags
--t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(1)$(D_SFX) \
-$(if $(HUB),-t dpanel/$(IMAGE_REPO):$(1)$(D_SFX),) \
-$(if $(filter 1,$(IS_CUSTOM)),-t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(APP_VER)$(if $(filter %-lite,$(1)),-lite,)$(D_SFX),) \
-$(if $(and $(filter 1,$(IS_CUSTOM)),$(HUB)),-t dpanel/$(IMAGE_REPO):$(APP_VER)$(if $(filter %-lite,$(1)),-lite,)$(D_SFX),)
+$(if $(filter 0,$(IS_CUSTOM)), \
+    -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(1)$(D_SFX) \
+    $(if $(HUB),-t dpanel/$(IMAGE_REPO):$(1)$(D_SFX),), \
+    -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),lite,latest)$(D_SFX) \
+    -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(APP_VER)$(if $(filter %-lite,$(1)),-lite,)$(D_SFX) \
+    $(if $(HUB),-t dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),lite,latest)$(D_SFX)) \
+    $(if $(HUB),-t dpanel/$(IMAGE_REPO):$(APP_VER)$(if $(filter %-lite,$(1)),-lite,)$(D_SFX)) \
+)
 endef
 
 .PHONY: help build build-js release clean
@@ -126,8 +132,8 @@ help:
 	@echo  "  ----------------------------------------------------------------"
 	@echo  "  \033[1mCROSS-COMPILATION GUIDE:\033[0m"
 	@echo  "    1. Filenames are unified to match Docker platforms (e.g., ARMv7 -> 'arm')."
-	@echo  "    2. Ensure CC toolchains are installed and matched with LIBC type."
-	@echo  "    3. Example: make build ARM7=1 (Produces dpanel-ce-musl-arm)"
+	@echo  "    2. If VERSION is set, tags will be 'latest/lite' and 'VERSION/-lite'."
+	@echo  "    3. If VERSION is not set, tags will be 'beta/beta-lite' based on timestamp."
 	@echo  ""
 
 build:
@@ -148,26 +154,26 @@ release: build
 	@docker buildx use dpanel-builder
 
 	@echo ">> Building [Lite] edition..."
-	@docker buildx build --target lite \
-       $(call get_tags,beta-lite) \
-       --platform $(D_PLATFORMS) \
-       --build-arg APP_VERSION=${APP_VER} \
-       --build-arg APP_FAMILY=${FAMILY} \
-       --build-arg APP_LIBC=${LIBC} \
-       $(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite$(D_SFX),) \
-       -f $(DOCKER_FILE) . --push
+	docker buildx build --target lite \
+		$(call get_tags,beta-lite) \
+		--platform $(D_PLATFORMS) \
+		--build-arg APP_VERSION=${APP_VER} \
+		--build-arg APP_FAMILY=${FAMILY} \
+		--build-arg APP_LIBC=${LIBC} \
+		$(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite$(D_SFX),) \
+		-f $(DOCKER_FILE) . --push
 
 	@if [ "$(LITE)" = "0" ]; then \
-       echo ">> Building [Production] edition..."; \
-       docker buildx build --target production \
-          $(call get_tags,beta) \
-          --platform $(D_PLATFORMS) \
-          --build-arg APP_VERSION=${APP_VER} \
-          --build-arg APP_FAMILY=${FAMILY} \
-          --build-arg APP_LIBC=${LIBC} \
-          $(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta$(D_SFX),) \
-          -f $(DOCKER_FILE) . --push; \
-    fi
+		echo ">> Building [Production] edition..."; \
+		docker buildx build --target production \
+		$(call get_tags,beta) \
+		--platform $(D_PLATFORMS) \
+		--build-arg APP_VERSION=${APP_VER} \
+		--build-arg APP_FAMILY=${FAMILY} \
+		--build-arg APP_LIBC=${LIBC} \
+		$(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta$(D_SFX),) \
+		-f $(DOCKER_FILE) . --push; \
+	fi
 
 clean:
 	@echo ">> Cleaning up..."
