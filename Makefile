@@ -12,11 +12,9 @@ JS_SOURCE_DIR    := $(abspath $(GO_SOURCE_DIR)/../../js/d-panel)
 AUTO_VERSION     := $(shell date +%Y%m%d.%H%M)
 
 ifeq ($(origin VERSION), undefined)
-    # Case 1: No version passed, use timestamp for internal, push beta tags
     APP_VER := $(AUTO_VERSION)
     IS_CUSTOM := 0
 else
-    # Case 2: Version passed, use it for internal and extra tags
     APP_VER := $(VERSION)
     IS_CUSTOM := 1
 endif
@@ -32,23 +30,7 @@ AMD64            ?=
 ARM64            ?=
 ARM7             ?=
 
-ACTIVE_ARCHS := $(strip $(if $(AMD64),amd64) $(if $(ARM64),arm64) $(if $(ARM7),armv7))
-ifeq ($(ACTIVE_ARCHS),)
-    ACTIVE_ARCHS := amd64
-endif
-
-# --- Simple & Stable Platform Logic ---
-# Directly construct the D_PLATFORMS string
-D_PLATFORMS :=
-ifeq ($(AMD64),1)
-    D_PLATFORMS := linux/amd64
-endif
-ifeq ($(ARM64),1)
-    D_PLATFORMS := $(if $(D_PLATFORMS),$(D_PLATFORMS),)linux/arm64$(if $(filter-out linux/arm64,$(D_PLATFORMS)),$(if $(D_PLATFORMS),$(comma),),)
-    # Manual concat is messy in Make, let's use a cleaner if-else sequence:
-endif
-
-# Re-simplifying the platform string construction for stability
+# Platform String Construction
 D_PLAT_LIST :=
 ifeq ($(AMD64),1)
     D_PLAT_LIST += linux/amd64
@@ -60,18 +42,16 @@ ifeq ($(ARM7),1)
     D_PLAT_LIST += linux/arm/v7
 endif
 
-# Fallback to amd64 if nothing selected
 ifeq ($(strip $(D_PLAT_LIST)),)
     D_PLAT_LIST := linux/amd64
 endif
 
-# Convert space-separated list to comma-separated for Docker
 null  :=
 space := $(null) $(null)
 comma := ,
 D_PLATFORMS := $(subst $(space),$(comma),$(strip $(D_PLAT_LIST)))
 
-# --- Toolchains ---
+# --- Toolchains (Adjust these variables to match your environment) ---
 MUSL_AMD64_CC    ?= x86_64-linux-musl-gcc
 MUSL_ARM64_CC    ?= aarch64-unknown-linux-musl-gcc
 MUSL_ARMV7_CC    ?= arm-linux-musleabihf-gcc
@@ -125,19 +105,29 @@ help:
 	@echo  "  ----------------------------------------------------------------"
 	@echo  "  \033[1mBUILD INFO:\033[0m"
 	@echo  "    Current App Version : $(APP_VER)"
-	@echo  "    Custom Version Set  : $(if $(filter 1,$(IS_CUSTOM)),Yes,No)"
-	@echo  "    Target Platforms    : $(D_PLATFORMS)"
+	@echo  "    Target Platforms    : $(D_PLATFORMS) (Libc: $(LIBC))"
 	@echo  ""
 	@echo  "  \033[1mBUILD FLAGS:\033[0m"
-	@echo  "    \033[32mAMD64/ARM64/ARM7\033[0m : Set to \033[33m1\033[0m to enable (Default: AMD64=1)"
-	@echo  "    \033[32mFAMILY\033[0m  Edition  : \033[33mce\033[0m, pe, ee"
-	@echo  "    \033[32mLITE\033[0m    Scope    : \033[33m1\033[0m (Lite Only), \033[33m0\033[0m (Lite & Production)"
-	@echo  "    \033[32mVERSION\033[0m Version  : Custom tag (e.g. 1.9.3)"
+	@echo  "    \033[32mAMD64/ARM64/ARM7=1\033[0m  : Enable specific architectures"
+	@echo  "    \033[32mGNU=y\033[0m               : Link against Glibc (Default: Musl)"
+	@echo  "    \033[32mFAMILY=ce/pe/ee\033[0m     : Product edition selector"
+	@echo  ""
+	@echo  "  \033[1mTOOLCHAIN ENV VARS (Override if needed):\033[0m"
+	@echo  "    \033[33mMUSL_AMD64_CC\033[0m : $(MUSL_AMD64_CC)"
+	@echo  "    \033[33mMUSL_ARM64_CC\033[0m : $(MUSL_ARM64_CC)"
+	@echo  "    \033[33mMUSL_ARMV7_CC\033[0m : $(MUSL_ARMV7_CC)"
+	@echo  "    \033[33mGNU_AMD64_CC \033[0m : $(GNU_AMD64_CC)"
+	@echo  "    \033[33mGNU_ARM64_CC \033[0m : $(GNU_ARM64_CC)"
 	@echo  ""
 	@echo  "  \033[1mCOMMANDS:\033[0m"
-	@echo  "    make build          Compile selected binaries"
-	@echo  "    make release        Build & Push Docker images (Multi-arch)"
+	@echo  "    make build          Compile binaries with CGO enabled"
+	@echo  "    make release        Multi-arch Docker build & push"
 	@echo  "  ----------------------------------------------------------------"
+	@echo  "  \033[1mCROSS-COMPILATION GUIDE:\033[0m"
+	@echo  "  1. Ensure the relevant Cross-Compiler (CC) is installed in your PATH."
+	@echo  "  2. For Alpine-based Docker images, use the default Musl toolchain."
+	@echo  "  3. Example to override CC path on the fly:"
+	@echo  "     \033[90mmake build ARM64=1 MUSL_ARM64_CC=/path/to/your-gcc\033[0m"
 	@echo  ""
 
 build:
@@ -145,8 +135,7 @@ build:
 	$(if $(filter 1,$(AMD64)),$(call go_build,linux,amd64,,$(AMD64_CC)),)
 	$(if $(filter 1,$(ARM64)),$(call go_build,linux,arm64,,$(ARM64_CC)),)
 	$(if $(filter 1,$(ARM7)),$(call go_build,linux,arm,7,$(ARMV7_CC)),)
-	@# Default if no arch specified
-	$(if $(strip $(ACTIVE_ARCHS)),,$(call go_build,linux,amd64,,$(AMD64_CC)))
+	$(if $(strip $(D_PLAT_LIST)),,$(call go_build,linux,amd64,,$(AMD64_CC)))
 
 build-js:
 	@echo ">> Building frontend assets..."
@@ -160,25 +149,25 @@ release: build
 
 	@echo ">> Building [Lite] edition..."
 	@docker buildx build --target lite \
-	   $(call get_tags,beta-lite) \
-	   --platform $(D_PLATFORMS) \
-	   --build-arg APP_VERSION=${APP_VER} \
-	   --build-arg APP_FAMILY=${FAMILY} \
-	   --build-arg APP_LIBC=${LIBC} \
-	   $(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite$(D_SFX),) \
-	   -f $(DOCKER_FILE) . --push
+       $(call get_tags,beta-lite) \
+       --platform $(D_PLATFORMS) \
+       --build-arg APP_VERSION=${APP_VER} \
+       --build-arg APP_FAMILY=${FAMILY} \
+       --build-arg APP_LIBC=${LIBC} \
+       $(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite$(D_SFX),) \
+       -f $(DOCKER_FILE) . --push
 
 	@if [ "$(LITE)" = "0" ]; then \
-	   echo ">> Building [Production] edition..."; \
-	   docker buildx build --target production \
-	      $(call get_tags,beta) \
-	      --platform $(D_PLATFORMS) \
-	      --build-arg APP_VERSION=${APP_VER} \
-	      --build-arg APP_FAMILY=${FAMILY} \
-	      --build-arg APP_LIBC=${LIBC} \
-	      $(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta$(D_SFX),) \
-	      -f $(DOCKER_FILE) . --push; \
-	fi
+       echo ">> Building [Production] edition..."; \
+       docker buildx build --target production \
+          $(call get_tags,beta) \
+          --platform $(D_PLATFORMS) \
+          --build-arg APP_VERSION=${APP_VER} \
+          --build-arg APP_FAMILY=${FAMILY} \
+          --build-arg APP_LIBC=${LIBC} \
+          $(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta$(D_SFX),) \
+          -f $(DOCKER_FILE) . --push; \
+    fi
 
 clean:
 	@echo ">> Cleaning up..."
