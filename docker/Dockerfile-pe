@@ -1,13 +1,19 @@
-ARG BASE_IMAGE=dpanel/dpanel:latest
+FROM dpanel/dpanel:lite AS lite
+ARG APP_VERSION
+ARG TARGETARCH
 
-FROM ${BASE_IMAGE}
+ENV APP_VERSION=$APP_VERSION
+
+COPY ./runtime/dpanel-pe-musl-${TARGETARCH} /app/server/dpanel
+COPY ./runtime/config.yaml /app/server/config.yaml
+
+
+FROM dpanel/dpanel:latest AS production
 
 ARG APP_VERSION
 ARG TARGETARCH
-ARG APP_FAMILY=pe
 
 ENV APP_VERSION=$APP_VERSION
-ENV APP_FAMILY=$APP_FAMILY
 
-COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
+COPY ./runtime/dpanel-pe-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml

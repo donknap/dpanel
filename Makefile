@@ -10,14 +10,8 @@ JS_SOURCE_DIR    := $(abspath $(GO_SOURCE_DIR)/../../js/d-panel)
 
 # --- Dynamic Versioning Logic ---
 AUTO_VERSION     := $(shell date +%Y%m%d.%H%M)
-
-ifeq ($(origin VERSION), undefined)
-    APP_VER := $(AUTO_VERSION)
-    IS_CUSTOM := 0
-else
-    APP_VER := $(VERSION)
-    IS_CUSTOM := 1
-endif
+APP_VER          := $(if $(VERSION),$(VERSION),$(AUTO_VERSION))
+IS_CUSTOM        := $(if $(VERSION),1,0)
 
 # --- Build Matrix Parameters ---
 FAMILY           ?= ce
@@ -51,7 +45,7 @@ space := $(null) $(null)
 comma := ,
 D_PLATFORMS := $(subst $(space),$(comma),$(strip $(D_PLAT_LIST)))
 
-# --- Toolchains (Adjust these variables to match your environment) ---
+# --- Toolchains ---
 MUSL_AMD64_CC    ?= x86_64-linux-musl-gcc
 MUSL_ARM64_CC    ?= aarch64-unknown-linux-musl-gcc
 MUSL_ARMV7_CC    ?= arm-linux-musleabihf-gcc
@@ -78,19 +72,20 @@ IMAGE_REPO  := dpanel$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)
 DOCKER_FILE := ./docker/Dockerfile$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)$(D_SFX)
 
 # --- Core Build Macros ---
-# Arguments: 1:OS, 2:Arch, 3:ArmVersion, 4:Compiler, 5:FilenameAlias
+# Logical Fix: If PROJECT_NAME is overridden from command line, use it directly.
+# Otherwise, use the structured naming convention.
 define go_build
-    @echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)$(if $(3),v$(3),)] (LIBC: $(LIBC)) Version: $(APP_VER)..."
+    $(eval TARGET_BIN := $(if $(filter dpanel,$(PROJECT_NAME)),$(PROJECT_NAME)-$(FAMILY)-$(LIBC)-$(5),$(PROJECT_NAME)))
+    @echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER)"
+    @echo ">> Target Filename: $(TARGET_BIN)"
     @CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
     go build -ldflags '-X main.DPanelVersion=${APP_VER} -s -w' \
     -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" \
     -tags ${FAMILY},w7_rangine_release \
-    -o ${GO_TARGET_DIR}/${PROJECT_NAME}-$(FAMILY)-$(LIBC)-$(5) ${GO_SOURCE_DIR}/*.go
+    -o ${GO_TARGET_DIR}/$(TARGET_BIN) ${GO_SOURCE_DIR}/*.go
     @cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 endef
 
-# Dynamic Tagging Logic
-# Argument 1: base tag suffix (e.g., beta or beta-lite)
 define get_tags
 $(if $(filter 0,$(IS_CUSTOM)), \
     -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(1)$(D_SFX) \
@@ -114,26 +109,13 @@ help:
 	@echo  "    Current App Version : $(APP_VER)"
 	@echo  "    Target Platforms    : $(D_PLATFORMS) (Libc: $(LIBC))"
 	@echo  ""
-	@echo  "  \033[1mBUILD FLAGS:\033[0m"
-	@echo  "    \033[32mAMD64/ARM64/ARM7=1\033[0m  : Enable specific architectures"
-	@echo  "    \033[32mGNU=y\033[0m               : Link against Glibc (Default: Musl)"
-	@echo  "    \033[32mFAMILY=ce/pe/ee\033[0m     : Product edition selector"
-	@echo  ""
-	@echo  "  \033[1mTOOLCHAIN ENV VARS (Override if needed):\033[0m"
-	@echo  "    \033[33mMUSL_AMD64_CC\033[0m : $(MUSL_AMD64_CC)"
-	@echo  "    \033[33mMUSL_ARM64_CC\033[0m : $(MUSL_ARM64_CC)"
-	@echo  "    \033[33mMUSL_ARMV7_CC\033[0m : $(MUSL_ARMV7_CC)"
-	@echo  "    \033[33mGNU_AMD64_CC \033[0m : $(GNU_AMD64_CC)"
-	@echo  "    \033[33mGNU_ARM64_CC \033[0m : $(GNU_ARM64_CC)"
-	@echo  ""
 	@echo  "  \033[1mCOMMANDS:\033[0m"
-	@echo  "    make build          Compile binaries (Result: dpanel-<family>-<libc>-<arch>)"
+	@echo  "    make build          Compile binaries"
 	@echo  "    make release        Multi-arch Docker build & push"
 	@echo  "  ----------------------------------------------------------------"
-	@echo  "  \033[1mCROSS-COMPILATION GUIDE:\033[0m"
-	@echo  "    1. Filenames are unified to match Docker platforms (e.g., ARMv7 -> 'arm')."
-	@echo  "    2. If VERSION is set, tags will be 'latest/lite' and 'VERSION/-lite'."
-	@echo  "    3. If VERSION is not set, tags will be 'beta/beta-lite' based on timestamp."
+	@echo  "  \033[1mNAMING RULE:\033[0m"
+	@echo  "    1. If PROJECT_NAME is 'dpanel', output is dpanel-<family>-<libc>-<arch>"
+	@echo  "    2. If PROJECT_NAME is overridden, output is exactly PROJECT_NAME"
 	@echo  ""
 
 build:
@@ -163,16 +145,16 @@ release: build
 		$(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite$(D_SFX),) \
 		-f $(DOCKER_FILE) . --push
 
-	@if [ "$(LITE)" = "0" ]; then \
+	if [ "$(LITE)" = "0" ]; then \
 		echo ">> Building [Production] edition..."; \
 		docker buildx build --target production \
-		$(call get_tags,beta) \
-		--platform $(D_PLATFORMS) \
-		--build-arg APP_VERSION=${APP_VER} \
-		--build-arg APP_FAMILY=${FAMILY} \
-		--build-arg APP_LIBC=${LIBC} \
-		$(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta$(D_SFX),) \
-		-f $(DOCKER_FILE) . --push; \
+		  $(call get_tags,beta) \
+		  --platform $(D_PLATFORMS) \
+		  --build-arg APP_VERSION=${APP_VER} \
+		  --build-arg APP_FAMILY=${FAMILY} \
+		  --build-arg APP_LIBC=${LIBC} \
+		  $(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta$(D_SFX),) \
+		  -f $(DOCKER_FILE) . --push; \
 	fi
 
 clean:

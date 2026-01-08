@@ -113,10 +113,11 @@ jobs:
       - name: Build
         run: |
           VERSION_TAG=${GITHUB_REF_NAME#v}
+          export CC=$(which clang)
           if [ "${{ runner.arch }}" = "X64" ]; then
-            make build VERSION=${VERSION_TAG} AMD64=1 PROJECT_NAME=dpanel-darwin-amd64 CGO_ENABLED=1
+            make build VERSION=${VERSION_TAG} AMD64=1 PROJECT_NAME=dpanel-darwin-amd64 AMD64_CC=$CC
           else
-            make build VERSION=${VERSION_TAG} ARM64=1 PROJECT_NAME=dpanel-darwin-arm64 CGO_ENABLED=1
+            make build VERSION=${VERSION_TAG} ARM64=1 PROJECT_NAME=dpanel-darwin-arm64 ARM64_CC=$CC
           fi
       - name: upload artifact
         uses: softprops/action-gh-release@v2
@@ -185,7 +186,7 @@ jobs:
           VERSION_TAG=${GITHUB_REF_NAME#v}
           make -C app/pro/tests/xk_open clean libxksssopen.so
           make clean-source 
-          make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 VERSION=${VERSION_TAG} AMD64=1
+          make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 VERSION=${VERSION_TAG} AMD64=1 AMD64_CC=gcc
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
