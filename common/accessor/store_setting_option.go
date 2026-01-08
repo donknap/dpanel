@@ -31,5 +31,6 @@ type StoreSettingOption struct {
 	Type      string         `json:"type,omitempty"`
 	Url       string         `json:"url,omitempty"`
 	Apps      []StoreAppItem `json:"apps,omitempty"`
+	Total     int            `json:"total"`
 	UpdatedAt int64          `json:"updatedAt,omitempty"`
 }

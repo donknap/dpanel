@@ -127,8 +127,9 @@ func (self Store) Delete(http *gin.Context) {
 
 func (self Store) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Title string `json:"title"`
-		Name  string `json:"name"`
+		Title         string `json:"title"`
+		Name          string `json:"name"`
+		EnableAppList bool   `json:"enableAppList"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -148,12 +149,20 @@ func (self Store) GetList(http *gin.Context) {
 
 	// 如果是本地商店，同步一遍数据
 	for _, item := range list {
+		item.Setting.Total = len(item.Setting.Apps)
 		if item.Setting.Type == define.StoreTypeOnePanelLocal {
 			if appList, err := (logic.Store{}).GetAppByOnePanel(item.Name); err == nil {
 				item.Setting.Apps = appList
 				_ = dao.Store.Save(item)
 			}
 		}
+	}
+
+	if !params.EnableAppList {
+		list = function.PluckArrayWalk(list, func(item *entity.Store) (*entity.Store, bool) {
+			item.Setting.Apps = make([]accessor.StoreAppItem, 0)
+			return item, true
+		})
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
