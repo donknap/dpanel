@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 )
@@ -37,17 +36,6 @@ func (self Task) Deploy(removeOrphans bool, pullImage bool) (io.ReadCloser, erro
 	response, err := self.runCommand(cmd)
 	if err != nil {
 		return nil, err
-	}
-
-	for _, item := range self.Project.Networks {
-		for _, serviceItem := range self.Project.Services {
-			for _, linkItem := range serviceItem.ExternalLinks {
-				links := strings.Split(linkItem, ":")
-				if len(links) == 2 {
-					_ = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, item.Name, links[0], &network.EndpointSettings{})
-				}
-			}
-		}
 	}
 	return response, nil
 }

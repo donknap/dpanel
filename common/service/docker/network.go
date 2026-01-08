@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/docker/docker/api/types/network"
@@ -86,5 +87,14 @@ func (self Client) NetworkConnect(ctx context.Context, networkRow types.NetworkI
 	if networkRow.MacAddress != "" {
 		endpointSetting.MacAddress = networkRow.MacAddress
 	}
-	return self.Client.NetworkConnect(ctx, networkRow.Name, containerName, endpointSetting)
+	err := self.Client.NetworkConnect(ctx, networkRow.Name, containerName, endpointSetting)
+	if err != nil && (networkRow.IpV4 != "" || networkRow.IpV6 != "") {
+		slog.Warn("network connect with ip", "error", err)
+		if function.ErrorHasKeyword(err, "with user configured subnets", "IP address is supported only") {
+			endpointSetting.IPAMConfig.IPv4Address = ""
+			endpointSetting.IPAMConfig.IPv6Address = ""
+			return self.Client.NetworkConnect(ctx, networkRow.Name, containerName, endpointSetting)
+		}
+	}
+	return err
 }

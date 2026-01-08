@@ -137,8 +137,8 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+		// copy 出错的只记录日志，不提示用户
+		slog.Debug("compose container deploy copy", "error", err)
 	}
 
 	// 查看当前任务下的容器 hash 值是否部署成功
@@ -152,6 +152,15 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		if item.Container.State != container.StateRunning {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
 			return
+		}
+	}
+
+	// 如果当前容器配置过转发，则加入 dpanel-local 网络
+	for _, item := range runCompose.ContainerList {
+		if row, err := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(item.Container.Names...)).First(); err == nil {
+			_ = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, types.NetworkItem{
+				Name: define.DPanelProxyNetworkName,
+			}, row.ContainerID)
 		}
 	}
 
