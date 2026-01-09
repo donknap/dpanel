@@ -1,8 +1,11 @@
 FROM dpanel/dpanel:lite AS lite
+
+ARG APP_FAMILY
 ARG APP_VERSION
 ARG TARGETARCH
 
 ENV APP_VERSION=$APP_VERSION
+ENV APP_FAMILY=$APP_FAMILY
 
 COPY ./runtime/dpanel-pe-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml
@@ -10,10 +13,12 @@ COPY ./runtime/config.yaml /app/server/config.yaml
 
 FROM dpanel/dpanel:latest AS production
 
+ARG APP_FAMILY
 ARG APP_VERSION
 ARG TARGETARCH
 
 ENV APP_VERSION=$APP_VERSION
+ENV APP_FAMILY=$APP_FAMILY
 
 COPY ./runtime/dpanel-pe-musl-${TARGETARCH} /app/server/dpanel
 COPY ./runtime/config.yaml /app/server/config.yaml

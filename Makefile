@@ -92,8 +92,8 @@ endef
 
 define get_tags
 $(if $(filter 0,$(IS_CUSTOM)), \
-    -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(1)$(D_SFX) \
-    $(if $(HUB),-t dpanel/$(IMAGE_REPO):$(1)$(D_SFX),), \
+    -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),beta-lite,beta)$(D_SFX) \
+    $(if $(HUB),-t dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),beta-lite,beta)$(D_SFX),), \
     -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),lite,latest)$(D_SFX) \
     -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(APP_VER)$(if $(filter %-lite,$(1)),-lite,)$(D_SFX) \
     $(if $(HUB),-t dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),lite,latest)$(D_SFX)) \
@@ -107,21 +107,41 @@ all: help
 
 help:
 	@echo  ""
-	@echo  "  \033[1;34mDPanel Build Manager\033[0m"
-	@echo  "  ----------------------------------------------------------------"
-	@echo  "  \033[1mBUILD INFO:\033[0m"
-	@echo  "    Host OS             : $(DETECTED_OS)"
-	@echo  "    Target OS           : $(OS)"
-	@echo  "    Current App Version : $(APP_VER)"
-	@echo  "    Target Platforms    : $(D_PLATFORMS) (Libc: $(LIBC))"
+	@echo  "  \033[1;34mDPanel Unified Build System\033[0m"
+	@echo  "  ================================================================"
+	@echo  "  \033[1mENVIRONMENT VARIABLES & ARGUMENTS:\033[0m"
+	@echo  "    \033[33mVERSION\033[0m      Set custom version string (Default: $(AUTO_VERSION))"
+	@echo  "    \033[33mFAMILY\033[0m       Build edition: [ce, ee, pro] (Default: ce)"
+	@echo  "    \033[33mGNU\033[0m          Linker type: [unset=musl, y=glibc/debian] (Default: musl)"
+	@echo  "    \033[33mLITE\033[0m         Docker scope: [1=Lite only, 0=Full + Lite] (Default: 1)"
+	@echo  "    \033[33mHUB\033[0m          Docker Push: [unset=Aliyun only, y=+ Docker Hub]"
 	@echo  ""
 	@echo  "  \033[1mCOMMANDS:\033[0m"
-	@echo  "    make build          Compile binaries"
-	@echo  "    make release        Multi-arch Docker build & push"
-	@echo  "  ----------------------------------------------------------------"
-	@echo  "  \033[1mNAMING RULE:\033[0m"
-	@echo  "    1. If PROJECT_NAME is 'dpanel', output is dpanel-<family>-<libc>-<arch>"
-	@echo  "    2. If PROJECT_NAME is overridden, output is exactly PROJECT_NAME"
+	@echo  "    \033[32mmake build\033[0m          Compile binaries for selected architectures"
+	@echo  "    \033[32mmake release\033[0m        Build & Push multi-arch Docker images"
+	@echo  "    \033[32mmake clean\033[0m          Remove build artifacts and prune docker builder"
+	@echo  ""
+	@echo  "  \033[1mUSAGE EXAMPLES:\033[0m"
+	@echo  "    \033[36m# Build for AMD64 & ARM64 with GLIBC (Debian style)\033[0m"
+	@echo  "    make build GNU=y AMD64=1 ARM64=1"
+	@echo  ""
+	@echo  "  \033[1mCURRENT CONFIGURATION:\033[0m"
+	@echo  "    \033[1mProject Info:\033[0m"
+	@echo  "      Name       : $(PROJECT_NAME) (Family: $(FAMILY))"
+	@echo  "      Version    : $(APP_VER) (Custom: $(IS_CUSTOM))"
+	@echo  "      Libc Type  : $(LIBC) $(if $(filter gnu,$(LIBC)),(glibc),(musl))"
+	@echo  ""
+	@echo  "    \033[1mArchitecture & Toolchains:\033[0m"
+	@echo  "      Selected   : \033[35m$(if $(strip $(D_PLATFORMS)),$(D_PLATFORMS),linux/amd64 (Default))\033[0m"
+	@echo  "      AMD64 (x86): $(if $(filter 1,$(AMD64)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(AMD64_CC)"
+	@echo  "      ARM64 (v8) : $(if $(filter 1,$(ARM64)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(ARM64_CC)"
+	@echo  "      ARMV7 (v7) : $(if $(filter 1,$(ARM7)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(ARMV7_CC)"
+	@echo  ""
+	@echo  "    \033[1mDocker Release Details:\033[0m"
+	@echo  "      Repo Name  : $(IMAGE_REPO)"
+	@echo  "      Dockerfile : $(DOCKER_FILE)"
+	@echo  "      Push Hub   : $(if $(HUB),\033[32mYES (Aliyun + DockerHub)\033[0m,\033[33mNO (Aliyun Only)\033[0m)"
+	@echo  "  ================================================================"
 	@echo  ""
 
 build:
