@@ -43,13 +43,15 @@ func (self Image) TagSync(http *gin.Context) {
 		if params.Type == "pull" {
 			imageNameDetail.Registry = s
 			// 使用代理地址时先尝试发起 http 请求是否可以访问。以便于可以减少直接 pull 的等待时间
-			reg := registry.New(
-				registry.WithAddress(s),
-				registry.WithCredentialsWithBasic(registryConfig.Config.Username, registryConfig.Config.Password),
-			)
-			if err = reg.Client().Ping(); err != nil {
-				slog.Debug("image remote select registry url", "error", err)
-				continue
+			if !function.IpIsLocalhost(s) {
+				reg := registry.New(
+					registry.WithAddress(s),
+					registry.WithCredentialsWithBasic(registryConfig.Config.Username, registryConfig.Config.Password),
+				)
+				if err = reg.Client().Ping(); err != nil {
+					slog.Debug("image remote select registry url", "error", err)
+					continue
+				}
 			}
 			pullOption := image.PullOptions{
 				RegistryAuth: registryConfig.GetAuthString(),
