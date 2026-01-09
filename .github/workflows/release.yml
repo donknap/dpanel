@@ -185,7 +185,7 @@ jobs:
         run: |
           VERSION_TAG=${GITHUB_REF_NAME#v}
           make -C app/pro/tests/xk_open clean libxksssopen.so
-          make clean-source 
+          make clean 
           make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 VERSION=${VERSION_TAG} AMD64=1 AMD64_CC=gcc
       - name: upload artifact
         uses: softprops/action-gh-release@v2
