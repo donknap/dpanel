@@ -299,7 +299,7 @@ func initRSA() error {
 			_ = os.Remove(file)
 		}
 		_, err := local.QuickRun(fmt.Sprintf(
-			`ssh-keygen -t rsa -b 4096 -f %s -N "" -C "%s@%s"`,
+			`ssh-keygen -t rsa -b 4096 -f "%s" -N "" -C "%s@%s"`,
 			filepath.Join(storage.Local{}.GetCertRsaPath(), define.DefaultIdKeyFile),
 			define.PanelAuthor,
 			define.PanelWebSite,

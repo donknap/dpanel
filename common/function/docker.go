@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"runtime"
 	"strings"
 
 	"github.com/distribution/reference"
@@ -17,6 +18,10 @@ import (
 
 func SplitCommandArray(cmd string) []string {
 	result := make([]string, 0)
+	if runtime.GOOS == "windows" {
+		// windows 中需要将路径再次转义一下，防止 parade 之后没有分隔符
+		cmd = strings.ReplaceAll(cmd, "\\", "\\\\")
+	}
 	result, err := shellwords.Parse(cmd)
 	if err != nil {
 		slog.Debug("function split command array ", "error", err)
