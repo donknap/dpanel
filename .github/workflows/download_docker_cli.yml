@@ -19,8 +19,8 @@ jobs:
             curl -sSL -o "docker-compose-windows-x86_64.exe" "$URL"
             
             # fnpack
-            curl -sSL -o fnpack https://static2.fnnas.com/fnpack/fnpack-1.0.1-linux-amd64
-            chmod 755 fnpack && fnpack --help
+            curl -sSL -o fnpack https://static2.fnnas.com/fnpack/fnpack-1.2.0-linux-amd64
+            chmod 755 fnpack && ./fnpack --help
       - name: Create Release
         if: always()
         uses: softprops/action-gh-release@v2
