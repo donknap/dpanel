@@ -15,16 +15,17 @@ func New(opts ...Option) (*Builder, error) {
 	var err error
 	c := &Builder{
 		imageBuildOption: build.ImageBuildOptions{
-			Dockerfile: "Dockerfile", // 默认在根目录
-			Remove:     true,
-			NoCache:    true,
+			Dockerfile:  "Dockerfile", // 默认在根目录
+			Remove:      true,
+			ForceRemove: true,
+			NoCache:     false,
+			//Version:     build.BuilderBuildKit,
 			Labels: map[string]string{
 				"maintainer":             define.PanelAuthor,
 				"com.dpanel.description": define.PanelDesc,
 				"com.dpanel.website":     define.PanelWebSite,
 				"com.dpanel.version":     facade.GetConfig().GetString("app.version"),
 			},
-			BuildArgs: map[string]*string{},
 		},
 	}
 	for _, opt := range opts {

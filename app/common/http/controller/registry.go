@@ -48,8 +48,11 @@ func (self Registry) Create(http *gin.Context) {
 	if params.Id <= 0 {
 		registryRow, _ = dao.Registry.Where(dao.Registry.ServerAddress.Eq(params.ServerAddress)).First()
 		if registryRow != nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.ServerAddress), 500)
-			return
+			// 类似腾讯云这样的仓库地址一样，如果用户名不一样也按两个仓库来对待
+			if params.Username != "" && params.Password != "" && params.Username == registryRow.Setting.Username {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.ServerAddress), 500)
+				return
+			}
 		}
 	} else {
 		registryRow, _ = dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).First()

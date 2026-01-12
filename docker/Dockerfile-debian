@@ -25,7 +25,7 @@ COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
 COPY ./docker/task /docker
 
-RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+RUN sed -i 's/deb.debian111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && apt-get install -y --no-install-recommends \
     tzdata git curl ca-certificates gnupg openssh-client && \
     curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
@@ -59,7 +59,7 @@ RUN printf '#!/bin/sh\nexit 101' > /usr/sbin/policy-rc.d && chmod +x /usr/sbin/p
     rm /usr/sbin/policy-rc.d && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private /var/www/challenges && \
-    cd /docker && ./acme.sh --install --config-home /dpanel/acme
+    tar -zxvf /docker/acme.tar.gz -C /docker && cd /docker/acme.sh-master && ./acme.sh --install --config-home /dpanel/acme
 
 EXPOSE 443 80 8080
 ENTRYPOINT [ "/docker/entrypoint.sh" ]

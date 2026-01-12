@@ -29,9 +29,11 @@ import (
 
 func (self Container) Upgrade(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5       string `json:"md5" binding:"required"`
-		ImageTag  string `json:"imageTag"`
-		EnableBak bool   `json:"enableBak"`
+		Md5              string `json:"md5" binding:"required"`
+		ImageTag         string `json:"imageTag"`
+		EnableBak        bool   `json:"enableBak"`
+		EnableResetEnv   bool   `json:"enableResetEnv"`   // 重置环境变量
+		EnableResetLabel bool   `json:"enableResetLabel"` // 重置 label 数据
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
