@@ -20,7 +20,7 @@ jobs:
             
             # fnpack
             curl -sSL -o fnpack https://static2.fnnas.com/fnpack/fnpack-1.0.1-linux-amd64
-            chmod 755 fnpack && fnpack --help
+            chmod 755 fnpack && ./fnpack --help
       - name: Create Release
         if: always()
         uses: softprops/action-gh-release@v2
