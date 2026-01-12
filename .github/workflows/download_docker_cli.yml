@@ -8,15 +8,19 @@ jobs:
       - name: Download Docker Cli x86
         continue-on-error: true
         run: |
-          LATEST_ZIP=$(curl -s https://download.docker.com/win/static/stable/x86_64/ | grep -oE 'docker-[0-9.]+\.zip' | tail -n 1)
-          wget https://download.docker.com/win/static/stable/x86_64/$LATEST_ZIP
-          unzip $LATEST_ZIP
-          cp docker/docker.exe docker-windows-x86_64.exe
+            # docker.exe
+            LATEST_ZIP=$(curl -sS https://download.docker.com/win/static/stable/x86_64/ | grep -oE 'docker-[0-9.]+\.zip' | tail -n 1)
+            curl -sSLO "https://download.docker.com/win/static/stable/x86_64/$LATEST_ZIP"
+            unzip -q $LATEST_ZIP
+            cp docker/docker.exe docker-windows-x86_64.exe
           
-          URL=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.assets[] | select(.name == "docker-compose-windows-x86_64.exe") | .browser_download_url')
-          wget "$URL"
-          
-          curl -L -o fnpack https://static2.fnnas.com/fnpack/fnpack-1.0.1-linux-amd64
+            # docker-compose.exe
+            URL=$(curl -sS https://api.github.com/repos/docker/compose/releases/latest | jq -r '.assets[] | select(.name == "docker-compose-windows-x86_64.exe") | .browser_download_url')
+            curl -sSL -o "docker-compose-windows-x86_64.exe" "$URL"
+            
+            # fnpack
+            curl -sSL -o fnpack https://static2.fnnas.com/fnpack/fnpack-1.0.1-linux-amd64
+            chmod 755 fnpack && fnpack --help
       - name: Create Release
         if: always()
         uses: softprops/action-gh-release@v2
