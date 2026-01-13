@@ -74,8 +74,15 @@ func (self Registry) Create(http *gin.Context) {
 		ServerAddress: params.ServerAddress,
 		Email:         params.Email,
 	}
+	// 未设置用户名及密码时，这些匿名仓库不做登录操作，因为有可能无法访问
+	if !function.InArray([]string{
+		"docker.io",
+		"quay.io",
+		"ghcr.io",
+	}, params.ServerAddress) || params.Username != "" {
+		response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, authConfig)
+	}
 
-	response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, authConfig)
 	if err != nil {
 		if function.ErrorHasKeyword(err, "server gave HTTP response to HTTPS client") {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImagePullServerHttp, "name", params.ServerAddress), 500)
