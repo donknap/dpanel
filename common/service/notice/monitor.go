@@ -18,9 +18,15 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
+// 跳过这些重复的事件
 var skipActionLog = []string{
 	"exec_create",
 	"exec_die",
+}
+
+// 只记录这些属性值
+var keepAttribute = []string{
+	"name", "image",
 }
 
 var Monitor = NewMonitor()
@@ -157,7 +163,7 @@ func (self *monitor) listen(c *client) {
 					if _, _, ok := function.PluckArrayItemWalk(skipActionLog, func(item string) bool {
 						return strings.HasPrefix(string(message.Action), item)
 					}); !ok {
-						message.Actor = events.Actor{}
+						message.Actor.Attributes = function.PluckMapWithKeys(message.Actor.Attributes, keepAttribute)
 						slog.Debug("Monitor message", "name", c.dockerEnv.Name, "message", message)
 					}
 				}
@@ -207,18 +213,16 @@ func (self *monitor) processor(name string, message events.Message) {
 	//		message.Actor.Attributes["name"],
 	//		"type", message.Actor.Attributes["type"],
 	//	}
-	case "image/delete",
-		"container/destroy", "container/create",
+	case "container/destroy", "container/create",
 		"container/stop", "container/start", "container/restart",
-		"container/pause", "container/unpause",
 		"container/kill", "container/die":
 		msg = []string{
 			message.Actor.Attributes["name"],
 		}
-	case "volume/destroy":
-		msg = []string{
-			message.Actor.ID,
-		}
+		//case "volume/destroy":
+		//	msg = []string{
+		//		message.Actor.ID,
+		//	}
 	}
 	if msg != nil {
 		facade.GetEvent().Publish(event.DockerMessageEvent, event.DockerMessagePayload{
