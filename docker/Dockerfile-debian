@@ -7,6 +7,7 @@ ARG APP_FAMILY
 ENV TZ=Asia/Shanghai
 ENV PATH="/app/server:${PATH}"
 ENV DOCKER_HOST=unix:///var/run/docker.sock
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 ENV DP_SYSTEM_STORAGE_LOCAL_PATH=/dpanel
 ENV DP_DB_DATABASE=${DP_SYSTEM_STORAGE_LOCAL_PATH}/dpanel.db
@@ -27,9 +28,9 @@ COPY ./docker/task /docker
 
 RUN sed -i 's/deb.debian111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && apt-get install -y --no-install-recommends \
-    tzdata git curl ca-certificates gnupg openssh-client && \
-    curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list && \
+    tzdata git curl ca-certificates gnupg openssh-client iputils-ping && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list && \
     apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin && \
     rm -f /usr/bin/docker-compose && \
     ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \

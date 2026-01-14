@@ -29,11 +29,10 @@ import (
 
 func (self Container) Upgrade(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5              string `json:"md5" binding:"required"`
-		ImageTag         string `json:"imageTag"`
-		EnableBak        bool   `json:"enableBak"`
-		EnableResetEnv   bool   `json:"enableResetEnv"`   // 重置环境变量
-		EnableResetLabel bool   `json:"enableResetLabel"` // 重置 label 数据
+		Md5                    string `json:"md5" binding:"required"`
+		ImageTag               string `json:"imageTag"`
+		EnableBak              bool   `json:"enableBak"`
+		EnableResetImageConfig bool   `json:"enableResetImageConfig"` // 重置镜像内的配置
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -71,6 +70,13 @@ func (self Container) Upgrade(http *gin.Context) {
 		//	"containerId": containerInfo.ID,
 		//})
 		//return
+	}
+	if params.EnableResetImageConfig {
+		containerInfo.Config.Env = imageInfo.Config.Env
+		containerInfo.Config.Labels = imageInfo.Config.Labels
+		containerInfo.Config.WorkingDir = imageInfo.Config.WorkingDir
+		containerInfo.Config.Cmd = imageInfo.Config.Cmd
+		containerInfo.Config.Entrypoint = imageInfo.Config.Entrypoint
 	}
 
 	// 成功的创建一个新的容器后再对旧的进停止或是删除操作

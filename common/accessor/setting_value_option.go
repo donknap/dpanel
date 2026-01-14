@@ -49,21 +49,23 @@ type ThemeConfig map[string]any
 type ThemeConsoleConfig map[string]any
 
 type ThemeUserConfig struct {
-	Token   map[string]interface{} `json:"token"`
-	BgImage struct {
-		Src    string `json:"src,omitempty"`
-		Width  string `json:"width,omitempty"`
-		Height string `json:"height,omitempty"`
-		Top    int    `json:"top,omitempty"`
-		Left   int    `json:"left,omitempty"`
-		Right  int    `json:"right,omitempty"`
-		Bottom int    `json:"bottom,omitempty"`
-	} `json:"bgImage,omitempty"`
-	SiteLink      []map[string]string `json:"siteLink,omitempty"`
-	SiteCopyright string              `json:"siteCopyright,omitempty"`
-	SiteTitle     string              `json:"siteTitle"`
-	SiteLogo      string              `json:"siteLogo,omitempty"`
-	LoginLogo     string              `json:"loginLogo,omitempty"`
+	Token         map[string]interface{} `json:"token"`
+	BgImage       ThemeUserConfigBgImage `json:"bgImage,omitempty"`
+	SiteLink      []map[string]string    `json:"siteLink,omitempty"`
+	SiteCopyright string                 `json:"siteCopyright,omitempty"`
+	SiteTitle     string                 `json:"siteTitle"`
+	SiteLogo      string                 `json:"siteLogo,omitempty"`
+	LoginLogo     string                 `json:"loginLogo,omitempty"`
+}
+
+type ThemeUserConfigBgImage struct {
+	Src    string `json:"src,omitempty"`
+	Width  string `json:"width,omitempty"`
+	Height string `json:"height,omitempty"`
+	Top    int    `json:"top,omitempty"`
+	Left   int    `json:"left,omitempty"`
+	Right  int    `json:"right,omitempty"`
+	Bottom int    `json:"bottom,omitempty"`
 }
 
 type DnsApi struct {

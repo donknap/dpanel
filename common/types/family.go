@@ -5,7 +5,7 @@ const (
 	FeatureFamilyEe           = "canSeeEnableEe"
 	FeatureFamilyCe           = "canSeeEnableCe"
 	FeatureFamilyXk           = "canSeeEnableXk"
-	FeatureFamilyAsusNw       = "canSeeEnableAsusNw"
+	FeatureFamilyNw           = "canSeeEnableNw"
 	FeatureVersionEnvLite     = "canSeeEnableVersionEnvLite"
 	FeatureVersionEnvStandard = "canSeeEnableVersionEnvStandard"
 	FeatureDockerEnvLocal     = "canSeeEnableDockerEnvLocal"

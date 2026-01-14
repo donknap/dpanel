@@ -1,13 +1,16 @@
-//go:build !pe && !ee && !xk && !nw
+//go:build nw
 
 package family
 
+/**
+ * ASUS_NW
+ */
+
 import (
 	"log/slog"
-	"path"
 
+	"github.com/donknap/dpanel/app/pro/nw"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/types"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
@@ -15,18 +18,13 @@ import (
 type Provider struct {
 }
 
-func (self Provider) Register(httpServer *server.Server) {
-	slog.Debug("provider load community edition")
-	httpServer.RegisterRouters(func(engine *gin.Engine) {
-		engine.POST(path.Join(function.RouterRootApi(), "/pro/*path"), notSupportedApi)
-	})
+func (self *Provider) Register(httpServer *server.Server) {
+	slog.Debug("provider load ASUS_NW edition")
+	new(nw.Provider).Register()
 }
 
 func (self Provider) Feature() []string {
-	return []string{
-		types.FeatureFamilyCe,
-		types.FeatureInDPanel,
-	}
+	return new(nw.Provider).Feature()
 }
 
 func (self Provider) Check(name string) bool {

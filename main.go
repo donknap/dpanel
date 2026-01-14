@@ -149,7 +149,7 @@ func main() {
 				gzipMiddleware := engine.Use(gzip.Gzip(gzip.DefaultCompression))
 				gzipMiddleware.StaticFS(function.RouterUri("/dpanel/static/asset"), fs2.NewHttpFs(subFs))
 
-				engine.StaticFileFS(function.RouterUri("/favicon.ico"), "dpanel.ico", http2.FS(subFs))
+				engine.StaticFileFS(function.RouterUri("/favicon.ico"), "/image/dpanel.ico", http2.FS(subFs))
 				engine.Static(function.RouterUri("/dpanel/static/image"), filepath.Join(storage.Local{}.GetSaveRootPath(), "image"))
 
 				engine.NoRoute(func(http *gin.Context) {

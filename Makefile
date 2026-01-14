@@ -74,20 +74,24 @@ endif
 D_SFX       := $(if $(filter gnu,$(LIBC)),-debian,)
 IMAGE_REPO  := dpanel$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)
 DOCKER_FILE := ./docker/Dockerfile$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)$(D_SFX)
-
+ifneq ($(filter %-nw-debian,$(DOCKER_FILE)),)
+    DOCKER_FILE := ./docker/Dockerfile-debian
+endif
 # --- Core Build Macros ---
 # Logical Fix: If PROJECT_NAME is overridden from command line, use it directly.
 # Otherwise, use the structured naming convention.
 define go_build
-    $(eval TARGET_BIN := $(if $(filter dpanel,$(PROJECT_NAME)),$(PROJECT_NAME)-$(FAMILY)-$(LIBC)-$(5),$(PROJECT_NAME)))
-    @echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER)"
-    @echo ">> Target Filename: $(TARGET_BIN)"
-    CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
-    go build -ldflags '-X main.DPanelVersion=${APP_VER} -s -w' \
-    -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" \
-    -tags ${FAMILY},w7_rangine_release \
-    -o ${GO_TARGET_DIR}/$(TARGET_BIN) ${GO_SOURCE_DIR}/*.go
-    @cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
+	$(if $(filter nw,$(FAMILY)), @echo "Compiling NW library"; $(MAKE) -C app/pro/_tests/asusnw_open CC=$(4) clean all)
+
+	$(eval TARGET_BIN := $(if $(filter dpanel,$(PROJECT_NAME)),$(PROJECT_NAME)-$(FAMILY)-$(LIBC)-$(5),$(PROJECT_NAME)))
+	@echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER)"
+	@echo ">> Target Filename: $(TARGET_BIN)"
+	CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
+	go build -ldflags '-X main.DPanelVersion=${APP_VER} -s -w' \
+	-gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" \
+	-tags ${FAMILY},w7_rangine_release \
+	-o ${GO_TARGET_DIR}/$(TARGET_BIN) ${GO_SOURCE_DIR}/*.go
+	@cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 endef
 
 define get_tags
@@ -168,7 +172,6 @@ release: build
 		--build-arg APP_VERSION=${APP_VER} \
 		--build-arg APP_FAMILY=${FAMILY} \
 		--build-arg APP_LIBC=${LIBC} \
-		$(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta-lite$(D_SFX),) \
 		-f $(DOCKER_FILE) . --push
 
 	if [ "$(LITE)" = "0" ]; then \
@@ -179,7 +182,6 @@ release: build
 		  --build-arg APP_VERSION=${APP_VER} \
 		  --build-arg APP_FAMILY=${FAMILY} \
 		  --build-arg APP_LIBC=${LIBC} \
-		  $(if $(filter-out ce,$(FAMILY)),--build-arg BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/dpanel/dpanel:beta$(D_SFX),) \
 		  -f $(DOCKER_FILE) . --push; \
 	fi
 
