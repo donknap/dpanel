@@ -44,6 +44,7 @@ type client struct {
 	dockerClient *docker.Client
 	ctx          context.Context
 	ctxCancel    context.CancelFunc
+	createdAt    time.Time // 创建时间，用于同名环境更新后，把旧的踢掉
 }
 
 func (self *client) Close() {
@@ -77,6 +78,7 @@ func (self *monitor) Join(dockerEnv *types.DockerEnv) {
 
 	c := &client{
 		dockerEnv: dockerEnv,
+		createdAt: time.Now(),
 	}
 	c.ctx, c.ctxCancel = context.WithCancel(context.Background())
 	self.clients.Store(dockerEnv.Name, c)
@@ -117,8 +119,10 @@ func (self *monitor) listen(c *client) {
 			})
 		}
 		time.Sleep(10 * time.Second)
-		if _, ok := self.clients.Load(c.dockerEnv.Name); !ok {
-			slog.Debug("Monitor client not found", "name", c.dockerEnv.Name, "error", initErr)
+		// 如果数据找不到或是当前循环的环境时间早于存储中的 Clients
+		// 时间早说明当前环境已经变更了，不需要再继续循环了
+		if v, ok := self.clients.Load(c.dockerEnv.Name); !ok || v.(*client).createdAt.After(c.createdAt) {
+			slog.Debug("Monitor client not found or updated", "name", c.dockerEnv.Name, "error", initErr)
 			c.Close()
 			return
 		}

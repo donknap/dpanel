@@ -29,10 +29,6 @@ func (self Provider) Feature() []string {
 	}
 }
 
-func (self Provider) Check(name string) bool {
-	return function.InArray(self.Feature(), name)
-}
-
 func (self Provider) Middleware() []gin.HandlerFunc {
 	return nil
 }

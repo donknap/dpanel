@@ -35,7 +35,7 @@ func (self User) Login(http *gin.Context) {
 		return
 	}
 
-	if !new(family.Provider).Check(types.FeatureFamilyCe) {
+	if !function.InArray((family.Provider{}).Feature(), types.FeatureFamilyCe) {
 		twoFa := accessor.TwoFa{}
 		exists := logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa, &twoFa)
 		if exists && twoFa.Enable {
@@ -76,7 +76,7 @@ func (self User) Login(http *gin.Context) {
 		return
 	}
 
-	if !(family.Provider{}).Check(types.FeatureFamilyEe) && currentUser.Name != logic.SettingGroupUserFounder {
+	if !function.InArray((family.Provider{}).Feature(), types.FeatureFamilyEe) && currentUser.Name != logic.SettingGroupUserFounder {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserDisable), 500)
 		return
 	}

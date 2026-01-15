@@ -165,7 +165,7 @@ func main() {
 		new(application.Provider).Register(httpServer)
 	}
 
-	new(ctrl.Provider).Register(facade.GetConsole())
+	new(ctrl.Provider).Command(facade.GetConsole())
 	myApp.RunConsole()
 }
 

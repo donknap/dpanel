@@ -12,8 +12,10 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
@@ -104,8 +106,8 @@ func (self Setting) SaveConfig(http *gin.Context) {
 		return
 	}
 
-	var settingRow *entity.Setting
 	var value interface{}
+	settingRow := &entity.Setting{}
 
 	if params.Theme != nil {
 		settingRow = &entity.Setting{
@@ -165,6 +167,12 @@ func (self Setting) SaveConfig(http *gin.Context) {
 	if params.SaveCache && settingRow != nil {
 		storage.Cache.Set(fmt.Sprintf(storage.CacheKeySetting, settingRow.Name), value, cache.DefaultExpiration)
 	}
+
+	facade.GetEvent().Publish(event.SettingSaveEvent, event.SettingPayload{
+		GroupName: settingRow.GroupName,
+		Name:      settingRow.Name,
+	})
+
 	self.JsonSuccessResponse(http)
 	return
 }
