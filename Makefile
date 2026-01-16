@@ -84,11 +84,12 @@ define go_build
 	$(if $(filter nw,$(FAMILY)), @echo "Compiling NW library"; $(MAKE) -C app/pro/_tests/asusnw_open CC=$(4) clean all)
 
 	$(eval TARGET_BIN := $(if $(filter dpanel,$(PROJECT_NAME)),$(PROJECT_NAME)-$(FAMILY)-$(LIBC)-$(5),$(PROJECT_NAME)))
-	@echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER)"
+	$(eval GO_EXECUTABLE := $(if $(filter 1,$(IS_CUSTOM)),garble -tiny -literals -seed=random,go))
+	@echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER) (Garble: $(if $(filter 1,$(IS_CUSTOM)),ON,OFF))"
 	@echo ">> Target Filename: $(TARGET_BIN)"
 	CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
-	go build -ldflags '-X main.DPanelVersion=${APP_VER} -s -w' \
-	-gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}" \
+	$(GO_EXECUTABLE) build -ldflags '-X main.DPanelVersion=${APP_VER} -s -w' \
+	$(if $(filter 1,$(IS_CUSTOM)), , -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}") \
 	-tags ${FAMILY},w7_rangine_release \
 	-o ${GO_TARGET_DIR}/$(TARGET_BIN) ${GO_SOURCE_DIR}/*.go
 	@cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
