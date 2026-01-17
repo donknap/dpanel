@@ -60,3 +60,12 @@ func PluckMapItemWalk[K cmp.Ordered, U interface{}](v map[K]U, walk func(k K, v 
 	}
 	return item, key, false
 }
+
+func PluckMapWithKeys[K cmp.Ordered, U interface{}](v map[K]U, keys []K) map[K]U {
+	if v == nil {
+		return map[K]U{}
+	}
+	return PluckMapWalk(v, func(key K, value U) bool {
+		return InArray(keys, key)
+	})
+}

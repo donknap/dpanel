@@ -48,8 +48,11 @@ func (self Registry) Create(http *gin.Context) {
 	if params.Id <= 0 {
 		registryRow, _ = dao.Registry.Where(dao.Registry.ServerAddress.Eq(params.ServerAddress)).First()
 		if registryRow != nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.ServerAddress), 500)
-			return
+			// 类似腾讯云这样的仓库地址一样，如果用户名不一样也按两个仓库来对待
+			if params.Username != "" && params.Password != "" && params.Username == registryRow.Setting.Username {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.ServerAddress), 500)
+				return
+			}
 		}
 	} else {
 		registryRow, _ = dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).First()
@@ -71,8 +74,15 @@ func (self Registry) Create(http *gin.Context) {
 		ServerAddress: params.ServerAddress,
 		Email:         params.Email,
 	}
+	// 未设置用户名及密码时，这些匿名仓库不做登录操作，因为有可能无法访问
+	if !function.InArray([]string{
+		"docker.io",
+		"quay.io",
+		"ghcr.io",
+	}, params.ServerAddress) || params.Username != "" {
+		response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, authConfig)
+	}
 
-	response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, authConfig)
 	if err != nil {
 		if function.ErrorHasKeyword(err, "server gave HTTP response to HTTPS client") {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImagePullServerHttp, "name", params.ServerAddress), 500)

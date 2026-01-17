@@ -1,4 +1,4 @@
-//go:build !pe && !ee && !xk
+//go:build !pe && !ee && !xk && !nw
 
 package family
 
@@ -27,10 +27,6 @@ func (self Provider) Feature() []string {
 		types.FeatureFamilyCe,
 		types.FeatureInDPanel,
 	}
-}
-
-func (self Provider) Check(name string) bool {
-	return function.InArray(self.Feature(), name)
 }
 
 func (self Provider) Middleware() []gin.HandlerFunc {

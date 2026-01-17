@@ -149,7 +149,7 @@ func main() {
 				gzipMiddleware := engine.Use(gzip.Gzip(gzip.DefaultCompression))
 				gzipMiddleware.StaticFS(function.RouterUri("/dpanel/static/asset"), fs2.NewHttpFs(subFs))
 
-				engine.StaticFileFS(function.RouterUri("/favicon.ico"), "dpanel.ico", http2.FS(subFs))
+				engine.StaticFileFS(function.RouterUri("/favicon.ico"), "/image/dpanel.ico", http2.FS(subFs))
 				engine.Static(function.RouterUri("/dpanel/static/image"), filepath.Join(storage.Local{}.GetSaveRootPath(), "image"))
 
 				engine.NoRoute(func(http *gin.Context) {
@@ -165,7 +165,7 @@ func main() {
 		new(application.Provider).Register(httpServer)
 	}
 
-	new(ctrl.Provider).Register(facade.GetConsole())
+	new(ctrl.Provider).Command(facade.GetConsole())
 	myApp.RunConsole()
 }
 
@@ -299,7 +299,7 @@ func initRSA() error {
 			_ = os.Remove(file)
 		}
 		_, err := local.QuickRun(fmt.Sprintf(
-			`ssh-keygen -t rsa -b 4096 -f %s -N "" -C "%s@%s"`,
+			`ssh-keygen -t rsa -b 4096 -f "%s" -N "" -C "%s@%s"`,
 			filepath.Join(storage.Local{}.GetCertRsaPath(), define.DefaultIdKeyFile),
 			define.PanelAuthor,
 			define.PanelWebSite,

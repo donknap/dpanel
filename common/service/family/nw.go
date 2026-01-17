@@ -1,11 +1,15 @@
-//go:build pe
+//go:build nw
 
 package family
+
+/**
+ * ASUS_NW
+ */
 
 import (
 	"log/slog"
 
-	"github.com/donknap/dpanel/app/pro/pe"
+	"github.com/donknap/dpanel/app/pro/nw"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
@@ -14,12 +18,12 @@ type Provider struct {
 }
 
 func (self Provider) Register(httpServer *server.Server) {
-	slog.Debug("provider load professional edition")
-	new(pe.Provider).Register(httpServer)
+	slog.Debug("provider load ASUS_NW edition")
+	new(nw.Provider).Register()
 }
 
 func (self Provider) Feature() []string {
-	return new(pe.Provider).Feature()
+	return new(nw.Provider).Feature()
 }
 
 func (self Provider) Middleware() []gin.HandlerFunc {

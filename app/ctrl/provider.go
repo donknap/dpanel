@@ -12,7 +12,7 @@ import (
 type Provider struct {
 }
 
-func (provider *Provider) Register(console console.Console) {
+func (provider Provider) Command(console console.Console) {
 	console.RegisterCommand(new(user.Reset))
 	console.RegisterCommand(new(store.Sync))
 

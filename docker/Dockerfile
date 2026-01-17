@@ -25,9 +25,9 @@ COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
 COPY ./docker/task /docker
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
+RUN sed -i 's/dl-cdn.alpinelinux111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
     apk add --no-cache --update \
-    musl docker-cli docker-cli-compose tzdata git openssh-client && \
+    bash musl docker-cli docker-cli-compose tzdata git openssh-client && \
     rm -f /usr/bin/docker-compose && \
     mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
     chmod -R 755 /docker/* /app/server/dpanel
@@ -49,7 +49,7 @@ COPY ./docker/nginx/include /etc/nginx/conf.d/include
 
 RUN apk add --no-cache nginx openssl && \
     mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private /var/www/challenges && \
-    cd /docker && ./acme.sh --install --config-home /dpanel/acme
+    tar -zxvf /docker/acme.tar.gz -C /docker && cd /docker/acme.sh-master && ./acme.sh --install --config-home /dpanel/acme
 
 EXPOSE 443 80 8080
 
