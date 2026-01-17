@@ -343,7 +343,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
-	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
+	dpanelInfo := logic.Setting{}.GetDPanelInfo()
 
 	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err == nil && info.ID != "" {
@@ -359,7 +359,7 @@ func (self Home) Info(http *gin.Context) {
 			"version":       facade.GetConfig().GetString("app.version"),
 			"family":        facade.GetConfig().GetString("app.family"),
 			"env":           facade.GetConfig().GetString("app.env"),
-			"containerInfo": dpanelContainerInfo,
+			"containerInfo": dpanelInfo.ContainerInfo,
 		},
 		"plugin": plugin.Wrapper{}.GetPluginList(),
 		"rsa": gin.H{
@@ -654,9 +654,9 @@ func (self Home) GetStatList(http *gin.Context) {
 }
 
 func (self Home) UpgradeScript(http *gin.Context) {
-	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
+	dpanelInfo := logic.Setting{}.GetDPanelInfo()
 	self.JsonResponseWithoutError(http, gin.H{
-		"info": dpanelContainerInfo,
+		"info": dpanelInfo.ContainerInfo,
 	})
 	return
 }

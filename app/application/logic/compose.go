@@ -311,18 +311,18 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
 	linkComposePath := ""
-	dpanelContainerInfo, _ := logic.Setting{}.GetDPanelInfo()
+	dpanelInfo := logic.Setting{}.GetDPanelInfo()
 
-	for i, mount := range dpanelContainerInfo.Mounts {
+	for i, mount := range dpanelInfo.ContainerInfo.Mounts {
 		if mount.Type != types.VolumeTypeBind {
 			continue
 		}
 		if v, ok := function.PathConvertWinPath2Unix(mount.Source); ok {
-			dpanelContainerInfo.Mounts[i].Source = filepath.Join("/", "mnt", "host", v)
+			dpanelInfo.ContainerInfo.Mounts[i].Source = filepath.Join("/", "mnt", "host", v)
 		}
 	}
 
-	for _, mount := range dpanelContainerInfo.Mounts {
+	for _, mount := range dpanelInfo.ContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
 			linkComposePath = filepath.Join(mount.Source, filepath.Base(workingDir))
 		}
@@ -334,7 +334,7 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 		mountComposePath = filepath.Join("/", "dpanel", "compose-"+dbRow.Setting.DockerEnvName)
 	}
 
-	for _, mount := range dpanelContainerInfo.Mounts {
+	for _, mount := range dpanelInfo.ContainerInfo.Mounts {
 		if mount.Type == types.VolumeTypeBind && mount.Destination == mountComposePath && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
 			linkComposePath = mount.Source
 		}
