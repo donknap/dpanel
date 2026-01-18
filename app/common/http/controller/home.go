@@ -356,10 +356,16 @@ func (self Home) Info(http *gin.Context) {
 		"clientVersion": docker.Sdk.Client.ClientVersion(),
 		"sdkVersion":    api.DefaultVersion,
 		"dpanel": map[string]interface{}{
-			"version":       facade.GetConfig().GetString("app.version"),
-			"family":        facade.GetConfig().GetString("app.family"),
-			"env":           facade.GetConfig().GetString("app.env"),
-			"containerInfo": dpanelInfo.ContainerInfo,
+			"version":          facade.GetConfig().GetString("app.version"),
+			"family":           facade.GetConfig().GetString("app.family"),
+			"env":              facade.GetConfig().GetString("app.env"),
+			"containerInfo":    dpanelInfo.ContainerInfo,
+			"runIn":            dpanelInfo.RunIn,
+			"storageLocalPath": storage.Local{}.GetStorageLocalPath(),
+		},
+		"dockerEnv": gin.H{
+			"name":       docker.Sdk.DockerEnv.Name,
+			"remoteType": docker.Sdk.DockerEnv.RemoteType,
 		},
 		"plugin": plugin.Wrapper{}.GetPluginList(),
 		"rsa": gin.H{

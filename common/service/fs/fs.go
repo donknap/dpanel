@@ -49,6 +49,12 @@ func NewContainerExplorer(containerName string) (*afero.Afero, error) {
 }
 
 func NewSshExplorer(dockerEnvName string) (*ssh.Client, *afero.Afero, error) {
+	if dockerEnvName == "local-os-fs" {
+		afs := &afero.Afero{
+			Fs: afero.NewOsFs(),
+		}
+		return nil, afs, nil
+	}
 	dockerEnv, err := logic2.Env{}.GetEnvByName(dockerEnvName)
 	if err != nil {
 		return nil, nil, err
