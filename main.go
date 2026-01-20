@@ -101,6 +101,7 @@ func main() {
 	})
 
 	if isAppServer() {
+		print("\n█████╗   ██████╗  █████╗ ███╗   ██╗███████╗██╗   \n██║  ██╗ ██╔══██╗██╔══██╗████╗  ██║██╔════╝██║   \n██║   ██╗██████╔╝███████║██╔██╗ ██║█████╗  ██║   \n██║   ██╝██╔═══╝ ██╔══██║██║╚██╗██║██╔══╝  ██║   \n██║  ██╝ ██║     ██║  ██║██║ ╚████║███████╗███████╗ \n█████╝   ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝\n\n")
 		slog.Debug("config", "env", facade.GetConfig().GetString("app.env"))
 		slog.Debug("config", "version", DPanelVersion)
 		slog.Debug("config", "storage", storage.Local{}.GetStorageLocalPath())

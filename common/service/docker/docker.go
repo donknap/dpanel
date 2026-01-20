@@ -224,6 +224,13 @@ func WithSockProxy() Option {
 		}
 
 		go func() {
+			for {
+				if self.Ctx != nil {
+					break
+				}
+				fmt.Printf("Anonymous function %v \n", "wait")
+				time.Sleep(time.Millisecond * 10)
+			}
 			<-self.Ctx.Done()
 			_ = localSock.Close()
 		}()
