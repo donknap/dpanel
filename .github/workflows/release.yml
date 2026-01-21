@@ -70,19 +70,13 @@ jobs:
             MUSL_ARM64_CC=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
             MUSL_ARMV7_CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc
 
-          # 2. 发布 PE 版 (Musl/Alpine)
-          make release FAMILY=pe VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0 \
-            MUSL_AMD64_CC=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc \
-            MUSL_ARM64_CC=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
-            MUSL_ARMV7_CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc
-
-          # 3. 发布 Debian 版 (GNU)
+          # 2. 发布 Debian 版 (GNU)
           make release FAMILY=ce GNU=y VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0 \
             GNU_AMD64_CC=gcc \
             GNU_ARM64_CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc \
             GNU_ARMV7_CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc
 
-          # 4. 补充特定平台的二进制（如群晖），只需 build 不需要 release 镜像
+          # 3. 补充特定平台的二进制（如群晖），只需 build 不需要 release 镜像
           make build VERSION=${VERSION_TAG} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 \
             ARM64_CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
           make build VERSION=${VERSION_TAG} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 \

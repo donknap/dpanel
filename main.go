@@ -51,15 +51,7 @@ var (
 	Asset embed.FS
 )
 
-const dpanelBanner = `DPanel is a lightweight Docker management panel. Website: https://deepanel.com
-
-  ██████╗  ██████╗  █████╗ ███╗   ██╗███████╗██╗     
-  ██╔══██╗ ██╔══██╗██╔══██╗████╗  ██║██╔════╝██║     
-  ██║  ██║ ██████╔╝███████║██╔██╗ ██║█████╗  ██║     
-  ██║  ██║ ██╔═══╝ ██╔══██║██║╚██╗██║██╔══╝  ██║     
-  ██████╔╝ ██║     ██║  ██║██║ ╚████║███████╗███████╗
-  ╚═════╝  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝
-`
+const dpanelBanner = `DPanel is a lightweight container management panel; visit https://deepanel.com for more information.`
 
 var DPanelVersion string
 

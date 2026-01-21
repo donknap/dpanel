@@ -69,6 +69,12 @@ else
     ARMV7_CC  := $(MUSL_ARMV7_CC)
 endif
 
+# 设置默认值（如果不传入 GARBLE=1，默认不开启混淆）
+GARBLE ?= 0
+GARBLE_SEED   ?= random
+
+CPUS := $(shell [ "$$(uname)" = "Darwin" ] && sysctl -n hw.ncpu || nproc)
+
 # --- Auto-Derived Docker Configurations ---
 D_SFX       := $(if $(filter gnu,$(LIBC)),-debian,)
 IMAGE_REPO  := dpanel$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)
@@ -80,14 +86,12 @@ endif
 # Logical Fix: If PROJECT_NAME is overridden from command line, use it directly.
 # Otherwise, use the structured naming convention.
 define go_build
-	$(if $(filter nw,$(FAMILY)), @echo "Compiling NW library"; $(MAKE) -C app/pro/_tests/asusnw_open CC=$(4) clean all)
-
 	$(eval TARGET_BIN := $(if $(filter dpanel,$(PROJECT_NAME)),$(PROJECT_NAME)-$(FAMILY)-$(LIBC)-$(5),$(PROJECT_NAME)))
-	$(eval GO_EXECUTABLE := $(if $(filter 1,$(IS_CUSTOM)),garble -tiny -literals -seed=random,go))
+	$(eval GO_EXECUTABLE := $(if $(filter 1,$(GARBLE)),GOGARBLE="github.com/donknap/dpanel" garble -literals -seed=${GARBLE_SEED},go))
 	@echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER) (Garble: $(if $(filter 1,$(IS_CUSTOM)),ON,OFF))"
 	@echo ">> Target Filename: $(TARGET_BIN)"
-	CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
-	$(GO_EXECUTABLE) build -trimpath \
+	GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
+	$(GO_EXECUTABLE) build -p $(CPUS) -trimpath \
 	-ldflags="-s -w -X 'main.DPanelVersion=${APP_VER}'" \
 	-tags "${FAMILY},w7_rangine_release" \
 	-o ${GO_TARGET_DIR}/$(TARGET_BIN) ${GO_SOURCE_DIR}/*.go
