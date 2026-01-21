@@ -5,7 +5,6 @@
 PROJECT_NAME     := dpanel
 GO_SOURCE_DIR    := $(shell pwd)
 GO_TARGET_DIR    := $(GO_SOURCE_DIR)/runtime
-TRIM_PATH        := /Users/renchao
 JS_SOURCE_DIR    := $(abspath $(GO_SOURCE_DIR)/../../js/d-panel)
 
 # --- Dynamic OS Detection ---
@@ -88,9 +87,9 @@ define go_build
 	@echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER) (Garble: $(if $(filter 1,$(IS_CUSTOM)),ON,OFF))"
 	@echo ">> Target Filename: $(TARGET_BIN)"
 	CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
-	$(GO_EXECUTABLE) build -ldflags '-X main.DPanelVersion=${APP_VER} -s -w' \
-	$(if $(filter 1,$(IS_CUSTOM)), , -gcflags="all=-trimpath=${TRIM_PATH}" -asmflags="all=-trimpath=${TRIM_PATH}") \
-	-tags ${FAMILY},w7_rangine_release \
+	$(GO_EXECUTABLE) build -trimpath \
+	-ldflags="-s -w -X 'main.DPanelVersion=${APP_VER}'" \
+	-tags "${FAMILY},w7_rangine_release" \
 	-o ${GO_TARGET_DIR}/$(TARGET_BIN) ${GO_SOURCE_DIR}/*.go
 	@cp ${GO_SOURCE_DIR}/config.yaml ${GO_TARGET_DIR}/config.yaml
 endef

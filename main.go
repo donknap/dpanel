@@ -51,6 +51,16 @@ var (
 	Asset embed.FS
 )
 
+const dpanelBanner = `DPanel is a lightweight Docker management panel. Website: https://deepanel.com
+
+  ██████╗  ██████╗  █████╗ ███╗   ██╗███████╗██╗     
+  ██╔══██╗ ██╔══██╗██╔══██╗████╗  ██║██╔════╝██║     
+  ██║  ██║ ██████╔╝███████║██╔██╗ ██║█████╗  ██║     
+  ██║  ██║ ██╔═══╝ ██╔══██║██║╚██╗██║██╔══╝  ██║     
+  ██████╔╝ ██║     ██║  ██║██║ ╚████║███████╗███████╗
+  ╚═════╝  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝
+`
+
 var DPanelVersion string
 
 func main() {
@@ -101,6 +111,7 @@ func main() {
 	})
 
 	if isAppServer() {
+		slog.Warn(dpanelBanner)
 		slog.Debug("config", "env", facade.GetConfig().GetString("app.env"))
 		slog.Debug("config", "version", DPanelVersion)
 		slog.Debug("config", "storage", storage.Local{}.GetStorageLocalPath())

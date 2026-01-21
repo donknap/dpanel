@@ -132,9 +132,18 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 			script = task.Setting.Script
 		}
 		// 如果没有指定容器，则直接在面板 shell 中执行
+		var runCmd [2]string
+		switch task.Setting.EntryShell {
+		case "/bin/sh", "/bin/bash":
+			runCmd = [2]string{task.Setting.EntryShell, "-c"}
+		case "cmd":
+			runCmd = [2]string{task.Setting.EntryShell, "/C"}
+		case "powershell":
+			runCmd = [2]string{task.Setting.EntryShell, "-Command"}
+		}
 		options := []local.Option{
-			local.WithCommandName("/bin/sh"),
-			local.WithArgs("-c", script),
+			local.WithCommandName(runCmd[0]),
+			local.WithArgs(runCmd[1], script),
 			local.WithEnv(globalEnv),
 		}
 		// 如果有超时间，则需要独立进程，超时后强制终止掉

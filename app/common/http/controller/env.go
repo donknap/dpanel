@@ -180,7 +180,7 @@ func (self Env) Create(http *gin.Context) {
 		dockerEnv.TlsKey = filepath.Join(dockerEnv.CertRoot(), "key.pem")
 	}
 
-	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv)
+	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithSockProxy())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

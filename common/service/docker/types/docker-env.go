@@ -45,15 +45,14 @@ func (self DockerEnv) CommandEnv() []string {
 		} else {
 			result = append(result, fmt.Sprintf("DOCKER_HOST=unix://%s/%s.sock", storage.Local{}.GetLocalProxySockPath(), self.Name))
 		}
-		result = append(result, os.Environ()...)
-		return result
-	}
-	result = append(result, fmt.Sprintf("DOCKER_HOST=%s", self.Address))
-	if self.EnableTLS {
-		result = append(result,
-			"DOCKER_TLS_VERIFY=1",
-			"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetCertPath(), self.TlsCa)),
-		)
+	} else {
+		result = append(result, fmt.Sprintf("DOCKER_HOST=%s", self.Address))
+		if self.EnableTLS {
+			result = append(result,
+				"DOCKER_TLS_VERIFY=1",
+				"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetCertPath(), self.TlsCa)),
+			)
+		}
 	}
 	// 只获取指定的系统环境变量，避免其它的污染
 	systemEnvList := []string{
@@ -70,7 +69,13 @@ func (self DockerEnv) CommandEnv() []string {
 	result = append(result, function.PluckArrayWalk(os.Environ(), func(item string) (string, bool) {
 		ok := false
 		for _, s := range systemEnvList {
-			if strings.HasPrefix(item, s+"=") {
+			if strings.HasPrefix(strings.ToUpper(item), s+"=") {
+				if s == "PATH" {
+					// 往 PATH 环境变量中追加程序的目录，便于调用 dpanel 命令
+					if v, err := os.Executable(); err == nil {
+						item += string(os.PathListSeparator) + filepath.Dir(v)
+					}
+				}
 				ok = true
 				break
 			}

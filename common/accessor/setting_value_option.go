@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
+	types3 "github.com/donknap/dpanel/common/types"
 )
 
 type SettingValueOption struct {
@@ -20,7 +20,7 @@ type SettingValueOption struct {
 	TwoFa                       *TwoFa                       `json:"twoFa,omitempty"`
 	ContainerCheckIgnoreUpgrade ContainerCheckIgnoreUpgrade  `json:"containerCheckIgnoreUpgrade,omitempty"`
 	ContainerCheckAllUpgrade    *ContainerCheckAllUpgrade    `json:"containerCheckAllUpgrade,omitempty"`
-	DPanelInfo                  *container.InspectResponse   `json:"DPanelInfo,omitempty"`
+	DPanelInfo                  *types3.DPanelInfo           `json:"DPanelInfo,omitempty"`
 	ThemeConfig                 *ThemeConfig                 `json:"themeConfig,omitempty"`
 	ThemeUserConfig             *ThemeUserConfig             `json:"themeUserConfig,omitempty"`
 	ThemeConsoleConfig          *ThemeConsoleConfig          `json:"themeConsoleConfig,omitempty"`

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"runtime"
 	"strings"
 
@@ -140,4 +141,14 @@ func ImageTag(tag string) *Tag {
 		result.ImageName = result.BaseName
 	}
 	return result
+}
+
+func IsRunInDocker() bool {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	if file, err := os.ReadFile("/proc/self/mountinfo"); err == nil {
+		return strings.Contains(string(file), "docker") || strings.Contains(string(file), "containerd")
+	}
+	return false
 }

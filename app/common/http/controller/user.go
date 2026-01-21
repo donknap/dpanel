@@ -151,16 +151,16 @@ func (self User) GetUserInfo(http *gin.Context) {
 func (self User) LoginInfo(http *gin.Context) {
 	result := gin.H{
 		"showRegister":  false,
-		"showBuildName": true,
+		"showBuildName": false,
 		"family":        facade.GetConfig().GetString("app.env"),
 		"feature":       family.Provider{}.Feature(),
 		"appName":       facade.GetConfig().GetString("app.name"),
 	}
-	_, err := logic.Setting{}.GetDPanelInfo()
-	if err == nil {
-		result["showBuildName"] = false
+	dpanelInfo := logic.Setting{}.GetDPanelInfo()
+	if dpanelInfo.RunIn == types.DPanelRunInContainer && dpanelInfo.ContainerInfo.ID == "" {
+		result["showBuildName"] = true
 	}
-	_, err = logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
+	_, err := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)
 	if err != nil {
 		result["showRegister"] = true
 	}

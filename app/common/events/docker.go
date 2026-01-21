@@ -16,6 +16,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
+	types2 "github.com/donknap/dpanel/common/types"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/patrickmn/go-cache"
@@ -92,26 +93,32 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 	defer func() {
 		sdk.Close()
 	}()
+	result := &types2.DPanelInfo{}
+	if function.IsRunInDocker() {
+		result.RunIn = types2.DPanelRunInContainer
+	} else {
+		result.RunIn = types2.DPanelRunInHost
+	}
 	if dockerInfo, err := sdk.Client.Info(sdk.Ctx); err == nil {
 		e.DockerEnv.DockerInfo = &types.DockerInfo{
-			ID:            dockerInfo.ID,
-			Name:          dockerInfo.Name,
-			KernelVersion: dockerInfo.KernelVersion,
-			Architecture:  dockerInfo.Architecture,
-			OSType:        dockerInfo.OSType,
-			InDPanel:      true,
+			ID:              dockerInfo.ID,
+			Name:            dockerInfo.Name,
+			KernelVersion:   dockerInfo.KernelVersion,
+			Architecture:    dockerInfo.Architecture,
+			OSType:          dockerInfo.OSType,
+			OperatingSystem: dockerInfo.OperatingSystem,
+			InDPanel:        true,
+		}
+		// 如果当前系统是属于 docker desktop 也强制标记为在容器中运行，因为无法读取宿主机的文件
+		if strings.Contains(dockerInfo.OperatingSystem, "Docker Desktop") {
+			result.RunIn = types2.DPanelRunInDockerDesktop
 		}
 		// 面板信息总是从默认环境中获取
 		if info, err := sdk.Client.ContainerInspect(sdk.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
 			info.ExecIDs = make([]string, 0)
-			_ = logic.Setting{}.Save(&entity.Setting{
-				GroupName: logic.SettingGroupSetting,
-				Name:      logic.SettingGroupSettingDPanelInfo,
-				Value: &accessor.SettingValueOption{
-					DPanelInfo: &info,
-				},
-			})
+			result.ContainerInfo = info
 
+			// 只有在容器才会包含 nginx 功能，如果有网络就自动中入，并重启 nginx
 			if _, err := sdk.Client.NetworkInspect(sdk.Ctx, define.DPanelProxyNetworkName, network.InspectOptions{}); err == nil {
 				_ = sdk.Client.NetworkConnect(sdk.Ctx, define.DPanelProxyNetworkName, info.ID, &network.EndpointSettings{
 					Aliases: []string{
@@ -124,6 +131,13 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 			_ = logic.Setting{}.Delete(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo)
 			slog.Warn("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err)
 		}
+		_ = logic.Setting{}.Save(&entity.Setting{
+			GroupName: logic.SettingGroupSetting,
+			Name:      logic.SettingGroupSettingDPanelInfo,
+			Value: &accessor.SettingValueOption{
+				DPanelInfo: result,
+			},
+		})
 		logic.Env{}.UpdateEnv(e.DockerEnv)
 	}
 }

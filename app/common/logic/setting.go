@@ -1,15 +1,14 @@
 package logic
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	types2 "github.com/donknap/dpanel/common/types"
 	"github.com/donknap/dpanel/common/types/define"
 )
 
@@ -88,12 +87,10 @@ func (self Setting) GetValueById(id int32) (*entity.Setting, error) {
 	return setting, nil
 }
 
-func (self Setting) GetDPanelInfo() (container.InspectResponse, error) {
-	result := container.InspectResponse{}
-	if exists := self.GetByKey(SettingGroupSetting, SettingGroupSettingDPanelInfo, &result); exists {
-		return result, nil
-	}
-	return result, errors.New("dpanel container not found")
+func (self Setting) GetDPanelInfo() types2.DPanelInfo {
+	result := types2.DPanelInfo{}
+	self.GetByKey(SettingGroupSetting, SettingGroupSettingDPanelInfo, &result)
+	return result
 }
 
 func (self Setting) Delete(groupName string, name string) error {
@@ -131,7 +128,7 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 				exists = true
 				*v = setting.Value.ContainerCheckIgnoreUpgrade
 			}
-		case *container.InspectResponse:
+		case *types2.DPanelInfo:
 			if setting.Value.DPanelInfo != nil {
 				exists = true
 				*v = *setting.Value.DPanelInfo
