@@ -13,9 +13,9 @@ type Event struct {
 
 func (self Event) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Page     int    `form:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize int    `form:"pageSize" binding:"omitempty"`
-		Type     string `form:"type" binding:"omitempty,oneof=builder config container daemon image network node plugin secret service volume"`
+		Page     int    `json:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize int    `json:"pageSize" binding:"omitempty"`
+		Type     string `json:"type" binding:"omitempty,oneof=builder config container daemon image network node plugin secret service volume"`
 	}
 
 	params := ParamsValidate{}

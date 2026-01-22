@@ -120,10 +120,10 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	}
 	type ParamsValidate struct {
 		Id      string `uri:"id" binding:"required"`
-		Width   uint   `form:"width"`
-		Height  uint   `form:"height"`
-		Cmd     string `form:"cmd,default=/bin/sh"`
-		WorkDir string `form:"workDir"`
+		Width   uint   `json:"width"`
+		Height  uint   `json:"height"`
+		Cmd     string `json:"cmd,default=/bin/sh"`
+		WorkDir string `json:"workDir"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -240,9 +240,9 @@ func (self Home) WsHostConsole(http *gin.Context) {
 	}
 	type ParamsValidate struct {
 		Name   string `uri:"name" binding:"required"`
-		Width  int    `form:"width"`
-		Height int    `form:"height"`
-		Cmd    string `form:"cmd,default=/bin/sh"`
+		Width  int    `json:"width"`
+		Height int    `json:"height"`
+		Cmd    string `json:"cmd,default=/bin/sh"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

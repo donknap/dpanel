@@ -27,7 +27,7 @@ type DockerEnv struct {
 	ComposePath       string          `json:"composePath,omitempty"`
 	EnableSSH         bool            `json:"enableSSH,omitempty"`
 	SshServerInfo     *ssh.ServerInfo `json:"sshServerInfo,omitempty"`
-	RemoteType        string          `json:"remoteType"`           // 连接客户端类型，支持 docker ssh
+	RemoteType        string          `json:"remoteType"`           // 连接客户端类型，支持 local ssh tcp
 	DockerType        string          `json:"dockerType,omitempty"` // 远程客户端类型，docker podman
 	DockerInfo        *DockerInfo     `json:"dockerInfo,omitempty"`
 	DockerStatus      *DockerStatus   `json:"dockerStatus,omitempty"`

@@ -667,7 +667,7 @@ func (self Explorer) AttachVolume(http *gin.Context) {
 	if explorerPlugin.Exists() {
 		_ = explorerPlugin.Destroy()
 	}
-	pluginName, err := explorerPlugin.Create()
+	pluginName, err := explorerPlugin.Run()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

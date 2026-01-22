@@ -23,7 +23,6 @@ import (
 )
 
 const PluginExplorer = "explorer"
-const PluginBackup = "backup"
 
 type TemplateParser struct {
 	Volumes       []string
@@ -154,13 +153,21 @@ func (self plugin) Create() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
+	return response.ID, nil
+}
+
+func (self plugin) Run() (string, error) {
+	id, err := self.Create()
+	if err != nil {
+		return id, err
+	}
+	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, id, container.StartOptions{})
 	if err != nil {
 		return "", err
 	}
 	for {
-		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, response.ID); err == nil {
-			return service.ContainerName, nil
+		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, id); err == nil {
+			return id, nil
 		} else {
 			time.Sleep(time.Second)
 		}

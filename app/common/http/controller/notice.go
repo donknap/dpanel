@@ -16,7 +16,7 @@ type Notice struct {
 
 func (self Notice) Unread(http *gin.Context) {
 	type ParamsValidate struct {
-		Action string `form:"action" binding:"required,oneof=new clear init"`
+		Action string `json:"action" binding:"required,oneof=new clear init"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -47,9 +47,9 @@ func (self Notice) Unread(http *gin.Context) {
 
 func (self Notice) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Page     int    `form:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize int    `form:"pageSize" binding:"omitempty"`
-		Type     string `form:"type" binding:"omitempty"`
+		Page     int    `json:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize int    `json:"pageSize" binding:"omitempty"`
+		Type     string `json:"type" binding:"omitempty"`
 	}
 
 	params := ParamsValidate{}
@@ -77,7 +77,7 @@ func (self Notice) GetList(http *gin.Context) {
 
 func (self Notice) Delete(http *gin.Context) {
 	type ParamsValidate struct {
-		Id []int32 `form:"id" binding:"required"`
+		Id []int32 `json:"id" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

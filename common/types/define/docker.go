@@ -11,8 +11,9 @@ const (
 )
 
 const (
-	DockerRemoteTypeSSH    = "ssh"
-	DockerRemoteTypeDocker = "docker"
+	DockerRemoteTypeSSH   = "ssh"
+	DockerRemoteTypeLocal = "local"
+	DockerRemoteTypeTcp   = "tcp"
 )
 
 const (

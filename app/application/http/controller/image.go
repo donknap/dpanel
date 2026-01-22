@@ -216,7 +216,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 
 func (self Image) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Tag   string `form:"tag" binding:"omitempty"`
+		Tag   string `json:"tag" binding:"omitempty"`
 		Title string `json:"title"`
 		Use   int    `json:"use"`
 	}
@@ -437,8 +437,8 @@ func (self Image) Prune(http *gin.Context) {
 
 func (self Image) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5                []string `form:"md5" binding:"required"`
-		EnableExportToPath bool     `form:"enableExportToPath"`
+		Md5                []string `json:"md5" binding:"required"`
+		EnableExportToPath bool     `json:"enableExportToPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

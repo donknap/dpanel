@@ -47,10 +47,11 @@ func NewClientWithDockerEnv(dockerEnv *types.DockerEnv, opts ...Option) (*Client
 func NewDefaultClient() *Client {
 	defaultDockerHost := dockerclient.DefaultDockerHost
 	v, _ := NewClient(WithAddress(defaultDockerHost), WithDockerEnv(&types.DockerEnv{
-		Name:    define.DockerDefaultClientName,
-		Title:   define.DockerDefaultClientName,
-		Address: defaultDockerHost,
-		Default: true,
+		Name:       define.DockerDefaultClientName,
+		Title:      define.DockerDefaultClientName,
+		Address:    defaultDockerHost,
+		Default:    true,
+		RemoteType: define.DockerRemoteTypeLocal,
 	}))
 	return v
 }
@@ -131,6 +132,9 @@ func WithAddress(host string) Option {
 
 func WithDockerEnv(info *types.DockerEnv) Option {
 	return func(self *Client) error {
+		if info != nil && strings.HasPrefix(info.Address, "tcp://") && info.RemoteType != define.DockerRemoteTypeSSH {
+			info.RemoteType = define.DockerRemoteTypeTcp
+		}
 		self.DockerEnv = info
 		return nil
 	}

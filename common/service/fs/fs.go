@@ -23,7 +23,7 @@ func NewContainerExplorer(containerName string) (*afero.Afero, error) {
 	if err != nil {
 		return nil, err
 	}
-	pluginName, err := explorerPlugin.Create()
+	pluginName, err := explorerPlugin.Run()
 	if err != nil {
 		return nil, err
 	}

@@ -127,8 +127,8 @@ func (self Image) TagSync(http *gin.Context) {
 
 func (self Image) TagDelete(http *gin.Context) {
 	type ParamsValidate struct {
-		Tag   string `form:"tag" binding:"required"`
-		Force bool   `form:"force" binding:"omitempty"`
+		Tag   string `json:"tag" binding:"required"`
+		Force bool   `json:"force" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -147,8 +147,8 @@ func (self Image) TagDelete(http *gin.Context) {
 
 func (self Image) TagAdd(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 string `form:"md5" binding:"required"`
-		Tag string `form:"tag" binding:"required"`
+		Md5 string `json:"md5" binding:"required"`
+		Tag string `json:"tag" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

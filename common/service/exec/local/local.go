@@ -35,8 +35,6 @@ func New(opts ...Option) (exec.Executor, error) {
 		}
 	}
 
-	slog.Debug("run local command", "name", c.cmd.Path, "args", c.cmd.Args[1:], "env", c.cmd.Env)
-
 	return c, nil
 }
 
@@ -71,6 +69,7 @@ func (self *Local) String() string {
 }
 
 func (self *Local) Run() error {
+	self.debug()
 	out := new(bytes.Buffer)
 	self.cmd.Stderr = out
 	err := self.cmd.Run()
@@ -84,6 +83,7 @@ func (self *Local) Run() error {
 }
 
 func (self *Local) RunWithResult() ([]byte, error) {
+	self.debug()
 	out, err := self.cmd.CombinedOutput()
 	if err != nil {
 		if out != nil && len(out) > 0 {
@@ -95,6 +95,7 @@ func (self *Local) RunWithResult() ([]byte, error) {
 }
 
 func (self *Local) RunInPip() (io.ReadCloser, error) {
+	self.debug()
 	stdout, err := self.cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -124,6 +125,7 @@ func (self *Local) RunInTerminal(size *pty.Winsize) (io.ReadCloser, error) {
 		return self.RunInPip()
 	}
 
+	self.debug()
 	out, err = pty.StartWithSize(self.cmd, size)
 	if err != nil {
 		return nil, err
@@ -146,4 +148,8 @@ func (self *Local) Close() error {
 
 func (self *Local) WorkDir(path string) {
 	self.cmd.Dir = path
+}
+
+func (self *Local) debug() {
+	slog.Debug("run local command", "cmd", self.cmd.String(), "env", self.cmd.Env)
 }

@@ -87,7 +87,7 @@ endif
 # Otherwise, use the structured naming convention.
 define go_build
 	$(eval TARGET_BIN := $(if $(filter dpanel,$(PROJECT_NAME)),$(PROJECT_NAME)-$(FAMILY)-$(LIBC)-$(5),$(PROJECT_NAME)))
-	$(eval GO_EXECUTABLE := $(if $(filter 1,$(GARBLE)),GOGARBLE="github.com/donknap/dpanel" garble -literals -seed=${GARBLE_SEED},go))
+	$(eval GO_EXECUTABLE := $(if $(filter 1,$(GARBLE)),GOGARBLE="github.com/donknap/dpanel" garble -seed=${GARBLE_SEED},go))
 	@echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER) (Garble: $(if $(filter 1,$(IS_CUSTOM)),ON,OFF))"
 	@echo ">> Target Filename: $(TARGET_BIN)"
 	GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \

@@ -17,8 +17,10 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
@@ -94,6 +96,42 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		}
 	}
 	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
+
+	// 如果是远程连接，尝试将本地的 compose 目录数据同步到端
+	if function.InArray([]string{
+		define.DockerRemoteTypeSSH,
+		define.DockerRemoteTypeTcp,
+	}, docker.Sdk.DockerEnv.RemoteType) {
+		explorerPlugin, err := plugin.NewPlugin(plugin.PluginExplorer, map[string]*plugin.TemplateParser{
+			"explorer": {
+				Volumes: []string{
+					fmt.Sprintf("%s:%s", tasker.Project.WorkingDir, tasker.Project.WorkingDir),
+				},
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		name, err := explorerPlugin.Create()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer func() {
+			_ = explorerPlugin.Destroy()
+		}()
+		importFileList, err := imports.NewFileImport(tasker.Project.WorkingDir, imports.WithImportPath(tasker.Project.WorkingDir))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, name, importFileList)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
 
 	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer progress.Close()

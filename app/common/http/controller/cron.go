@@ -188,8 +188,8 @@ func (self Cron) GetDetail(http *gin.Context) {
 func (self Cron) GetLogList(http *gin.Context) {
 	type ParamsValidate struct {
 		Id       int32 `json:"id" binding:"required"`
-		Page     int   `form:"page,default=1" binding:"omitempty,gt=0"`
-		PageSize int   `form:"pageSize" binding:"omitempty"`
+		Page     int   `json:"page,default=1" binding:"omitempty,gt=0"`
+		PageSize int   `json:"pageSize" binding:"omitempty"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

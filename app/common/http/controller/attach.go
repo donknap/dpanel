@@ -44,7 +44,7 @@ func (self Attach) Upload(http *gin.Context) {
 
 func (self Attach) Delete(http *gin.Context) {
 	type ParamsValidate struct {
-		Path string `form:"path" binding:"required"`
+		Path string `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

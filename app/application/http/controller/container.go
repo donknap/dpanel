@@ -43,8 +43,8 @@ type Container struct {
 
 func (self Container) Status(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5     string `form:"md5" binding:"required"`
-		Operate string `form:"operate" binding:"required,oneof=start stop restart pause unpause"`
+		Md5     string `json:"md5" binding:"required"`
+		Operate string `json:"operate" binding:"required,oneof=start stop restart pause unpause"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -185,7 +185,7 @@ func (self Container) GetList(http *gin.Context) {
 
 func (self Container) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5 string `form:"md5" binding:"required"`
+		Md5 string `json:"md5" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -461,8 +461,8 @@ func (self Container) Delete(http *gin.Context) {
 
 func (self Container) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5                string `form:"md5" binding:"required"`
-		EnableExportToPath bool   `form:"enableExportToPath"`
+		Md5                string `json:"md5" binding:"required"`
+		EnableExportToPath bool   `json:"enableExportToPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

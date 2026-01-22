@@ -7,7 +7,6 @@ ARG APP_FAMILY
 ENV TZ=Asia/Shanghai
 ENV PATH="/app/server:${PATH}"
 ENV DOCKER_HOST=unix:///var/run/docker.sock
-ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 ENV DP_SYSTEM_STORAGE_LOCAL_PATH=/dpanel
 ENV DP_DB_DATABASE=${DP_SYSTEM_STORAGE_LOCAL_PATH}/dpanel.db

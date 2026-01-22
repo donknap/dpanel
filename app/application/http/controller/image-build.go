@@ -89,7 +89,7 @@ func (self ImageBuild) Create(http *gin.Context) {
 
 func (self ImageBuild) GetDetail(http *gin.Context) {
 	type ParamsValidate struct {
-		Id int32 `form:"id" binding:"required"`
+		Id int32 `json:"id" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -123,7 +123,7 @@ func (self ImageBuild) GetDetail(http *gin.Context) {
 
 func (self ImageBuild) Delete(http *gin.Context) {
 	type ParamsValidate struct {
-		Id []int32 `form:"id" binding:"required"`
+		Id []int32 `json:"id" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

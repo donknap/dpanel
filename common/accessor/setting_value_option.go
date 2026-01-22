@@ -50,6 +50,7 @@ type ThemeConsoleConfig map[string]any
 
 type ThemeUserConfig struct {
 	Token         map[string]interface{} `json:"token"`
+	Components    map[string]interface{} `json:"components"`
 	BgImage       ThemeUserConfigBgImage `json:"bgImage,omitempty"`
 	SiteLink      []map[string]string    `json:"siteLink,omitempty"`
 	SiteCopyright string                 `json:"siteCopyright,omitempty"`

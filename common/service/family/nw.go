@@ -19,7 +19,7 @@ type Provider struct {
 
 func (self Provider) Register(httpServer *server.Server) {
 	slog.Debug("provider load ASUS_NW edition")
-	new(nw.Provider).Register()
+	new(nw.Provider).Register(httpServer)
 }
 
 func (self Provider) Feature() []string {

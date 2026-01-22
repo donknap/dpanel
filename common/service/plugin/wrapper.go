@@ -15,7 +15,7 @@ type pluginItem struct {
 
 func (self Wrapper) GetPluginList() map[string]pluginItem {
 	pluginList := []string{
-		PluginExplorer, PluginBackup,
+		PluginExplorer,
 	}
 	r := make(map[string]pluginItem)
 	for _, name := range pluginList {

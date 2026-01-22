@@ -157,7 +157,7 @@ func (self User) LoginInfo(http *gin.Context) {
 		"appName":       facade.GetConfig().GetString("app.name"),
 	}
 	dpanelInfo := logic.Setting{}.GetDPanelInfo()
-	if dpanelInfo.RunIn == types.DPanelRunInContainer && dpanelInfo.ContainerInfo.ID == "" {
+	if dpanelInfo.RunIn == types.DPanelRunInContainer && (dpanelInfo.ContainerInfo.ContainerJSONBase == nil || dpanelInfo.ContainerInfo.ID == "") {
 		result["showBuildName"] = true
 	}
 	_, err := logic.Setting{}.GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder)

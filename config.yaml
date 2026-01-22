@@ -44,4 +44,4 @@ system:
   permission:
     default_username: __public__
 asusnw:
-  gui_theme: ${DP_GUI_THEME-dark} # rog | dark | light
+  gui_theme: ${DP_GUI_THEME-dark} # rog_1 | rog_2 | dark | light
