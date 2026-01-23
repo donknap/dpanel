@@ -2,53 +2,97 @@ package fs
 
 import (
 	"bytes"
+	"compress/gzip"
+	"errors"
 	"io"
 	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/donknap/dpanel/common/function"
-	"github.com/spf13/afero/mem"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 func NewHttpFs(fs fs.FS) http.FileSystem {
+	cacheDir := filepath.Join(os.TempDir(), "dpanel_js_cache")
+	_ = os.RemoveAll(cacheDir)
+	_ = os.MkdirAll(cacheDir, 0755)
+
 	return HttpFs{
-		fs: http.FS(fs),
+		fs:       http.FS(fs),
+		cacheDir: cacheDir,
 	}
 }
 
 type HttpFs struct {
-	fs http.FileSystem
+	fs       http.FileSystem
+	cacheDir string
 }
 
 func (self HttpFs) Open(name string) (http.File, error) {
-	file, err := self.fs.Open(name)
-	if err != nil {
-		return file, err
+	if !strings.HasSuffix(name, ".js") {
+		return self.fs.Open(name)
 	}
-	if strings.HasSuffix(name, ".js") {
-		buffer := new(bytes.Buffer)
-		_, err = io.Copy(buffer, file)
+
+	cleanName := filepath.Clean(name)
+	cachePath := filepath.Join(self.cacheDir, cleanName)
+
+	if cachedFile, err := os.Open(cachePath); err == nil {
+		return cachedFile, nil
+	}
+
+	var content []byte
+
+	origFile, err := self.fs.Open(name)
+
+	if os.IsNotExist(err) || errors.Is(err, fs.ErrNotExist) {
+		gzFile, gzErr := self.fs.Open(name + ".gz")
+		if gzErr != nil {
+			return nil, gzErr
+		}
+		defer gzFile.Close()
+
+		gzReader, err := gzip.NewReader(gzFile)
 		if err != nil {
 			return nil, err
 		}
-		content := buffer.String()
+		defer gzReader.Close()
+
+		content, err = io.ReadAll(gzReader)
+		if err != nil {
+			return nil, err
+		}
+	} else if err != nil {
+		return nil, err
+	} else {
+		content, err = io.ReadAll(origFile)
+		origFile.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if facade.Config.GetString("system.baseurl") != "" {
 		for _, v := range []string{
 			"/dpanel/api", "/dpanel/ws",
 			"/dpanel/ui", "/dpanel/static",
 		} {
-			content = strings.ReplaceAll(content, v, function.RouterUri(v))
+			content = bytes.ReplaceAll(content, []byte(v), []byte(function.RouterUri(v)))
 		}
-		memFile := mem.NewFileHandle(mem.CreateFile(name))
-		_, err = memFile.WriteString(content)
-		if err != nil {
-			return nil, err
-		}
-		_, err = memFile.Seek(0, io.SeekStart)
-		if err != nil {
-			return nil, err
-		}
-		return memFile, nil
 	}
-	return file, nil
+
+	_ = os.MkdirAll(filepath.Dir(cachePath), 0755)
+	tempFile, err := os.CreateTemp(filepath.Dir(cachePath), "tmp_js_*")
+	if err != nil {
+		return nil, err
+	}
+	tempName := tempFile.Name()
+	_, _ = tempFile.Write(content)
+	tempFile.Close()
+
+	_ = os.Rename(tempName, cachePath)
+
+	return os.Open(cachePath)
 }

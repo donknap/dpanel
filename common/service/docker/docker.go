@@ -51,7 +51,7 @@ func NewDefaultClient() *Client {
 		Title:      define.DockerDefaultClientName,
 		Address:    defaultDockerHost,
 		Default:    true,
-		RemoteType: define.DockerRemoteTypeLocal,
+		RemoteType: define.DockerRemoteTypeSock,
 	}))
 	return v
 }

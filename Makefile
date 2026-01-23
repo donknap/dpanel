@@ -2,45 +2,53 @@
 # DPanel Unified Build & Release System
 # ==============================================================================
 
-PROJECT_NAME     := dpanel
-GO_SOURCE_DIR    := $(shell pwd)
-GO_TARGET_DIR    := $(GO_SOURCE_DIR)/runtime
-JS_SOURCE_DIR    := $(abspath $(GO_SOURCE_DIR)/../../js/d-panel)
+PROJECT_NAME	 := dpanel
+GO_SOURCE_DIR	:= $(shell pwd)
+GO_TARGET_DIR	:= $(GO_SOURCE_DIR)/runtime
+JS_SOURCE_DIR	:= $(abspath $(GO_SOURCE_DIR)/../../js/d-panel)
+
+# --- Busybox Image Setup (New) ---
+BUSYBOX_IMAGE	  := busybox
+BUSYBOX_TAG		:= latest
+BUSYBOX_SAVE_DIR   := $(GO_SOURCE_DIR)/docker/image
+EXPLORER_ASSET_DIR := $(GO_SOURCE_DIR)/asset/plugin/explorer
 
 # --- Dynamic OS Detection ---
-DETECTED_OS      := $(shell uname -s | tr '[:upper:]' '[:lower:]')
-OS               ?= $(DETECTED_OS)
+DETECTED_OS	  := $(shell uname -s | tr '[:upper:]' '[:lower:]')
+OS			   ?= $(DETECTED_OS)
 
 # --- Dynamic Versioning Logic ---
-AUTO_VERSION     := $(shell date +%Y%m%d.%H%M)
-APP_VER          := $(if $(VERSION),$(VERSION),$(AUTO_VERSION))
-IS_CUSTOM        := $(if $(VERSION),1,0)
+AUTO_VERSION	 := $(shell date +%Y%m%d.%H%M)
+APP_VER		  := $(if $(VERSION),$(VERSION),$(AUTO_VERSION))
+IS_CUSTOM		:= $(if $(VERSION),1,0)
 
 # --- Build Matrix Parameters ---
-FAMILY           ?= ce
-GNU              ?= # [Default] Musl, [Set GNU=y] GNU/glibc
-HUB              ?= # [Default] Aliyun, [Set HUB=y] + Docker Hub
-LITE             ?= 1# [Default] 1 (Lite Only), [Set LITE=0] Build Both
+FAMILY		   ?= ce
+GNU			  ?= # [Default] Musl, [Set GNU=y] GNU/glibc
+HUB			  ?= # [Default] Aliyun, [Set HUB=y] + Docker Hub
+LITE			 ?= 1# [Default] 1 (Lite Only), [Set LITE=0] Build Both
 
 # --- Architecture Flags ---
-AMD64            ?=
-ARM64            ?=
-ARM7             ?=
+AMD64			?=
+ARM64			?=
+ARM7			 ?=
+
+HTTP_PROXY		?=
 
 # Platform String Construction
 D_PLAT_LIST :=
 ifeq ($(AMD64),1)
-    D_PLAT_LIST += linux/amd64
+	D_PLAT_LIST += linux/amd64
 endif
 ifeq ($(ARM64),1)
-    D_PLAT_LIST += linux/arm64
+	D_PLAT_LIST += linux/arm64
 endif
 ifeq ($(ARM7),1)
-    D_PLAT_LIST += linux/arm/v7
+	D_PLAT_LIST += linux/arm/v7
 endif
 
 ifeq ($(strip $(D_PLAT_LIST)),)
-    D_PLAT_LIST := linux/amd64
+	D_PLAT_LIST := linux/amd64
 endif
 
 null  :=
@@ -49,24 +57,24 @@ comma := ,
 D_PLATFORMS := $(subst $(space),$(comma),$(strip $(D_PLAT_LIST)))
 
 # --- Toolchains ---
-MUSL_AMD64_CC    ?= x86_64-linux-musl-gcc
-MUSL_ARM64_CC    ?= aarch64-unknown-linux-musl-gcc
-MUSL_ARMV7_CC    ?= arm-linux-musleabihf-gcc
+MUSL_AMD64_CC	?= x86_64-linux-musl-gcc
+MUSL_ARM64_CC	?= aarch64-unknown-linux-musl-gcc
+MUSL_ARMV7_CC	?= arm-linux-musleabihf-gcc
 
-GNU_AMD64_CC     ?= /usr/local/Cellar/x86_64-unknown-linux-gnu/bin/x86_64-unknown-linux-gnu-gcc
-GNU_ARM64_CC     ?= /usr/local/Cellar/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
-GNU_ARMV7_CC     ?= /usr/local/Cellar/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-gcc
+GNU_AMD64_CC	 ?= /usr/local/Cellar/x86_64-unknown-linux-gnu/bin/x86_64-unknown-linux-gnu-gcc
+GNU_ARM64_CC	 ?= /usr/local/Cellar/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
+GNU_ARMV7_CC	 ?= /usr/local/Cellar/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-gcc
 
 ifneq ($(GNU),)
-    LIBC      := gnu
-    AMD64_CC  := $(GNU_AMD64_CC)
-    ARM64_CC  := $(GNU_ARM64_CC)
-    ARMV7_CC  := $(GNU_ARMV7_CC)
+	LIBC	  := gnu
+	AMD64_CC  := $(GNU_AMD64_CC)
+	ARM64_CC  := $(GNU_ARM64_CC)
+	ARMV7_CC  := $(GNU_ARMV7_CC)
 else
-    LIBC      := musl
-    AMD64_CC  := $(MUSL_AMD64_CC)
-    ARM64_CC  := $(MUSL_ARM64_CC)
-    ARMV7_CC  := $(MUSL_ARMV7_CC)
+	LIBC	  := musl
+	AMD64_CC  := $(MUSL_AMD64_CC)
+	ARM64_CC  := $(MUSL_ARM64_CC)
+	ARMV7_CC  := $(MUSL_ARMV7_CC)
 endif
 
 # 设置默认值（如果不传入 GARBLE=1，默认不开启混淆）
@@ -76,20 +84,31 @@ GARBLE_SEED   ?= random
 CPUS := $(shell [ "$$(uname)" = "Darwin" ] && sysctl -n hw.ncpu || nproc)
 
 # --- Auto-Derived Docker Configurations ---
-D_SFX       := $(if $(filter gnu,$(LIBC)),-debian,)
+D_SFX	   := $(if $(filter gnu,$(LIBC)),-debian,)
 IMAGE_REPO  := dpanel$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)
 DOCKER_FILE := ./docker/Dockerfile$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)$(D_SFX)
 ifneq ($(filter %-nw-debian,$(DOCKER_FILE)),)
-    DOCKER_FILE := ./docker/Dockerfile-debian
+	DOCKER_FILE := ./docker/Dockerfile-debian
 endif
+
 # --- Core Build Macros ---
 # Logical Fix: If PROJECT_NAME is overridden from command line, use it directly.
 # Otherwise, use the structured naming convention.
+# New logic added to clean and copy busybox tar for the specific architecture before building.
 define go_build
 	$(eval TARGET_BIN := $(if $(filter dpanel,$(PROJECT_NAME)),$(PROJECT_NAME)-$(FAMILY)-$(LIBC)-$(5),$(PROJECT_NAME)))
 	$(eval GO_EXECUTABLE := $(if $(filter 1,$(GARBLE)),GOGARBLE="github.com/donknap/dpanel" garble -seed=${GARBLE_SEED},go))
-	@echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER) (Garble: $(if $(filter 1,$(IS_CUSTOM)),ON,OFF))"
+	@echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER) (Garble: $(if $(filter 1,$(GARBLE)),ON,OFF))"
 	@echo ">> Target Filename: $(TARGET_BIN)"
+	
+	@# --- Asset Injection Logic ---
+	@echo ">> Cleaning old assets in $(EXPLORER_ASSET_DIR)..."
+	@mkdir -p $(EXPLORER_ASSET_DIR)
+	@rm -f $(EXPLORER_ASSET_DIR)/*.tar
+	@echo ">> Injecting $(5) busybox image to explorer assets..."
+	@cp $(BUSYBOX_SAVE_DIR)/$(BUSYBOX_IMAGE)_$(BUSYBOX_TAG)_$(5).tar $(EXPLORER_ASSET_DIR)/image-$(5).tar
+
+	@# --- Compilation Logic ---
 	GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
 	$(GO_EXECUTABLE) build -p $(CPUS) -trimpath \
 	-ldflags="-s -w -X 'main.DPanelVersion=${APP_VER}'" \
@@ -100,16 +119,16 @@ endef
 
 define get_tags
 $(if $(filter 0,$(IS_CUSTOM)), \
-    -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),beta-lite,beta)$(D_SFX) \
-    $(if $(HUB),-t dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),beta-lite,beta)$(D_SFX),), \
-    -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),lite,latest)$(D_SFX) \
-    -t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(APP_VER)$(if $(filter %-lite,$(1)),-lite,)$(D_SFX) \
-    $(if $(HUB),-t dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),lite,latest)$(D_SFX)) \
-    $(if $(HUB),-t dpanel/$(IMAGE_REPO):$(APP_VER)$(if $(filter %-lite,$(1)),-lite,)$(D_SFX)) \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),beta-lite,beta)$(D_SFX) \
+	$(if $(HUB),-t dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),beta-lite,beta)$(D_SFX),), \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),lite,latest)$(D_SFX) \
+	-t registry.cn-hangzhou.aliyuncs.com/dpanel/$(IMAGE_REPO):$(APP_VER)$(if $(filter %-lite,$(1)),-lite,)$(D_SFX) \
+	$(if $(HUB),-t dpanel/$(IMAGE_REPO):$(if $(filter %-lite,$(1)),lite,latest)$(D_SFX)) \
+	$(if $(HUB),-t dpanel/$(IMAGE_REPO):$(APP_VER)$(if $(filter %-lite,$(1)),-lite,)$(D_SFX)) \
 )
 endef
 
-.PHONY: help build build-js release clean
+.PHONY: help build build-js release clean download-images
 
 all: help
 
@@ -118,39 +137,52 @@ help:
 	@echo  "  \033[1;34mDPanel Unified Build System\033[0m"
 	@echo  "  ================================================================"
 	@echo  "  \033[1mENVIRONMENT VARIABLES & ARGUMENTS:\033[0m"
-	@echo  "    \033[33mVERSION\033[0m      Set custom version string (Default: $(AUTO_VERSION))"
-	@echo  "    \033[33mFAMILY\033[0m       Build edition: [ce, ee, pro] (Default: ce)"
-	@echo  "    \033[33mGNU\033[0m          Linker type: [unset=musl, y=glibc/debian] (Default: musl)"
-	@echo  "    \033[33mLITE\033[0m         Docker scope: [1=Lite only, 0=Full + Lite] (Default: 1)"
-	@echo  "    \033[33mHUB\033[0m          Docker Push: [unset=Aliyun only, y=+ Docker Hub]"
+	@echo  "	\033[33mVERSION\033[0m	  Set custom version string (Default: $(AUTO_VERSION))"
+	@echo  "	\033[33mFAMILY\033[0m	   Build edition: [ce, ee, pro] (Default: ce)"
+	@echo  "	\033[33mGNU\033[0m		  Linker type: [unset=musl, y=glibc/debian] (Default: musl)"
+	@echo  "	\033[33mLITE\033[0m		 Docker scope: [1=Lite only, 0=Full + Lite] (Default: 1)"
+	@echo  "	\033[33mHUB\033[0m		  Docker Push: [unset=Aliyun only, y=+ Docker Hub]"
 	@echo  ""
 	@echo  "  \033[1mCOMMANDS:\033[0m"
-	@echo  "    \033[32mmake build\033[0m          Compile binaries for selected architectures"
-	@echo  "    \033[32mmake release\033[0m        Build & Push multi-arch Docker images"
-	@echo  "    \033[32mmake clean\033[0m          Remove build artifacts and prune docker builder"
+	@echo  "	\033[32mmake download-images\033[0m	Pre-download multi-arch busybox images"
+	@echo  "	\033[32mmake build\033[0m			  Compile binaries for selected architectures"
+	@echo  "	\033[32mmake release\033[0m			Build & Push multi-arch Docker images"
+	@echo  "	\033[32mmake clean\033[0m			  Remove build artifacts, images and prune docker builder"
 	@echo  ""
 	@echo  "  \033[1mUSAGE EXAMPLES:\033[0m"
-	@echo  "    \033[36m# Build for AMD64 & ARM64 with GLIBC (Debian style)\033[0m"
-	@echo  "    make build GNU=y AMD64=1 ARM64=1"
+	@echo  "	\033[36m# Build for AMD64 & ARM64 with GLIBC (Debian style)\033[0m"
+	@echo  "	make build GNU=y AMD64=1 ARM64=1"
 	@echo  ""
 	@echo  "  \033[1mCURRENT CONFIGURATION:\033[0m"
-	@echo  "    \033[1mProject Info:\033[0m"
-	@echo  "      Name       : $(PROJECT_NAME) (Family: $(FAMILY))"
-	@echo  "      Version    : $(APP_VER) (Custom: $(IS_CUSTOM))"
-	@echo  "      Libc Type  : $(LIBC) $(if $(filter gnu,$(LIBC)),(glibc),(musl))"
+	@echo  "	\033[1mProject Info:\033[0m"
+	@echo  "	  Name	   : $(PROJECT_NAME) (Family: $(FAMILY))"
+	@echo  "	  Version	: $(APP_VER) (Custom: $(IS_CUSTOM))"
+	@echo  "	  Libc Type  : $(LIBC) $(if $(filter gnu,$(LIBC)),(glibc),(musl))"
 	@echo  ""
-	@echo  "    \033[1mArchitecture & Toolchains:\033[0m"
-	@echo  "      Selected   : \033[35m$(if $(strip $(D_PLATFORMS)),$(D_PLATFORMS),linux/amd64 (Default))\033[0m"
-	@echo  "      AMD64 (x86): $(if $(filter 1,$(AMD64)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(AMD64_CC)"
-	@echo  "      ARM64 (v8) : $(if $(filter 1,$(ARM64)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(ARM64_CC)"
-	@echo  "      ARMV7 (v7) : $(if $(filter 1,$(ARM7)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(ARMV7_CC)"
+	@echo  "	\033[1mArchitecture & Toolchains:\033[0m"
+	@echo  "	  Selected   : \033[35m$(if $(strip $(D_PLATFORMS)),$(D_PLATFORMS),linux/amd64 (Default))\033[0m"
+	@echo  "	  AMD64 (x86): $(if $(filter 1,$(AMD64)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(AMD64_CC)"
+	@echo  "	  ARM64 (v8) : $(if $(filter 1,$(ARM64)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(ARM64_CC)"
+	@echo  "	  ARMV7 (v7) : $(if $(filter 1,$(ARM7)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(ARMV7_CC)"
 	@echo  ""
-	@echo  "    \033[1mDocker Release Details:\033[0m"
-	@echo  "      Repo Name  : $(IMAGE_REPO)"
-	@echo  "      Dockerfile : $(DOCKER_FILE)"
-	@echo  "      Push Hub   : $(if $(HUB),\033[32mYES (Aliyun + DockerHub)\033[0m,\033[33mNO (Aliyun Only)\033[0m)"
+	@echo  "	\033[1mDocker Release Details:\033[0m"
+	@echo  "	  Repo Name  : $(IMAGE_REPO)"
+	@echo  "	  Dockerfile : $(DOCKER_FILE)"
+	@echo  "	  Push Hub   : $(if $(HUB),\033[32mYES (Aliyun + DockerHub)\033[0m,\033[33mNO (Aliyun Only)\033[0m)"
 	@echo  "  ================================================================"
 	@echo  ""
+
+# --- New Target: Download Multi-Arch Images ---
+download-images:
+	@echo ">> Downloading and repackaging images for all architectures..."
+	@for arch in amd64 arm64 arm; do \
+		echo ">> Processing linux/$$arch ..."; \
+		docker pull --platform linux/$$arch $(BUSYBOX_IMAGE):$(BUSYBOX_TAG); \
+		docker tag $(BUSYBOX_IMAGE):$(BUSYBOX_TAG) dpanel/explorer; \
+		docker save -o $(BUSYBOX_SAVE_DIR)/$(BUSYBOX_IMAGE)_$(BUSYBOX_TAG)_$$arch.tar dpanel/explorer; \
+		docker rmi dpanel/explorer > /dev/null 2>&1; \
+	done
+	@echo ">> Images successfully saved to $(BUSYBOX_SAVE_DIR)"
 
 build:
 	@mkdir -p ${GO_TARGET_DIR}
@@ -158,11 +190,14 @@ build:
 	$(if $(filter 1,$(ARM64)),$(call go_build,$(OS),arm64,,$(ARM64_CC),arm64),)
 	$(if $(filter 1,$(ARM7)),$(call go_build,$(OS),arm,7,$(ARMV7_CC),arm),)
 	$(if $(strip $(D_PLAT_LIST)),,$(call go_build,$(OS),amd64,,$(AMD64_CC),amd64))
+	git checkout
 
 build-js:
 	@echo ">> Building frontend assets..."
-	@rm -f ${GO_SOURCE_DIR}/asset/static/*.js ${GO_SOURCE_DIR}/asset/static/*.css ${GO_SOURCE_DIR}/asset/static/index.html
+	@rm -f ${GO_SOURCE_DIR}/asset/static/*.js ${GO_SOURCE_DIR}/asset/static/*.css ${GO_SOURCE_DIR}/asset/static/index.html ${GO_SOURCE_DIR}/asset/static/*.gz
 	@cd ${JS_SOURCE_DIR} && npm run build && cp -r ${JS_SOURCE_DIR}/dist/* ${GO_SOURCE_DIR}/asset/static
+	@echo ">> Pruning redundant original files to reduce Go binary size..."
+	@find ${GO_SOURCE_DIR}/asset/static -type f -name "*.gz" | while read gz_file; do rm -f "$${gz_file%.gz}"; done
 
 release: build
 	@echo ">> Using Dockerfile: $(DOCKER_FILE)"
@@ -171,26 +206,31 @@ release: build
 
 	@echo ">> Building [Lite] edition..."
 	docker buildx build --target lite \
-		$(call get_tags,beta-lite) \
-		--platform $(D_PLATFORMS) \
-		--build-arg APP_VERSION=${APP_VER} \
-		--build-arg APP_FAMILY=${FAMILY} \
-		--build-arg APP_LIBC=${LIBC} \
-		-f $(DOCKER_FILE) . --push
+	   $(call get_tags,beta-lite) \
+	   --platform $(D_PLATFORMS) \
+	   --build-arg APP_VERSION=${APP_VER} \
+	   --build-arg APP_FAMILY=${FAMILY} \
+	   --build-arg APP_LIBC=${LIBC} \
+	   --build-arg HTTP_PROXY=${HTTP_PROXY} \
+       --build-arg HTTPS_PROXY=${HTTP_PROXY} \
+	   -f $(DOCKER_FILE) . --push
 
 	if [ "$(LITE)" = "0" ]; then \
-		echo ">> Building [Production] edition..."; \
-		docker buildx build --target production \
-		  $(call get_tags,beta) \
-		  --platform $(D_PLATFORMS) \
-		  --build-arg APP_VERSION=${APP_VER} \
-		  --build-arg APP_FAMILY=${FAMILY} \
-		  --build-arg APP_LIBC=${LIBC} \
-		  -f $(DOCKER_FILE) . --push; \
+	   echo ">> Building [Production] edition..."; \
+	   docker buildx build --target production \
+		 $(call get_tags,beta) \
+		 --platform $(D_PLATFORMS) \
+		 --build-arg APP_VERSION=${APP_VER} \
+		 --build-arg APP_FAMILY=${FAMILY} \
+		 --build-arg APP_LIBC=${LIBC} \
+		 --build-arg HTTP_PROXY=${HTTP_PROXY} \
+         --build-arg HTTPS_PROXY=${HTTP_PROXY} \
+		 -f $(DOCKER_FILE) . --push; \
 	fi
-
+	@git checkout -- $(EXPLORER_ASSET_DIR)/image-amd64.tar
 clean:
 	@echo ">> Cleaning up..."
 	@go clean
 	@rm -f ${GO_TARGET_DIR}/config.yaml ${GO_TARGET_DIR}/${PROJECT_NAME}*
+	@rm -rf $(BUSYBOX_SAVE_DIR) $(EXPLORER_ASSET_DIR)
 	@docker buildx prune -a -f

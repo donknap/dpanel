@@ -119,17 +119,19 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 		return
 	}
 	type ParamsValidate struct {
-		Id      string `uri:"id" binding:"required"`
+		Id      string `json:"id" uri:"id" binding:"required"`
 		Width   uint   `json:"width"`
 		Height  uint   `json:"height"`
-		Cmd     string `json:"cmd,default=/bin/sh"`
+		Cmd     string `json:"cmd"`
 		WorkDir string `json:"workDir"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
+	if params.Cmd == "" {
+		params.Cmd = "/bin/sh"
+	}
 	containerName := params.Id
 	if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
 		containerName = pluginName
@@ -239,10 +241,10 @@ func (self Home) WsHostConsole(http *gin.Context) {
 		return
 	}
 	type ParamsValidate struct {
-		Name   string `uri:"name" binding:"required"`
+		Name   string `json:"name" uri:"name" binding:"required"`
 		Width  int    `json:"width"`
 		Height int    `json:"height"`
-		Cmd    string `json:"cmd,default=/bin/sh"`
+		Cmd    string `json:"cmd"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -250,6 +252,9 @@ func (self Home) WsHostConsole(http *gin.Context) {
 	}
 	if params.Name == "" {
 		params.Name = define.DockerDefaultClientName
+	}
+	if params.Cmd == "" {
+		params.Cmd = "/bin/sh"
 	}
 	var err error
 	var sshClient *ssh.Client

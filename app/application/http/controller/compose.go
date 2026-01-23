@@ -45,7 +45,7 @@ func (self Compose) Create(http *gin.Context) {
 		Title        string           `json:"title"`
 		Name         string           `json:"name" binding:"required,lowercase"`
 		Type         string           `json:"type" binding:"required"`
-		Yaml         string           `json:"yaml" binding:"required_without=Id"`
+		Yaml         string           `json:"yaml"`
 		YamlOverride string           `json:"yamlOverride"`
 		RemoteUrl    string           `json:"remoteUrl"`
 		Environment  []types2.EnvItem `json:"environment"`

@@ -13,7 +13,7 @@ type Event struct {
 
 func (self Event) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Page     int    `json:"page,default=1" binding:"omitempty,gt=0"`
+		Page     int    `json:"page" binding:"omitempty,gt=0"`
 		PageSize int    `json:"pageSize" binding:"omitempty"`
 		Type     string `json:"type" binding:"omitempty,oneof=builder config container daemon image network node plugin secret service volume"`
 	}

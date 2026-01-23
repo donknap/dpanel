@@ -525,16 +525,13 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 		return
 	}
 	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.Md5)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	// 如果本地 digest 为空，则不检测
-	if function.IsEmptyArray(imageInfo.RepoDigests) {
+	if err != nil || function.IsEmptyArray(imageInfo.RepoDigests) {
 		self.JsonResponseWithoutError(http, gin.H{
 			"upgrade":     false,
 			"digest":      "",
 			"digestLocal": imageInfo.RepoDigests,
+			"error":       err,
 		})
 		return
 	}

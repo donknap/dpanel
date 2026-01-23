@@ -123,13 +123,13 @@ func (self SiteCert) DnsApi(http *gin.Context) {
 func (self SiteCert) Apply(http *gin.Context) {
 	type ParamsValidate struct {
 		Type        string   `json:"type"`
-		Domain      []string `json:"domain" binding:"required_if=Type apply"`
-		Email       string   `json:"email" binding:"required_if=Type apply"`
-		CertServer  string   `json:"certServer" binding:"required_if=Type apply" oneof:"zerossl letsencrypt"`
+		Domain      []string `json:"domain"`
+		Email       string   `json:"email"`
+		CertServer  string   `json:"certServer" oneof:"zerossl letsencrypt"`
 		AutoUpgrade bool     `json:"autoUpgrade"`
 		Renew       bool     `json:"renew"`
 		Debug       bool     `json:"debug"`
-		DnsApi      string   `json:"dnsApi" binding:"required_if=Type apply"`
+		DnsApi      string   `json:"dnsApi"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
