@@ -174,13 +174,14 @@ help:
 
 # --- New Target: Download Multi-Arch Images ---
 download-images:
-	@echo ">> Downloading and repackaging images for all architectures..."
+	@echo ">> Downloading and repackaging images for all architectures using Skopeo..."
+	@mkdir -p $(BUSYBOX_SAVE_DIR)
 	@for arch in amd64 arm64 arm; do \
-		echo ">> Processing linux/$$arch ..."; \
-		docker pull --platform linux/$$arch $(BUSYBOX_IMAGE):$(BUSYBOX_TAG); \
-		docker tag $(BUSYBOX_IMAGE):$(BUSYBOX_TAG) dpanel/explorer; \
-		docker save -o $(BUSYBOX_SAVE_DIR)/$(BUSYBOX_IMAGE)_$(BUSYBOX_TAG)_$$arch.tar dpanel/explorer; \
-		docker rmi dpanel/explorer > /dev/null 2>&1; \
+	   echo ">> Processing linux/$$arch ..."; \
+	   rm -f $(BUSYBOX_SAVE_DIR)/$(BUSYBOX_IMAGE)_$(BUSYBOX_TAG)_$$arch.tar; \
+	   skopeo copy --override-os linux --override-arch $$arch \
+	   docker://$(BUSYBOX_IMAGE):$(BUSYBOX_TAG) \
+	   docker-archive:$(BUSYBOX_SAVE_DIR)/$(BUSYBOX_IMAGE)_$(BUSYBOX_TAG)_$$arch.tar:dpanel/explorer:latest; \
 	done
 	@echo ">> Images successfully saved to $(BUSYBOX_SAVE_DIR)"
 
