@@ -9,6 +9,7 @@ const (
 	DPanelLabelComposeProject      = "com.dpanel.compose.project"
 	DPanelLabelContainerAutoRemove = "com.dpanel.container.auto_remove"
 	DPanelLabelContainerTitle      = "com.dpanel.container.title"
+	DPanelLabelContainerHidden     = "com.dpanel.container.hidden"
 
 	ComposeProjectPrefix = "dpanel-c-"                 // Deprecated
 	ComposeProjectName   = ComposeProjectPrefix + "%s" // Deprecated

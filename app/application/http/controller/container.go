@@ -118,6 +118,10 @@ func (self Container) GetList(http *gin.Context) {
 	}
 
 	list = function.PluckArrayWalk(list, func(item container.Summary) (container.Summary, bool) {
+		if v, ok := item.Labels[define.DPanelLabelContainerHidden]; ok && (v == "true" || v == "1") {
+			return item, false
+		}
+
 		if function.IsEmptyArray(searchContainerIds) && params.Image == "" && params.SiteTitle == "" {
 			return item, true
 		}

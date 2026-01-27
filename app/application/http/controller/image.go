@@ -19,9 +19,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/app/application/logic"
-	"github.com/donknap/dpanel/common/accessor"
-	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
@@ -216,21 +213,12 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 
 func (self Image) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Tag   string `json:"tag" binding:"omitempty"`
-		Title string `json:"title"`
-		Use   int    `json:"use"`
+		Tag string `json:"tag" binding:"omitempty"`
+		Use int    `json:"use"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
-	}
-
-	var filterTagList []string
-	if params.Title != "" {
-		_ = dao.Image.Where(dao.Image.Title.Like("%"+params.Title+"%")).Pluck(dao.Image.Tag, &filterTagList)
-	}
-	if params.Tag != "" {
-		filterTagList = append(filterTagList, params.Tag)
 	}
 
 	var result []image.Summary
@@ -274,22 +262,18 @@ func (self Image) GetList(http *gin.Context) {
 		}
 	}
 
-	if !function.IsEmptyArray(filterTagList) {
-		for _, summary := range imageList {
-			for _, tag := range summary.RepoTags {
-				has := false
-				for _, s := range filterTagList {
-					if strings.Contains(tag, s) {
-						has = true
-						result = append(result, summary)
-						break
-					}
-				}
-				if has {
-					break
+	if params.Tag != "" {
+		result = function.PluckArrayWalk(imageList, func(item image.Summary) (image.Summary, bool) {
+			for _, tag := range item.RepoTags {
+				if strings.Contains(tag, params.Tag) {
+					return item, true
 				}
 			}
-		}
+			if strings.Contains(item.ID, params.Tag) {
+				return item, true
+			}
+			return item, false
+		})
 	} else {
 		result = imageList
 	}
@@ -306,16 +290,8 @@ func (self Image) GetList(http *gin.Context) {
 		})
 	}
 
-	titleList := make(map[string]string)
-	imageDbList, err := dao.Image.Find()
-	if err == nil {
-		for _, item := range imageDbList {
-			titleList[item.Tag] = item.Title
-		}
-	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"list":  result,
-		"title": titleList,
+		"list": result,
 	})
 	return
 }
@@ -355,8 +331,7 @@ func (self Image) GetDetail(http *gin.Context) {
 
 func (self Image) Delete(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5   []string `json:"md5" binding:"required"`
-		Force bool     `json:"force"`
+		Md5 []string `json:"md5" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -365,9 +340,24 @@ func (self Image) Delete(http *gin.Context) {
 
 	if !function.IsEmptyArray(params.Md5) {
 		for _, sha := range params.Md5 {
-			_, err := docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, sha, image.RemoveOptions{
+			imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, sha)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			force := false
+			// 如果镜像没有被使用，包含之个 tag 时需要增加 force 参数
+			if len(imageInfo.RepoTags) > 1 {
+				if list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+					All:     true,
+					Filters: filters.NewArgs(filters.Arg("ancestor", sha)),
+				}); err == nil && len(list) == 0 {
+					force = true
+				}
+			}
+			_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, sha, image.RemoveOptions{
 				PruneChildren: true,
-				Force:         params.Force,
+				Force:         force,
 			})
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
@@ -480,35 +470,6 @@ func (self Image) Export(http *gin.Context) {
 		http.Header("Content-Type", "application/tar")
 		http.Header("Content-Disposition", "attachment; filename="+fileName)
 		http.DataFromReader(200, -1, "application/tar", out, nil)
-	}
-	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self Image) UpdateTitle(http *gin.Context) {
-	type ParamsValidate struct {
-		Tag   string `json:"tag" binding:"required"`
-		Title string `json:"title" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	imageBuildRow, _ := dao.Image.Where(dao.Image.Tag.Eq(params.Tag)).First()
-	if imageBuildRow != nil {
-		dao.Image.Where(dao.Image.Tag.Eq(params.Tag)).Updates(&entity.Image{
-			Title: params.Title,
-		})
-	} else {
-		_ = dao.Image.Create(&entity.Image{
-			Title:     params.Title,
-			Tag:       params.Tag,
-			BuildType: "pull",
-			Setting: &accessor.ImageSettingOption{
-				Tag:       params.Tag,
-				BuildType: "pull",
-			},
-		})
 	}
 	self.JsonSuccessResponse(http)
 	return

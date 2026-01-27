@@ -277,25 +277,24 @@ func (self SiteDomain) RestartNginx(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New(string(out)), 500)
 		return
 	}
-	_, err = local.QuickRun("nginx -s reload")
-	if err != nil {
-		if function.ErrorHasKeyword(err, "invalid PID number") {
-			// 尝试启动 nginx
-			if cmd, err := local.New(
-				local.WithCommandName("nginx"),
-				local.WithArgs("-g", "daemon on;"),
-			); err == nil {
-				err = cmd.Run()
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
-				}
-				self.JsonSuccessResponse(http)
+	if b, _ := local.QuickCheckRunning("nginx"); b {
+		_, err = local.QuickRun("nginx -s reload")
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	} else {
+		// 尝试启动 nginx
+		if cmd, err := local.New(
+			local.WithCommandName("nginx"),
+			local.WithArgs("-g", "daemon on;"),
+		); err == nil {
+			err = cmd.Run()
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
 				return
 			}
 		}
-		self.JsonResponseWithError(http, err, 500)
-		return
 	}
 	self.JsonSuccessResponse(http)
 	return

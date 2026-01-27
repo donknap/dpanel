@@ -9,10 +9,12 @@ import (
 	"os"
 	exec2 "os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/creack/pty"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 func New(opts ...Option) (exec.Executor, error) {
@@ -48,6 +50,29 @@ func QuickRun(command string) ([]byte, error) {
 		return nil, err
 	}
 	return cmd.RunWithResult()
+}
+
+func QuickCheckRunning(targetCmd string) (bool, error) {
+	currentPID := int32(os.Getpid())
+
+	processes, err := process.Processes()
+	if err != nil {
+		return false, err
+	}
+
+	for _, p := range processes {
+		if p.Pid == currentPID {
+			continue
+		}
+		name, err := p.Name()
+		if err == nil {
+			if strings.EqualFold(strings.ToLower(name), strings.ToLower(targetCmd)) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 type Local struct {

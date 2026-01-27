@@ -3,10 +3,13 @@ FROM debian:bookworm-slim AS base
 ARG TARGETARCH
 ARG APP_VERSION
 ARG APP_FAMILY
+ARG HTTP_PROXY
 
 ENV TZ=Asia/Shanghai
 ENV PATH="/app/server:${PATH}"
 ENV DOCKER_HOST=unix:///var/run/docker.sock
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTP_PROXY}
 
 ENV DP_SYSTEM_STORAGE_LOCAL_PATH=/dpanel
 ENV DP_DB_DATABASE=${DP_SYSTEM_STORAGE_LOCAL_PATH}/dpanel.db
@@ -25,7 +28,9 @@ COPY ./runtime/config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
 COPY ./docker/task /docker
 
-RUN sed -i 's/deb.debian111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    sed -i 's/deb.debian111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && apt-get install -y --no-install-recommends \
     tzdata git curl ca-certificates gnupg openssh-client iputils-ping && \
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
@@ -33,8 +38,7 @@ RUN sed -i 's/deb.debian111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources
     apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin && \
     rm -f /usr/bin/docker-compose && \
     ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
-    mkdir -p /root/.ssh && chmod 700 /root/.ssh && chmod -R 755 /docker/* /app/server/dpanel && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    mkdir -p /root/.ssh && chmod 700 /root/.ssh && chmod -R 755 /docker/* /app/server/dpanel
 
 WORKDIR /app/server
 EXPOSE 8080
@@ -53,11 +57,12 @@ COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/nginx/default.conf /etc/nginx/sites-enabled/default
 COPY ./docker/nginx/include /etc/nginx/conf.d/include
 
-RUN printf '#!/bin/sh\nexit 101' > /usr/sbin/policy-rc.d && chmod +x /usr/sbin/policy-rc.d && \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    printf '#!/bin/sh\nexit 101' > /usr/sbin/policy-rc.d && chmod +x /usr/sbin/policy-rc.d && \
     apt-get update && apt-get install -y --no-install-recommends nginx cron && \
     id -u nginx >/dev/null 2>&1 || (groupadd -r nginx && useradd -r -g nginx -s /sbin/nologin nginx) && \
     rm /usr/sbin/policy-rc.d && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
     mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private /var/www/challenges && \
     tar -zxvf /docker/acme.tar.gz -C /docker && cd /docker/acme.sh-master && ./acme.sh --install --config-home /dpanel/acme
 

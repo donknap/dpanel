@@ -71,7 +71,6 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/image/prune", controller.Image{}.Prune)
 			cors.POST("/app/image/export", controller.Image{}.Export)
 			cors.GET("/app/image/export", controller.Image{}.Export)
-			cors.POST("/app/image/update-title", controller.Image{}.UpdateTitle)
 			cors.POST("/app/image/check-upgrade", controller.Image{}.CheckUpgrade)
 
 			cors.POST("/app/image/tag-sync", controller.Image{}.TagSync)

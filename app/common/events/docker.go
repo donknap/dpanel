@@ -15,6 +15,7 @@ import (
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
 	types2 "github.com/donknap/dpanel/common/types"
 	"github.com/donknap/dpanel/common/types/define"
@@ -125,6 +126,23 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 						fmt.Sprintf(define.DPanelNetworkHostName, strings.Trim(info.Name, "/")),
 					},
 				})
+				var nginxErr error
+				if facade.GetConfig().Get("app.env") == define.PanelAppEnvStandard {
+					if b, _ := local.QuickCheckRunning("nginx"); b {
+						_, nginxErr = local.QuickRun("nginx -s reload")
+					} else {
+						// 尝试启动 nginx
+						if cmd, nginxErr := local.New(
+							local.WithCommandName("nginx"),
+							local.WithArgs("-g", "daemon on;"),
+						); nginxErr == nil {
+							err = cmd.Run()
+						}
+					}
+					if nginxErr != nil {
+						slog.Debug("init nginx", "error", nginxErr)
+					}
+				}
 			}
 		} else {
 			e.DockerEnv.DockerInfo.InDPanel = false

@@ -121,7 +121,7 @@ func (self User) GetUserInfo(http *gin.Context) {
 
 	feature := make([]string, 0)
 
-	if facade.GetConfig().GetString("app.env") == "lite" {
+	if facade.GetConfig().GetString("app.env") == define.PanelAppEnvLite {
 		feature = append(feature, types.FeatureVersionEnvLite)
 	} else {
 		feature = append(feature, types.FeatureVersionEnvStandard)

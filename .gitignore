@@ -19,3 +19,4 @@ app/pro/**/.DS_Store
 docker/**/*.log
 .run/**.*
 build/**.*
+asset/plugin/explorer/*arm*

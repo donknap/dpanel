@@ -8,10 +8,11 @@ GO_TARGET_DIR	:= $(GO_SOURCE_DIR)/runtime
 JS_SOURCE_DIR	:= $(abspath $(GO_SOURCE_DIR)/../../js/d-panel)
 
 # --- Busybox Image Setup (New) ---
-BUSYBOX_IMAGE	  := busybox
-BUSYBOX_TAG		:= latest
-BUSYBOX_SAVE_DIR   := $(GO_SOURCE_DIR)/docker/image
-EXPLORER_ASSET_DIR := $(GO_SOURCE_DIR)/asset/plugin/explorer
+IMAGE_SAVE_DIR   := $(GO_SOURCE_DIR)/docker/image
+
+PLUGIN_EXPLORER_IMAGE_SOURCE ?= busybox
+PLUGIN_EXPLORER_IMAGE_TARGET ?= dpanel/explorer
+PLUGIN_EXPLORER_IMAGE_DIR := $(GO_SOURCE_DIR)/asset/plugin/explorer
 
 # --- Dynamic OS Detection ---
 DETECTED_OS	  := $(shell uname -s | tr '[:upper:]' '[:lower:]')
@@ -91,6 +92,11 @@ ifneq ($(filter %-nw-debian,$(DOCKER_FILE)),)
 	DOCKER_FILE := ./docker/Dockerfile-debian
 endif
 
+ifeq ($(FAMILY),nw)
+    IMAGE_REPO  := asusnw
+    DOCKER_FILE := ./docker/Dockerfile
+endif
+
 # --- Core Build Macros ---
 # Logical Fix: If PROJECT_NAME is overridden from command line, use it directly.
 # Otherwise, use the structured naming convention.
@@ -102,11 +108,10 @@ define go_build
 	@echo ">> Target Filename: $(TARGET_BIN)"
 	
 	@# --- Asset Injection Logic ---
-	@echo ">> Cleaning old assets in $(EXPLORER_ASSET_DIR)..."
-	@mkdir -p $(EXPLORER_ASSET_DIR)
-	@rm -f $(EXPLORER_ASSET_DIR)/*.tar
-	@echo ">> Injecting $(5) busybox image to explorer assets..."
-	@cp $(BUSYBOX_SAVE_DIR)/$(BUSYBOX_IMAGE)_$(BUSYBOX_TAG)_$(5).tar $(EXPLORER_ASSET_DIR)/image-$(5).tar
+	@echo ">> Cleaning old assets in $(PLUGIN_EXPLORER_IMAGE_DIR)..."
+	@rm -f $(PLUGIN_EXPLORER_IMAGE_DIR)/*.tar
+	@echo ">> Injecting $(5) explorer image to explorer assets..."
+	@cp $(IMAGE_SAVE_DIR)/$(subst /,_,$(PLUGIN_EXPLORER_IMAGE_TARGET))_$(5).tar $(PLUGIN_EXPLORER_IMAGE_DIR)/image-$(5).tar
 
 	@# --- Compilation Logic ---
 	GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
@@ -174,16 +179,14 @@ help:
 
 # --- New Target: Download Multi-Arch Images ---
 download-images:
-	@echo ">> Downloading and repackaging images for all architectures using Skopeo..."
-	@mkdir -p $(BUSYBOX_SAVE_DIR)
+	@echo ">> Downloading and repackaging images for all architectures using pure Docker..."
+	@mkdir -p $(IMAGE_SAVE_DIR)
+	@rm -f $(IMAGE_SAVE_DIR)/*.tar
 	@for arch in amd64 arm64 arm; do \
-	   echo ">> Processing linux/$$arch ..."; \
-	   rm -f $(BUSYBOX_SAVE_DIR)/$(BUSYBOX_IMAGE)_$(BUSYBOX_TAG)_$$arch.tar; \
-	   skopeo copy --override-os linux --override-arch $$arch \
-	   docker://$(BUSYBOX_IMAGE):$(BUSYBOX_TAG) \
-	   docker-archive:$(BUSYBOX_SAVE_DIR)/$(BUSYBOX_IMAGE)_$(BUSYBOX_TAG)_$$arch.tar:dpanel/explorer:latest; \
+		echo ">> Processing linux/$$arch, Save in: $(IMAGE_SAVE_DIR)/$(subst /,_,$(PLUGIN_EXPLORER_IMAGE_TARGET))_$$arch.tar"; \
+		docker build --platform linux/$$arch --tag $(PLUGIN_EXPLORER_IMAGE_TARGET) --output type=docker,dest=$(IMAGE_SAVE_DIR)/$(subst /,_,$(PLUGIN_EXPLORER_IMAGE_TARGET))_$$arch.tar -f docker/Dockerfile-explorer .; \
 	done
-	@echo ">> Images successfully saved to $(BUSYBOX_SAVE_DIR)"
+	@echo ">> Images successfully saved to $(IMAGE_SAVE_DIR)"
 
 build:
 	@mkdir -p ${GO_TARGET_DIR}
@@ -191,7 +194,6 @@ build:
 	$(if $(filter 1,$(ARM64)),$(call go_build,$(OS),arm64,,$(ARM64_CC),arm64),)
 	$(if $(filter 1,$(ARM7)),$(call go_build,$(OS),arm,7,$(ARMV7_CC),arm),)
 	$(if $(strip $(D_PLAT_LIST)),,$(call go_build,$(OS),amd64,,$(AMD64_CC),amd64))
-	git checkout
 
 build-js:
 	@echo ">> Building frontend assets..."
@@ -228,10 +230,9 @@ release: build
          --build-arg HTTPS_PROXY=${HTTP_PROXY} \
 		 -f $(DOCKER_FILE) . --push; \
 	fi
-	@git checkout -- $(EXPLORER_ASSET_DIR)/image-amd64.tar
+	@git checkout -- "${PLUGIN_EXPLORER_IMAGE_DIR}/image-amd64.tar"
 clean:
 	@echo ">> Cleaning up..."
 	@go clean
 	@rm -f ${GO_TARGET_DIR}/config.yaml ${GO_TARGET_DIR}/${PROJECT_NAME}*
-	@rm -rf $(BUSYBOX_SAVE_DIR) $(EXPLORER_ASSET_DIR)
 	@docker buildx prune -a -f
