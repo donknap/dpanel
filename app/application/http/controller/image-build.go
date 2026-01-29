@@ -42,11 +42,6 @@ func (self ImageBuild) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildTypeConflict), 500)
 		return
 	}
-	imageNameDetail := function.ImageTag(params.Tag)
-	if params.Registry != "" {
-		imageNameDetail.Registry = params.Registry
-	}
-	params.Tag = imageNameDetail.Uri()
 
 	if params.BuildZip != "" {
 		path := storage.Local{}.GetSaveRealPath(params.BuildZip)
@@ -56,6 +51,10 @@ func (self ImageBuild) Create(http *gin.Context) {
 		}
 		params.BuildZip = path
 	}
+
+	params.Tags = function.PluckArrayWalk(params.Tags, func(i *function.Tag) (*function.Tag, bool) {
+		return function.ImageTag(fmt.Sprintf("%s/%s", i.Registry, i.Name)), true
+	})
 
 	imageNew := &entity.Image{
 		Tag:       "",
@@ -105,7 +104,7 @@ func (self ImageBuild) GetDetail(http *gin.Context) {
 		tag = imageRow.Tag
 	}
 	tagDetail := function.ImageTag(tag)
-	imageRow.Setting.Tag = tagDetail.Name()
+	imageRow.Setting.Tag = tagDetail.Name
 	if imageRow.Setting.BuildType == "" {
 		imageRow.Setting.BuildType = imageRow.BuildType
 	}
@@ -114,6 +113,11 @@ func (self ImageBuild) GetDetail(http *gin.Context) {
 	}
 	if imageRow.Setting.BuildDockerfileRoot == "" {
 		imageRow.Setting.BuildDockerfileRoot = imageRow.Setting.BuildRoot
+	}
+	if function.IsEmptyArray(imageRow.Setting.Tags) {
+		imageRow.Setting.Tags = []*function.Tag{
+			tagDetail,
+		}
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"detail": imageRow,
@@ -149,6 +153,11 @@ func (self ImageBuild) GetList(http *gin.Context) {
 			item.Setting.ImageId = imageInfo.ID
 		} else {
 			item.Setting.ImageId = ""
+		}
+		if function.IsEmptyArray(item.Setting.Tags) {
+			item.Setting.Tags = []*function.Tag{
+				function.ImageTag(item.Setting.Tag),
+			}
 		}
 		return item, true
 	})

@@ -15,7 +15,7 @@ import (
 
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
-	builder "github.com/donknap/dpanel/common/service/docker/image"
+	"github.com/donknap/dpanel/common/service/docker/buildx"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -34,17 +34,37 @@ func (self DockerTask) ImageBuild(messageId string, task accessor.ImageSettingOp
 
 	// 如果是 git 指定根目录后在仓库中体现 url#branch:path，Dockerfile 无需要再拼接
 	// 如果是 zip 指定根目录后在解包的时候会只保存根目录下的文件，无需要再拼接
+	options := []buildx.Option{
+		buildx.WithTag(function.PluckArrayWalk(task.Tags, func(item *function.Tag) (string, bool) {
+			return item.Uri(), true
+		})...),
+		buildx.WithBuildArg(task.BuildArgs...),
+		buildx.WithPlatform(),
+	}
+	if task.BuildGit != "" {
+		options = append(options, buildx.WithDockerFilePath(task.BuildDockerfileName))
+		options = append(options, buildx.WithGitUrl(task.BuildGit))
+	} else if task.BuildZip != "" {
+		options = append(options, buildx.WithDockerFilePath(task.BuildDockerfileName))
+		options = append(options, buildx.WithWorkDir(task.BuildDockerfileRoot))
+		options = append(options, buildx.WithZipFilePath(task.BuildZip))
+	} else if task.BuildDockerfileName != "" {
+		options = append(options, buildx.WithDockerFilePath(task.BuildDockerfileName))
+	} else {
+		options = append(options, buildx.WithDockerFileContent([]byte(task.BuildDockerfileContent)))
+	}
+	b, err := buildx.New(wsBuffer.Context(), options...)
 
-	b, err := builder.New(
-		builder.WithContext(wsBuffer.Context()),
-		builder.WithDockerFilePath(task.BuildDockerfileName),
-		builder.WithDockerFileContent([]byte(task.BuildDockerfileContent)),
-		builder.WithGitUrl(task.BuildGit),
-		builder.WithZipFilePath(task.BuildDockerfileRoot, task.BuildZip),
-		builder.WithPlatform(task.PlatformArch),
-		builder.WithTag(task.Tag),
-		builder.WithArgs(task.BuildArgs...),
-	)
+	//b, err := builder.New(
+	//	builder.WithContext(wsBuffer.Context()),
+	//	builder.WithDockerFilePath(task.BuildDockerfileName),
+	//	builder.WithDockerFileContent([]byte(task.BuildDockerfileContent)),
+	//	builder.WithGitUrl(task.BuildGit),
+	//	builder.WithZipFilePath(task.BuildDockerfileRoot, task.BuildZip),
+	//	builder.WithPlatform(task.PlatformArch),
+	//	builder.WithTag(task.Tag),
+	//	builder.WithArgs(task.BuildArgs...),
+	//)
 	if err != nil {
 		return "", err
 	}
@@ -53,11 +73,15 @@ func (self DockerTask) ImageBuild(messageId string, task accessor.ImageSettingOp
 		return "", err
 	}
 	defer func() {
-		if response.Body.Close() != nil {
+		if response.Close() != nil {
 			slog.Error("image", "build", err.Error())
 		}
 	}()
 
+	out, err := response.RunInPip()
+	if err != nil {
+		return "", err
+	}
 	log := new(bytes.Buffer)
 	buffer := new(bytes.Buffer)
 
@@ -95,7 +119,7 @@ func (self DockerTask) ImageBuild(messageId string, task accessor.ImageSettingOp
 		buffer.Reset()
 		return nil
 	}
-	_, err = io.Copy(wsBuffer, response.Body)
+	_, err = io.Copy(wsBuffer, out)
 	if err != nil {
 		return log.String(), err
 	}

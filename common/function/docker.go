@@ -83,11 +83,12 @@ func DefaultCapabilities() []string {
 
 // Tag {registry}/{{namespace-可能有多个路径}/{imageName}basename}:{version}
 type Tag struct {
-	Registry  string
-	Namespace string
-	ImageName string
-	Version   string
-	BaseName  string
+	Name      string `json:"name"`
+	Registry  string `json:"registry"`
+	Namespace string `json:"namespace"`
+	ImageName string `json:"imageName"`
+	Version   string `json:"version"`
+	BaseName  string `json:"baseName"`
 }
 
 func (self Tag) Uri() string {
@@ -103,12 +104,12 @@ func (self Tag) Uri() string {
 	}
 }
 
-func (self Tag) Name() string {
+func (self Tag) getName() string {
 	version := self.Version
 	if strings.Contains(self.Version, "@") {
 		version = strings.Split(version, "@")[0]
 	}
-	if self.Namespace == "" || self.Namespace == "library" {
+	if self.Namespace == "" {
 		return fmt.Sprintf("%s:%s", self.ImageName, version)
 	} else {
 		return fmt.Sprintf("%s/%s:%s", self.Namespace, self.ImageName, version)
@@ -127,7 +128,6 @@ func ImageTag(tag string) *Tag {
 	result.BaseName = reference.Path(ref)
 
 	// .String() docker.io/test/phpmyadmin:latest@sha256
-	// .Name() docker.io/test/phpmyadmin
 	tagName := reference.TagNameOnly(ref)
 	if i := strings.LastIndex(tagName.String(), result.BaseName); i > -1 {
 		result.Version = tagName.String()[i+len(result.BaseName)+1:]
@@ -140,6 +140,11 @@ func ImageTag(tag string) *Tag {
 	} else {
 		result.ImageName = result.BaseName
 	}
+	// 如果当前是 docker.io 没有 namespace 时默认添加上 library
+	if result.Registry == "docker.io" && result.Namespace == "" {
+		result.Namespace = "library"
+	}
+	result.Name = result.getName()
 	return result
 }
 

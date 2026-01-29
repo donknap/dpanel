@@ -2,7 +2,6 @@ package buildx
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/donknap/dpanel/common/function"
@@ -17,25 +16,21 @@ const (
 	DPanelBuilder = "dpanel-builder"
 )
 
-func New(opts ...Option) *Builder {
-
+func New(ctx context.Context, opts ...Option) (*Builder, error) {
 	b := &Builder{
 		options: &BuildOptions{
 			Labels: make([]string, 0),
 		},
 	}
 
-	b.ctx, b.ctxCancel = context.WithCancel(context.Background())
+	b.ctx, b.ctxCancel = context.WithCancel(ctx)
 
-	if info, err := docker.Sdk.Client.ServerVersion(docker.Sdk.Ctx); err == nil {
-		opts = append(opts, WithOutputDocker(fmt.Sprintf("%s/%s", info.Os, info.Arch)))
-	}
-
+	var err error
 	for _, o := range opts {
-		o(b)
+		err = o(b)
 	}
 
-	return b
+	return b, err
 }
 
 type Builder struct {
