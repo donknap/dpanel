@@ -150,11 +150,14 @@ func WithTarget(target string) Option {
 	}
 }
 
-// WithSecret 添加 Secret (format: "id=mysecret,src=/local/secret")
-func WithSecret(id, src string) Option {
+// WithSecret 添加 Secret
+func WithSecret(args ...types.EnvItem) Option {
 	return func(self *Builder) error {
-		val := fmt.Sprintf("id=%s,src=%s", id, src)
-		self.options.Secrets = append(self.options.Secrets, val)
+		for _, item := range args {
+			val := fmt.Sprintf("id=%s,env=%s", item.Name, item.Name)
+			self.options.Secrets = append(self.options.Secrets, val)
+		}
+		self.env = append(self.env, args...)
 		return nil
 	}
 }

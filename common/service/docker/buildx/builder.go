@@ -6,6 +6,7 @@ import (
 
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/types/define"
@@ -38,6 +39,7 @@ type Builder struct {
 	ctxCancel context.CancelFunc
 	options   *BuildOptions
 	workDir   string
+	env       []types.EnvItem
 }
 
 func (self Builder) Close() {

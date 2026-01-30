@@ -91,6 +91,7 @@ type NetworkCreateItem struct {
 	Gateway string `json:"gateway"`
 }
 
+// Deprecated: instead PlatformArch
 type ImagePlatform struct {
 	Type string `json:"type"`
 	Arch string `json:"arch"`

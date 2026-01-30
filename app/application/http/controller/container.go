@@ -465,13 +465,16 @@ func (self Container) Delete(http *gin.Context) {
 
 func (self Container) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5                string `json:"md5" binding:"required"`
+		Md5                string `json:"md5"`
 		EnableExportToPath bool   `json:"enableExportToPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
+	params.Md5 = http.Query("md5")
+	params.EnableExportToPath = http.Query("enableExportToPath") == "true"
+
 	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
