@@ -134,7 +134,7 @@ func (self SiteDomain) Create(http *gin.Context) {
 		siteDomainRow.ContainerID = containerRow.Name
 	}
 	params.ExtraNginx = template.HTML(params.ExtraNginx)
-	params.TargetName = function.GetMd5(params.ServerName)
+	params.TargetName = function.Md5(params.ServerName)
 	siteDomainRow.Setting = &params.SiteDomainSettingOption
 
 	if params.CertName != "" && params.EnableSSL {

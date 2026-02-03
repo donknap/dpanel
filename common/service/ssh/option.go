@@ -43,13 +43,9 @@ func WithAuthPem(username string, privateKeyPem string, password string) Option 
 	}
 }
 
-func WithAuthDefaultPem(username string) Option {
+func WithAuthDefaultPem(username string, rsaKeyContent []byte) Option {
 	return func(self *Client) error {
-		_, private, err := storage.GetCertRsaContent()
-		if err != nil {
-			return err
-		}
-		return WithAuthPem(username, string(private), "")(self)
+		return WithAuthPem(username, string(rsaKeyContent), "")(self)
 	}
 }
 
@@ -75,7 +71,11 @@ func WithServerInfo(info *ServerInfo) []Option {
 	} else if info.AuthType == SshAuthTypeBasic {
 		option = append(option, WithAuthBasic(info.Username, info.Password))
 	} else if info.AuthType == SshAuthTypePemDefault {
-		option = append(option, WithAuthDefaultPem(info.Username))
+		var rsaKeyContent []byte
+		if v, ok := storage.Cache.Get(storage.CacheKeyRsaKey); ok {
+			rsaKeyContent = v.([]byte)
+		}
+		option = append(option, WithAuthDefaultPem(info.Username, rsaKeyContent))
 	}
 	return option
 }

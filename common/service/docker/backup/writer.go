@@ -23,7 +23,7 @@ type writer struct {
 }
 
 func (self writer) WriteBlob(content []byte) (path string, err error) {
-	path, err = self.getBlobPath(function.GetSha256(content))
+	path, err = self.getBlobPath(function.Sha256(content))
 	if err != nil {
 		return path, err
 	}
@@ -31,7 +31,7 @@ func (self writer) WriteBlob(content []byte) (path string, err error) {
 		return "", errors.New("context canceled")
 	}
 	buffer := bytes.NewBuffer(content)
-	return self.WriteBlobReader(function.GetSha256(content), io.NopCloser(buffer))
+	return self.WriteBlobReader(function.Sha256(content), io.NopCloser(buffer))
 }
 
 func (self writer) WriteBlobStruct(v interface{}) (path string, err error) {

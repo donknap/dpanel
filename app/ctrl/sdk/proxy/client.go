@@ -17,7 +17,6 @@ import (
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/app/ctrl/sdk/types"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -109,11 +108,11 @@ func (self *Client) token() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, privateKeyContent, err := storage.GetCertRsaContent()
+	privateKeyContent, err := os.ReadFile(facade.GetConfig().GetString("system.rsa.key"))
 	if err != nil {
 		return "", err
 	}
-	privateKey, err := function.ParseRsaPrivateKey(privateKeyContent)
+	privateKey, err := function.RSAParsePrivateKey(privateKeyContent)
 	if err != nil {
 		return "", err
 	}

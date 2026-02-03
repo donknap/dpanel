@@ -160,7 +160,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 						return err
 					}
 					if info.Size > 0 {
-						path, err := b.Writer.WriteBlobReader(function.GetSha256([]byte(mount.Destination)), out)
+						path, err := b.Writer.WriteBlobReader(function.Sha256([]byte(mount.Destination)), out)
 						if err != nil {
 							return err
 						}
@@ -388,7 +388,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		for _, volume := range item.Volume {
 			destPath := "/"
 			for _, mount := range containerInfo.Mounts {
-				if strings.HasSuffix(function.GetSha256([]byte(mount.Destination)), filepath.Base(volume)) {
+				if strings.HasSuffix(function.Sha256([]byte(mount.Destination)), filepath.Base(volume)) {
 					// 导出的数据是按最后一个目录或是文件名存放，所以需要脱一级目录做为根目录
 					destPath = filepath.Dir(mount.Destination)
 				}

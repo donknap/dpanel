@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/acme"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/google/uuid"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
@@ -30,10 +30,6 @@ func (self Local) GetSaveRealPath(name string) string {
 
 func (self Local) GetCertPath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "cert")
-}
-
-func (self Local) GetCertRsaPath() string {
-	return filepath.Join(self.GetCertPath(), "rsa")
 }
 
 func (self Local) GetCertDomainPath() string {
@@ -123,7 +119,7 @@ func (self Local) SaveUploadImage(uploadFileName, newFileNamePrefix string, appe
 	}
 	var newFileName string
 	if appendRandomString {
-		newFileName = fmt.Sprintf("%s-%s.png", newFileNamePrefix, function.GetRandomString(5))
+		newFileName = fmt.Sprintf("%s-%s.png", newFileNamePrefix, uuid.New().String()[24:])
 	} else {
 		newFileName = fmt.Sprintf("%s.png", newFileNamePrefix)
 	}

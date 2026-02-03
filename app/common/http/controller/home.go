@@ -354,8 +354,10 @@ func (self Home) Info(http *gin.Context) {
 	if err == nil && info.ID != "" {
 		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
 	}
-
-	public, _, _ := storage.GetCertRsaContent()
+	var public string
+	if v, ok := storage.Cache.Get(storage.CacheKeyRsaPub); ok {
+		public = string(v.([]byte))
+	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":          info,
 		"clientVersion": docker.Sdk.Client.ClientVersion(),
@@ -374,7 +376,7 @@ func (self Home) Info(http *gin.Context) {
 		},
 		"plugin": plugin.Wrapper{}.GetPluginList(),
 		"rsa": gin.H{
-			"public": string(public),
+			"public": public,
 		},
 	})
 	return

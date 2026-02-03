@@ -38,21 +38,21 @@ func (self Setting) Founder(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	if oldUser.Value.Password != function.GetMd5(params.Password+oldUser.Value.Username) {
+	if oldUser.Value.Password != function.Md5(params.Password+oldUser.Value.Username) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserUsernameOrPasswordError), 500)
 		return
 	}
 
 	// 修改密码
 	if params.NewPassword != "" {
-		oldUser.Value.Password = function.GetMd5(params.NewPassword + oldUser.Value.Username)
+		oldUser.Value.Password = function.Md5(params.NewPassword + oldUser.Value.Username)
 		params.Password = params.NewPassword
 	}
 
 	// 修改用户名
 	if params.Username != "" {
 		oldUser.Value.Username = params.Username
-		oldUser.Value.Password = function.GetMd5(params.Password + params.Username)
+		oldUser.Value.Password = function.Md5(params.Password + params.Username)
 	}
 
 	err = logic.Setting{}.Save(oldUser)

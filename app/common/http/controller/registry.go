@@ -62,7 +62,7 @@ func (self Registry) Create(http *gin.Context) {
 		}
 		// 如果提交上来密码为空，则使用默认密码
 		if params.Password == "" && registryRow.Setting.Password != "" {
-			code, _ := function.AseDecode(facade.GetConfig().GetString("app.name"), registryRow.Setting.Password)
+			code, _ := function.RSADecode(registryRow.Setting.Password, []byte(facade.GetConfig().GetString("app.name")))
 			params.Password = code
 		}
 	}
@@ -104,8 +104,7 @@ func (self Registry) Create(http *gin.Context) {
 		},
 	}
 	if params.Password != "" {
-		key := facade.GetConfig().GetString("app.name")
-		code, _ := function.AseEncode(key, params.Password)
+		code, _ := function.RSAEncode(params.Password)
 		registryNew.Setting.Password = code
 	}
 
@@ -184,52 +183,10 @@ func (self Registry) GetDetail(http *gin.Context) {
 		return
 	}
 	if registryItem.Setting != nil && registryItem.Setting.Password != "" {
-		key := facade.GetConfig().GetString("app.name")
-		registryItem.Setting.Password, _ = function.AseDecode(key, registryItem.Setting.Password)
+		registryItem.Setting.Password, _ = function.RSADecode(registryItem.Setting.Password, []byte(facade.GetConfig().GetString("app.name")))
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"info": registryItem,
-	})
-	return
-}
-
-func (self Registry) Update(http *gin.Context) {
-	type ParamsValidate struct {
-		Id            int32    `json:"id" binding:"required"`
-		Title         string   `json:"title"`
-		ServerAddress string   `json:"serverAddress"`
-		Username      string   `json:"username"`
-		Password      string   `json:"password"`
-		Proxy         []string `json:"proxy"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	row, _ := dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).First()
-	if row == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
-		return
-	}
-	password := row.Setting.Password
-	if params.Password != "" {
-		password, _ = function.AseEncode(facade.GetConfig().GetString("app.name"), params.Password)
-	}
-	_, err := dao.Registry.Where(dao.Registry.ID.Eq(params.Id)).Updates(&entity.Registry{
-		Title:         params.Title,
-		ServerAddress: params.ServerAddress,
-		Setting: &accessor.RegistrySettingOption{
-			Username: params.Username,
-			Password: password,
-		},
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	self.JsonResponseWithoutError(http, gin.H{
-		"id": params.Id,
 	})
 	return
 }

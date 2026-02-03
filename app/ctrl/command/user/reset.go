@@ -5,7 +5,7 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
-	"github.com/donknap/dpanel/common/function"
+	"github.com/google/uuid"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
@@ -54,7 +54,7 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	}
 	if username == "" && password == "" {
 		username = "admin"
-		password = function.GetRandomString(10)
+		password = uuid.New().String()[24:]
 	}
 
 	if username != "" && password == "" {

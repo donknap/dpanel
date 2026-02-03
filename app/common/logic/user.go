@@ -46,7 +46,7 @@ func (self User) GetBuiltInPublicUsername() string {
 }
 
 func (self User) GetMd5Password(password string, key string) string {
-	return function.GetMd5(password + key)
+	return function.Md5(password + key)
 }
 
 func (self User) CheckLock(username string) error {
@@ -102,11 +102,11 @@ func (self User) GetUserOauthToken(user *entity.Setting, autoLogin bool) (string
 		AutoLogin:        autoLogin,
 	}
 	userInfo.RegisteredClaims.IssuedAt = jwt.NewNumericDate(time.Now())
-	_, privateKeyContent, err := storage.GetCertRsaContent()
-	if err != nil {
-		return "", err
+	var rsaKeyContent []byte
+	if v, ok := storage.Cache.Get(storage.CacheKeyRsaKey); ok {
+		rsaKeyContent = v.([]byte)
 	}
-	privateKey, err := function.ParseRsaPrivateKey(privateKeyContent)
+	privateKey, err := function.RSAParsePrivateKey(rsaKeyContent)
 	if err != nil {
 		return "", err
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
@@ -54,6 +55,13 @@ func (self ImageBuild) Create(http *gin.Context) {
 
 	params.Tags = function.PluckArrayWalk(params.Tags, func(i *function.Tag) (*function.Tag, bool) {
 		return function.ImageTag(fmt.Sprintf("%s/%s", i.Registry, i.Name)), true
+	})
+
+	params.BuildSecret = function.PluckArrayWalk(params.BuildSecret, func(item types.EnvItem) (types.EnvItem, bool) {
+		if v, err := function.RSAEncode(item.Value); err == nil {
+			item.Value = v
+		}
+		return item, true
 	})
 
 	imageNew := &entity.Image{
@@ -99,12 +107,25 @@ func (self ImageBuild) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	tag := imageRow.Setting.Tag
-	if tag == "" {
-		tag = imageRow.Tag
+	if function.IsEmptyArray(imageRow.Setting.Tags) {
+		tag := imageRow.Setting.Tag
+		if tag == "" {
+			tag = imageRow.Tag
+		}
+		tagDetail := function.ImageTag(tag)
+		imageRow.Setting.Tag = tagDetail.Name
+		imageRow.Setting.Tags = []*function.Tag{
+			tagDetail,
+		}
 	}
-	tagDetail := function.ImageTag(tag)
-	imageRow.Setting.Tag = tagDetail.Name
+
+	imageRow.Setting.BuildSecret = function.PluckArrayWalk(imageRow.Setting.BuildSecret, func(item types.EnvItem) (types.EnvItem, bool) {
+		if v, err := function.RSADecode(item.Value, nil); err == nil {
+			item.Value = v
+		}
+		return item, true
+	})
+
 	if imageRow.Setting.BuildType == "" {
 		imageRow.Setting.BuildType = imageRow.BuildType
 	}
@@ -114,11 +135,7 @@ func (self ImageBuild) GetDetail(http *gin.Context) {
 	if imageRow.Setting.BuildDockerfileRoot == "" {
 		imageRow.Setting.BuildDockerfileRoot = imageRow.Setting.BuildRoot
 	}
-	if function.IsEmptyArray(imageRow.Setting.Tags) {
-		imageRow.Setting.Tags = []*function.Tag{
-			tagDetail,
-		}
-	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"detail": imageRow,
 	})

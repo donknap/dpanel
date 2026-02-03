@@ -34,7 +34,6 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/registry/create", controller.Registry{}.Create)
 		cors.POST("/common/registry/get-list", controller.Registry{}.GetList)
 		cors.POST("/common/registry/get-detail", controller.Registry{}.GetDetail)
-		cors.POST("/common/registry/update", controller.Registry{}.Update)
 		cors.POST("/common/registry/delete", controller.Registry{}.Delete)
 
 		// 全局

@@ -56,11 +56,11 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 
 	myUserInfo := logic.UserInfo{}
 	token, err := jwt.ParseWithClaims(authCode[1], &myUserInfo, func(t *jwt.Token) (interface{}, error) {
-		_, private, err := storage.GetCertRsaContent()
-		if err != nil {
-			return nil, err
+		var rsaKeyContent []byte
+		if v, ok := storage.Cache.Get(storage.CacheKeyRsaKey); ok {
+			rsaKeyContent = v.([]byte)
 		}
-		privateKey, err := function.ParseRsaPrivateKey(private)
+		privateKey, err := function.RSAParsePrivateKey(rsaKeyContent)
 		if err != nil {
 			return nil, err
 		}

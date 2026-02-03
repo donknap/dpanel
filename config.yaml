@@ -43,5 +43,8 @@ system:
       path: ${STORAGE_LOCAL_PATH}
   permission:
     default_username: __public__
+  rsa:
+    key: ${STORAGE_LOCAL_PATH}/cert/rsa/id_rsa
+    pub: ${STORAGE_LOCAL_PATH}/cert/rsa/id_rsa.pub
 asusnw:
   gui_theme: ${DP_GUI_THEME-dark} # rog_1 | rog_2 | dark | light

@@ -648,7 +648,7 @@ func (self Explorer) AttachVolume(http *gin.Context) {
 		return
 	}
 	_ = notice.Message{}.Info(".volumeMountSomeVolume")
-	path := fmt.Sprintf("/%s", function.GetMd5(params.Name))
+	path := fmt.Sprintf("/%s", function.Md5(params.Name))
 	explorerPlugin, err := plugin.NewPlugin(plugin.PluginExplorer, map[string]*plugin.TemplateParser{
 		plugin.PluginExplorer: {
 			ExtService: compose.ExtService{
