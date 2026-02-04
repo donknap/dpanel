@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 
 func NewHttpFs(fs fs.FS) http.FileSystem {
 	cacheDir := filepath.Join(os.TempDir(), "dpanel_js_cache")
+	slog.Debug("js cache:", "path", cacheDir)
 	_ = os.RemoveAll(cacheDir)
 	_ = os.MkdirAll(cacheDir, 0755)
 

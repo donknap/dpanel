@@ -43,7 +43,10 @@ func (self *Collection) Join(c *Client) {
 }
 
 func (self *Collection) Leave(c *Client) {
-	self.clients.Delete(c.Fd)
+	if _, loaded := self.clients.LoadAndDelete(c.Fd); !loaded {
+		return
+	}
+	_ = c.Conn.Close()
 
 	self.progressPip.Range(func(key, value any) bool {
 		if v, ok := value.(*ProgressPip); ok && !v.IsKeepAlive {
@@ -99,16 +102,18 @@ func (self *Collection) Leave(c *Client) {
 }
 
 func (self *Collection) sendMessage(message *RespMessage) {
-	lock.Lock()
-	lock.Unlock()
 	self.clients.Range(func(key, value any) bool {
-		c := value.(*Client)
+		c, ok := value.(*Client)
+		if !ok {
+			return true
+		}
 		if message.Fd != "" && c.Fd != message.Fd {
 			return true
 		}
 		err := c.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
 		if err != nil {
 			slog.Debug("ws broadcast error", "fd", c.Fd, "error", err.Error())
+			self.Leave(c)
 		}
 		return true
 	})
