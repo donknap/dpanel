@@ -30,7 +30,7 @@ COPY ./docker/task /docker
 
 RUN sed -i 's/dl-cdn.alpinelinux111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
     apk add --no-cache --update \
-    bash musl docker-cli docker-cli-compose tzdata git openssh-client && \
+    bash musl docker-cli docker-cli-compose tzdata git openssh-client curl && \
     rm -f /usr/bin/docker-compose && \
     mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
     chmod -R 755 /docker/* /app/server/dpanel
