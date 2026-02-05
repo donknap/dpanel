@@ -26,6 +26,10 @@ func NewProgressPip(messageType string) *ProgressPip {
 		}
 	}
 	collect.progressPip.Store(messageType, process)
+	go func() {
+		<-process.ctx.Done()
+		collect.progressPip.Delete(process.messageType)
+	}()
 	return process
 }
 
@@ -88,7 +92,6 @@ func (self *ProgressPip) BroadcastMessage(data interface{}) {
 
 func (self *ProgressPip) Close() {
 	self.cancel()
-	collect.progressPip.Delete(self.messageType)
 }
 
 func (self *ProgressPip) CloseFd(fd string) {
