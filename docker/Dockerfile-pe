@@ -1,3 +1,52 @@
+# syntax=docker/dockerfile:1
+
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS source
+
+ARG DP_VERSION
+ENV DP_VERSION=${DP_VERSION:-master}
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTP_PROXY}
+
+WORKDIR /src
+
+RUN apk add --no-cache git github-cli gcc musl-dev make
+
+RUN --mount=type=secret,id=GIT_TOKEN \
+    export GH_TOKEN=$(cat /run/secrets/GIT_TOKEN) && \
+    gh repo clone donknap/dpanel . -- -b ${DP_VERSION} --depth 1 && \
+    rm -rf ./app/pro && \
+    gh repo clone donknap/dpanel-pro ./app/pro -- --depth 1 && \
+    go test -v --run TestGenerateDefines ./app/pro/tests/obfuscate_test.go
+
+FROM golang:1.25-alpine AS builder
+
+ARG DP_VERSION
+ARG TARGETARCH
+ARG HTTP_PROXY
+
+ENV DP_VERSION=${DP_VERSION:-master}
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTP_PROXY}
+
+WORKDIR /src
+
+RUN apk add --no-cache make gcc musl-dev git && \
+    go install mvdan.cc/garble@latest
+
+COPY --from=source /src /src
+
+RUN --mount=type=secret,id=GARBLE_SEED \
+    --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETARCH} \
+    --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
+    export SEED=$(cat /run/secrets/GARBLE_SEED) && \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        make build VERSION=${DP_VERSION} FAMILY=pe OS=linux AMD64=1 AMD64_CC=gcc GARBLE=1 GARBLE_SEED=${SEED}; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        make build VERSION=${DP_VERSION} FAMILY=pe OS=linux ARM64=1 ARM64_CC=gcc GARBLE=1 GARBLE_SEED=${SEED}; \
+    else \
+        echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+    fi
+
 FROM dpanel/dpanel:lite AS lite
 
 ARG APP_FAMILY
@@ -7,8 +56,8 @@ ARG TARGETARCH
 ENV APP_VERSION=$APP_VERSION
 ENV APP_FAMILY=$APP_FAMILY
 
-COPY ./runtime/dpanel-pe-musl-${TARGETARCH} /app/server/dpanel
-COPY ./runtime/config.yaml /app/server/config.yaml
+COPY --from=builder /src/runtime/dpanel-pe-musl-${TARGETARCH} /app/server/dpanel
+COPY --from=builder /src/runtime/config.yaml /app/server/config.yaml
 
 
 FROM dpanel/dpanel:latest AS production
@@ -20,5 +69,5 @@ ARG TARGETARCH
 ENV APP_VERSION=$APP_VERSION
 ENV APP_FAMILY=$APP_FAMILY
 
-COPY ./runtime/dpanel-pe-musl-${TARGETARCH} /app/server/dpanel
-COPY ./runtime/config.yaml /app/server/config.yaml
+COPY --from=builder /src/runtime/dpanel-pe-musl-${TARGETARCH} /app/server/dpanel
+COPY --from=builder /src/runtime/config.yaml /app/server/config.yaml

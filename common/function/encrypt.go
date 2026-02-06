@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -61,6 +62,10 @@ func RSADecode(str string, userKey []byte) (string, error) {
 			return "", err
 		}
 		return string(decrypted), nil
+	}
+	// 兼容明文的情况
+	if userKey == nil {
+		return str, nil
 	}
 
 	return AseDecode(string(userKey), str)
@@ -193,4 +198,12 @@ func Sha256(str []byte) string {
 	hash := sha256.New()
 	hash.Write(str)
 	return fmt.Sprintf("sha256:%x", hash.Sum(nil))
+}
+
+func Sha256Struct(data interface{}) string {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return ""
+	}
+	return Sha256(b)
 }

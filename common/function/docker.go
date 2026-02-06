@@ -25,7 +25,7 @@ func SplitCommandArray(cmd string) []string {
 	}
 	result, err := shellwords.Parse(cmd)
 	if err != nil {
-		slog.Debug("function split command array ", "error", err)
+		slog.Debug("function split command array", "error", err)
 	}
 	return result
 }

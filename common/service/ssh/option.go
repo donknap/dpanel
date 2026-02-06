@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -64,6 +65,11 @@ func WithAddress(address string, port int) Option {
 }
 
 func WithServerInfo(info *ServerInfo) []Option {
+	if info != nil && info.Password != "" {
+		if w, err := function.RSADecode(info.Password, nil); err == nil {
+			info.Password = w
+		}
+	}
 	option := make([]Option, 0)
 	option = append(option, WithAddress(info.Address, info.Port))
 	if info.AuthType == SshAuthTypePem {

@@ -1,9 +1,14 @@
 package buildx
 
 import (
+	"bytes"
 	"context"
-	"strconv"
+	"fmt"
+	"os"
+	"path/filepath"
+	"text/template"
 
+	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
@@ -13,14 +18,12 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
-const (
-	DPanelBuilder = "dpanel-builder"
-)
-
-func New(ctx context.Context, opts ...Option) (*Builder, error) {
+func New(ctx context.Context, client *docker.Client, opts ...Option) (*Builder, error) {
 	b := &Builder{
 		options: &BuildOptions{
-			Labels: make([]string, 0),
+			Labels:       make([]string, 0),
+			Name:         fmt.Sprintf(define.DockerContextName, client.DockerEnv.Name),
+			RegistryAuth: make([]registry.AuthConfig, 0),
 		},
 	}
 
@@ -38,7 +41,6 @@ type Builder struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 	options   *BuildOptions
-	workDir   string
 	env       []types.EnvItem
 }
 
@@ -47,66 +49,45 @@ func (self Builder) Close() {
 }
 
 func (self Builder) Execute() (exec.Executor, error) {
-	cmd := make([]string, 0)
-	cmd = append(cmd, docker.Sdk.DockerEnv.CommandParams()...)
-	cmd = append(cmd, "buildx",
-		"build",
-		"--progress", "plain",
-		"--builder", DPanelBuilder,
-	)
-	appendArgv := func(flag string, values []string) {
-		for _, v := range values {
-			cmd = append(cmd, flag, v)
-		}
-	}
-	appendArgv("-t", self.options.Tags)
-	appendArgv("--build-arg", self.options.BuildArg)
-	appendArgv("--cache-from", self.options.CacheFrom)
-	appendArgv("--cache-to", self.options.CacheTo)
-
 	self.options.Labels = append(self.options.Labels,
 		"maintainer="+define.PanelAuthor,
 		"com.dpanel.description="+define.PanelDesc,
 		"com.dpanel.website="+define.PanelWebSite,
 		"com.dpanel.version="+facade.GetConfig().GetString("app.version"),
 	)
-	appendArgv("--label", function.PluckArrayWalk(self.options.Labels, func(item string) (string, bool) {
-		return strconv.Quote(item), true
-	}))
-	appendArgv("--annotation", self.options.Annotation)
-	appendArgv("--platform", self.options.Platforms)
-	appendArgv("--secret", self.options.Secrets)
-	appendArgv("--output", self.options.Outputs)
 
-	if self.options.File != "" {
-		cmd = append(cmd, "-f", self.options.File)
+	tmpl, err := template.New("buildx").Funcs(buildShellFunc).Parse(buildShellTmpl)
+	if err != nil {
+		return nil, err
+	}
+	var scriptBuffer bytes.Buffer
+	if err := tmpl.Execute(&scriptBuffer, self.options); err != nil {
+		return nil, err
 	}
 
-	if self.options.Target != "" {
-		cmd = append(cmd, "--target", self.options.Target)
-	}
-
-	if self.options.NoCache {
-		cmd = append(cmd, "--no-cache")
-	}
-
-	if self.options.Pull {
-		cmd = append(cmd, "--pull")
-	}
-
-	if self.options.Push {
-		cmd = append(cmd, "--push")
-	}
-
-	cmd = append(cmd, self.workDir)
+	env := function.PluckArrayWalk(self.env, func(item types.EnvItem) (string, bool) {
+		return item.String(), true
+	})
+	env = append(env, docker.Sdk.DockerEnv.CommandEnv()...)
 
 	return local.New(
-		local.WithCommandName("docker"),
-		local.WithArgs(cmd...),
+		local.WithCommandName("/bin/sh"),
+		local.WithArgs("-c", scriptBuffer.String()),
+		local.WithEnv(env),
+		local.WithCtx(self.ctx),
 	)
 }
 
+func (self Builder) Result() error {
+	_, err := os.ReadFile(filepath.Join(self.options.WorkDir, "meta.json"))
+	return err
+}
+
 type BuildOptions struct {
+	Name         string // 自动生成的临时名称
+	RegistryAuth []registry.AuthConfig
+	WorkDir      string // 构建上下文路径 (即最后的 .)
+
 	Annotation []string // --annotation: 为镜像添加 OCI 注解
 	BuildArg   []string // --build-arg: 设置构建时变量 (ARG)
 	CacheFrom  []string // --cache-from: 外部缓存源 (例如 "user/app:cache")
@@ -121,7 +102,6 @@ type BuildOptions struct {
 	File    string // -f, --file: Dockerfile 的名称及路
 	Target  string // --target: 设置要构建的目标构建阶段 (Stage)
 
-	Load    bool // --load: Shorthand for "--output=type=docker"
 	NoCache bool // --no-cache: 构建时不使用任何缓存
 	Pull    bool // --pull: 始终尝试拉取所有引用的镜像
 	Push    bool // --push: Shorthand for "--output=type=registry"

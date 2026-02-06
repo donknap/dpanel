@@ -82,7 +82,7 @@ func (self *reader) Manifest() ([]Manifest, error) {
 func (self *reader) ReadBlobs(fileName string) (io.Reader, error) {
 	var index int
 	var ok bool
-	if ok, index = function.IndexArrayWalk(self.blobs, func(i blobItem) bool {
+	if index, ok = function.IndexArrayWalk(self.blobs, func(i blobItem) bool {
 		return strings.HasSuffix(i.Name, fileName)
 	}); !ok {
 		return nil, errors.New("blob file not found in archive")

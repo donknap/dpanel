@@ -18,6 +18,8 @@ const (
 
 const (
 	DockerDefaultClientName = "local"
+	DockerContextName       = "dpanel-context-%s"
+	DockerBuilderName       = DockerContextName + "-builder"
 )
 
 const (

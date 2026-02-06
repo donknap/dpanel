@@ -20,6 +20,8 @@ type ImageSettingOption struct {
 	BuildSecret            []types.EnvItem `json:"buildSecret,omitempty"`
 	BuildPlatformType      []string        `json:"buildPlatformType,omitempty"`
 	BuildEnablePush        bool            `json:"buildEnablePush,omitempty"`
+	BuildCacheType         string          `json:"buildCacheType"`
+	UseTime                float64         `json:"useTime"`
 	BuildDockerfile        string          `json:"buildDockerfile,omitempty,deprecated"` // Deprecated: instead BuildDockerfileContent
 	BuildRoot              string          `json:"buildRoot,omitempty,deprecated"`       // Deprecated: instead BuildDockerfileRoot
 }

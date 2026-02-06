@@ -183,7 +183,7 @@ func (self Store) parseOnePanelSetting(getter *function.ConfigMap, root string) 
 		result = append(result, envItem)
 	}
 	// 如果包含了 PANEL_DB_TYPE 附加数据库其它参数
-	if ok, index := function.IndexArrayWalk(result, func(item types.EnvItem) bool {
+	if index, ok := function.IndexArrayWalk(result, func(item types.EnvItem) bool {
 		return item.Name == "PANEL_DB_TYPE"
 	}); ok {
 		result = append(result[:index], append([]types.EnvItem{

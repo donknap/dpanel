@@ -11,10 +11,11 @@ func (self Client) Run(command ...string) (exec.Executor, error) {
 	var cmd exec.Executor
 	var err error
 	options := make([]local.Option, 0)
-	options = append(options, local.WithCommandName("docker"), local.WithArgs(append(
-		self.DockerEnv.CommandParams(),
-		command...,
-	)...))
+	options = append(options,
+		local.WithCommandName("docker"),
+		local.WithArgs(command...),
+		local.WithEnv(self.DockerEnv.CommandEnv()),
+	)
 	cmd, err = local.New(options...)
 	if err != nil {
 		return nil, err

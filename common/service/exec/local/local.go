@@ -40,11 +40,18 @@ func New(opts ...Option) (exec.Executor, error) {
 	return c, nil
 }
 
-func QuickRun(command string) ([]byte, error) {
-	cmdArr := function.SplitCommandArray(command)
+func QuickRun(cmdStrOrArr ...string) ([]byte, error) {
+	if function.IsEmptyArray(cmdStrOrArr) {
+		return nil, errors.New("invalid cmd")
+	}
+	if _, ok := function.IndexArrayWalk(cmdStrOrArr, func(item string) bool {
+		return strings.Contains(item, " ")
+	}); ok {
+		cmdStrOrArr = function.SplitCommandArray(strings.Join(cmdStrOrArr, " "))
+	}
 	cmd, err := New(
-		WithCommandName(cmdArr[0]),
-		WithArgs(cmdArr[1:]...),
+		WithCommandName(cmdStrOrArr[0]),
+		WithArgs(cmdStrOrArr[1:]...),
 	)
 	if err != nil {
 		return nil, err

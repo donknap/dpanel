@@ -213,16 +213,16 @@ func (self Container) Ignore(http *gin.Context) {
 	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore, &checkIgnore)
 
 	ignore := fmt.Sprintf("%s@%s", params.Md5, params.ImageId)
-	exists, i := function.IndexArrayWalk(checkIgnore, func(i string) bool {
+	i, ok := function.IndexArrayWalk(checkIgnore, func(i string) bool {
 		return strings.HasPrefix(i, params.Md5+"@")
 	})
 
 	if params.ImageId == "" {
-		if exists {
+		if ok {
 			checkIgnore = slices.Delete(checkIgnore, i, i+1)
 		}
 	} else {
-		if exists {
+		if ok {
 			checkIgnore[i] = ignore
 		} else {
 			checkIgnore = append(checkIgnore, ignore)

@@ -2,7 +2,11 @@ package controller
 
 import (
 	"fmt"
+	"log/slog"
+	"net/url"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/build"
 	"github.com/docker/go-units"
@@ -13,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
@@ -27,8 +32,9 @@ type ImageBuild struct {
 
 func (self ImageBuild) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id    int32  `json:"id"`
-		Title string `json:"title"`
+		Id       int32  `json:"id"`
+		Title    string `json:"title"`
+		OnlySave bool   `json:"onlySave"`
 		accessor.ImageSettingOption
 	}
 	params := ParamsValidate{}
@@ -74,22 +80,38 @@ func (self ImageBuild) Create(http *gin.Context) {
 	}
 	if imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First(); imageRow != nil {
 		imageNew.ID = imageRow.ID
+		imageNew.Status = imageRow.Status
+		imageNew.Message = imageRow.Message
 	}
 	_ = dao.Image.Save(imageNew)
 
-	log, err := logic.DockerTask{}.ImageBuild(fmt.Sprintf(ws.MessageTypeImageBuild, params.Id), params.ImageSettingOption)
-	if err != nil {
-		imageNew.Status = define.DockerImageBuildStatusError
-		imageNew.Message = log + "\n" + err.Error()
-		_ = dao.Image.Save(imageNew)
-	} else {
-		imageNew.Status = define.DockerImageBuildStatusSuccess
+	if !params.OnlySave {
+		builderName := fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)
+
+		if result, err := local.QuickRun("docker buildx inspect", builderName, "2>/dev/null"); err != nil || result == nil {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageCreateBuildx), 500)
+			return
+		}
+
+		startTime := time.Now()
+		log, err := logic.DockerTask{}.ImageBuild(fmt.Sprintf(ws.MessageTypeImageBuild, params.Id), params.ImageSettingOption)
+		if err != nil {
+			imageNew.Status = define.DockerImageBuildStatusError
+		} else {
+			imageNew.Status = define.DockerImageBuildStatusSuccess
+		}
+		imageNew.Setting.UseTime = time.Now().Sub(startTime).Seconds()
 		imageNew.Message = log
+		_ = dao.Image.Save(imageNew)
+
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
-	_ = dao.Image.Save(imageNew)
+
 	self.JsonResponseWithoutError(http, gin.H{
-		"id":    imageNew.ID,
-		"error": err,
+		"id": imageNew.ID,
 	})
 	return
 }
@@ -166,7 +188,11 @@ func (self ImageBuild) GetList(http *gin.Context) {
 		return
 	}
 	list = function.PluckArrayWalk(list, func(item *entity.Image) (*entity.Image, bool) {
-		if imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, item.Setting.Tag); err == nil {
+		tag := item.Setting.Tag
+		if tag == "" && !function.IsEmptyArray(item.Setting.Tags) {
+			tag = item.Setting.Tags[0].Uri()
+		}
+		if imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, tag); err == nil {
 			item.Setting.ImageId = imageInfo.ID
 		} else {
 			item.Setting.ImageId = ""
@@ -194,5 +220,94 @@ func (self ImageBuild) Prune(http *gin.Context) {
 	}
 	_ = notice.Message{}.Info(".imageBuildPrune", "size", units.HumanSize(float64(res.SpaceReclaimed)))
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self ImageBuild) Buildx(http *gin.Context) {
+	type ParamsValidate struct {
+		ProxyUrl     string `json:"proxyUrl"`
+		EnableCreate bool   `json:"enableCreate"`
+		EnablePrune  bool   `json:"enablePrune"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if _, err := url.Parse(params.ProxyUrl); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	builderName := fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)
+	contextName := fmt.Sprintf(define.DockerContextName, docker.Sdk.Name)
+	description := fmt.Sprintf("Created by DPanel DO NOT DELETE!!! %s", function.Sha256Struct(docker.Sdk.DockerEnv))
+
+	recreateContext := true
+	if result, err := local.QuickRun("docker context inspect", contextName); err == nil && strings.Contains(string(result), description) {
+		recreateContext = false
+	}
+	if !params.EnableCreate && recreateContext {
+		// 如果 hash 不对，是表示当前的构建环境不能用了，所以返回空
+		self.JsonResponseWithoutError(http, gin.H{
+			"name":   builderName,
+			"detail": "",
+		})
+		return
+	}
+
+	if params.EnableCreate {
+		if recreateContext {
+			if _, err := local.QuickRun("docker context rm", contextName,
+				"--force", "&&",
+				"docker buildx rm", contextName+"-builder", "--force", "2>/dev/null",
+			); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			cmd, err := docker.Sdk.Run("context", "create", contextName,
+				"--description", description,
+			)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			if _, err = cmd.RunWithResult(); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
+		if params.ProxyUrl == "" {
+			params.ProxyUrl = os.Getenv("HTTP_PROXY")
+		}
+		_, err := local.QuickRun("docker buildx rm", builderName, "--force 2>/dev/null")
+		if err != nil {
+			slog.Debug("image buildx rm", "error", err)
+		}
+		cmd, err := docker.Sdk.Run("buildx", "create",
+			"--name", builderName,
+			"--driver", "docker-container",
+			"--driver-opt", "network=host",
+			"--driver-opt", "env.http_proxy="+params.ProxyUrl,
+			"--driver-opt", "env.https_proxy="+params.ProxyUrl,
+			"--bootstrap", fmt.Sprintf(define.DockerContextName, docker.Sdk.Name))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_, err = cmd.RunWithResult()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	var detail string
+	if v, err := local.QuickRun("docker buildx inspect", fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)); err == nil {
+		detail = string(v)
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"name":   builderName,
+		"detail": detail,
+	})
 	return
 }

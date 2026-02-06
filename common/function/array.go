@@ -41,20 +41,20 @@ func InArrayArray[T cmp.Ordered](v []T, item ...T) bool {
 }
 
 func InArrayWalk[T interface{}](v []T, walk func(i T) bool) bool {
-	exists, _ := IndexArrayWalk(v, walk)
-	return exists
+	_, ok := IndexArrayWalk(v, walk)
+	return ok
 }
 
-func IndexArrayWalk[T interface{}](v []T, walk func(i T) bool) (exists bool, index int) {
+func IndexArrayWalk[T interface{}](v []T, walk func(i T) bool) (index int, ok bool) {
 	if v == nil {
-		return false, 0
+		return 0, false
 	}
 	for i, t := range v {
 		if walk(t) {
-			return true, i
+			return i, true
 		}
 	}
-	return false, 0
+	return 0, false
 }
 
 func PluckArrayWalk[T interface{}, R interface{}](v []T, walk func(i T) (R, bool)) []R {

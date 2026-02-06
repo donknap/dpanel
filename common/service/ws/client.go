@@ -88,7 +88,7 @@ func (self *Client) ReadMessage() {
 				slog.Info("stop read message goroutine", "fd", self.Fd)
 				err = self.Close()
 				if err != nil {
-					slog.Error("websocket", "client close", err)
+					slog.Warn("websocket", "client close", err)
 				}
 				return
 			}

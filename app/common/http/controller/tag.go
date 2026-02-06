@@ -38,13 +38,13 @@ func (self Tag) Create(http *gin.Context) {
 	tagList := make([]accessor.Tag, 0)
 	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingTag, &tagList)
 
-	if ok, i := function.IndexArrayWalk(tagList, func(i accessor.Tag) bool {
+	if i, ok := function.IndexArrayWalk(tagList, func(i accessor.Tag) bool {
 		if i.Tag == params.Tag {
 			return true
 		}
 		return false
 	}); ok {
-		if ok, j := function.IndexArrayWalk(tagList[i].Item, func(item accessor.TagItem) bool {
+		if j, ok := function.IndexArrayWalk(tagList[i].Item, func(item accessor.TagItem) bool {
 			return item.Name != "" && item.Name == params.Name
 		}); ok {
 			tagList[i].Item[j] = params.TagItem
@@ -130,7 +130,7 @@ func (self Tag) Delete(http *gin.Context) {
 	if params.Tag != "" {
 		tagList = function.PluckArrayWalk(tagList, func(item accessor.Tag) (accessor.Tag, bool) {
 			if item.Tag == params.Tag {
-				if ok, i := function.IndexArrayWalk(item.Item, func(i accessor.TagItem) bool {
+				if i, ok := function.IndexArrayWalk(item.Item, func(i accessor.TagItem) bool {
 					if i.Name == params.Name {
 						return true
 					}
@@ -148,7 +148,7 @@ func (self Tag) Delete(http *gin.Context) {
 		})
 	} else {
 		tagList = function.PluckArrayWalk(tagList, func(item accessor.Tag) (accessor.Tag, bool) {
-			if ok, i := function.IndexArrayWalk(item.Item, func(i accessor.TagItem) bool {
+			if i, ok := function.IndexArrayWalk(item.Item, func(i accessor.TagItem) bool {
 				if i.Name == params.Name {
 					return true
 				}

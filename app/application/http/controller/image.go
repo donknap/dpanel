@@ -90,7 +90,6 @@ func (self Image) ImportByContainerTar(http *gin.Context) {
 	for _, volume := range params.Volume {
 		change = append(change, "VOLUME "+volume)
 	}
-	fmt.Printf("ImportByContainerTar %v \n", imageNameDetail.Uri())
 	out, err := docker.Sdk.Client.ImageImport(docker.Sdk.Ctx, image.ImportSource{
 		Source:     containerTar,
 		SourceName: "-",

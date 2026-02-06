@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"fmt"
-
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -90,7 +88,6 @@ func (self Cron) Create(http *gin.Context) {
 		return
 	}
 
-	fmt.Printf("Create %v \n", crontab.Client)
 	self.JsonSuccessResponse(http)
 	return
 }

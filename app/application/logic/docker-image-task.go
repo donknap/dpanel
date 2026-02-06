@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"math"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/buildx"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/ws"
@@ -35,12 +35,23 @@ func (self DockerTask) ImageBuild(messageId string, task accessor.ImageSettingOp
 	// 如果是 git 指定根目录后在仓库中体现 url#branch:path，Dockerfile 无需要再拼接
 	// 如果是 zip 指定根目录后在解包的时候会只保存根目录下的文件，无需要再拼接
 	options := []buildx.Option{
-		buildx.WithTag(function.PluckArrayWalk(task.Tags, func(item *function.Tag) (string, bool) {
-			return item.Uri(), true
-		})...),
 		buildx.WithBuildArg(task.BuildArgs...),
-		buildx.WithPlatform(),
+		buildx.WithBuildSecret(task.BuildSecret...),
+		buildx.WithPlatform(task.BuildPlatformType...),
+		buildx.WithOutputImage(task.BuildEnablePush, ""),
 	}
+	options = append(options, buildx.WithTag(function.PluckArrayWalk(task.Tags, func(item *function.Tag) (string, bool) {
+		// 获取仓库权限
+		if v := (Image{}).GetRegistryConfig(item.Registry); v != nil {
+			options = append(options, buildx.WithRegistryAuth(v.Config))
+		}
+		return item.Uri(), true
+	})...))
+
+	if task.BuildCacheType != "" {
+		options = append(options, buildx.WithCache(task.BuildCacheType))
+	}
+
 	if task.BuildGit != "" {
 		options = append(options, buildx.WithDockerFilePath(task.BuildDockerfileName))
 		options = append(options, buildx.WithGitUrl(task.BuildGit))
@@ -53,77 +64,40 @@ func (self DockerTask) ImageBuild(messageId string, task accessor.ImageSettingOp
 	} else {
 		options = append(options, buildx.WithDockerFileContent([]byte(task.BuildDockerfileContent)))
 	}
-	b, err := buildx.New(wsBuffer.Context(), options...)
-
-	//b, err := builder.New(
-	//	builder.WithContext(wsBuffer.Context()),
-	//	builder.WithDockerFilePath(task.BuildDockerfileName),
-	//	builder.WithDockerFileContent([]byte(task.BuildDockerfileContent)),
-	//	builder.WithGitUrl(task.BuildGit),
-	//	builder.WithZipFilePath(task.BuildDockerfileRoot, task.BuildZip),
-	//	builder.WithPlatform(task.PlatformArch),
-	//	builder.WithTag(task.Tag),
-	//	builder.WithArgs(task.BuildArgs...),
-	//)
+	b, err := buildx.New(wsBuffer.Context(), docker.Sdk, options...)
 	if err != nil {
 		return "", err
 	}
-	response, err := b.Execute()
+	cmd, err := b.Execute()
 	if err != nil {
 		return "", err
 	}
 	defer func() {
-		if response.Close() != nil {
+		if cmd.Close() != nil {
 			slog.Error("image", "build", err.Error())
 		}
 	}()
-
-	out, err := response.RunInPip()
+	out, err := cmd.RunInPip()
 	if err != nil {
 		return "", err
 	}
 	log := new(bytes.Buffer)
-	buffer := new(bytes.Buffer)
-
 	wsBuffer.OnWrite = func(p string) error {
-		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
-		for {
-			line, _, err := newReader.ReadLine()
-			if err == io.EOF {
-				break
-			}
-			msg := types.BuildMessage{}
-			if err = json.Unmarshal(line, &msg); err == nil {
-				if msg.ErrorDetail.Message != "" {
-					buffer.WriteString(msg.ErrorDetail.Message)
-					wsBuffer.BroadcastMessage(buffer.String())
-					if strings.Contains(msg.ErrorDetail.Message, "ADD failed") || strings.Contains(msg.ErrorDetail.Message, "COPY failed") {
-						return function.ErrorMessage(define.ErrorMessageImageBuildAddFileTypeError)
-					}
-					return errors.New(msg.ErrorDetail.Message)
-				} else if msg.PullMessage.Id != "" {
-					buffer.WriteString(fmt.Sprintf("\r%s: %s", msg.PullMessage.Id, msg.PullMessage.Progress))
-				} else {
-					buffer.WriteString(msg.Stream)
-				}
-			} else {
-				slog.Error("docker", "image build task", err, "data", p)
-				return err
-			}
-		}
-		log.WriteString(buffer.String())
-		if buffer.Len() < 512 {
-			return nil
-		}
-		wsBuffer.BroadcastMessage(buffer.String())
-		buffer.Reset()
+		log.WriteString(p)
+		wsBuffer.BroadcastMessage(p)
 		return nil
 	}
 	_, err = io.Copy(wsBuffer, out)
 	if err != nil {
-		return log.String(), err
+		return log.String(), function.ErrorMessage(define.ErrorMessageCommonCancelOperator, "message", err.Error())
 	}
-	wsBuffer.BroadcastMessage(buffer.String())
+	if strings.Contains(log.String(), "ERROR: no builder") {
+		return log.String(), function.ErrorMessage(define.ErrorMessageImageBuildError, "message", log.String())
+	}
+	// 检测是否成功
+	if err = b.Result(); err != nil {
+		return log.String(), function.ErrorMessage(define.ErrorMessageImageBuildError, "message", "")
+	}
 	return log.String(), nil
 }
 

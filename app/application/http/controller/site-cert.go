@@ -58,9 +58,9 @@ func (self SiteCert) DnsApi(http *gin.Context) {
 	}
 
 	for _, item := range logic.DefaultDnsApi {
-		if exists, _ := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
+		if _, ok := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
 			return i.ServerName == item.ServerName
-		}); !exists {
+		}); !ok {
 			dnsApi = append(dnsApi, item)
 		}
 	}
@@ -74,9 +74,9 @@ func (self SiteCert) DnsApi(http *gin.Context) {
 			}
 			return i, true
 		}) {
-			if exists, index := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
+			if index, ok := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
 				return i.ServerName == item.ServerName
-			}); exists {
+			}); ok {
 				dnsApi[index] = item
 			} else {
 				dnsApi = append(dnsApi, item)
@@ -86,9 +86,9 @@ func (self SiteCert) DnsApi(http *gin.Context) {
 
 	if !function.IsEmptyArray(params.User) {
 		for _, item := range params.User {
-			if exists, index := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
+			if index, ok := function.IndexArrayWalk(dnsApi, func(i accessor.DnsApi) bool {
 				return i.ServerName == item.ServerName
-			}); exists {
+			}); ok {
 				dnsApi[index] = item
 			} else {
 				dnsApi = append(dnsApi, item)
@@ -161,9 +161,9 @@ func (self SiteCert) Apply(http *gin.Context) {
 		} else {
 			dnsApiList := make([]accessor.DnsApi, 0)
 			logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingDnsApi, &dnsApiList)
-			if exists, i := function.IndexArrayWalk(dnsApiList, func(i accessor.DnsApi) bool {
+			if i, ok := function.IndexArrayWalk(dnsApiList, func(i accessor.DnsApi) bool {
 				return i.ServerName == params.DnsApi
-			}); exists {
+			}); ok {
 				env := function.PluckArrayWalk(dnsApiList[i].Env, func(i types.EnvItem) (string, bool) {
 					return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 				})

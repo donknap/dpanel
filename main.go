@@ -283,12 +283,12 @@ func initRSA() error {
 		for _, file := range rsaIdFiles {
 			_ = os.Remove(file)
 		}
-		_, err := local.QuickRun(fmt.Sprintf(
-			`ssh-keygen -t rsa -b 4096 -f "%s" -N "" -C "%s@%s"`,
-			rsaIdFiles[1],
-			define.PanelAuthor,
-			define.PanelWebSite,
-		))
+		_, err := local.QuickRun("ssh-keygen",
+			"-t", "rsa",
+			"-b", "4096",
+			"-f", rsaIdFiles[1],
+			"-N", "",
+			"-C", define.PanelAuthor+"@"+define.PanelWebSite)
 		if err != nil {
 			return err
 		}

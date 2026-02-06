@@ -73,6 +73,9 @@ func (self Env) GetList(http *gin.Context) {
 				status = v.(types2.DockerStatus)
 			}
 			item.DockerStatus = &status
+			if item.SshServerInfo != nil && item.SshServerInfo.Password != "" {
+				item.SshServerInfo.Password = "******"
+			}
 			return item, true
 		}),
 	})
@@ -95,6 +98,13 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvTlsInvalidCert), 500)
 		return
 	}
+	var oldDockerEnv *types2.DockerEnv
+	if v, err := (logic.Env{}).GetEnvByName(params.Name); err == nil {
+		oldDockerEnv = v
+		if params.SshServerInfo != nil && params.SshServerInfo.Password == "******" {
+			params.SshServerInfo.Password = oldDockerEnv.SshServerInfo.Password
+		}
+	}
 
 	if params.EnableSSH {
 		knownHostsCallback := ssh.NewDefaultKnownHostCallback()
@@ -109,6 +119,10 @@ func (self Env) Create(http *gin.Context) {
 		defer func() {
 			sshClient.Close()
 		}()
+		// ssh 密码加密
+		if v, err := function.RSAEncode(params.SshServerInfo.Password); err == nil {
+			params.SshServerInfo.Password = v
+		}
 	}
 
 	defaultEnv := false
@@ -199,7 +213,7 @@ func (self Env) Create(http *gin.Context) {
 	event2.Monitor.Join(dockerEnv)
 
 	// 如果修改的是当前客户端的连接地址，则更新 docker sdk
-	if docker.Sdk.Name == params.Name && docker.Sdk.Client.DaemonHost() != params.Address {
+	if docker.Sdk.Name == params.Name {
 		docker.Sdk.Close()
 		docker.Sdk = dockerClient
 	} else {

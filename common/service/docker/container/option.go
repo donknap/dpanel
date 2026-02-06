@@ -127,9 +127,9 @@ func WithVolume(item ...types.VolumeItem) Option {
 				permission = "ro"
 			}
 			bind := fmt.Sprintf("%s:%s:%s", volumeItem.Host, volumeItem.Dest, permission)
-			if exists, index := function.IndexArrayWalk(self.hostConfig.Binds, func(i string) bool {
+			if index, ok := function.IndexArrayWalk(self.hostConfig.Binds, func(i string) bool {
 				return strings.Contains(i, ":"+volumeItem.Dest+":")
-			}); exists {
+			}); ok {
 				self.hostConfig.Binds[index] = bind
 			} else {
 				self.hostConfig.Binds = append(self.hostConfig.Binds, bind)
