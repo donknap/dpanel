@@ -10,7 +10,7 @@ import (
 
 	"github.com/docker/docker/api/types/build"
 	"github.com/docker/go-units"
-	"github.com/donknap/dpanel/app/application/logic"
+	"github.com/donknap/dpanel/app/application/logic/task"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -86,15 +86,8 @@ func (self ImageBuild) Create(http *gin.Context) {
 	_ = dao.Image.Save(imageNew)
 
 	if !params.OnlySave {
-		builderName := fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)
-
-		if result, err := local.QuickRun("docker buildx inspect", builderName, "2>/dev/null"); err != nil || result == nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageCreateBuildx), 500)
-			return
-		}
-
 		startTime := time.Now()
-		log, err := logic.DockerTask{}.ImageBuild(fmt.Sprintf(ws.MessageTypeImageBuild, params.Id), params.ImageSettingOption)
+		log, err := task.Docker{}.ImageBuild(fmt.Sprintf(ws.MessageTypeImageBuild, params.Id), params.ImageSettingOption)
 		if err != nil {
 			imageNew.Status = define.DockerImageBuildStatusError
 		} else {
@@ -257,9 +250,8 @@ func (self ImageBuild) Buildx(http *gin.Context) {
 
 	if params.EnableCreate {
 		if recreateContext {
-			if _, err := local.QuickRun("docker context rm", contextName,
-				"--force", "&&",
-				"docker buildx rm", contextName+"-builder", "--force", "2>/dev/null",
+			if _, err := docker.Sdk.RunResult("context",
+				"rm", contextName, "--force",
 			); err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
@@ -279,11 +271,14 @@ func (self ImageBuild) Buildx(http *gin.Context) {
 		if params.ProxyUrl == "" {
 			params.ProxyUrl = os.Getenv("HTTP_PROXY")
 		}
-		_, err := local.QuickRun("docker buildx rm", builderName, "--force 2>/dev/null")
-		if err != nil {
-			slog.Debug("image buildx rm", "error", err)
+		if _, err := docker.Sdk.RunResult("buildx",
+			"rm", contextName+"-builder",
+			"--force",
+		); err != nil {
+			// 即使出错也不提示只记录日志
+			slog.Debug("image build rm buildx", "error", err)
 		}
-		cmd, err := docker.Sdk.Run("buildx", "create",
+		_, err := docker.Sdk.RunResult("buildx", "create",
 			"--name", builderName,
 			"--driver", "docker-container",
 			"--driver-opt", "network=host",
@@ -294,15 +289,10 @@ func (self ImageBuild) Buildx(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		_, err = cmd.RunWithResult()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
 	}
 
 	var detail string
-	if v, err := local.QuickRun("docker buildx inspect", fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)); err == nil {
+	if v, err := docker.Sdk.RunResult("buildx", "inspect", fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)); err == nil {
 		detail = string(v)
 	}
 	self.JsonResponseWithoutError(http, gin.H{

@@ -11,4 +11,5 @@ const (
 	FeatureDockerEnvLocal     = "canSeeEnableDockerEnvLocal"
 	FeatureInDPanel           = "canSeeEnableInDPanel" // 当前是否处于 dpanel 还是其它发行版中
 	FeatureSwarmManage        = "canSeeEnableSwarmManage"
+	FeatureBuildX             = "canSeeEnableBuildX"
 )

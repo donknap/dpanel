@@ -1,4 +1,4 @@
-package logic
+package task
 
 import (
 	"log/slog"
@@ -12,7 +12,7 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 )
 
-func (self DockerTask) ContainerCreate(task *CreateContainerOption) (string, error) {
+func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) {
 
 	var err error
 	var containerOwnerNetwork string

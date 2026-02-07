@@ -61,7 +61,12 @@ func (self DockerEnv) CommandEnv() []string {
 		"HOSTNAME", "LOGNAME",
 		"OLDPWD", "TMPDIR", "TERMINFO_DIRS",
 		"COLORTERM", "PAGER", "_",
-		"HTTP_PROXY", "HTTPS_PROXY",
+
+		"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+
+		// windows
+		"USERPROFILE", "SystemRoot", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "HOMEDRIVE", "HOMEPATH",
+
 		// @todo dpanel 要用到的环境变量，期待以后修正为以 DP_ 开头
 		"STORAGE_LOCAL_PATH", "DP_ACME_CONFIG_HOME", "DB_DATABASE",
 		"APP_ENV", "APP_NAME", "APP_FAMILY", "APP_SERVER_PORT", "APP_VERSION",
@@ -69,7 +74,7 @@ func (self DockerEnv) CommandEnv() []string {
 	result = append(result, function.PluckArrayWalk(os.Environ(), func(item string) (string, bool) {
 		ok := false
 		for _, s := range systemEnvList {
-			if strings.HasPrefix(strings.ToUpper(item), s+"=") {
+			if strings.HasPrefix(strings.ToUpper(item), strings.ToUpper(s+"=")) {
 				if s == "PATH" {
 					// 往 PATH 环境变量中追加程序的目录，便于调用 dpanel 命令
 					if v, err := os.Executable(); err == nil {

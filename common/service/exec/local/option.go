@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"runtime"
+	"strings"
 
 	"github.com/donknap/dpanel/common/function"
 )
@@ -12,11 +14,17 @@ type Option func(command *Local) error
 
 func WithArgs(args ...string) Option {
 	return func(self *Local) error {
+		var commandName string
 		if self.cmd.Path == "" {
-			self.cmd = exec.CommandContext(self.ctx, args[0], args[1:]...)
+			commandName = args[0]
+			args = args[1:]
 		} else {
-			self.cmd = exec.CommandContext(self.ctx, self.cmd.Path, args...)
+			commandName = self.cmd.Path
 		}
+		if strings.HasSuffix(commandName, "powershell.exe") && args[0] == "-c" {
+			args[0] = "-Command"
+		}
+		self.cmd = exec.CommandContext(self.ctx, commandName, args...)
 		return nil
 	}
 }
@@ -25,6 +33,9 @@ func WithCommandName(commandName string) Option {
 	return func(self *Local) error {
 		if commandName == "" {
 			return nil
+		}
+		if (commandName == "/bin/sh" || commandName == "/bin/bash") && runtime.GOOS == "windows" {
+			commandName = "powershell"
 		}
 		if function.IsEmptyArray(self.cmd.Args) {
 			self.cmd = exec.CommandContext(self.ctx, commandName)

@@ -1,4 +1,4 @@
-package logic
+package task
 
 import (
 	"github.com/donknap/dpanel/common/accessor"
@@ -21,6 +21,6 @@ type ImageRemoteOption struct {
 	Proxy    string
 }
 
-type DockerTask struct {
+type Docker struct {
 	sdk *docker.Client
 }

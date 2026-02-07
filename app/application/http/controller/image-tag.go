@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	dockerRegistry "github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/app/application/logic"
+	"github.com/donknap/dpanel/app/application/logic/task"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/registry"
@@ -89,7 +90,7 @@ func (self Image) TagSync(http *gin.Context) {
 		return
 	}
 
-	err = logic.DockerTask{}.ImageRemote(wsBuffer, out)
+	err = task.Docker{}.ImageSync(wsBuffer, out)
 	// 可能最后循环后还包含错误
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

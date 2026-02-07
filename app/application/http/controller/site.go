@@ -8,7 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
-	"github.com/donknap/dpanel/app/application/logic"
+	"github.com/donknap/dpanel/app/application/logic/task"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -137,13 +137,13 @@ func (self Site) CreateByImage(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	runTaskRow := &logic.CreateContainerOption{
+	runTaskRow := &task.CreateContainerOption{
 		SiteName:    siteRow.SiteName,
 		SiteId:      siteRow.ID,
 		BuildParams: &buildParams,
 		ContainerId: params.ContainerId,
 	}
-	containerId, err := logic.DockerTask{}.ContainerCreate(runTaskRow)
+	containerId, err := task.Docker{}.ContainerCreate(runTaskRow)
 	if err != nil {
 		if containerId != "" {
 			// 如果容器在启动时发生错误，需要先删除掉

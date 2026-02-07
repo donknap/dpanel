@@ -41,7 +41,6 @@ const (
 	ErrorMessageImageBuildTypeEmpty                         = ".imageBuildTypeEmpty"
 	ErrorMessageImageBuildTypeConflict                      = ".imageBuildTypeConflict"
 	ErrorMessageImageBuildError                             = ".imageBuildError"
-	ErrorMessageImageCreateBuildx                           = ".imageCreateBuildx"
 	ErrorMessageSwarmNotInit                                = ".swarmNotInit"
 	ErrorMessageSwarmNotManager                             = ".swarmNotManager"
 	ErrorMessageSystemEnvTlsInvalidCert                     = ".systemEnvTlsInvalidCert"
