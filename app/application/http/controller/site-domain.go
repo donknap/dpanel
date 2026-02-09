@@ -268,6 +268,10 @@ func (self SiteDomain) Delete(http *gin.Context) {
 }
 
 func (self SiteDomain) RestartNginx(http *gin.Context) {
+	if err := (logic.Site{}).MakeNginxResolver(); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	out, err := local.QuickRun("nginx -t")
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

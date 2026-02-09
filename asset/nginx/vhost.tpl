@@ -2,12 +2,6 @@ map $scheme $hsts_header {
     https   "max-age=63072000; preload";
 }
 
-{{if or (eq .Type "proxy") (eq .Type "fpm")}}
-upstream {{.TargetName}} {
-    server {{.ServerAddress}}:{{.Port}};
-}
-{{end}}
-
 {{if .EnableSSL}}
 server {
     listen 80;
@@ -31,6 +25,8 @@ server {
 
     server_name {{.ServerName}} {{range $index, $value := .ServerNameAlias}}{{$value}} {{end}};
 
+    include /etc/nginx/conf.d/include/resolver.conf;
+
     {{if .EnableSSL}}
     ssl_certificate {{.SslCrt}};
     ssl_certificate_key {{.SslKey}};
@@ -39,6 +35,7 @@ server {
     ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE:ECDH:AES:HIGH:!NULL:!aNULL:!MD5:!ADH:!RC4;
     ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
+    add_header Strict-Transport-Security $hsts_header always;
     {{end}}
 
     {{if .EnableSSL}}
@@ -73,7 +70,8 @@ server {
         proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
         proxy_set_header X-Real-IP          $remote_addr;
 
-        proxy_pass $forward_scheme://{{.TargetName}}$request_uri;
+        set $upstream_endpoint {{.ServerAddress}}:{{.Port}};
+        proxy_pass $forward_scheme://$upstream_endpoint$request_uri;
     }
     {{end}}
 
@@ -89,7 +87,9 @@ server {
     location ~ \.php$ {
         try_files $uri =404;
 
-        fastcgi_pass {{.TargetName}};
+        set $upstream_endpoint {{.ServerAddress}}:{{.Port}};
+        fastcgi_pass $upstream_endpoint;
+
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME {{.FPMRoot}}$fastcgi_script_name;
         include fastcgi_params;

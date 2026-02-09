@@ -3,9 +3,7 @@ package logic
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -356,31 +354,6 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 	}
 
 	slog.Info("db compose ", "workDir", workingDir)
-
-	// 如果是远程文件，每次都获取最新的 yaml 文件进行覆盖
-	if dbRow.Setting.Type == accessor.ComposeTypeRemoteUrl {
-		err := func() error {
-			response, err := http.Get(dbRow.Setting.RemoteUrl)
-			if err != nil {
-				return err
-			}
-			defer func() {
-				_ = response.Body.Close()
-			}()
-			content, err := io.ReadAll(response.Body)
-			if err != nil {
-				return err
-			}
-			err = os.WriteFile(dbRow.Setting.GetUriFilePath(), self.makeDeployYamlHeader(content), 0666)
-			if err != nil {
-				return err
-			}
-			return nil
-		}()
-		if err != nil {
-			slog.Debug("db compose remote download", "error", err)
-		}
-	}
 
 	taskFileDir := filepath.Join(workingDir, filepath.Dir(dbRow.Setting.Uri[0]))
 

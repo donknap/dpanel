@@ -177,13 +177,18 @@ func (self SiteCert) Apply(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	response, err := builder.Run()
+	cmd, err := builder.Run()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	wsBuffer := ws.NewProgressPip(ws.MessageTypeDomainApply)
 	defer wsBuffer.Close()
+
+	go func() {
+		<-wsBuffer.Done()
+		_ = cmd.Close()
+	}()
 
 	errMessage := function.ErrorMessage(define.ErrorMessageSiteDomainCertIssueFailed)
 	success := false
@@ -197,10 +202,14 @@ func (self SiteCert) Apply(http *gin.Context) {
 		}
 		return nil
 	}
-
-	_, err = io.Copy(wsBuffer, response)
+	out, err := cmd.RunInPip()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	_, err = io.Copy(wsBuffer, out)
+	if err != nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonCancelOperator, "message", err.Error()), 500)
 		return
 	}
 	if success {

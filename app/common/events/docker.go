@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/network"
+	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
@@ -128,6 +129,10 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 				})
 				var nginxErr error
 				if facade.GetConfig().Get("app.env") == define.PanelAppEnvStandard {
+					err = logic2.Site{}.MakeNginxResolver()
+					if err != nil {
+						slog.Debug("init nginx make resolver", "error", err)
+					}
 					if b, _ := local.QuickCheckRunning("nginx"); b {
 						_, nginxErr = local.QuickRun("nginx -s reload")
 					} else {

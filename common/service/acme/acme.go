@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/exec/local"
 )
 
@@ -50,7 +50,7 @@ type Acme struct {
 	configHome  string
 }
 
-func (self Acme) Run() (io.ReadCloser, error) {
+func (self Acme) Run() (exec.Executor, error) {
 	options := []local.Option{
 		local.WithCommandName(self.commandName),
 		local.WithArgs(self.argv...),
@@ -58,11 +58,7 @@ func (self Acme) Run() (io.ReadCloser, error) {
 	if !function.IsEmptyArray(self.env) {
 		options = append(options, local.WithEnv(self.env))
 	}
-	cmd, err := local.New(options...)
-	if err != nil {
-		return nil, err
-	}
-	return cmd.RunInPip()
+	return local.New(options...)
 }
 
 type Cert struct {

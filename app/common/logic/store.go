@@ -41,6 +41,13 @@ func (self Store) SyncByGit(gitUrl string, option SyncByGitOption) error {
 	if _, err := exec2.LookPath("git"); err != nil {
 		return function.ErrorMessage(define.ErrorMessageSystemStoreNotFoundGit)
 	}
+	var branch string
+
+	if b, a, ok := strings.Cut(gitUrl, "#"); ok {
+		gitUrl = b
+		branch = a
+	}
+
 	// 先创建一个临时目录，下载完成后再同步数据，否则失败时原先的数据会被删除
 	if option.TempDownloadPath == "" {
 		// 仅当内部生成临时目录的时候才删除，如果是外部传递的，由外部来维护
@@ -52,10 +59,16 @@ func (self Store) SyncByGit(gitUrl string, option SyncByGitOption) error {
 
 	slog.Debug("store git download", "path", option.TempDownloadPath)
 
+	args := []string{
+		"clone", "--depth", "1",
+	}
+	if branch != "" {
+		args = append(args, "-b", branch)
+	}
+	args = append(args, gitUrl, option.TempDownloadPath)
 	cmd, err := local.New(
 		local.WithCommandName("git"),
-		local.WithArgs("clone", "--depth", "1",
-			gitUrl, option.TempDownloadPath),
+		local.WithArgs(args...),
 	)
 	if err != nil {
 		return err

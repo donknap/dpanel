@@ -205,10 +205,9 @@ build-js:
 release: build
 	@echo ">> Using Dockerfile: $(DOCKER_FILE)"
 	@echo ">> Platforms: $(D_PLATFORMS)"
-	@docker buildx use dpanel-builder
 
 	@echo ">> Building [Lite] edition..."
-	docker buildx build --target lite \
+	docker buildx build --builder dpanel-context-local-builder --target lite \
 	   $(call get_tags,beta-lite) \
 	   --platform $(D_PLATFORMS) \
 	   --build-arg APP_VERSION=${APP_VER} \
@@ -220,7 +219,7 @@ release: build
 
 	if [ "$(LITE)" = "0" ]; then \
 	   echo ">> Building [Production] edition..."; \
-	   docker buildx build --target production \
+	   docker buildx build --builder dpanel-context-local-builder --target production \
 		 $(call get_tags,beta) \
 		 --platform $(D_PLATFORMS) \
 		 --build-arg APP_VERSION=${APP_VER} \

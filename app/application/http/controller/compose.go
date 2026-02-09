@@ -407,33 +407,54 @@ func (self Compose) GetFromGit(http *gin.Context) {
 	composeRow, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(
 		datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
 	)...).First()
-	if composeRow != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
-		return
+
+	if composeRow == nil {
+		createTime := time.Now().Local().Format(time.DateTime)
+		composeRow = &entity.Compose{
+			Title: params.Title,
+			Name:  params.Name,
+			Setting: &accessor.ComposeSettingOption{
+				Type:          accessor.ComposeTypeStoragePath,
+				Environment:   make([]types2.EnvItem, 0),
+				Uri:           []string{},
+				RemoteUrl:     params.Uri,
+				DockerEnvName: dockerEnvName,
+				CreatedAt:     createTime,
+				UpdatedAt:     createTime,
+			},
+		}
+	}
+	var err error
+	targetPath := filepath.Join(storage.Local{}.GetComposePath(dockerEnvName), params.Name)
+
+	if strings.Contains(params.Uri, ".git") {
+		err = logic2.Store{}.SyncByGit(params.Uri, logic2.SyncByGitOption{
+			TargetPath: targetPath,
+		})
+	} else {
+		response, err := http2.Get(params.Uri)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer func() {
+			_ = response.Body.Close()
+		}()
+		file, err := os.OpenFile(filepath.Join(targetPath, define.ComposeProjectDeployComposeFileName), os.O_RDWR|os.O_TRUNC, 0666)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_, err = io.Copy(file, response.Body)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 
-	targetPath := filepath.Join(storage.Local{}.GetComposePath(dockerEnvName), params.Name)
-	err := logic2.Store{}.SyncByGit(params.Uri, logic2.SyncByGitOption{
-		TargetPath: targetPath,
-	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
-	}
-
-	createTime := time.Now().Local().Format(time.DateTime)
-	composeRow = &entity.Compose{
-		Title: params.Title,
-		Name:  params.Name,
-		Setting: &accessor.ComposeSettingOption{
-			Type:          accessor.ComposeTypeStoragePath,
-			Environment:   make([]types2.EnvItem, 0),
-			Uri:           []string{},
-			RemoteUrl:     params.Uri,
-			DockerEnvName: dockerEnvName,
-			CreatedAt:     createTime,
-			UpdatedAt:     createTime,
-		},
 	}
 
 	for _, suffix := range logic.ComposeFileNameSuffix {

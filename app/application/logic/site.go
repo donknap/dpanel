@@ -191,6 +191,10 @@ func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 	if err != nil {
 		return err
 	}
+	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
+	if err != nil {
+		return err
+	}
 	nginxConfPath := filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(VhostFileName, setting.ServerName))
 	vhostFile, err := os.OpenFile(nginxConfPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
@@ -199,11 +203,34 @@ func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 	defer func() {
 		_ = vhostFile.Close()
 	}()
+	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", setting)
+	if err != nil {
+		return err
+	}
+	err = self.MakeNginxResolver()
+	return err
+}
+
+func (self Site) MakeNginxResolver() error {
+	var asset embed.FS
+	err := facade.GetContainer().NamedResolve(&asset, "asset")
+	if err != nil {
+		return err
+	}
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
 	if err != nil {
 		return err
 	}
-	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", setting)
+	resolverFile, err := os.OpenFile("/etc/nginx/conf.d/include/resolver.conf", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+	if err != nil {
+		return fmt.Errorf("create Nginx resolver configuration failed %s", err.Error())
+	}
+	defer func() {
+		_ = resolverFile.Close()
+	}()
+	err = parser.ExecuteTemplate(resolverFile, "resolver.tpl", map[string]interface{}{
+		"Resolver": function.SystemResolver("127.0.0.11", "1.1.1.1", "8.8.8.8"),
+	})
 	if err != nil {
 		return err
 	}
