@@ -9,8 +9,9 @@ type SiteDomainSettingOption struct {
 	ServerNameAlias           []string      `json:"serverNameAlias,omitempty"`
 	ServerAddress             string        `json:"serverAddress"`
 	ServerProtocol            string        `json:"serverProtocol"`
+	ServerPort                string        `json:"serverPort"`
 	TargetName                string        `json:"targetName"`
-	Port                      int32         `json:"port" binding:"required"`
+	Port                      int32         `json:"port" binding:"required"` // 目标转发转发端口
 	EnableBlockCommonExploits bool          `json:"enableBlockCommonExploits"`
 	EnableAssetCache          bool          `json:"enableAssetCache"`
 	EnableWs                  bool          `json:"enableWs"`

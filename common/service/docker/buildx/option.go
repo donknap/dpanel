@@ -24,9 +24,27 @@ func WithWorkDir(path string) Option {
 }
 
 // WithTag 添加镜像 Tag (支持多个)
-func WithTag(tags ...string) Option {
+func WithTag(targetName string, tags ...string) Option {
 	return func(self *Builder) error {
-		self.options.Tags = append(self.options.Tags, tags...)
+		if len(tags) == 0 {
+			return nil
+		}
+
+		found := false
+		for i, group := range self.options.Target {
+			if group.Target == targetName {
+				self.options.Target[i].Tags = append(self.options.Target[i].Tags, tags...)
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			self.options.Target = append(self.options.Target, BuildOptionsTarget{
+				Target: targetName,
+				Tags:   tags,
+			})
+		}
 		return nil
 	}
 }
@@ -118,15 +136,7 @@ func WithBuildArg(args ...types.EnvItem) Option {
 	}
 }
 
-// WithTarget 指定构建阶段
-func WithTarget(target string) Option {
-	return func(self *Builder) error {
-		self.options.Target = target
-		return nil
-	}
-}
-
-// WithSecret 添加 Secret
+// WithBuildSecret 添加 Secret
 func WithBuildSecret(args ...types.EnvItem) Option {
 	return func(self *Builder) error {
 		for _, item := range args {
@@ -148,20 +158,28 @@ func WithCache(mode string) Option {
 		self.options.CacheTo = []string{}
 		self.options.CacheFrom = []string{}
 
+		var firstTag string
+		for _, group := range self.options.Target {
+			if len(group.Tags) > 0 {
+				firstTag = group.Tags[0]
+				break
+			}
+		}
+
 		switch mode {
 		case "none":
 			self.options.NoCache = true
 		case "default":
 		case "inline":
 			self.options.CacheTo = append(self.options.CacheTo, "type=inline")
-			if len(self.options.Tags) > 0 {
-				self.options.CacheFrom = append(self.options.CacheFrom, self.options.Tags[0])
+			if firstTag != "" {
+				self.options.CacheFrom = append(self.options.CacheFrom, firstTag)
 			}
 		case "registry":
-			if len(self.options.Tags) == 0 {
-				return errors.New("cache mode 'registry' requires at least one image tag")
+			if firstTag == "" {
+				return errors.New("cache mode 'registry' requires at least one valid image tag")
 			}
-			if a, _, ok := strings.Cut(self.options.Tags[0], ":"); ok {
+			if a, _, ok := strings.Cut(firstTag, ":"); ok {
 				self.options.CacheTo = append(self.options.CacheTo, fmt.Sprintf("type=registry,ref=%s,mode=max", a+":dpanel-buildcache"))
 				self.options.CacheFrom = append(self.options.CacheFrom, fmt.Sprintf("type=registry,ref=%s", a+":dpanel-buildcache"))
 			}
@@ -195,7 +213,13 @@ func WithOutputImage(push bool, compression string) Option {
 
 func WithRegistryAuth(auth ...registry.AuthConfig) Option {
 	return func(self *Builder) error {
-		self.options.RegistryAuth = append(self.options.RegistryAuth, auth...)
+		for _, config := range auth {
+			if ok := function.InArrayWalk(self.options.RegistryAuth, func(item registry.AuthConfig) bool {
+				return item.ServerAddress == config.ServerAddress
+			}); !ok {
+				self.options.RegistryAuth = append(self.options.RegistryAuth, config)
+			}
+		}
 		return nil
 	}
 }

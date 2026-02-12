@@ -117,7 +117,7 @@ func (self Tag) getName() string {
 }
 
 func ImageTag(tag string) *Tag {
-	tag = strings.TrimPrefix(strings.TrimPrefix(tag, "http://"), "https://")
+	tag = strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(tag, "/"), "http://"), "https://")
 	result := &Tag{}
 
 	ref, err := reference.ParseNormalizedNamed(tag)

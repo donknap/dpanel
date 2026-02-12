@@ -19,9 +19,9 @@ DETECTED_OS	  := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 OS			   ?= $(DETECTED_OS)
 
 # --- Dynamic Versioning Logic ---
-AUTO_VERSION	 := $(shell date +%Y%m%d.%H%M)
-APP_VER		  := $(if $(VERSION),$(VERSION),$(AUTO_VERSION))
-IS_CUSTOM		:= $(if $(VERSION),1,0)
+AUTO_VERSION	 	:= $(shell date +%Y%m%d.%H%M)
+APP_VER 			:= $(if $(strip $(VERSION)),$(VERSION),$(AUTO_VERSION))
+IS_CUSTOM			:= $(if $(VERSION),1,0)
 
 # --- Build Matrix Parameters ---
 FAMILY		   ?= ce

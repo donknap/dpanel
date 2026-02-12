@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -41,7 +42,7 @@ func (self ImageBuild) Create(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	if params.BuildDockerfileContent == "" && params.BuildZip == "" && params.BuildGit == "" {
+	if params.BuildDockerfileContent == "" && params.BuildZip == "" && params.BuildGit == "" && params.BuildPath == "" {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildTypeEmpty), 500)
 		return
 	}
@@ -59,8 +60,16 @@ func (self ImageBuild) Create(http *gin.Context) {
 		params.BuildZip = path
 	}
 
-	params.Tags = function.PluckArrayWalk(params.Tags, func(i *function.Tag) (*function.Tag, bool) {
-		return function.ImageTag(fmt.Sprintf("%s/%s", i.Registry, i.Name)), true
+	if params.BuildPath != "" {
+		if _, err := os.Stat(params.BuildPath); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	params.Tags = function.PluckArrayWalk(params.Tags, func(item accessor.ImageSettingTag) (accessor.ImageSettingTag, bool) {
+		item.Tag = function.ImageTag(fmt.Sprintf("%s/%s", item.Registry, item.Name))
+		return item, true
 	})
 
 	params.BuildSecret = function.PluckArrayWalk(params.BuildSecret, func(item types.EnvItem) (types.EnvItem, bool) {
@@ -93,6 +102,16 @@ func (self ImageBuild) Create(http *gin.Context) {
 		} else {
 			imageNew.Status = define.DockerImageBuildStatusSuccess
 		}
+		// 检测是否成功
+		matches := regexp.MustCompile(`"containerimage\.digest"\s*:\s*"(sha256:[a-f0-9]+)"`).FindAllStringSubmatch(log, -1)
+		imageId := function.PluckArrayWalk(matches, func(item []string) (string, bool) {
+			return item[1], true
+		})
+		if function.IsEmptyArray(imageId) {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildError, "message", ""), 500)
+			return
+		}
+		imageNew.Setting.ImageId = strings.Join(imageId, "-")
 		imageNew.Setting.UseTime = time.Now().Sub(startTime).Seconds()
 		imageNew.Message = log
 		_ = dao.Image.Save(imageNew)
@@ -129,8 +148,11 @@ func (self ImageBuild) GetDetail(http *gin.Context) {
 		}
 		tagDetail := function.ImageTag(tag)
 		imageRow.Setting.Tag = tagDetail.Name
-		imageRow.Setting.Tags = []*function.Tag{
-			tagDetail,
+		imageRow.Setting.Tags = []accessor.ImageSettingTag{
+			{
+				Enable: true,
+				Tag:    tagDetail,
+			},
 		}
 	}
 
@@ -181,18 +203,13 @@ func (self ImageBuild) GetList(http *gin.Context) {
 		return
 	}
 	list = function.PluckArrayWalk(list, func(item *entity.Image) (*entity.Image, bool) {
-		tag := item.Setting.Tag
-		if tag == "" && !function.IsEmptyArray(item.Setting.Tags) {
-			tag = item.Setting.Tags[0].Uri()
-		}
-		if imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, tag); err == nil {
-			item.Setting.ImageId = imageInfo.ID
-		} else {
-			item.Setting.ImageId = ""
-		}
 		if function.IsEmptyArray(item.Setting.Tags) {
-			item.Setting.Tags = []*function.Tag{
-				function.ImageTag(item.Setting.Tag),
+
+			item.Setting.Tags = []accessor.ImageSettingTag{
+				{
+					Tag:    function.ImageTag(item.Setting.Tag),
+					Enable: true,
+				},
 			}
 		}
 		return item, true

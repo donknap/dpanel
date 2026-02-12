@@ -74,7 +74,7 @@ func (self Explorer) Export(http *gin.Context) {
 	zipWriter := zip.NewWriter(tempFile)
 
 	for _, p := range params.FileList {
-		p = function.Path2Safe(p)
+		p = function.Path2SystemSafe(p)
 		err = func() error {
 			file, err := afs.Open(p)
 			if err != nil {
@@ -139,7 +139,8 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		return
 	}
 
-	params.DestPath = function.Path2Safe(params.DestPath)
+	params.File = function.PathClean(params.File)
+	params.DestPath = function.Path2SystemSafe(params.DestPath)
 
 	sshClient, afs, err := fs.NewSshExplorer(params.Name)
 	if err != nil {
@@ -170,25 +171,20 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 }
 
 func (self Explorer) Import(http *gin.Context) {
+	type fileListItem struct {
+		Name string `json:"name"`
+		Path string `json:"path"`
+	}
 	type ParamsValidate struct {
-		Name     string `json:"name" binding:"required"`
-		FileList []struct {
-			Name string `json:"name"`
-			Path string `json:"path"`
-		} `json:"fileList" binding:"required"`
-		DestPath string `json:"destPath" binding:"required"`
+		Name     string         `json:"name" binding:"required"`
+		FileList []fileListItem `json:"fileList" binding:"required"`
+		DestPath string         `json:"destPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	defer func() {
-		for _, s := range params.FileList {
-			realPath := storage.Local{}.GetSaveRealPath(s.Path)
-			_ = os.Remove(realPath)
-		}
-	}()
-	params.DestPath = function.Path2Safe(params.DestPath)
+	params.DestPath = function.Path2SystemSafe(params.DestPath)
 	sshClient, afs, err := fs.NewSshExplorer(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -202,13 +198,14 @@ func (self Explorer) Import(http *gin.Context) {
 
 	for _, item := range params.FileList {
 		err = func() error {
-			item.Path = function.Path2Safe(item.Path)
+			item.Path = function.Path2SystemSafe(item.Path)
 			realPath, err := os.Open(storage.Local{}.GetSaveRealPath(item.Path))
 			if err != nil {
 				return err
 			}
 			defer func() {
 				_ = realPath.Close()
+				_ = os.Remove(realPath.Name())
 			}()
 			err = afs.WriteReader(filepath.Join(params.DestPath, item.Name), realPath)
 			if err != nil {
@@ -247,7 +244,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 	}()
 	options := make([]imports.ImportFileOption, 0)
 	for _, p := range params.File {
-		p = function.Path2Safe(p)
+		p = function.Path2SystemSafe(p)
 		file, err := afs.OpenFile(p, os.O_RDONLY, 0o644)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -285,7 +282,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			return
 		}
 	}
-	params.Path = function.Path2Safe(params.Path)
+	params.Path = function.Path2SystemSafe(params.Path)
 	importFile, err := imports.NewFileImport(params.Path, options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -325,8 +322,9 @@ func (self Explorer) Delete(http *gin.Context) {
 		return
 	}
 
+	safePath := make([]string, 0)
 	for _, p := range params.FileList {
-		p = function.Path2Safe(p)
+		p = function.Path2SystemSafe(p)
 		if p == "/" ||
 			p == "./" ||
 			p == "." ||
@@ -334,6 +332,7 @@ func (self Explorer) Delete(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerEditDeleteUnsafe), 500)
 			return
 		}
+		safePath = append(safePath, p)
 	}
 
 	sshClient, afs, err := fs.NewSshExplorer(params.Name)
@@ -347,8 +346,7 @@ func (self Explorer) Delete(http *gin.Context) {
 		}
 	}()
 
-	for _, p := range params.FileList {
-		p = function.Path2Safe(p)
+	for _, p := range safePath {
 		err = self.deleteAll(afs, p)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -368,7 +366,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	params.Path = function.Path2Safe(params.Path)
+	params.Path = function.Path2SystemSafe(params.Path)
 	sshClient, afs, err := fs.NewSshExplorer(params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -482,7 +480,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 			sshClient.Close()
 		}
 	}()
-	params.File = function.Path2Safe(params.File)
+	params.File = function.Path2SystemSafe(params.File)
 	file, err := afs.OpenFile(params.File, os.O_RDONLY, 0o644)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -543,7 +541,7 @@ func (self Explorer) Chmod(http *gin.Context) {
 	}()
 	mode, err := strconv.ParseUint(params.Mod, 8, 32)
 	for _, p := range params.FileList {
-		p = function.Path2Safe(p)
+		p = function.Path2SystemSafe(p)
 		err = afs.Chmod(p, os.FileMode(mode))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -578,7 +576,7 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 			sshClient.Close()
 		}
 	}()
-	params.Path = function.Path2Safe(params.Path)
+	params.Path = function.Path2SystemSafe(params.Path)
 	var fileInfo os.FileInfo
 	file, err := afs.OpenFile(params.Path, os.O_RDONLY, 0o644)
 	if err != nil {
@@ -682,7 +680,7 @@ func (self Explorer) MkDir(http *gin.Context) {
 			sshClient.Close()
 		}
 	}()
-	params.DestPath = function.Path2Safe(params.DestPath)
+	params.DestPath = function.Path2SystemSafe(params.DestPath)
 	err = afs.MkdirAll(params.DestPath, os.ModePerm)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -703,8 +701,8 @@ func (self Explorer) Copy(http *gin.Context) {
 		return
 	}
 
-	params.SourceFile = function.Path2Safe(params.SourceFile)
-	params.TargetFile = function.Path2Safe(params.TargetFile)
+	params.SourceFile = function.Path2SystemSafe(params.SourceFile)
+	params.TargetFile = function.Path2SystemSafe(params.TargetFile)
 	if !filepath.IsAbs(params.TargetFile) {
 		params.TargetFile = filepath.Join(filepath.Dir(params.SourceFile), params.TargetFile)
 	}

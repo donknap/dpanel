@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"text/template"
 
 	"github.com/docker/docker/api/types/registry"
@@ -14,11 +12,17 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/exec/local"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 func New(ctx context.Context, client *docker.Client, opts ...Option) (*Builder, error) {
+	tempFile, _ := storage.Local{}.CreateTempFile("")
+	defer func() {
+		_ = tempFile.Close()
+	}()
+
 	b := &Builder{
 		options: &BuildOptions{
 			Labels:       make([]string, 0),
@@ -78,11 +82,6 @@ func (self Builder) Execute() (exec.Executor, error) {
 	)
 }
 
-func (self Builder) Result() error {
-	_, err := os.ReadFile(filepath.Join(self.options.WorkDir, "meta.json"))
-	return err
-}
-
 type BuildOptions struct {
 	Name         string // 自动生成的临时名称
 	RegistryAuth []registry.AuthConfig
@@ -96,13 +95,17 @@ type BuildOptions struct {
 	Outputs    []string // -o, --output: 输出目的地 (格式: "type=local,dest=path")
 	Platforms  []string // --platform: 设置构建的目标平台 (如 "linux/amd64")
 	Secrets    []string // --secret: 暴露给构建过程的机密信息 (格式: "id=mysecret")
-	Tags       []string // -t, --tag: 镜像名称及标签 (格式: "name:tag")
 
-	Builder string // --builder: 覆盖配置的 builder 实例
-	File    string // -f, --file: Dockerfile 的名称及路
-	Target  string // --target: 设置要构建的目标构建阶段 (Stage)
+	Builder string               // --builder: 覆盖配置的 builder 实例
+	File    string               // -f, --file: Dockerfile 的名称及路
+	Target  []BuildOptionsTarget // --target: 设置要构建的目标构建阶段 (Stage)
 
 	NoCache bool // --no-cache: 构建时不使用任何缓存
 	Pull    bool // --pull: 始终尝试拉取所有引用的镜像
 	Push    bool // --push: Shorthand for "--output=type=registry"
+}
+
+type BuildOptionsTarget struct {
+	Target string
+	Tags   []string
 }

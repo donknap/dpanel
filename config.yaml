@@ -35,7 +35,8 @@ database:
     charset: utf8mb4
     prefix: ims_
     options:
-      mode: ${DB_MODE}
+      mode: ${DP_DB_MODE-rwc}
+      _journal_mode: WAL
 system:
   baseurl: ${DP_SYSTEM_BASEURL}
   storage:

@@ -223,6 +223,9 @@ func (self Site) MakeNginxResolver() error {
 	}
 	resolverFile, err := os.OpenFile("/etc/nginx/conf.d/include/resolver.conf", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
+		if os.Getenv("APP_ENV") == "debug" {
+			return nil
+		}
 		return fmt.Errorf("create Nginx resolver configuration failed %s", err.Error())
 	}
 	defer func() {

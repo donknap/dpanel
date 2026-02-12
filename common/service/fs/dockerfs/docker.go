@@ -64,12 +64,12 @@ func (self Fs) Mkdir(name string, perm os.FileMode) error {
 	panic("implement me")
 }
 
-func (self Fs) MkdirAll(path string, perm os.FileMode) error {
-	path, err := self.getSafePath(path)
+func (self Fs) MkdirAll(p string, perm os.FileMode) error {
+	p, err := self.getSafePath(p)
 	if err != nil {
 		return err
 	}
-	cmd := fmt.Sprintf("mkdir -p \"%s\"", path)
+	cmd := fmt.Sprintf("mkdir -p \"%s\"", p)
 	_, err = self.sdk.ContainerExecResult(self.sdk.Ctx, self.proxyContainerName, cmd)
 	if err != nil {
 		return err
@@ -124,12 +124,12 @@ func (self Fs) Remove(name string) error {
 	panic("implement me")
 }
 
-func (self Fs) RemoveAll(path string) error {
-	path, err := self.getSafePath(path)
+func (self Fs) RemoveAll(p string) error {
+	p, err := self.getSafePath(p)
 	if err != nil {
 		return err
 	}
-	cmd := fmt.Sprintf("rm -rf \"%s\"", path)
+	cmd := fmt.Sprintf("rm -rf \"%s\"", p)
 	_, err = self.sdk.ContainerExecResult(self.sdk.Ctx, self.proxyContainerName, cmd)
 	if err != nil {
 		return err
@@ -148,11 +148,11 @@ func (self Fs) Stat(name string) (os.FileInfo, error) {
 }
 
 func (self Fs) Chmod(name string, mode os.FileMode) error {
-	path, err := self.getSafePath(name)
+	p, err := self.getSafePath(name)
 	if err != nil {
 		return err
 	}
-	cmd := fmt.Sprintf("chmod -R %d %s", mode, path)
+	cmd := fmt.Sprintf("chmod -R %d %s", mode, p)
 	_, err = self.sdk.ContainerExecResult(self.sdk.Ctx, self.proxyContainerName, cmd)
 	if err != nil {
 		return err
@@ -248,6 +248,10 @@ func (self Fs) readDirFromContainer(rootPath string) ([]os.FileInfo, error) {
 }
 
 func (self Fs) getSafePath(rootPath string) (string, error) {
+	if rootPath != function.PathClean(rootPath) {
+		return "", errors.New("illegal path")
+	}
+	rootPath = function.PathClean(rootPath)
 	// 目录必须是以 / 开头
 	if !strings.HasPrefix(rootPath, "/") {
 		return "", errors.New("please use absolute address")

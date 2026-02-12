@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/paths"
+	"github.com/donknap/dpanel/common/library/sanitize"
 )
 
 // PathConvertWinPath2Unix 转换 windows 路径 c:\\my\\path\\shiny 为 /c/my/path/shiny
@@ -27,15 +28,15 @@ func PathConvertWinPath2Unix(p string) (string, bool) {
 	return path.Clean(convertedSource), true
 }
 
-// Path2Safe 传入类 linux 风格的路径，返回一个当前系统支持的路径
-func Path2Safe(path string) string {
-	if path == "" {
+// Path2SystemSafe 传入类 linux 风格的路径，返回一个当前系统支持的安全路径
+func Path2SystemSafe(p string) string {
+	if p == "" {
 		return "."
 	}
-	if len(path) < 2 {
-		return filepath.Clean(path)
+	if len(p) < 2 {
+		return filepath.Clean(p)
 	}
-	p := filepath.ToSlash(path)
+	p = filepath.ToSlash(p)
 	if runtime.GOOS == "windows" && p[0] == '/' {
 		// 无论 /d/abc 还是 /d，统一处理
 		// 核心逻辑：取第2位作为盘符，拼接冒号，再接剩下的部分
@@ -44,6 +45,13 @@ func Path2Safe(path string) string {
 		} else if p[2] == '/' {
 			p = string(p[1]) + ":" + p[2:]
 		}
+		// Windows 没办法清除路径
+		return p
+	} else {
+		return PathClean(filepath.FromSlash(p))
 	}
-	return filepath.Clean(filepath.FromSlash(p))
+}
+
+func PathClean(p string) string {
+	return sanitize.Path(p)
 }

@@ -1,33 +1,13 @@
-map $scheme $hsts_header {
-    https   "max-age=63072000; preload";
-}
-
-{{if .EnableSSL}}
-server {
-    listen 80;
-    listen [::]:80;
-    server_name {{.ServerName}} {{range $index, $value := .ServerNameAlias}}{{$value}} {{end}};
-
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-{{end}}
-
 server {
     set $forward_scheme {{.ServerProtocol}};
-    {{if .EnableSSL}}
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    {{else}}
-    listen 80;
-    {{end}}
-
-    server_name {{.ServerName}} {{range $index, $value := .ServerNameAlias}}{{$value}} {{end}};
-
-    include /etc/nginx/conf.d/include/resolver.conf;
 
     {{if .EnableSSL}}
+    listen {{.ServerPort}} ssl;
+    listen [::]:{{.ServerPort}} ssl;
+    # http2 on;
+
+    error_page 497 =307 https://$host:$server_port$request_uri;
+
     ssl_certificate {{.SslCrt}};
     ssl_certificate_key {{.SslKey}};
     ssl_session_cache shared:SSL:1m;
@@ -35,12 +15,15 @@ server {
     ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE:ECDH:AES:HIGH:!NULL:!aNULL:!MD5:!ADH:!RC4;
     ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
-    add_header Strict-Transport-Security $hsts_header always;
+    add_header Strict-Transport-Security "max-age=63072000; preload" always;
+    {{else}}
+    listen {{.ServerPort}};
+    listen [::]:{{.ServerPort}};
     {{end}}
 
-    {{if .EnableSSL}}
-    add_header Strict-Transport-Security $hsts_header always;
-    {{end}}
+    server_name {{.ServerName}} {{range $index, $value := .ServerNameAlias}}{{$value}} {{end}};
+
+    include /etc/nginx/conf.d/include/resolver.conf;
 
     {{if .EnableAssetCache}}
     # Asset Caching
@@ -58,7 +41,7 @@ server {
     location / {
         {{if .EnableWs}}
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $http_connection;
+        proxy_set_header Connection $connection_upgrade;
         proxy_http_version 1.1;
         {{end}}
 
@@ -70,8 +53,12 @@ server {
         proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
         proxy_set_header X-Real-IP          $remote_addr;
 
-        set $upstream_endpoint {{.ServerAddress}}:{{.Port}};
-        proxy_pass $forward_scheme://$upstream_endpoint$request_uri;
+        {{if eq .ServerAddress "host.dpanel.local"}}
+            proxy_pass $forward_scheme://host.dpanel.local:{{.Port}}$request_uri;
+        {{else}}
+             set $upstream_endpoint {{.ServerAddress}}:{{.Port}};
+             proxy_pass $forward_scheme://$upstream_endpoint$request_uri;
+        {{end}}
     }
     {{end}}
 
@@ -86,10 +73,12 @@ server {
     index index.php index.html index.htm;
     location ~ \.php$ {
         try_files $uri =404;
-
-        set $upstream_endpoint {{.ServerAddress}}:{{.Port}};
-        fastcgi_pass $upstream_endpoint;
-
+        {{if eq .ServerAddress "host.dpanel.local"}}
+            fastcgi_pass host.dpanel.local:{{.Port}};
+        {{else}}
+             set $upstream_endpoint {{.ServerAddress}}:{{.Port}};
+             fastcgi_pass $upstream_endpoint;
+        {{end}}
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME {{.FPMRoot}}$fastcgi_script_name;
         include fastcgi_params;

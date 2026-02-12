@@ -137,6 +137,9 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	params.File = function.PathClean(params.File)
+	params.DestPath = function.PathClean(params.DestPath)
+
 	if strings.HasPrefix(params.File, "/") {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerInvalidFilename), 500)
 		return

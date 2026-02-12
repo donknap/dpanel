@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"io"
 	"log/slog"
+	"path"
 	"strings"
 
 	"github.com/donknap/dpanel/app/application/logic"
@@ -36,13 +37,15 @@ func (self Docker) ImageBuild(messageId string, task accessor.ImageSettingOption
 		buildx.WithPlatform(task.BuildPlatformType...),
 		buildx.WithOutputImage(task.BuildEnablePush, ""),
 	}
-	options = append(options, buildx.WithTag(function.PluckArrayWalk(task.Tags, func(item *function.Tag) (string, bool) {
-		// 获取仓库权限
-		if v := (logic.Image{}).GetRegistryConfig(item.Registry); v != nil {
+	for _, tag := range task.Tags {
+		if !tag.Enable {
+			continue
+		}
+		if v := (logic.Image{}).GetRegistryConfig(tag.Registry); v != nil {
 			options = append(options, buildx.WithRegistryAuth(v.Config))
 		}
-		return item.Uri(), true
-	})...))
+		options = append(options, buildx.WithTag(tag.Target, tag.Uri()))
+	}
 
 	if task.BuildCacheType != "" {
 		options = append(options, buildx.WithCache(task.BuildCacheType))
@@ -55,8 +58,9 @@ func (self Docker) ImageBuild(messageId string, task accessor.ImageSettingOption
 		options = append(options, buildx.WithDockerFilePath(task.BuildDockerfileName))
 		options = append(options, buildx.WithWorkDir(task.BuildDockerfileRoot))
 		options = append(options, buildx.WithZipFilePath(task.BuildZip))
-	} else if task.BuildDockerfileName != "" {
-		options = append(options, buildx.WithDockerFilePath(task.BuildDockerfileName))
+	} else if task.BuildPath != "" {
+		options = append(options, buildx.WithDockerFilePath(path.Join(task.BuildPath, task.BuildDockerfileName)))
+		options = append(options, buildx.WithWorkDir(task.BuildPath))
 	} else {
 		options = append(options, buildx.WithDockerFileContent([]byte(task.BuildDockerfileContent)))
 	}
@@ -69,6 +73,7 @@ func (self Docker) ImageBuild(messageId string, task accessor.ImageSettingOption
 		return "", err
 	}
 	defer func() {
+		b.Close()
 		if cmd.Close() != nil {
 			slog.Error("image", "build", err.Error())
 		}
@@ -90,9 +95,6 @@ func (self Docker) ImageBuild(messageId string, task accessor.ImageSettingOption
 	if strings.Contains(log.String(), "ERROR: no builder") {
 		return log.String(), function.ErrorMessage(define.ErrorMessageImageBuildError, "message", log.String())
 	}
-	// 检测是否成功
-	if err = b.Result(); err != nil {
-		return log.String(), function.ErrorMessage(define.ErrorMessageImageBuildError, "message", "")
-	}
+
 	return log.String(), nil
 }

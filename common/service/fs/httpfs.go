@@ -34,7 +34,7 @@ type HttpFs struct {
 }
 
 func (self HttpFs) Open(name string) (http.File, error) {
-	if !strings.HasSuffix(name, ".js") {
+	if !strings.HasSuffix(name, ".js") && !strings.HasSuffix(name, ".css") {
 		return self.fs.Open(name)
 	}
 
