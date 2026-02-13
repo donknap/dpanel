@@ -4,9 +4,10 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"golang.org/x/net/http/httpproxy"
 )
 
 const (
@@ -16,24 +17,24 @@ const (
 	SecureTransport
 )
 
-var (
-	secureHTTPTransport   http.RoundTripper
-	insecureHTTPTransport http.RoundTripper
-)
-
-func init() {
-	insecureHTTPTransport = NewTransport(WithInsecureSkipVerify(true))
-	if InternalTLSEnabled() {
-		secureHTTPTransport = NewTransport(WithInternalTLSConfig())
-	} else {
-		secureHTTPTransport = NewTransport()
-	}
-}
-
-func AddTracingWithGlobalTransport() {
-	insecureHTTPTransport = otelhttp.NewTransport(insecureHTTPTransport)
-	secureHTTPTransport = otelhttp.NewTransport(secureHTTPTransport)
-}
+//var (
+//	secureHTTPTransport   http.RoundTripper
+//	insecureHTTPTransport http.RoundTripper
+//)
+//
+//func init() {
+//	insecureHTTPTransport = NewTransport(WithInsecureSkipVerify(true))
+//	if InternalTLSEnabled() {
+//		secureHTTPTransport = NewTransport(WithInternalTLSConfig())
+//	} else {
+//		secureHTTPTransport = NewTransport()
+//	}
+//}
+//
+//func AddTracingWithGlobalTransport() {
+//	insecureHTTPTransport = otelhttp.NewTransport(insecureHTTPTransport)
+//	secureHTTPTransport = otelhttp.NewTransport(secureHTTPTransport)
+//}
 
 // Use this instead of Default Transport in library because it sets ForceAttemptHTTP2 to true
 // And that options introduced in go 1.13 will cause the https requests hang forever in replication environment
@@ -85,6 +86,14 @@ func WithIdleconnectionTimeout(idleConnectionTimeout time.Duration) func(*http.T
 	}
 }
 
+func WithProxyFromEnv() func(*http.Transport) {
+	return func(tr *http.Transport) {
+		tr.Proxy = func(request *http.Request) (*url.URL, error) {
+			return httpproxy.FromEnvironment().ProxyFunc()(request.URL)
+		}
+	}
+}
+
 // NewTransport returns a new http.Transport with the specified options
 func NewTransport(opts ...func(*http.Transport)) http.RoundTripper {
 	tr := newDefaultTransport()
@@ -115,8 +124,14 @@ func GetHTTPTransport(opts ...TransportOption) http.RoundTripper {
 	for _, opt := range opts {
 		opt(cfg)
 	}
+
 	if cfg.Insecure {
-		return insecureHTTPTransport
+		return NewTransport(WithInsecureSkipVerify(true), WithProxyFromEnv())
 	}
-	return secureHTTPTransport
+
+	if InternalTLSEnabled() {
+		return NewTransport(WithInternalTLSConfig(), WithProxyFromEnv())
+	} else {
+		return NewTransport(WithProxyFromEnv())
+	}
 }

@@ -2,6 +2,7 @@ package function
 
 import (
 	"fmt"
+	"io/fs"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -54,4 +55,22 @@ func Path2SystemSafe(p string) string {
 
 func PathClean(p string) string {
 	return sanitize.Path(p)
+}
+
+func PathSize(p string) (int64, error) {
+	var size int64
+
+	err := filepath.WalkDir(p, func(walkPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			info, err := d.Info()
+			if err == nil {
+				size += info.Size()
+			}
+		}
+		return nil
+	})
+	return size, err
 }

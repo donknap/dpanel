@@ -57,8 +57,6 @@ ENV APP_VERSION=$APP_VERSION
 ENV APP_FAMILY=$APP_FAMILY
 
 COPY --from=builder /src/runtime/dpanel-pe-musl-${TARGETARCH} /app/server/dpanel
-COPY --from=builder /src/runtime/config.yaml /app/server/config.yaml
-
 
 FROM dpanel/dpanel:latest AS production
 
@@ -70,4 +68,3 @@ ENV APP_VERSION=$APP_VERSION
 ENV APP_FAMILY=$APP_FAMILY
 
 COPY --from=builder /src/runtime/dpanel-pe-musl-${TARGETARCH} /app/server/dpanel
-COPY --from=builder /src/runtime/config.yaml /app/server/config.yaml

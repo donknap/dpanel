@@ -54,7 +54,7 @@ RUN sed -i 's/dl-cdn.alpinelinux111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk
     mkdir -p /root/.ssh && chmod 700 /root/.ssh
 
 COPY --from=builder /src/runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
-COPY ./runtime/config.yaml /app/server/config.yaml
+COPY ./config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
 COPY ./docker/task /docker
 

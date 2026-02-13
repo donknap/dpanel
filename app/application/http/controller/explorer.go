@@ -53,7 +53,7 @@ func (self Explorer) Export(http *gin.Context) {
 		return
 	}
 	fileName := strings.Trim(containerInfo.Name, "/") + "-" + time.Now().Format(define.DateYmdHis) + ".zip"
-	tempFile, err := storage.Local{}.CreateTempFile("export/file/" + fileName)
+	tempFile, err := storage.Local{}.CreateSaveFile("export/file/" + fileName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

@@ -11,4 +11,5 @@ const (
 type DPanelInfo struct {
 	ContainerInfo container.InspectResponse
 	RunIn         string
+	Proxy         string
 }

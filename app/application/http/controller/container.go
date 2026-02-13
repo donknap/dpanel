@@ -490,7 +490,7 @@ func (self Container) Export(http *gin.Context) {
 	}()
 	fileName := strings.Trim(containerInfo.Name, "/") + "-" + time.Now().Format(define.DateYmdHis) + ".tar"
 	if params.EnableExportToPath {
-		file, err := storage.Local{}.CreateTempFile("export/container/" + fileName)
+		file, err := storage.Local{}.CreateSaveFile("export/container/" + fileName)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

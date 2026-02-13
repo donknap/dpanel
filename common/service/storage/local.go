@@ -88,20 +88,28 @@ func (self Local) GetStorageLocalPath() string {
 	}
 }
 
+func (self Local) CreateSaveFile(name string) (*os.File, error) {
+	f := filepath.Join(self.GetSaveRootPath(), name)
+	_ = os.MkdirAll(filepath.Dir(f), os.ModePerm)
+	return os.Create(f)
+}
+
 func (self Local) CreateTempFile(name string) (*os.File, error) {
+	cacheDir := filepath.Join(self.GetSaveRootPath(), "temp")
 	if name == "" {
-		return os.CreateTemp(self.GetSaveRootPath(), "dpanel-temp-")
+		return os.CreateTemp(cacheDir, "dpanel-temp-")
 	}
-	_ = os.MkdirAll(filepath.Dir(filepath.Join(self.GetSaveRootPath(), name)), os.ModePerm)
-	return os.Create(filepath.Join(self.GetSaveRootPath(), name))
+	_ = os.MkdirAll(filepath.Dir(filepath.Join(cacheDir, name)), os.ModePerm)
+	return os.Create(filepath.Join(cacheDir, name))
 }
 
 func (self Local) CreateTempDir(name string) (string, error) {
+	cacheDir := filepath.Join(self.GetSaveRootPath(), "temp")
 	if name == "" {
-		return os.MkdirTemp(self.GetSaveRootPath(), "dpanel-temp-")
+		return os.MkdirTemp(cacheDir, "dpanel-temp-")
 	}
 	name = fmt.Sprintf("dpanel-temp-%s", name)
-	path := filepath.Join(self.GetSaveRootPath(), name)
+	path := filepath.Join(cacheDir, name)
 	if _, err := os.Stat(path); err == nil {
 		_ = os.RemoveAll(path)
 	}

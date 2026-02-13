@@ -3,6 +3,7 @@ package events
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -95,7 +96,12 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 	defer func() {
 		sdk.Close()
 	}()
-	result := &types2.DPanelInfo{}
+	result := logic.Setting{}.GetDPanelInfo()
+	if result.Proxy != "" {
+		_ = os.Setenv("HTTP_PROXY", result.Proxy)
+		_ = os.Setenv("HTTPS_PROXY", result.Proxy)
+		slog.Debug("init dpanel proxy", "url", result.Proxy)
+	}
 	if function.IsRunInDocker() {
 		result.RunIn = types2.DPanelRunInContainer
 	} else {
@@ -158,7 +164,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 			GroupName: logic.SettingGroupSetting,
 			Name:      logic.SettingGroupSettingDPanelInfo,
 			Value: &accessor.SettingValueOption{
-				DPanelInfo: result,
+				DPanelInfo: &result,
 			},
 		})
 		logic.Env{}.UpdateEnv(e.DockerEnv)

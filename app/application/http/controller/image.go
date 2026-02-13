@@ -463,7 +463,7 @@ func (self Image) Export(http *gin.Context) {
 	})
 	fileName := fmt.Sprintf("export/image/%s-%s.tar", strings.Join(names, "-"), time.Now().Format(define.DateYmdHis))
 	if params.EnableExportToPath {
-		file, err := storage.Local{}.CreateTempFile(fileName)
+		file, err := storage.Local{}.CreateSaveFile(fileName)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

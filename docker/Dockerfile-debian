@@ -24,7 +24,7 @@ ENV STORAGE_LOCAL_PATH=$DP_SYSTEM_STORAGE_LOCAL_PATH
 ENV DB_DATABASE=$DP_DB_DATABASE
 
 COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-gnu-${TARGETARCH} /app/server/dpanel
-COPY ./runtime/config.yaml /app/server/config.yaml
+COPY ./config.yaml /app/server/config.yaml
 COPY ./docker/script /app/script
 COPY ./docker/task /docker
 
