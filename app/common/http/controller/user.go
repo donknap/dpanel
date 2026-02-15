@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"runtime"
 	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
@@ -134,11 +133,6 @@ func (self User) GetUserInfo(http *gin.Context) {
 
 	if info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx); err == nil && info.Swarm.ControlAvailable {
 		feature = append(feature, types.FeatureSwarmManage)
-	}
-
-	// windows 系统不开启 buildx 问题比较多
-	if runtime.GOOS != "windows" {
-		feature = append(feature, types.FeatureBuildX)
 	}
 
 	result["feature"] = append(feature, family.Provider{}.Feature()...)

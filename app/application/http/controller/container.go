@@ -201,7 +201,10 @@ func (self Container) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
+	dpanelInfo := logic2.Setting{}.GetDPanelInfo()
+	if dpanelInfo.ContainerInfo.ContainerJSONBase != nil && dpanelInfo.ContainerInfo.Name == detail.Name {
+		detail.Config.Labels[define.DPanelLabelContainerDPanelSelf] = "true"
+	}
 	ignore := accessor.ContainerCheckIgnoreUpgrade{}
 	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore, &ignore)
 

@@ -348,8 +348,6 @@ func (self Home) WsHostConsole(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
-	dpanelInfo := logic.Setting{}.GetDPanelInfo()
-
 	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err == nil && info.ID != "" {
 		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
@@ -357,6 +355,14 @@ func (self Home) Info(http *gin.Context) {
 	var public string
 	if v, ok := storage.Cache.Get(storage.CacheKeyRsaPub); ok {
 		public = string(v.([]byte))
+	}
+	dpanelInfo := logic.Setting{}.GetDPanelInfo()
+	var containerInfo gin.H
+	if dpanelInfo.ContainerInfo.ContainerJSONBase != nil {
+		containerInfo = gin.H{
+			"Id":   dpanelInfo.ContainerInfo.ID,
+			"Name": dpanelInfo.ContainerInfo.Name,
+		}
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":          info,
@@ -366,7 +372,7 @@ func (self Home) Info(http *gin.Context) {
 			"version":          facade.GetConfig().GetString("app.version"),
 			"family":           facade.GetConfig().GetString("app.family"),
 			"env":              facade.GetConfig().GetString("app.env"),
-			"containerInfo":    dpanelInfo.ContainerInfo,
+			"containerInfo":    containerInfo,
 			"runIn":            dpanelInfo.RunIn,
 			"storageLocalPath": storage.Local{}.GetStorageLocalPath(),
 		},
@@ -704,18 +710,7 @@ func (self Home) Prune(http *gin.Context) {
 	}
 
 	if params.EnableTempFile {
-		if v := (storage.Local{}).GetSaveRootPath(); v != "" {
-			if list, err := os.ReadDir(v); err == nil {
-				for _, entry := range list {
-					if strings.HasPrefix(entry.Name(), "dpanel-temp-") {
-						if err := os.Remove(storage.Local{}.GetSaveRealPath(entry.Name())); err == nil {
-							total++
-						}
-					}
-
-				}
-			}
-		}
+		_ = os.RemoveAll(storage.Local{}.GetLocalTempDir())
 	}
 
 	runtime.GC()

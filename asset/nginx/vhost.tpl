@@ -54,10 +54,10 @@ server {
         proxy_set_header X-Real-IP          $remote_addr;
 
         {{if eq .ServerAddress "host.dpanel.local"}}
-            proxy_pass $forward_scheme://host.dpanel.local:{{.Port}}$request_uri;
+        proxy_pass $forward_scheme://host.dpanel.local:{{.Port}}$request_uri;
         {{else}}
-             set $upstream_endpoint {{.ServerAddress}}:{{.Port}};
-             proxy_pass $forward_scheme://$upstream_endpoint$request_uri;
+        set $upstream_endpoint {{.ServerAddress}}:{{.Port}};
+        proxy_pass $forward_scheme://$upstream_endpoint$request_uri;
         {{end}}
     }
     {{end}}
@@ -74,10 +74,10 @@ server {
     location ~ \.php$ {
         try_files $uri =404;
         {{if eq .ServerAddress "host.dpanel.local"}}
-            fastcgi_pass host.dpanel.local:{{.Port}};
+        fastcgi_pass host.dpanel.local:{{.Port}};
         {{else}}
-             set $upstream_endpoint {{.ServerAddress}}:{{.Port}};
-             fastcgi_pass $upstream_endpoint;
+        set $upstream_endpoint {{.ServerAddress}}:{{.Port}};
+        fastcgi_pass $upstream_endpoint;
         {{end}}
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME {{.FPMRoot}}$fastcgi_script_name;

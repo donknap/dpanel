@@ -10,6 +10,7 @@ const (
 	DPanelLabelContainerAutoRemove = "com.dpanel.container.auto_remove"
 	DPanelLabelContainerTitle      = "com.dpanel.container.title"
 	DPanelLabelContainerHidden     = "com.dpanel.container.hidden"
+	DPanelLabelContainerDPanelSelf = "com.dpanel.container.dpanel_self" // 表示当前容器为 DPanel 自身限制管理
 
 	ComposeProjectPrefix = "dpanel-c-"                 // Deprecated
 	ComposeProjectName   = ComposeProjectPrefix + "%s" // Deprecated

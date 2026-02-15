@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
@@ -134,6 +135,13 @@ func WithZipFilePath(trimPath string, path string) Option {
 			}
 		}
 		self.buildContext = buf
+		return nil
+	}
+}
+
+func WithSdk(sdk *docker.Client) Option {
+	return func(self *Builder) error {
+		self.sdk = sdk
 		return nil
 	}
 }

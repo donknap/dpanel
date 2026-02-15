@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -94,22 +95,40 @@ func (self Local) CreateSaveFile(name string) (*os.File, error) {
 	return os.Create(f)
 }
 
-func (self Local) CreateTempFile(name string) (*os.File, error) {
-	cacheDir := filepath.Join(self.GetSaveRootPath(), "temp")
-	if name == "" {
-		return os.CreateTemp(cacheDir, "dpanel-temp-")
+func (self Local) GetLocalTempDir() string {
+	p := filepath.Join(self.GetSaveRootPath(), "temp")
+	if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {
+		_ = os.MkdirAll(p, os.ModePerm)
 	}
-	_ = os.MkdirAll(filepath.Dir(filepath.Join(cacheDir, name)), os.ModePerm)
-	return os.Create(filepath.Join(cacheDir, name))
+	return p
+}
+
+func (self Local) GetTempFile(name string) (file *os.File, path string, err error) {
+	tempFilePath := filepath.Join(self.GetLocalTempDir(), name)
+	_, err = os.Stat(tempFilePath)
+	if err != nil {
+		return nil, "", err
+	}
+	file, err = os.OpenFile(tempFilePath, os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return nil, "", err
+	}
+	return file, file.Name(), err
+}
+
+func (self Local) CreateTempFile(name string) (*os.File, error) {
+	if name == "" {
+		return os.CreateTemp(self.GetLocalTempDir(), "dpanel-temp-")
+	}
+	return os.Create(filepath.Join(self.GetLocalTempDir(), name))
 }
 
 func (self Local) CreateTempDir(name string) (string, error) {
-	cacheDir := filepath.Join(self.GetSaveRootPath(), "temp")
 	if name == "" {
-		return os.MkdirTemp(cacheDir, "dpanel-temp-")
+		return os.MkdirTemp(self.GetLocalTempDir(), "dpanel-temp-")
 	}
 	name = fmt.Sprintf("dpanel-temp-%s", name)
-	path := filepath.Join(cacheDir, name)
+	path := filepath.Join(self.GetLocalTempDir(), name)
 	if _, err := os.Stat(path); err == nil {
 		_ = os.RemoveAll(path)
 	}
@@ -134,9 +153,12 @@ func (self Local) SaveUploadImage(uploadFileName, newFileNamePrefix string, appe
 
 	newBgFile := filepath.Join(rootPath, newFileName)
 	_ = os.MkdirAll(filepath.Dir(newBgFile), 0777)
-	_ = os.Rename(
+	err := os.Rename(
 		uploadFileName,
 		newBgFile,
 	)
+	if err != nil {
+		slog.Debug("save upload image fail", "error", err)
+	}
 	return "/dpanel/static/image/" + newFileName
 }

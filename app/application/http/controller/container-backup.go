@@ -318,6 +318,28 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					}
 					if _, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, networkInfo.Name, network.InspectOptions{}); err != nil {
 						networkCreate = append(networkCreate, networkInfo)
+						if networkInfo.IPAM.Config != nil {
+							for i, ipamConfig := range networkInfo.IPAM.Config {
+								// fix docker 导出 ipv6 网关地址的时候附带了 /64
+								//"IPAM": {
+								//    "Config": [
+								//        {
+								//            "Gateway": "172.18.0.1",
+								//            "Subnet": "172.18.0.0/16"
+								//        },
+								//        {
+								//            "Gateway": "fd86:9ba5:b9cc::1/64",
+								//            "Subnet": "fd86:9ba5:b9cc::/64"
+								//        }
+								//    ],
+								//    "Driver": "default",
+								//    "Options": {}
+								//}
+								if b, _, ok := strings.Cut(ipamConfig.Gateway, "/"); ok {
+									networkInfo.IPAM.Config[i].Gateway = b
+								}
+							}
+						}
 						_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, networkInfo.Name, network.CreateOptions{
 							Driver:     networkInfo.Driver,
 							Scope:      networkInfo.Scope,

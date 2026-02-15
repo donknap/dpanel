@@ -1,10 +1,13 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,7 +25,7 @@ type Panel struct {
 	controller.Abstract
 }
 
-func (self Panel) Usage(c *gin.Context) {
+func (self Panel) Usage(http *gin.Context) {
 	type pathItem struct {
 		Name        string  `json:"name"`
 		Path        string  `json:"path"`
@@ -77,7 +80,7 @@ func (self Panel) Usage(c *gin.Context) {
 		item.UsedPercent = float64(item.Used) / float64(diskTotal) * 100
 	}
 
-	self.JsonResponseWithoutError(c, gin.H{
+	self.JsonResponseWithoutError(http, gin.H{
 		"pathUsage":  savePath,
 		"diskUsage":  diskTotal,
 		"panelUsage": panelTotal,
@@ -100,7 +103,7 @@ func (self Panel) Backup(http *gin.Context) {
 	backupFile, err := storage.Local{}.CreateSaveFile(
 		path.Join("export",
 			"panel",
-			fmt.Sprintf("dpanel_backup_%s.tar.gz", time.Now().Format(define.DateYmdHis))))
+			fmt.Sprintf("dpanel-backup-%s.tar.gz", time.Now().Format(define.DateYmdHis))))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -146,4 +149,91 @@ func (self Panel) Backup(http *gin.Context) {
 		"path": backupFilePath,
 	})
 	return
+}
+
+func (self Panel) Proxy(http *gin.Context) {
+	type ParamsValidate struct {
+		Proxy   string `json:"proxy"`
+		NoProxy string `json:"noProxy"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+}
+
+func (self Panel) BackupList(http *gin.Context) {
+	root := filepath.Join(storage.Local{}.GetSaveRootPath(), "export", "panel")
+	type backupFileItem struct {
+		Path      string    `json:"path"`
+		CreatedAt time.Time `json:"createdAt"`
+		Size      int64     `json:"size"`
+	}
+	backupList := make([]backupFileItem, 0)
+	err := filepath.Walk(root, func(path string, info fs.FileInfo, err error) error {
+		if path == root {
+			return nil
+		}
+		if info.IsDir() {
+			return filepath.SkipDir
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		backupList = append(backupList, backupFileItem{
+			Path:      rel,
+			Size:      info.Size(),
+			CreatedAt: info.ModTime(),
+		})
+		return nil
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	sort.Slice(backupList, func(i, j int) bool {
+		return backupList[i].CreatedAt.After(backupList[j].CreatedAt)
+	})
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": backupList,
+	})
+	return
+}
+
+func (self Panel) BackupDelete(http *gin.Context) {
+	type ParamsValidate struct {
+		Name []string `json:"name"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	for _, s := range params.Name {
+		backupFilePath := filepath.Join(storage.Local{}.GetSaveRootPath(), "export", "panel", function.PathClean(s))
+		if _, err := os.Stat(backupFilePath); errors.Is(err, os.ErrNotExist) {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		err := os.Remove(backupFilePath)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Panel) Restore(http *gin.Context) {
+	type ParamsValidate struct {
+		FileName string `json:"fileName"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
 }

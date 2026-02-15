@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"os"
@@ -10,7 +11,9 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/build"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/go-units"
+	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/application/logic/task"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -95,23 +98,57 @@ func (self ImageBuild) Create(http *gin.Context) {
 	_ = dao.Image.Save(imageNew)
 
 	if !params.OnlySave {
+		var log string
+		var err error
+		var imageId string
+
 		startTime := time.Now()
-		log, err := task.Docker{}.ImageBuild(fmt.Sprintf(ws.MessageTypeImageBuild, params.Id), params.ImageSettingOption)
+		messageId := fmt.Sprintf(ws.MessageTypeImageBuild, params.Id)
+		if params.BuildEngine == define.ImageBuildBuildX {
+			log, err = task.Docker{}.ImageBuildX(messageId, params.ImageSettingOption)
+			// 检测是否成功
+			matches := regexp.MustCompile(`"containerimage\.digest"\s*:\s*"(sha256:[a-f0-9]+)"`).FindAllStringSubmatch(log, -1)
+			imageId = strings.Join(function.PluckArrayWalk(matches, func(item []string) (string, bool) {
+				return item[1], true
+			}), "-")
+			if imageId == "" {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildError, "message", ""), 500)
+				return
+			}
+		} else {
+			log, err = task.Docker{}.ImageBuild(docker.Sdk, messageId, params.ImageSettingOption)
+			if params.ImageSettingOption.BuildEnablePush {
+				wsBuffer := ws.NewProgressPip(messageId)
+				defer wsBuffer.Close()
+				for _, tag := range params.ImageSettingOption.Tags {
+					pushOption := image.PushOptions{}
+					if v := (logic.Image{}).GetRegistryConfig(tag.Registry); v != nil {
+						pushOption.RegistryAuth = v.GetAuthString()
+					}
+					reader, err := docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, tag.Uri(), pushOption)
+					if err != nil {
+						self.JsonResponseWithError(http, err, 500)
+						return
+					}
+					_, err = io.Copy(wsBuffer, reader)
+					if err != nil {
+						self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonCancelOperator, "message", err.Error()), 500)
+						return
+					}
+				}
+			}
+			matches := regexp.MustCompile(`Successfully built\s*([a-f0-9]+)`).FindAllStringSubmatch(log, -1)
+			imageId = strings.Join(function.PluckArrayWalk(matches, func(item []string) (string, bool) {
+				return item[1], true
+			}), "-")
+		}
 		if err != nil {
 			imageNew.Status = define.DockerImageBuildStatusError
 		} else {
 			imageNew.Status = define.DockerImageBuildStatusSuccess
 		}
-		// 检测是否成功
-		matches := regexp.MustCompile(`"containerimage\.digest"\s*:\s*"(sha256:[a-f0-9]+)"`).FindAllStringSubmatch(log, -1)
-		imageId := function.PluckArrayWalk(matches, func(item []string) (string, bool) {
-			return item[1], true
-		})
-		if function.IsEmptyArray(imageId) {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildError, "message", ""), 500)
-			return
-		}
-		imageNew.Setting.ImageId = strings.Join(imageId, "-")
+
+		imageNew.Setting.ImageId = imageId
 		imageNew.Setting.UseTime = time.Now().Sub(startTime).Seconds()
 		imageNew.Message = log
 		_ = dao.Image.Save(imageNew)
