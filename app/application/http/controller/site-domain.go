@@ -1,13 +1,18 @@
 package controller
 
 import (
+	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -19,6 +24,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -267,7 +273,7 @@ func (self SiteDomain) Delete(http *gin.Context) {
 
 }
 
-func (self SiteDomain) RestartNginx(http *gin.Context) {
+func (self SiteDomain) NginxRestart(http *gin.Context) {
 	if err := (logic.Site{}).MakeNginxResolver(); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -300,6 +306,82 @@ func (self SiteDomain) RestartNginx(http *gin.Context) {
 			}
 		}
 	}
+	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self SiteDomain) NginxLog(http *gin.Context) {
+	type ParamsValidate struct {
+		Log       []string `json:"log"`
+		LineTotal int      `json:"lineTotal"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	wsBuffer := ws.NewProgressPip(ws.MessageTypeNginxLog)
+	defer wsBuffer.Close()
+
+	ctx, cancel := context.WithCancel(wsBuffer.Context())
+	defer cancel()
+
+	var wg sync.WaitGroup
+
+	for _, s := range params.Log {
+		wg.Add(1)
+
+		go func(filename string) {
+			defer wg.Done()
+
+			file, err := os.Open(filename)
+			if err != nil {
+				wsBuffer.BroadcastMessage(function.ConsoleWriteError(fmt.Sprintf("打开文件失败 %s: %v", filename, err)))
+				return
+			}
+
+			defer file.Close()
+
+			err = function.FileSeekToLastNLines(file, params.LineTotal)
+			if err != nil {
+				wsBuffer.BroadcastMessage(function.ConsoleWriteError(err.Error()))
+				return
+			}
+
+			reader := bufio.NewReader(file)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				line, err := reader.ReadString('\n')
+				if err != nil {
+					if err == io.EOF {
+						select {
+						case <-ctx.Done():
+							return
+						case <-time.After(100 * time.Millisecond):
+							continue
+						}
+					}
+					wsBuffer.BroadcastMessage(function.ConsoleWriteError(err.Error()))
+					return
+				}
+				wsBuffer.BroadcastMessage(line)
+			}
+		}(s)
+	}
+
+	go func() {
+		wg.Wait()
+		cancel()
+		wsBuffer.Close()
+	}()
+
+	<-wsBuffer.Done()
+
 	self.JsonSuccessResponse(http)
 	return
 }

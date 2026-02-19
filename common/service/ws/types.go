@@ -25,6 +25,7 @@ const (
 	MessageTypeDomainApply      = "domain:apply"
 	MessageTypeUserPermission   = "user:permission:%s"
 	MessageTypeSwarmLog         = "swarm:log:%s:%s"
+	MessageTypeNginxLog         = "nginx:log"
 )
 
 type RespMessage struct {

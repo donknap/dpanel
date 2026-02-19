@@ -29,7 +29,8 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/site-domain/delete", controller.SiteDomain{}.Delete)
 			cors.POST("/app/site-domain/get-list", controller.SiteDomain{}.GetList)
 			cors.POST("/app/site-domain/get-detail", controller.SiteDomain{}.GetDetail)
-			cors.POST("/app/site-domain/restart-nginx", controller.SiteDomain{}.RestartNginx)
+			cors.POST("/app/site-domain/nginx-restart", controller.SiteDomain{}.NginxRestart)
+			cors.POST("/app/site-domain/nginx-log", controller.SiteDomain{}.NginxLog)
 			cors.POST("/app/site-domain/update-vhost", controller.SiteDomain{}.UpdateVhost)
 
 			cors.POST("/app/site-cert/apply", controller.SiteCert{}.Apply)

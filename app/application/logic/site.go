@@ -232,7 +232,7 @@ func (self Site) MakeNginxResolver() error {
 		_ = resolverFile.Close()
 	}()
 	err = parser.ExecuteTemplate(resolverFile, "resolver.tpl", map[string]interface{}{
-		"Resolver": function.SystemResolver("127.0.0.11", "1.1.1.1", "8.8.8.8"),
+		"Resolver": function.SystemResolver(),
 	})
 	if err != nil {
 		return err

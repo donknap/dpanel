@@ -1,3 +1,13 @@
+{{if and .EnableSSL (eq (print .ServerPort) "443")}}
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{.ServerName}} {{range $index, $value := .ServerNameAlias}}{{$value}} {{end}};
+
+    return 301 https://$host$request_uri;
+}
+{{end}}
+
 server {
     set $forward_scheme {{.ServerProtocol}};
 

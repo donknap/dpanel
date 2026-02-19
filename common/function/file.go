@@ -56,3 +56,48 @@ func CopyDir(targetPath, sourcePath string) error {
 	_ = os.MkdirAll(targetPath, os.ModePerm)
 	return os.CopyFS(targetPath, os.DirFS(sourcePath))
 }
+
+func FileSeekToLastNLines(file *os.File, n int) error {
+	stat, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	size := stat.Size()
+	if size == 0 {
+		return nil
+	}
+
+	var chunkSize int64 = 4096
+	var offset = size
+	var lineCount int
+	buf := make([]byte, chunkSize)
+
+	for offset > 0 && lineCount <= n {
+		readSize := chunkSize
+		if offset < chunkSize {
+			readSize = offset
+		}
+		offset -= readSize
+		_, err := file.Seek(offset, io.SeekStart)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.ReadFull(file, buf[:readSize])
+		if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
+			return err
+		}
+
+		for i := int(readSize) - 1; i >= 0; i-- {
+			if buf[i] == '\n' {
+				lineCount++
+				if lineCount == n+1 {
+					_, err = file.Seek(offset+int64(i)+1, io.SeekStart)
+					return err
+				}
+			}
+		}
+	}
+	_, err = file.Seek(0, io.SeekStart)
+	return err
+}
