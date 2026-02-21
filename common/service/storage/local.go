@@ -77,6 +77,10 @@ func (self Local) GetNginxSettingPath() string {
 	return fmt.Sprintf("%s/nginx/proxy_host/", self.GetStorageLocalPath())
 }
 
+func (self Local) GetNginxExtraSettingPath() string {
+	return fmt.Sprintf("%s/nginx/extra_host/", self.GetStorageLocalPath())
+}
+
 func (self Local) GetStorageLocalPath() string {
 	if facade.GetConfig() == nil {
 		slog.Debug("storage local path empty")

@@ -109,3 +109,13 @@ func WithReloadCommand(file string) Option {
 		return nil
 	}
 }
+
+func WithEabAccount(kid, hmacKey string) Option {
+	return func(self *Acme) error {
+		if kid == "" || hmacKey == "" {
+			return nil
+		}
+		self.argv = append(self.argv, "--eab-kid", kid, "--eab-hmac-key", hmacKey)
+		return nil
+	}
+}

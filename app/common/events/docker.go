@@ -122,7 +122,8 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 			result.RunIn = types2.DPanelRunInDockerDesktop
 		}
 		// 面板信息总是从默认环境中获取
-		if info, err := sdk.Client.ContainerInspect(sdk.Ctx, facade.GetConfig().GetString("app.name")); err == nil {
+		dpanelContainerName := facade.GetConfig().GetString("app.name")
+		if info, err := sdk.Client.ContainerInspect(sdk.Ctx, dpanelContainerName); err == nil {
 			info.ExecIDs = make([]string, 0)
 			result.ContainerInfo = info
 

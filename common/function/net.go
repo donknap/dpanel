@@ -43,11 +43,11 @@ func IpIsLocalhost(address string) bool {
 	return false
 }
 
-func SystemResolver(dnsIps ...string) []string {
+func SystemResolver(defaultDnsIps ...string) []string {
 	var resolvers = make([]string, 0)
 	file, err := os.Open("/etc/resolv.conf")
 	if err != nil {
-		return append(resolvers, dnsIps...)
+		return defaultDnsIps
 	}
 	defer file.Close()
 
@@ -64,6 +64,8 @@ func SystemResolver(dnsIps ...string) []string {
 			}
 		}
 	}
-
-	return append(resolvers, dnsIps...)
+	if len(resolvers) == 0 {
+		return defaultDnsIps
+	}
+	return resolvers
 }

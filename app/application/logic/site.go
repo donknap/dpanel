@@ -191,12 +191,12 @@ func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 	if err != nil {
 		return err
 	}
+	confFileName := fmt.Sprintf(VhostFileName, setting.ServerName)
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
 	if err != nil {
 		return err
 	}
-	nginxConfPath := filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(VhostFileName, setting.ServerName))
-	vhostFile, err := os.OpenFile(nginxConfPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+	vhostFile, err := os.OpenFile(filepath.Join(storage.Local{}.GetNginxSettingPath(), confFileName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
 		return errors.New("the Nginx configuration directory does not exist")
 	}
@@ -206,6 +206,19 @@ func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 	err = parser.ExecuteTemplate(vhostFile, "vhost.tpl", setting)
 	if err != nil {
 		return err
+	}
+	if setting.ExtraNginx != "" {
+		extraVhostFile, err := os.OpenFile(filepath.Join(storage.Local{}.GetNginxExtraSettingPath(), confFileName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+		if err != nil {
+			return errors.New("the Nginx configuration directory does not exist")
+		}
+		defer func() {
+			_ = extraVhostFile.Close()
+		}()
+		_, err = extraVhostFile.WriteString(string(setting.ExtraNginx))
+		if err != nil {
+			return err
+		}
 	}
 	err = self.MakeNginxResolver()
 	return err
@@ -232,7 +245,7 @@ func (self Site) MakeNginxResolver() error {
 		_ = resolverFile.Close()
 	}()
 	err = parser.ExecuteTemplate(resolverFile, "resolver.tpl", map[string]interface{}{
-		"Resolver": function.SystemResolver(),
+		"Resolver": function.SystemResolver("127.0.0.11"),
 	})
 	if err != nil {
 		return err

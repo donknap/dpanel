@@ -1,3 +1,5 @@
+# Created by DPanel. DO NOT EDIT OR DELETE!!!
+
 {{if and .EnableSSL (eq (print .ServerPort) "443")}}
 server {
     listen 80;
@@ -45,7 +47,10 @@ server {
     include /etc/nginx/conf.d/include/block-exploits.conf;
     {{end}}
 
-    {{.ExtraNginx}}
+    {{if .ExtraNginx}}
+    # Extra Nginx Configuration
+    include /dpanel/nginx/extra_host/{{.ServerName}}.conf;
+    {{end}}
 
     {{if eq .Type "proxy"}}
     location / {

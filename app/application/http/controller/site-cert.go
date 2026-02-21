@@ -3,6 +3,7 @@ package controller
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
@@ -125,11 +126,13 @@ func (self SiteCert) Apply(http *gin.Context) {
 		Type        string   `json:"type"`
 		Domain      []string `json:"domain"`
 		Email       string   `json:"email"`
-		CertServer  string   `json:"certServer" oneof:"zerossl letsencrypt"`
+		CertServer  string   `json:"certServer"`
 		AutoUpgrade bool     `json:"autoUpgrade"`
 		Renew       bool     `json:"renew"`
 		Debug       bool     `json:"debug"`
 		DnsApi      string   `json:"dnsApi"`
+		EabKid      string   `json:"eabKid"`
+		EabHmacKey  string   `json:"eabHmacKey"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -171,19 +174,20 @@ func (self SiteCert) Apply(http *gin.Context) {
 			}
 		}
 	}
+	wsBuffer := ws.NewProgressPip(ws.MessageTypeDomainApply)
+	defer wsBuffer.Close()
 
-	builder, err := acme.New(options...)
+	builder, err := acme.New(wsBuffer.Context(), options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	cmd, err := builder.Run()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	wsBuffer := ws.NewProgressPip(ws.MessageTypeDomainApply)
-	defer wsBuffer.Close()
 
 	go func() {
 		<-wsBuffer.Done()
@@ -202,6 +206,26 @@ func (self SiteCert) Apply(http *gin.Context) {
 		}
 		return nil
 	}
+
+	// 如果需要注册帐号，先运行
+	if params.EabKid != "" && params.EabHmacKey != "" {
+		if b, err := acme.New(wsBuffer.Context(),
+			acme.WithEmail(params.Email),
+			acme.WithCertServer(params.CertServer),
+			acme.WithEabAccount(params.EabKid, params.EabHmacKey),
+		); err == nil {
+			result, err := b.Result()
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			wsBuffer.BroadcastMessage(string(result))
+		} else {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
 	out, err := cmd.RunInPip()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -304,7 +328,7 @@ func (self SiteCert) Import(http *gin.Context) {
 }
 
 func (self SiteCert) GetList(http *gin.Context) {
-	builder, err := acme.New()
+	builder, err := acme.New(context.Background())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -343,7 +367,7 @@ func (self SiteCert) Delete(http *gin.Context) {
 			return
 		}
 	}
-	builder, err := acme.New()
+	builder, err := acme.New(context.Background())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -376,6 +400,31 @@ func (self SiteCert) Delete(http *gin.Context) {
 	return
 }
 
+func (self SiteCert) GetDetail(http *gin.Context) {
+	type ParamsValidate struct {
+		MainDomain string `json:"mainDomain"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	var err error
+	builder, err := acme.New(context.Background())
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	cert, err := builder.Info(params.MainDomain)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"detail": cert,
+	})
+	return
+}
+
 func (self SiteCert) Download(http *gin.Context) {
 	type ParamsValidate struct {
 		Name string `json:"name" binding:"required"`
@@ -384,7 +433,7 @@ func (self SiteCert) Download(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	builder, err := acme.New()
+	builder, err := acme.New(context.Background())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

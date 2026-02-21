@@ -2,9 +2,7 @@
 
 NGINX_CONFIG_DIR="/dpanel/nginx"
 
-chmod 755 /app/server/dpanel && mkdir -p /dpanel/nginx/default_host /dpanel/nginx/proxy_host \
-  /dpanel/nginx/redirection_host /dpanel/nginx/dead_host /dpanel/nginx/temp \
-  /dpanel/cert /dpanel/storage
+chmod 755 /app/server/dpanel && mkdir -p /dpanel/nginx/extra_host /dpanel/nginx/proxy_host /dpanel/nginx/temp /dpanel/cert /dpanel/storage
 
 if command -v crond >/dev/null 2>&1; then
     crond

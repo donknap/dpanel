@@ -37,6 +37,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/site-cert/get-list", controller.SiteCert{}.GetList)
 			cors.POST("/app/site-cert/dns-api", controller.SiteCert{}.DnsApi)
 			cors.POST("/app/site-cert/delete", controller.SiteCert{}.Delete)
+			cors.POST("/app/site-cert/get-detail", controller.SiteCert{}.GetDetail)
 			cors.POST("/app/site-cert/import", controller.SiteCert{}.Import)
 			cors.POST("/app/site-cert/download", controller.SiteCert{}.Download)
 
