@@ -3,7 +3,7 @@ FROM golang:1.25-alpine AS builder
 ARG TARGETARCH
 ARG HTTP_PROXY
 
-RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && apk add --no-cache make gcc musl-dev git
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && apk add --no-cache make gcc musl-dev git linux-headers
 
 ARG APP_VERSION
 ARG APP_FAMILY

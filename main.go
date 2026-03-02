@@ -311,7 +311,7 @@ func initDocker() error {
 		defaultDockerHost = e
 	}
 	var defaultDockerEnv *types.DockerEnv
-	if v, err := (logic.Env{}).GetDefaultEnv(); err == nil {
+	if v, err := (logic.Env{}).GetDefaultEnv(); err == nil && v != nil {
 		defaultDockerEnv = v
 	} else {
 		defaultDockerEnv = &types.DockerEnv{
@@ -322,12 +322,20 @@ func initDocker() error {
 		}
 		logic.Env{}.UpdateEnv(defaultDockerEnv)
 	}
-	if dockerClient, err := docker.NewClientWithDockerEnv(defaultDockerEnv, docker.WithSockProxy()); err == nil {
-		docker.Sdk = dockerClient
-	} else {
-		slog.Debug("init docker", "error", err, "env", defaultDockerEnv)
-	}
-
+	// 初始化一个 sdk 连接，只是为了防止报错，里面不包含实际的 docker client，真实的连接在后续协程或是切换中处理
+	docker.Sdk = docker.NewEmptyClient(defaultDockerEnv)
+	go func() {
+		// 改为异步连接后，如果用户在连接期间切换到其它服务端。如果在连接期间用户主动切换了连接，这里就不再赋值了
+		if dockerClient, err := docker.NewClientWithDockerEnv(defaultDockerEnv, docker.WithSockProxy()); err == nil {
+			if _, err = dockerClient.Client.Info(dockerClient.GetTryCtx()); err == nil && docker.Sdk.Name == dockerClient.Name {
+				docker.Sdk = dockerClient
+			} else {
+				dockerClient.Close()
+			}
+		} else {
+			slog.Debug("init docker", "error", err, "env", defaultDockerEnv)
+		}
+	}()
 	dockerEnvList := make(map[string]*types.DockerEnv)
 	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDocker, &dockerEnvList)
 	for _, env := range dockerEnvList {

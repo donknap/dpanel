@@ -350,7 +350,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 func (self Home) Info(http *gin.Context) {
 	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err == nil && info.ID != "" {
-		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.Client.DaemonHost())
+		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.DockerEnv.Address)
 	}
 	var public string
 	if v, ok := storage.Cache.Get(storage.CacheKeyRsaPub); ok {
@@ -376,11 +376,8 @@ func (self Home) Info(http *gin.Context) {
 			"runIn":            dpanelInfo.RunIn,
 			"storageLocalPath": storage.Local{}.GetStorageLocalPath(),
 		},
-		"dockerEnv": gin.H{
-			"name":       docker.Sdk.DockerEnv.Name,
-			"remoteType": docker.Sdk.DockerEnv.RemoteType,
-		},
-		"plugin": plugin.Wrapper{}.GetPluginList(),
+		"dockerEnv": docker.Sdk.DockerEnv,
+		"plugin":    plugin.Wrapper{}.GetPluginList(),
 		"rsa": gin.H{
 			"public": public,
 		},

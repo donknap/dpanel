@@ -73,13 +73,15 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		return
 	}
 	dockerStatusCacheKey := fmt.Sprintf(storage.CacheKeyDockerStatus, e.DockerEnv.Name)
-	// 如果有错误记录缓存返回
+
+	slog.Debug("docker daemon/event status", "cacheKey", dockerStatusCacheKey, e.DockerEnv.Name, e.Status)
+	storage.Cache.Set(dockerStatusCacheKey, e.Status, cache.DefaultExpiration)
+
+	// 如果有错误记录缓存返回,并删除缓存信息，默认为的状态为 false
 	if !e.Status.Available {
-		storage.Cache.Set(dockerStatusCacheKey, e.Status, cache.DefaultExpiration)
+		storage.Cache.Delete(dockerStatusCacheKey)
 		return
 	}
-
-	storage.Cache.Delete(dockerStatusCacheKey)
 
 	if e.DockerEnv.Name != define.DockerDefaultClientName {
 		return

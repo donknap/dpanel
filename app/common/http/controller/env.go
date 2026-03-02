@@ -66,7 +66,7 @@ func (self Env) GetList(http *gin.Context) {
 		"currentName": docker.Sdk.Name,
 		"list": function.PluckArrayWalk(result, func(item *types2.DockerEnv) (*types2.DockerEnv, bool) {
 			status := types2.DockerStatus{
-				Available: true,
+				Available: false,
 				Message:   "",
 			}
 			if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyDockerStatus, item.Name)); ok {
@@ -126,7 +126,7 @@ func (self Env) Create(http *gin.Context) {
 	}
 
 	defaultEnv := false
-	if params.Name == "local" {
+	if params.Name == define.DockerDefaultClientName {
 		defaultEnv = true
 	}
 

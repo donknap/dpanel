@@ -17,9 +17,10 @@ const (
 )
 
 const (
-	DockerDefaultClientName = "local"
-	DockerContextName       = "dpanel-context-%s"
-	DockerBuilderName       = DockerContextName + "-builder"
+	DockerDefaultClientName      = "local"
+	DockerContextName            = "dpanel-context-%s"
+	DockerBuilderName            = DockerContextName + "-builder"
+	DockerDefaultEmptyClientHost = "tcp://127.0.0.1:1"
 )
 
 const (

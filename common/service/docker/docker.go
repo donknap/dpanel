@@ -24,9 +24,7 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 )
 
-var (
-	Sdk = NewDefaultClient()
-)
+var Sdk *Client
 
 func NewClientWithDockerEnv(dockerEnv *types.DockerEnv, opts ...Option) (*Client, error) {
 	options := make([]Option, 0)
@@ -44,15 +42,15 @@ func NewClientWithDockerEnv(dockerEnv *types.DockerEnv, opts ...Option) (*Client
 	return NewClient(options...)
 }
 
-func NewDefaultClient() *Client {
-	defaultDockerHost := dockerclient.DefaultDockerHost
-	v, _ := NewClient(WithAddress(defaultDockerHost), WithDockerEnv(&types.DockerEnv{
-		Name:       define.DockerDefaultClientName,
-		Title:      define.DockerDefaultClientName,
-		Address:    defaultDockerHost,
-		Default:    true,
-		RemoteType: define.DockerRemoteTypeSock,
-	}))
+func NewEmptyClient(dockerEnv *types.DockerEnv) *Client {
+	v, err := NewClient(
+		WithAddress(define.DockerDefaultEmptyClientHost),
+		WithName(dockerEnv.Name),
+		WithDockerEnv(dockerEnv),
+	)
+	if err != nil {
+		panic(err)
+	}
 	return v
 }
 
@@ -63,6 +61,7 @@ func NewClient(opts ...Option) (*Client, error) {
 			dockerclient.FromEnv,
 			dockerclient.WithAPIVersionNegotiation(),
 		},
+		Client: &dockerclient.Client{},
 	}
 
 	for _, opt := range opts {
@@ -87,6 +86,7 @@ func NewClient(opts ...Option) (*Client, error) {
 
 type Client struct {
 	Name          string
+	Host          string
 	Client        *dockerclient.Client
 	Option        []dockerclient.Opt
 	Ctx           context.Context
@@ -126,6 +126,7 @@ func WithName(name string) Option {
 func WithAddress(host string) Option {
 	return func(self *Client) error {
 		self.Option = append(self.Option, dockerclient.WithHost(host))
+		self.Host = host
 		return nil
 	}
 }
