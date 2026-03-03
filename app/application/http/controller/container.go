@@ -417,7 +417,7 @@ func (self Container) Delete(http *gin.Context) {
 	// 删除域名、配置、证书
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.Name)).Find()
 	for _, domain := range domainList {
-		err = os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(logic.VhostFileName, domain.ServerName)))
+		err = os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), domain.Setting.VHostFilename()))
 		if err != nil {
 			slog.Debug("container delete domain", "error", err)
 		}

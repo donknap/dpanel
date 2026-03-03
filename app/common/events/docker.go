@@ -82,6 +82,15 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		storage.Cache.Delete(dockerStatusCacheKey)
 		return
 	}
+	// 连接成功后，并且判断一下是否是当前连接。更新一下状态
+	if docker.Sdk.Name == e.DockerEnv.Name {
+		if _, err := docker.Sdk.Client.Ping(docker.Sdk.Ctx); err != nil {
+			if v, err := docker.NewClientWithDockerEnv(e.DockerEnv, docker.WithSockProxy()); err == nil {
+				docker.Sdk = v
+				slog.Debug("docker daemon/event update docker.Sdk")
+			}
+		}
+	}
 
 	if e.DockerEnv.Name != define.DockerDefaultClientName {
 		return

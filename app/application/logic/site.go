@@ -21,7 +21,6 @@ import (
 var (
 	CertFileName  = "fullchain.cer"
 	KeyFileName   = "%s.key"
-	VhostFileName = "%s.conf"
 	CertName      = "%s_ecc"
 	DefaultDnsApi = []accessor.DnsApi{
 		{
@@ -201,7 +200,7 @@ func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 	nginxSettingPath := storage.Local{}.GetNginxSettingPath()
 
 	// 删除该域名的所有配置文件（包括 .conf 和 .disable）
-	matchedFiles, _ := filepath.Glob(filepath.Join(nginxSettingPath, setting.ServerName+".conf*"))
+	matchedFiles, _ := filepath.Glob(filepath.Join(nginxSettingPath, fmt.Sprintf(accessor.VhostFileName+"*", setting.ServerName)))
 	for _, file := range matchedFiles {
 		_ = os.Remove(file)
 	}

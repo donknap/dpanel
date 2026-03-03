@@ -136,6 +136,12 @@ func WithDockerEnv(info *types.DockerEnv) Option {
 		if info != nil && strings.HasPrefix(info.Address, "tcp://") && info.RemoteType != define.DockerRemoteTypeSSH {
 			info.RemoteType = define.DockerRemoteTypeTcp
 		}
+		if info.DockerStatus == nil {
+			info.DockerStatus = &types.DockerStatus{
+				Available: false,
+				Message:   "",
+			}
+		}
 		self.DockerEnv = info
 		return nil
 	}

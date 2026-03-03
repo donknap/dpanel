@@ -100,6 +100,8 @@ endif
 LITE_FROM_BASE    := $(if $(filter 0,$(IS_CUSTOM)),dpanel/dpanel:beta-lite,dpanel/dpanel:lite)
 PROD_FROM_BASE    := $(if $(filter 0,$(IS_CUSTOM)),dpanel/dpanel:beta,dpanel/dpanel:latest)
 
+SUPPORTED_LOCALES = en-US zh-CN ja-JP
+
 # --- Core Build Macros ---
 # Logical Fix: If PROJECT_NAME is overridden from command line, use it directly.
 # Otherwise, use the structured naming convention.
@@ -207,6 +209,20 @@ build-js:
 	docker build --output type=tar,dest=- --build-arg HTTP_PROXY=${HTTP_PROXY} "${JS_SOURCE_DIR}" | tar -x -m -C "${GO_SOURCE_DIR}/asset/static"
 	@echo ">> Pruning redundant original files..."
 	@find ${GO_SOURCE_DIR}/asset/static -type f -name "*.gz" | while read gz_file; do rm -f "$${gz_file%.gz}"; done
+
+	@echo ">> Converting selected locales: $(SUPPORTED_LOCALES)..."
+	@for lang in $(SUPPORTED_LOCALES); do \
+		src_file="${JS_SOURCE_DIR}/src/locales/$$lang.ts"; \
+		if [ -f "$$src_file" ]; then \
+			echo "   -> Converting $$lang.ts"; \
+			cat $$src_file | \
+			sed -E 's/export default[[:space:]]+//g' | \
+			sed -E 's/^const[[:space:]]+[a-zA-Z0-9_]+[[:space:]]*=[[:space:]]*//g' | \
+			sed 's/;$$//g' > "${GO_SOURCE_DIR}/asset/static/i18n/$$lang.json"; \
+		else \
+			echo "   !! Warning: $$lang.ts not found, skipping."; \
+		fi \
+	done
 
 release:
 	@echo ">> Using Dockerfile: $(DOCKER_FILE)"
