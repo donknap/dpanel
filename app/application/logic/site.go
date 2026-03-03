@@ -191,12 +191,22 @@ func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 	if err != nil {
 		return err
 	}
-	confFileName := fmt.Sprintf(VhostFileName, setting.ServerName)
+
+	confFileName := setting.VHostFilename()
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
 	if err != nil {
 		return err
 	}
-	vhostFile, err := os.OpenFile(filepath.Join(storage.Local{}.GetNginxSettingPath(), confFileName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+
+	nginxSettingPath := storage.Local{}.GetNginxSettingPath()
+
+	// 删除该域名的所有配置文件（包括 .conf 和 .disable）
+	matchedFiles, _ := filepath.Glob(filepath.Join(nginxSettingPath, setting.ServerName+".conf*"))
+	for _, file := range matchedFiles {
+		_ = os.Remove(file)
+	}
+
+	vhostFile, err := os.OpenFile(filepath.Join(nginxSettingPath, confFileName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
 		return errors.New("the Nginx configuration directory does not exist")
 	}
