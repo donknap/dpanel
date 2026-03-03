@@ -192,6 +192,9 @@ func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 		return err
 	}
 	confFileName := fmt.Sprintf(VhostFileName, setting.ServerName)
+	if !setting.Enable {
+		confFileName = confFileName + ".disable"
+	}
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
 	if err != nil {
 		return err

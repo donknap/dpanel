@@ -12,6 +12,7 @@ type SiteDomainSettingOption struct {
 	ServerPort                string        `json:"serverPort"`
 	TargetName                string        `json:"targetName"`
 	Port                      int32         `json:"port" binding:"required"` // 目标转发转发端口 TargetPort
+	Enable                    bool          `json:"enable"`                  // 是否启用域名转发，false 时生成 .conf.disable 文件跳过 nginx include
 	EnableBlockCommonExploits bool          `json:"enableBlockCommonExploits"`
 	EnableAssetCache          bool          `json:"enableAssetCache"`
 	EnableWs                  bool          `json:"enableWs"`

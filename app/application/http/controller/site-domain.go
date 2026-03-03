@@ -226,6 +226,9 @@ func (self SiteDomain) GetDetail(http *gin.Context) {
 	}
 
 	vhostFileName := fmt.Sprintf(logic.VhostFileName, domainRow.ServerName)
+	if domainRow.Setting != nil && !domainRow.Setting.Enable {
+		vhostFileName = vhostFileName + ".disable"
+	}
 	vhost, err := os.ReadFile(filepath.Join(storage.Local{}.GetNginxSettingPath(), vhostFileName))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -251,9 +254,14 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	}
 	list, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
 	for _, item := range list {
-		err := os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(logic.VhostFileName, item.ServerName)))
+		vhostFileName := fmt.Sprintf(logic.VhostFileName, item.ServerName)
+		err := os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), vhostFileName))
 		if err != nil {
 			slog.Debug("container delete domain", "error", err)
+		}
+		err = os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), vhostFileName+".disable"))
+		if err != nil {
+			slog.Debug("container delete domain disable", "error", err)
 		}
 	}
 	_, err := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Delete()
