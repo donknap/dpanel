@@ -1,6 +1,7 @@
 package accessor
 
 import (
+	"fmt"
 	"html/template"
 )
 
@@ -23,4 +24,15 @@ type SiteDomainSettingOption struct {
 	Type                      string        `json:"type"`
 	WWWRoot                   string        `json:"wwwRoot,omitempty"`
 	FPMRoot                   string        `json:"fpmRoot,omitempty"`
+	Title                     string        `json:"title,omitempty"` // 域名描述说明
+	Enable                    bool          `json:"enable"`          // 是否启用配置，false 时生成 .disable 文件
+}
+
+// VHostFilename 返回 vhost 配置文件名
+// 当 Enable 为 false 时，返回 .disable 后缀的文件名以跳过 nginx 加载
+func (s *SiteDomainSettingOption) VHostFilename() string {
+	if s.Enable {
+		return fmt.Sprintf("%s.conf", s.ServerName)
+	}
+	return fmt.Sprintf("%s.disable", s.ServerName)
 }

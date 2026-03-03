@@ -225,7 +225,7 @@ func (self SiteDomain) GetDetail(http *gin.Context) {
 		return
 	}
 
-	vhostFileName := fmt.Sprintf(logic.VhostFileName, domainRow.ServerName)
+	vhostFileName := domainRow.Setting.VHostFilename()
 	vhost, err := os.ReadFile(filepath.Join(storage.Local{}.GetNginxSettingPath(), vhostFileName))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -251,7 +251,7 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	}
 	list, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
 	for _, item := range list {
-		err := os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(logic.VhostFileName, item.ServerName)))
+		err := os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), item.Setting.VHostFilename()))
 		if err != nil {
 			slog.Debug("container delete domain", "error", err)
 		}
@@ -411,7 +411,7 @@ func (self SiteDomain) UpdateVhost(http *gin.Context) {
 		return
 	}
 
-	nginxConfPath := filepath.Join(storage.Local{}.GetNginxSettingPath(), fmt.Sprintf(logic.VhostFileName, siteDomainRow.Setting.ServerName))
+	nginxConfPath := filepath.Join(storage.Local{}.GetNginxSettingPath(), siteDomainRow.Setting.VHostFilename())
 	err = os.WriteFile(nginxConfPath, []byte(params.Vhost), 0666)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
