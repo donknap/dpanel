@@ -1,6 +1,7 @@
 package event
 
 import (
+	"github.com/docker/docker/api/types/events"
 	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
@@ -15,8 +16,6 @@ type DockerDaemonPayload struct {
 }
 
 type DockerMessagePayload struct {
-	Type    string
-	Action  string
-	Time    int64
-	Message []string
+	DockerEnvName string         `json:"dockerEnvName"`
+	Message       events.Message `json:"message"`
 }

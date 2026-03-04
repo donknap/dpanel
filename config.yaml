@@ -36,7 +36,7 @@ database:
     prefix: ims_
     options:
       mode: ${DP_DB_MODE-rwc}
-      _journal_mode: WAL
+      _journal_mode: ${DP_DB_JOURNAL-DELETE} # WAL
 system:
   baseurl: ${DP_SYSTEM_BASEURL}
   storage:

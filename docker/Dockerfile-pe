@@ -41,7 +41,7 @@ ARG HTTP_PROXY
 ENV HTTP_PROXY=${HTTP_PROXY}
 ENV HTTPS_PROXY=${HTTP_PROXY}
 
-RUN apk add --no-cache make gcc musl-dev git && \
+RUN apk add --no-cache make gcc musl-dev git linux-headers && \
     go install mvdan.cc/garble@latest
 
 ARG APP_VERSION
@@ -56,10 +56,15 @@ RUN --mount=type=secret,id=GARBLE_SEED \
     --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETARCH} \
     --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
     export SEED=$(cat /run/secrets/GARBLE_SEED) && \
+    export HTTP_PROXY=${HTTP_PROXY} && \
+    export HTTPS_PROXY=${HTTP_PROXY} && \
+    COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY-pe} OS=linux GARBLE=1 GARBLE_SEED=${SEED}" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
-        make build VERSION=${APP_VERSION} FAMILY=pe OS=linux AMD64=1 AMD64_CC=gcc GARBLE=1 GARBLE_SEED=${SEED}; \
+        make build ${COMMON_ARGS} AMD64=1 AMD64_CC=gcc; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
-        make build VERSION=${APP_VERSION} FAMILY=pe OS=linux ARM64=1 ARM64_CC=gcc GARBLE=1 GARBLE_SEED=${SEED}; \
+        make build ${COMMON_ARGS} ARM64=1 ARM64_CC=gcc; \
+    elif [ "$TARGETARCH" = "armv7" ]; then \
+        make build ${COMMON_ARGS} ARM7=1 ARM7_CC=gcc; \
     else \
         echo "Unsupported architecture: $TARGETARCH" && exit 1; \
     fi

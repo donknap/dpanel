@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/docker/docker/api/types/network"
 	logic2 "github.com/donknap/dpanel/app/application/logic"
@@ -26,44 +25,12 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
+const maxEventCacheSize = 100
+
 var (
-	dataPool = make([]*entity.Event, 0)
-	mu       = sync.Mutex{}
-	ticker   = time.NewTicker(time.Second * 10)
+	eventCache = make([]*event.DockerMessagePayload, 0, maxEventCacheSize)
+	mu         = sync.Mutex{}
 )
-
-func init() {
-	go func() {
-		for {
-			<-ticker.C
-			commit()
-		}
-	}()
-}
-
-func commit() {
-	if len(dataPool) == 0 {
-		return
-	}
-	slog.Debug("Event monitor commit start", "length", len(dataPool))
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	db, err := facade.GetDbFactory().Channel("default")
-	if err != nil {
-		slog.Debug("Event monitor commit", "err", err)
-		return
-	}
-
-	err = db.CreateInBatches(dataPool, len(dataPool)).Error
-	if err != nil {
-		slog.Debug("Event monitor commit", "len", len(dataPool), "err", err)
-		return
-	}
-	dataPool = []*entity.Event{}
-	return
-}
 
 type Docker struct {
 }
@@ -184,24 +151,24 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 }
 
 func (self Docker) Message(e event.DockerMessagePayload) {
-	if !function.IsEmptyArray(e.Message) {
-		mu.Lock()
-		defer mu.Unlock()
-		dataPool = append(dataPool, &entity.Event{
-			Type:      e.Type,
-			Action:    e.Action,
-			Message:   strings.Join(e.Message, " "),
-			CreatedAt: time.UnixMilli(e.Time / 1000000).Format("2006-01-02 15:04:05.000"),
-		})
+	mu.Lock()
+	eventCache = append(eventCache, &e)
+
+	if len(eventCache) > maxEventCacheSize {
+		eventCache = eventCache[len(eventCache)-maxEventCacheSize:]
 	}
 
+	storage.Cache.Set(storage.CacheKeyDockerEvents, eventCache, cache.DefaultExpiration)
+	mu.Unlock()
+
+	msgType := string(e.Message.Type) + "/" + string(e.Message.Action)
 	if function.InArray([]string{
 		define.DockerEventContainerDestroy, define.DockerEventContainerCreate,
 		define.DockerEventContainerDie, define.DockerEventContainerStart,
-	}, e.Action) {
-		crontab.Client.RunByEvent(e.Action, []types.EnvItem{
-			types.NewEnvItemFromKV("DP_DOCKER_ENV_NAME", e.Type),
-			types.NewEnvItemFromKV("DP_CONTAINER_NAME", e.Message[0]),
+	}, msgType) {
+		crontab.Client.RunByEvent(msgType, []types.EnvItem{
+			types.NewEnvItemFromKV("DP_DOCKER_ENV_NAME", e.DockerEnvName),
+			types.NewEnvItemFromKV("DP_CONTAINER_NAME", e.Message.Actor.Attributes["name"]),
 		})
 	}
 }

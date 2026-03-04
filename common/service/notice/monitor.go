@@ -186,54 +186,8 @@ func (self *monitor) listen(c *client) {
 }
 
 func (self *monitor) processor(name string, message events.Message) {
-	var msg []string
-	msgType := string(message.Type) + "/" + string(message.Action)
-	switch msgType {
-	//case "image/tag", "image/save", "image/push", "image/pull", "image/load",
-	//	"image/import", "image/delete",
-	//	"container/destroy", "container/create",
-	//	"container/stop", "container/start", "container/restart",
-	//	"container/kill", "container/die",
-	//	"container/extract-to-dir":
-	//	msg = []string{
-	//		message.Actor.Attributes["name"],
-	//	}
-	//case "container/resize":
-	//	msg = []string{
-	//		message.Actor.Attributes["name"], ":",
-	//		message.Actor.Attributes["width"], "-", message.Actor.Attributes["height"],
-	//	}
-	//case "volume/mount":
-	//	msg = []string{
-	//		"container", message.Actor.Attributes["container"],
-	//		"mount", message.Actor.Attributes["destination"],
-	//		"driver", message.Actor.Attributes["driver"],
-	//		"permission", message.Actor.Attributes["read/write"],
-	//	}
-	//case "network/disconnect", "network/connect":
-	//	msg = []string{
-	//		"container", message.Actor.Attributes["container"][:12],
-	//		string(message.Action),
-	//		message.Actor.Attributes["name"],
-	//		"type", message.Actor.Attributes["type"],
-	//	}
-	case "container/destroy", "container/create",
-		"container/stop", "container/start", "container/restart",
-		"container/kill", "container/die":
-		msg = []string{
-			message.Actor.Attributes["name"],
-		}
-		//case "volume/destroy":
-		//	msg = []string{
-		//		message.Actor.ID,
-		//	}
-	}
-	if msg != nil {
-		facade.GetEvent().Publish(event.DockerMessageEvent, event.DockerMessagePayload{
-			Type:    name,
-			Action:  msgType,
-			Message: msg,
-			Time:    message.TimeNano,
-		})
-	}
+	facade.GetEvent().Publish(event.DockerMessageEvent, event.DockerMessagePayload{
+		DockerEnvName: name,
+		Message:       message,
+	})
 }

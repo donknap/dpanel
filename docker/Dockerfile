@@ -17,7 +17,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETA
     --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
     export HTTP_PROXY=${HTTP_PROXY} && \
     export HTTPS_PROXY=${HTTP_PROXY} && \
-    COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY} OS=linux" && \
+    COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY-ce} OS=linux" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
         make build ${COMMON_ARGS} AMD64=1 AMD64_CC=gcc; \
     elif [ "$TARGETARCH" = "arm64" ]; then \

@@ -691,11 +691,6 @@ func (self Home) Prune(http *gin.Context) {
 	var noticeTotal int64
 
 	if params.EnableNotice {
-		if oldRow, _ := dao.Event.Last(); oldRow != nil {
-			query := dao.Event.Where(dao.Event.ID.Lte(oldRow.ID))
-			eventTotal, _ = query.Count()
-			_, _ = query.Delete()
-		}
 		if oldRow, _ := dao.Notice.Last(); oldRow != nil {
 			query := dao.Notice.Where(dao.Notice.ID.Lte(oldRow.ID))
 			noticeTotal, _ = query.Count()

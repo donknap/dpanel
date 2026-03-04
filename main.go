@@ -131,7 +131,7 @@ func main() {
 			storage.Cache.Set(storage.CacheKeyCommonServerStartTime, time.Now(), cache.DefaultExpiration)
 		}
 
-		if v, err := Asset.ReadDir("asset/static/i18n"); err == nil {
+		if v, err := Asset.ReadDir("asset/static/i18n"); err == nil && !isDebug() {
 			storage.Cache.Set(storage.CacheKeySettingLocale, function.PluckArrayWalk(v, func(item fs.DirEntry) (string, bool) {
 				return strings.TrimSuffix(item.Name(), filepath.Ext(item.Name())), true
 			}), cache.DefaultExpiration)
