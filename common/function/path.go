@@ -54,7 +54,37 @@ func Path2SystemSafe(p string) string {
 }
 
 func PathClean(p string) string {
-	return sanitize.Path(p)
+	const underscorePlaceholder = "DPanelUnderscorePlaceholder"
+	safeP := strings.ReplaceAll(p, "_", strings.ToLower(underscorePlaceholder))
+
+	var cleaned string
+	if runtime.GOOS == "windows" && (filepath.VolumeName(p) != "" || strings.Contains(p, "\\")) {
+		vol := filepath.VolumeName(safeP)
+		rest := safeP[len(vol):]
+
+		// 处理 Windows 内部逻辑
+		cleanedRest := sanitize.Path(filepath.ToSlash(rest))
+		cleanedRest = filepath.FromSlash(cleanedRest)
+
+		// 补回被截掉的根路径分隔符
+		if len(rest) > 0 && (rest[0] == '/' || rest[0] == '\\') {
+			if len(cleanedRest) == 0 || !(cleanedRest[0] == '/' || cleanedRest[0] == '\\') {
+				cleaned = vol + string(filepath.Separator) + cleanedRest
+			} else {
+				cleaned = vol + cleanedRest
+			}
+		} else {
+			cleaned = vol + cleanedRest
+		}
+	} else {
+		// 如果是 Linux 系统，或者是 Windows 下的 Linux 风格路径 (如 /etc/nginx)
+		// 直接使用 sanitize 处理，它能完美处理这种斜杠开头的路径
+		cleaned = sanitize.Path(safeP)
+	}
+
+	// 还原下划线
+	cleaned = strings.ReplaceAll(cleaned, strings.ToLower(underscorePlaceholder), "_")
+	return cleaned
 }
 
 func PathSize(p string) (int64, error) {

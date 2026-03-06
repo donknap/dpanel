@@ -12,6 +12,14 @@ import (
 
 type ProgressWrite func(p []byte) ([]byte, error)
 
+func PushEvent(messageType string, data interface{}) {
+	BroadcastMessage <- &RespMessage{
+		Type:   messageType,
+		Data:   data,
+		RespAt: time.Now(),
+	}
+}
+
 func NewProgressPip(messageType string) *ProgressPip {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	process := &ProgressPip{

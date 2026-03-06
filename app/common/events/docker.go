@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
@@ -18,9 +19,11 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/ws"
 	types2 "github.com/donknap/dpanel/common/types"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
+	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
@@ -57,6 +60,10 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 				slog.Debug("docker daemon/event update docker.Sdk")
 			}
 		}
+		// 当前的状态有变化，强制前端重新刷新一下状态
+		ws.PushEvent(ws.MessageTypeEventRefreshDockerEnv, gin.H{
+			"name": docker.Sdk.Name,
+		})
 	}
 
 	if e.DockerEnv.Name != define.DockerDefaultClientName {
@@ -136,7 +143,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 			}
 		} else {
 			e.DockerEnv.DockerInfo.InDPanel = false
-			_ = logic.Setting{}.Delete(logic.SettingGroupSetting, logic.SettingGroupSettingDPanelInfo)
+			result.ContainerInfo = container.InspectResponse{}
 			slog.Warn("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err)
 		}
 		_ = logic.Setting{}.Save(&entity.Setting{

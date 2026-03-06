@@ -364,6 +364,13 @@ func (self Home) Info(http *gin.Context) {
 			"Name": dpanelInfo.ContainerInfo.Name,
 		}
 	}
+
+	dockerEnv := docker.Sdk.DockerEnv
+	dockerEnv.SshServerInfo = nil
+	dockerEnv.TlsCert = ""
+	dockerEnv.TlsCa = ""
+	dockerEnv.TlsKey = ""
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":          info,
 		"clientVersion": docker.Sdk.Client.ClientVersion(),
