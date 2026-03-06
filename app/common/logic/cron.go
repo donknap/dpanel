@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -27,6 +28,10 @@ import (
 
 var (
 	lock = sync.RWMutex{}
+)
+
+const (
+	taskFileName = "dpanel-task-%d.%s"
 )
 
 type JobContext struct {
@@ -107,10 +112,11 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 			})), true
 		})...)
 
-		var script string
+		var commandArgs []string
 		if containerName != "" {
 			dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv)
 			if err != nil {
+				ctx.Err = err
 				return
 			}
 			if task.Setting.EntryShell == "" {
@@ -119,31 +125,63 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 			defer func() {
 				dockerClient.Close()
 			}()
-			script, err = self.scriptTemplate(&scriptTemplateParams{
+			script, err := self.scriptTemplate(&scriptTemplateParams{
 				Container:     containerName,
 				ScriptName:    fmt.Sprintf("%s-%d.sh", strings.Trim(containerName, "/"), task.ID),
 				ScriptContent: task.Setting.Script,
 				EntryShell:    task.Setting.EntryShell,
 			})
 			if err != nil {
+				ctx.Err = err
 				return
 			}
+			// 在宿主机调用 docker exec 时，固定使用 /bin/sh -c 即可
+			commandArgs = []string{"-c", script}
 		} else {
-			script = task.Setting.Script
+			var fileName string
+			switch task.Setting.EntryShell {
+			case "cmd":
+				fileName = fmt.Sprintf(taskFileName, task.ID, "bat")
+			case "powershell":
+				fileName = fmt.Sprintf(taskFileName, task.ID, "ps1")
+			default:
+				fileName = fmt.Sprintf(taskFileName, task.ID, "sh")
+			}
+
+			tmpFile, err := storage.Local{}.CreateTempFile(fileName)
+			if err != nil {
+				ctx.Err = err
+				return
+			}
+
+			tmpFilePath := tmpFile.Name()
+			defer os.Remove(tmpFilePath)
+
+			if task.Setting.EntryShell == "powershell" || task.Setting.EntryShell == "cmd" {
+				tmpFile.Write([]byte{0xEF, 0xBB, 0xBF})
+			}
+			if _, err := tmpFile.WriteString(task.Setting.Script); err != nil {
+				tmpFile.Close()
+				ctx.Err = err
+				return
+			}
+			tmpFile.Close()
+
+			_ = os.Chmod(tmpFilePath, 0755)
+
+			switch task.Setting.EntryShell {
+			case "cmd":
+				commandArgs = []string{"/C", tmpFilePath}
+			case "powershell":
+				commandArgs = []string{"-ExecutionPolicy", "Bypass", "-File", tmpFilePath}
+			default:
+				commandArgs = []string{tmpFilePath}
+			}
 		}
-		// 如果没有指定容器，则直接在面板 shell 中执行
-		var runCmd [2]string
-		switch task.Setting.EntryShell {
-		case "/bin/sh", "/bin/bash":
-			runCmd = [2]string{task.Setting.EntryShell, "-c"}
-		case "cmd":
-			runCmd = [2]string{task.Setting.EntryShell, "/C"}
-		case "powershell":
-			runCmd = [2]string{task.Setting.EntryShell, "-Command"}
-		}
+
 		options := []local.Option{
-			local.WithCommandName(runCmd[0]),
-			local.WithArgs(runCmd[1], script),
+			local.WithCommandName(task.Setting.EntryShell),
+			local.WithArgs(commandArgs...),
 			local.WithEnv(globalEnv),
 		}
 		// 如果有超时间，则需要独立进程，超时后强制终止掉
@@ -160,8 +198,19 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 				}
 			}()
 		}
-		out, err := cmd.RunWithResult()
-		ctx.Output = string(out)
+		buffer := new(bytes.Buffer)
+		out, err := cmd.RunInPip()
+		if err != nil {
+			ctx.Err = err
+			return
+		}
+		w := io.MultiWriter(buffer, os.Stdout)
+		_, err = io.Copy(w, out)
+		if err != nil {
+			ctx.Err = err
+			return
+		}
+		ctx.Output = buffer.String()
 		ctx.Err = err
 		return
 	}))

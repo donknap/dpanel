@@ -3,7 +3,7 @@ permissions: write-all
 on:
   push:
     tags:
-    - 'v*'
+      - 'v*'
 jobs:
   build:
     strategy:
@@ -34,7 +34,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          name: dpanel-builder
+          name: dpanel-context-local-builder
           driver-opts: image=moby/buildkit:master
           install: true
       - name: Login to Docker Hub
@@ -65,16 +65,9 @@ jobs:
           VERSION_TAG=${GITHUB_REF_NAME#v}
 
           # 1. 发布 CE 版 (Musl/Alpine)
-          make release FAMILY=ce VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0 \
-            MUSL_AMD64_CC=${PWD}/x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc \
-            MUSL_ARM64_CC=${PWD}/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
-            MUSL_ARMV7_CC=${PWD}/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc
-
           # 2. 发布 Debian 版 (GNU)
-          make release FAMILY=ce GNU=y VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0 \
-            GNU_AMD64_CC=gcc \
-            GNU_ARM64_CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc \
-            GNU_ARMV7_CC=${PWD}/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc
+          make release FAMILY=ce VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0
+          make release FAMILY=ce VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0 GNU=y
 
           # 3. 补充特定平台的二进制（如群晖），只需 build 不需要 release 镜像
           make build VERSION=${VERSION_TAG} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 \
@@ -144,11 +137,14 @@ jobs:
       - name: Install dependencies
         run: |
           go get .
+      - name: Install Make
+        run: choco install make -y
       - name: Build
+        shell: bash
         run: |
           VERSION_TAG=${GITHUB_REF_NAME#v}
-          CGO_ENABLED=1 go build -o runtime/dpanel.exe -tags ce,w7_rangine_release,containers_image_openpgp -ldflags "-X main.DPanelVersion=$VERSION_TAG -s -w"
-        shell: bash
+          # 强制覆盖 OS=windows，因为 Git Bash 会把 OS 识别为 MINGW64 导致交叉编译失败
+          make build VERSION=${VERSION_TAG} OS=windows AMD64=1 PROJECT_NAME=dpanel.exe AMD64_CC=gcc
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:

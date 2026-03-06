@@ -116,6 +116,7 @@ define go_build
 	@echo ">> Cleaning old assets in $(PLUGIN_EXPLORER_IMAGE_DIR)..."
 	@rm -f $(PLUGIN_EXPLORER_IMAGE_DIR)/*.tar
 	@echo ">> Injecting $(5) explorer image to explorer assets..."
+	@mkdir -p $(PLUGIN_EXPLORER_IMAGE_DIR)
 	@cp $(IMAGE_SAVE_DIR)/$(subst /,_,$(PLUGIN_EXPLORER_IMAGE_TARGET))_$(5).tar $(PLUGIN_EXPLORER_IMAGE_DIR)/image-$(5).tar
 
 	@# --- Compilation Logic ---
@@ -259,7 +260,6 @@ release:
         --build-arg PROD_FROM_BASE=${PROD_FROM_BASE} \
 		-f $(DOCKER_FILE) . --push; \
 	fi
-	@git checkout -- "${PLUGIN_EXPLORER_IMAGE_DIR}/image-amd64.tar"
 clean:
 	@echo ">> Cleaning up..."
 	@go clean

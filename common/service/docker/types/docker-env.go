@@ -65,7 +65,9 @@ func (self DockerEnv) CommandEnv() []string {
 		"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
 
 		// windows
-		"USERPROFILE", "SystemRoot", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "HOMEDRIVE", "HOMEPATH",
+		"USERPROFILE", "SystemRoot", "APPDATA", "LOCALAPPDATA", "TEMP",
+		"TMP", "HOMEDRIVE", "HOMEPATH", "PATHEXT",
+		"SystemDrive", "WinDir",
 
 		// @todo dpanel 要用到的环境变量，期待以后修正为以 DP_ 开头
 		"STORAGE_LOCAL_PATH", "DP_ACME_CONFIG_HOME", "DB_DATABASE",
