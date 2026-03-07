@@ -7,9 +7,6 @@ GO_SOURCE_DIR	:= $(shell pwd)
 GO_TARGET_DIR	:= $(GO_SOURCE_DIR)/runtime
 JS_SOURCE_DIR	:= $(abspath $(GO_SOURCE_DIR)/../../js/d-panel)
 
-# --- Busybox Image Setup (New) ---
-IMAGE_SAVE_DIR   := $(GO_SOURCE_DIR)/docker/image
-
 PLUGIN_EXPLORER_IMAGE_SOURCE ?= busybox
 PLUGIN_EXPLORER_IMAGE_TARGET ?= dpanel/explorer
 PLUGIN_EXPLORER_IMAGE_DIR := $(GO_SOURCE_DIR)/asset/plugin/explorer
@@ -60,22 +57,22 @@ D_PLATFORMS := $(subst $(space),$(comma),$(strip $(D_PLAT_LIST)))
 # --- Toolchains ---
 MUSL_AMD64_CC	?= x86_64-linux-musl-gcc
 MUSL_ARM64_CC	?= aarch64-unknown-linux-musl-gcc
-MUSL_ARMV7_CC	?= arm-linux-musleabihf-gcc
+MUSL_ARM7_CC	?= arm-linux-musleabihf-gcc
 
 GNU_AMD64_CC	 ?= /usr/local/Cellar/x86_64-unknown-linux-gnu/bin/x86_64-unknown-linux-gnu-gcc
 GNU_ARM64_CC	 ?= /usr/local/Cellar/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
-GNU_ARMV7_CC	 ?= /usr/local/Cellar/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-gcc
+GNU_ARM7_CC	 ?= /usr/local/Cellar/arm-unknown-linux-gnueabi/bin/arm-unknown-linux-gnueabi-gcc
 
 ifneq ($(GNU),)
 	LIBC	  := gnu
 	AMD64_CC  := $(GNU_AMD64_CC)
 	ARM64_CC  := $(GNU_ARM64_CC)
-	ARMV7_CC  := $(GNU_ARMV7_CC)
+	ARM7_CC  := $(GNU_ARM7_CC)
 else
 	LIBC	  := musl
 	AMD64_CC  := $(MUSL_AMD64_CC)
 	ARM64_CC  := $(MUSL_ARM64_CC)
-	ARMV7_CC  := $(MUSL_ARMV7_CC)
+	ARM7_CC  := $(MUSL_ARM7_CC)
 endif
 
 # 设置默认值（如果不传入 GARBLE=1，默认不开启混淆）
@@ -88,6 +85,7 @@ CPUS := $(shell [ "$$(uname)" = "Darwin" ] && sysctl -n hw.ncpu || nproc)
 D_SFX	   := $(if $(filter gnu,$(LIBC)),-debian,)
 IMAGE_REPO  := dpanel$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)
 DOCKER_FILE := ./docker/Dockerfile$(if $(filter-out ce,$(FAMILY)),-$(FAMILY),)$(D_SFX)
+
 ifneq ($(filter %-nw-debian,$(DOCKER_FILE)),)
 	DOCKER_FILE := ./docker/Dockerfile-debian
 endif
@@ -102,6 +100,19 @@ PROD_FROM_BASE    := $(if $(filter 0,$(IS_CUSTOM)),dpanel/dpanel:beta,dpanel/dpa
 
 SUPPORTED_LOCALES = en-US zh-CN ja-JP
 
+DOCKER_BUILD_ARGS := --builder dpanel-context-local-builder \
+		--platform $(D_PLATFORMS) \
+		--build-arg APP_VERSION=${APP_VER} \
+		--build-arg APP_FAMILY=${FAMILY} \
+		--build-arg APP_LIBC=${LIBC} \
+		--build-arg HTTP_PROXY=${HTTP_PROXY} \
+		--build-arg HTTPS_PROXY=${HTTP_PROXY} \
+		--secret id=GIT_TOKEN,env=GIT_TOKEN \
+		--secret id=GARBLE_SEED,env=GARBLE_SEED \
+		--build-arg LITE_FROM_BASE=${LITE_FROM_BASE} \
+		--build-arg PROD_FROM_BASE=${PROD_FROM_BASE} \
+		-f $(DOCKER_FILE) .
+
 # --- Core Build Macros ---
 # Logical Fix: If PROJECT_NAME is overridden from command line, use it directly.
 # Otherwise, use the structured naming convention.
@@ -111,13 +122,6 @@ define go_build
 	$(eval GO_EXECUTABLE := $(if $(filter 1,$(GARBLE)),GOGARBLE="github.com/donknap/dpanel" garble -seed=${GARBLE_SEED},go))
 	@echo ">> Compiling [$(FAMILY)] for [$(1)/$(2)] Version: $(APP_VER) (Garble: $(if $(filter 1,$(GARBLE)),ON,OFF))"
 	@echo ">> Target Filename: $(TARGET_BIN)"
-	
-	@# --- Asset Injection Logic ---
-	@echo ">> Cleaning old assets in $(PLUGIN_EXPLORER_IMAGE_DIR)..."
-	@rm -f $(PLUGIN_EXPLORER_IMAGE_DIR)/*.tar
-	@echo ">> Injecting $(5) explorer image to explorer assets..."
-	@mkdir -p $(PLUGIN_EXPLORER_IMAGE_DIR)
-	@cp $(IMAGE_SAVE_DIR)/$(subst /,_,$(PLUGIN_EXPLORER_IMAGE_TARGET))_$(5).tar $(PLUGIN_EXPLORER_IMAGE_DIR)/image-$(5).tar
 
 	@# --- Compilation Logic ---
 	GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=$(1) GOARCH=$(2) GOARM=$(3) CC=$(4) \
@@ -139,7 +143,7 @@ $(if $(filter 0,$(IS_CUSTOM)), \
 )
 endef
 
-.PHONY: help build build-js release clean download-images
+.PHONY: help build build-js build-explorer-image release clean toolchain
 
 all: help
 
@@ -174,7 +178,7 @@ help:
 	@echo  "	  Selected   : \033[35m$(if $(strip $(D_PLATFORMS)),$(D_PLATFORMS),linux/amd64 (Default))\033[0m"
 	@echo  "	  AMD64 (x86): $(if $(filter 1,$(AMD64)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(AMD64_CC)"
 	@echo  "	  ARM64 (v8) : $(if $(filter 1,$(ARM64)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(ARM64_CC)"
-	@echo  "	  ARMV7 (v7) : $(if $(filter 1,$(ARM7)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(ARMV7_CC)"
+	@echo  "	  ARM7 (v7) : $(if $(filter 1,$(ARM7)),\033[32mON \033[0m,\033[90mOFF\033[0m) -> CC: $(ARM7_CC)"
 	@echo  ""
 	@echo  "	\033[1mDocker Release Details:\033[0m"
 	@echo  "	  Repo Name  : $(IMAGE_REPO)"
@@ -184,21 +188,20 @@ help:
 	@echo  ""
 
 # --- New Target: Download Multi-Arch Images ---
-download-images:
+build-explorer-image:
 	@echo ">> Downloading and repackaging images for all architectures using pure Docker..."
-	@mkdir -p $(IMAGE_SAVE_DIR)
-	@rm -f $(IMAGE_SAVE_DIR)/*.tar
+	@rm -f $(PLUGIN_EXPLORER_IMAGE_DIR)/*.tar
 	@for arch in amd64 arm64 arm; do \
-		echo ">> Processing linux/$$arch, Save in: $(IMAGE_SAVE_DIR)/$(subst /,_,$(PLUGIN_EXPLORER_IMAGE_TARGET))_$$arch.tar"; \
-		docker build --platform linux/$$arch --tag $(PLUGIN_EXPLORER_IMAGE_TARGET) --output type=docker,dest=$(IMAGE_SAVE_DIR)/$(subst /,_,$(PLUGIN_EXPLORER_IMAGE_TARGET))_$$arch.tar -f docker/Dockerfile-explorer .; \
+		echo ">> Processing linux/$$arch, Save in: $(PLUGIN_EXPLORER_IMAGE_DIR)/$(subst /,_,$(PLUGIN_EXPLORER_IMAGE_TARGET))_$$arch.tar"; \
+		docker build --platform linux/$$arch --tag $(PLUGIN_EXPLORER_IMAGE_TARGET) --output type=docker,dest=$(PLUGIN_EXPLORER_IMAGE_DIR)/image-$$arch.tar -f docker/Dockerfile-explorer .; \
 	done
-	@echo ">> Images successfully saved to $(IMAGE_SAVE_DIR)"
+	@echo ">> Images successfully saved to $(PLUGIN_EXPLORER_IMAGE_DIR)"
 
 build:
 	@mkdir -p ${GO_TARGET_DIR}
 	$(if $(filter 1,$(AMD64)),$(call go_build,$(OS),amd64,,$(AMD64_CC),amd64),)
 	$(if $(filter 1,$(ARM64)),$(call go_build,$(OS),arm64,,$(ARM64_CC),arm64),)
-	$(if $(filter 1,$(ARM7)),$(call go_build,$(OS),arm,7,$(ARMV7_CC),arm),)
+	$(if $(filter 1,$(ARM7)),$(call go_build,$(OS),arm,7,$(ARM7_CC),arm),)
 	$(if $(strip $(D_PLAT_LIST)),,$(call go_build,$(OS),amd64,,$(AMD64_CC),amd64))
 
 build-js:
@@ -230,36 +233,26 @@ release:
 	@echo ">> Platforms: $(D_PLATFORMS)"
 
 	@echo ">> Building [Lite] edition..."
-	docker buildx build --builder dpanel-context-local-builder --target lite \
-		$(call get_tags,beta-lite) \
-		--platform $(D_PLATFORMS) \
-		--build-arg APP_VERSION=${APP_VER} \
-		--build-arg APP_FAMILY=${FAMILY} \
-		--build-arg APP_LIBC=${LIBC} \
-		--build-arg HTTP_PROXY=${HTTP_PROXY} \
-		--build-arg HTTPS_PROXY=${HTTP_PROXY} \
-		--secret id=GIT_TOKEN,env=GIT_TOKEN \
-		--secret id=GARBLE_SEED,env=GARBLE_SEED \
-		--build-arg LITE_FROM_BASE=${LITE_FROM_BASE} \
-        --build-arg PROD_FROM_BASE=${PROD_FROM_BASE} \
-		-f $(DOCKER_FILE) . --push
+	docker buildx build --target lite $(call get_tags,beta-lite) $(DOCKER_BUILD_ARGS) --push
+
+	@echo ">> 2. Extracting Binaries to Host $(GO_TARGET_DIR)..."
+	docker buildx build --target binary-export --output type=local,dest=$(GO_TARGET_DIR) $(DOCKER_BUILD_ARGS)
 
 	if [ "$(LITE)" = "0" ]; then \
-	   echo ">> Building [Production] edition..."; \
-	   docker buildx build --builder dpanel-context-local-builder --target production \
-		$(call get_tags,beta) \
-		--platform $(D_PLATFORMS) \
-		--build-arg APP_VERSION=${APP_VER} \
-		--build-arg APP_FAMILY=${FAMILY} \
-		--build-arg APP_LIBC=${LIBC} \
+		echo ">> Building [Production] edition..."; \
+		docker buildx build --target production $(call get_tags,beta) $(DOCKER_BUILD_ARGS) --push; \
+	fi
+
+build-builder:
+	docker buildx build --target builder-alpine --builder dpanel-context-local-builder \
 		--build-arg HTTP_PROXY=${HTTP_PROXY} \
 		--build-arg HTTPS_PROXY=${HTTP_PROXY} \
-		--secret id=GIT_TOKEN,env=GIT_TOKEN \
-		--secret id=GARBLE_SEED,env=GARBLE_SEED \
-		--build-arg LITE_FROM_BASE=${LITE_FROM_BASE} \
-        --build-arg PROD_FROM_BASE=${PROD_FROM_BASE} \
-		-f $(DOCKER_FILE) . --push; \
-	fi
+		-t dpanel/builder:alpine -f ./docker/Dockerfile-builder --push .
+	docker buildx build --target builder-debian --builder dpanel-context-local-builder \
+		--build-arg HTTP_PROXY=${HTTP_PROXY} \
+		--build-arg HTTPS_PROXY=${HTTP_PROXY} \
+		-t dpanel/builder:debian -f ./docker/Dockerfile-builder --push .
+
 clean:
 	@echo ">> Cleaning up..."
 	@go clean

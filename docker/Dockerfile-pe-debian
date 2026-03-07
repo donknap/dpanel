@@ -1,14 +1,16 @@
 # syntax=docker/dockerfile:1
-ARG LITE_FROM_BASE=dpanel/dpanel:lite
-ARG PROD_FROM_BASE=dpanel/dpanel:latest
+ARG LITE_FROM_BASE=dpanel/dpanel:lite-debian
+ARG PROD_FROM_BASE=dpanel/dpanel:debian
 
-FROM --platform=$BUILDPLATFORM dpanel/builder:alpine AS source
+FROM --platform=${BUILDPLATFORM} dpanel/builder:debian AS source
 
 ARG HTTP_PROXY
 ENV HTTP_PROXY=${HTTP_PROXY}
 ENV HTTPS_PROXY=${HTTP_PROXY}
 
-RUN apk add --no-cache git github-cli gcc musl-dev make
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    make gcc libc6-dev git
 
 ARG APP_VERSION
 ARG REPO_BRANCH
@@ -35,13 +37,15 @@ RUN --mount=type=secret,id=GIT_TOKEN \
     fi && \
     go test -v --run TestGenerateDefines ./app/pro/tests/obfuscate_test.go
 
-FROM --platform=$BUILDPLATFORM dpanel/builder:alpine AS builder
+FROM --platform=${BUILDPLATFORM} dpanel/builder:debian AS builder
 
 ARG HTTP_PROXY
 ENV HTTP_PROXY=${HTTP_PROXY}
 ENV HTTPS_PROXY=${HTTP_PROXY}
 
-RUN apk add --no-cache make gcc musl-dev git linux-headers && \
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    make gcc libc6-dev git && \
     go install mvdan.cc/garble@latest
 
 ARG APP_VERSION
@@ -58,13 +62,13 @@ RUN --mount=type=secret,id=GARBLE_SEED \
     export SEED=$(cat /run/secrets/GARBLE_SEED) && \
     export HTTP_PROXY=${HTTP_PROXY} && \
     export HTTPS_PROXY=${HTTP_PROXY} && \
-    COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY-pe} OS=linux GARBLE=1 GARBLE_SEED=${SEED}" && \
+    COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY-pe} OS=linux GNU=1 GARBLE=1 GARBLE_SEED=${SEED}" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
         make build ${COMMON_ARGS} AMD64=1 AMD64_CC=gcc; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
-        make build ${COMMON_ARGS} ARM64=1 ARM64_CC=$TC_MUSL_ARM64; \
+        make build ${COMMON_ARGS} ARM64=1 ARM64_CC=$TC_GNU_ARM64; \
     elif [ "$TARGETARCH" = "arm" ]; then \
-        make build ${COMMON_ARGS} ARM7=1 ARM7_CC=$TC_MUSL_ARMV7; \
+        make build ${COMMON_ARGS} ARM7=1 ARM7_CC=$TC_GNU_ARMV7; \
     else \
         echo "Unsupported architecture: $TARGETARCH" && exit 1; \
     fi
@@ -81,7 +85,7 @@ ARG TARGETARCH
 ENV APP_VERSION=$APP_VERSION
 ENV APP_FAMILY=$APP_FAMILY
 
-COPY --from=builder /src/runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
+COPY --from=builder /src/runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-gnu-${TARGETARCH} /app/server/dpanel
 
 FROM $PROD_FROM_BASE AS production
 
@@ -92,4 +96,4 @@ ARG TARGETARCH
 ENV APP_VERSION=$APP_VERSION
 ENV APP_FAMILY=$APP_FAMILY
 
-COPY --from=builder /src/runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
+COPY --from=builder /src/runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-gnu-${TARGETARCH} /app/server/dpanel

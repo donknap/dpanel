@@ -1,13 +1,9 @@
-FROM golang:1.25-bookworm AS builder
+FROM --platform=${BUILDPLATFORM} dpanel/builder:debian AS builder
 
 ARG TARGETARCH
 ARG HTTP_PROXY
 ARG APP_VERSION
 ARG APP_FAMILY
-
-RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    make gcc libc6-dev git
 
 WORKDIR /src
 COPY ./ /src
@@ -19,12 +15,15 @@ RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETA
     if [ "$TARGETARCH" = "amd64" ]; then \
         make build ${COMMON_ARGS} AMD64=1 AMD64_CC=gcc; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
-        make build ${COMMON_ARGS} ARM64=1 ARM64_CC=gcc; \
-    elif [ "$TARGETARCH" = "armv7" ]; then \
-        make build ${COMMON_ARGS} ARM7=1 ARM7_CC=gcc; \
+        make build ${COMMON_ARGS} ARM64=1 ARM64_CC=$TC_GNU_ARM64; \
+    elif [ "$TARGETARCH" = "arm" ]; then \
+        make build ${COMMON_ARGS} ARM7=1 ARM7_CC=$TC_GNU_ARMV7; \
     else \
         echo "Unsupported architecture: $TARGETARCH" && exit 1; \
     fi
+
+FROM scratch AS binary-export
+COPY --from=builder /src/runtime /
 
 FROM debian:bookworm-slim AS base
 
@@ -58,7 +57,7 @@ COPY ./docker/task /docker
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    sed -i 's/deb.debian111.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && apt-get install -y --no-install-recommends \
     tzdata git curl ca-certificates gnupg openssh-client iputils-ping && \
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \

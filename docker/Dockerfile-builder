@@ -1,0 +1,28 @@
+FROM alpine:3.21 AS downloader
+ARG HTTP_PROXY
+
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    apk add --no-cache curl xz
+
+WORKDIR /tmp/toolchains
+
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    curl -Lo arm64.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64.tar.xz && tar -xf arm64.tar.xz && \
+    curl -Lo arm.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm.tar.xz && tar -xf arm.tar.xz && \
+    curl -Lo arm64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64-musl.tgz && tar -xzf arm64-musl.tgz && \
+    curl -Lo arm-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm-musl.tgz && tar -xzf arm-musl.tgz && \
+    rm *.tar.xz *.tgz
+
+FROM golang:1.25-alpine AS builder-alpine
+RUN apk add --no-cache make gcc musl-dev git linux-headers curl
+COPY --from=downloader /tmp/toolchains/aarch64-linux-musl-cross /opt/toolchains/aarch64-linux-musl-cross
+COPY --from=downloader /tmp/toolchains/arm-linux-musleabihf-cross /opt/toolchains/arm-linux-musleabihf-cross
+ENV TC_MUSL_ARM64=/opt/toolchains/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
+    TC_MUSL_ARMV7=/opt/toolchains/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc
+
+FROM golang:1.25-bookworm AS builder-debian
+RUN apt-get update && apt-get install -y --no-install-recommends make gcc libc6-dev git curl xz-utils && rm -rf /var/lib/apt/lists/*
+COPY --from=downloader /tmp/toolchains/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu /opt/toolchains/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu
+COPY --from=downloader /tmp/toolchains/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf /opt/toolchains/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf
+ENV TC_GNU_ARM64=/opt/toolchains/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-gcc \
+    TC_GNU_ARMV7=/opt/toolchains/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc
