@@ -195,6 +195,18 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 
 	for _, s := range tarPathList {
 		err := func() error {
+			mimeType, err := docker.Sdk.OciMimeType(docker.Sdk.Ctx, s)
+			if err != nil {
+				return err
+			}
+			if strings.Contains(mimeType, "application/vnd.oci") {
+				// oci 镜像
+				err = docker.Sdk.OciLoadImage(docker.Sdk.Ctx, s)
+				if err != nil {
+					return err
+				}
+				return nil
+			}
 			imageTar, err := os.Open(s)
 			if err != nil {
 				return err

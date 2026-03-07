@@ -6,13 +6,22 @@ func CurrentSystemPlatform() (string, string) {
 	currentOS := runtime.GOOS
 	currentArch := runtime.GOARCH
 
-	if currentOS == "darwin" {
+	if currentOS == "windows" || currentOS == "darwin" {
 		currentOS = "linux"
-		if currentArch == "arm64" {
-			currentArch = "arm64"
-		} else {
-			currentArch = "amd64"
-		}
 	}
+
+	switch currentArch {
+	case "amd64":
+		currentArch = "amd64"
+	case "arm64":
+		currentArch = "arm64"
+	case "386":
+		currentArch = "386"
+	case "arm":
+		currentArch = "arm"
+	default:
+		// 默认保持原样
+	}
+
 	return currentOS, currentArch
 }

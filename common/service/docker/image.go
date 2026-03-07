@@ -13,11 +13,6 @@ import (
 	"sort"
 	"strings"
 
-	imagecopy "github.com/containers/image/v5/copy"
-	"github.com/containers/image/v5/docker/daemon"
-	"github.com/containers/image/v5/oci/archive"
-	"github.com/containers/image/v5/signature"
-	"github.com/containers/image/v5/types"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/types/fs"
 	"github.com/mcuadros/go-version"
@@ -133,37 +128,4 @@ func getFileListFromTar(tarReader *tar.Reader) (files []*fs.FileData, err error)
 		}
 	}
 	return files, nil
-}
-
-func (self Client) ImageLoadFromOci(ctx context.Context, ociPath string, imageName string) error {
-	srcRef, err := archive.NewReference(ociPath, "")
-	if err != nil {
-		return err
-	}
-	destRef, err := daemon.ParseReference(imageName)
-	if err != nil {
-		return err
-	}
-
-	policyContext, err := signature.NewPolicyContext(&signature.Policy{
-		Default: []signature.PolicyRequirement{signature.NewPRInsecureAcceptAnything()},
-	})
-	if err != nil {
-		return err
-	}
-	defer policyContext.Destroy()
-
-	currentOS, currentArch := function.CurrentSystemPlatform()
-	sysCtx := &types.SystemContext{
-		ArchitectureChoice: currentArch,
-		OSChoice:           currentOS,
-		DockerDaemonHost:   self.Client.DaemonHost(),
-	}
-
-	_, err = imagecopy.Image(ctx, policyContext, destRef, srcRef, &imagecopy.Options{
-		SourceCtx:      sysCtx,
-		DestinationCtx: sysCtx,
-	})
-
-	return err
 }

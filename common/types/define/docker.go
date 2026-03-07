@@ -38,3 +38,7 @@ const (
 	DockerEventDaemonStart      = "daemon/start"
 	DockerEventDaemonDie        = "daemon/die"
 )
+
+const (
+	DockerAnnotationRefName = "io.containerd.image.name"
+)
