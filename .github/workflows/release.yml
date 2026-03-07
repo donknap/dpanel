@@ -8,9 +8,8 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [ ubuntu-latest]
-        go-version: [ '1.23' ]
-    runs-on: ${{ matrix.platform }}
+        family: [ce, pe, nw, sy]
+    runs-on: ubuntu-latest
     steps:
       - name: Test Env
         run: |
@@ -25,7 +24,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: '1.25'
       - name: Install dependencies
         run: |
           go get .
@@ -50,30 +49,53 @@ jobs:
           password: ${{ secrets.ALIYUN_TOKEN }}
       - name: Prepare Toolchains
         run: |
-          # GNU Toolchains
-          curl -Lo arm64.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64.tar.xz && tar -xf arm64.tar.xz
-          curl -Lo arm.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm.tar.xz && tar -xf arm.tar.xz
-          # Musl Toolchains
-          curl -Lo amd64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-musl.tgz && tar xzf amd64-musl.tgz
-          curl -Lo arm64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64-musl.tgz && tar xzf arm64-musl.tgz
-          curl -Lo arm-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm-musl.tgz && tar zxf arm-musl.tgz
+#          # GNU Toolchains
+#          curl -Lo arm64.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64.tar.xz && tar -xf arm64.tar.xz
+#          curl -Lo arm.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm.tar.xz && tar -xf arm.tar.xz
+#          # Musl Toolchains
+#          curl -Lo amd64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-musl.tgz && tar xzf amd64-musl.tgz
+#          curl -Lo arm64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64-musl.tgz && tar xzf arm64-musl.tgz
+#          curl -Lo arm-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm-musl.tgz && tar zxf arm-musl.tgz
           # Synology Toolchains
           curl -Lo armv8-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/armv8-synology.txz && tar -Jvxf armv8-synology.txz
           curl -Lo amd64-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-synology.txz && tar -Jvxf amd64-synology.txz
-      - name: Docker Release & Binary Build
+      - name: Build PE Version
+        if: matrix.family == 'pe'
+        env:
+          GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
+          GIT_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         run: |
           VERSION_TAG=${GITHUB_REF_NAME#v}
-
-          # 1. 发布 CE 版 (Musl/Alpine)
-          # 2. 发布 Debian 版 (GNU)
-          make release FAMILY=ce VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0
-          make release FAMILY=ce VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 HUB=y LITE=0 GNU=y
-
-          # 3. 补充特定平台的二进制（如群晖），只需 build 不需要 release 镜像
+          make release FAMILY=pe VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} GNU=1
+          make release FAMILY=pe VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }}
+      - name: Build CE Version
+        if: matrix.family == 'ce'
+        run: |
+          VERSION_TAG=${GITHUB_REF_NAME#v}
+          make release FAMILY=ce VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GNU=1
+          make release FAMILY=ce VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1
+      - name: Build NW Version
+        if: matrix.family == 'nw'
+        run: |
+          VERSION_TAG=${GITHUB_REF_NAME#v}
+          # make release FAMILY=nw VERSION=${VERSION_TAG} AMD64=1 ARM64=1 OS=linux HUB=1 GNU=1
+          make release FAMILY=nw VERSION=${VERSION_TAG} AMD64=1 ARM64=1 OS=linux HUB=1
+      - name: Build SY (Synology) Version
+        if: matrix.family == 'sy'
+        run: |
+          VERSION_TAG=${GITHUB_REF_NAME#v}
           make build VERSION=${VERSION_TAG} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 \
             ARM64_CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
+          
           make build VERSION=${VERSION_TAG} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 \
             AMD64_CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
+      - name: Flatten Artifact Directories
+        run: |
+          # 1. 查找 runtime 目录下深度大于等于 2 的所有文件，并强制移动到 runtime 根目录
+          find runtime -mindepth 2 -type f -name 'dpanel-*' -exec mv -f {} runtime/ \; || true
+          
+          # 2. 删除 runtime 下所有的空子目录（清理现场）
+          find runtime -mindepth 1 -type d -empty -delete || true
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
@@ -84,7 +106,7 @@ jobs:
     strategy:
       matrix:
         platform: [ 'macos-15-intel', 'macos-latest' ]
-        go-version: [ '1.23' ]
+        go-version: [ '1.25' ]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Test Env
@@ -120,7 +142,7 @@ jobs:
     strategy:
       matrix:
         platform: [ 'windows-latest' ]
-        go-version: [ '1.23' ]
+        go-version: [ '1.25' ]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Test Env
@@ -155,7 +177,7 @@ jobs:
     strategy:
       matrix:
         platform: [ 'ubuntu-latest' ]
-        go-version: [ '1.23' ]
+        go-version: [ '1.25' ]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Test Env
@@ -188,7 +210,7 @@ jobs:
           files: runtime/*
           prerelease: false
   push-tags-to-related-repos:
-    needs: [ build ]
+    needs: [ build, macos-build, windows-build, xk-build ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout dpanel-gui
