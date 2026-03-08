@@ -4,12 +4,37 @@ on:
   push:
     tags:
       - 'v*'
+
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version_param: ${{ steps.set_param.outputs.version_param }}
+      is_prerelease: ${{ steps.set_param.outputs.is_prerelease }}
+    steps:
+      - name: Determine Version Param
+        id: set_param
+        run: |
+          TAG=${GITHUB_REF_NAME#v}
+          # 严格判断是否以 -beta 结尾
+          if [[ "$TAG" == *-beta ]]; then
+            echo "🚧 Beta release detected (tag ends with -beta). Using timestamp for version."
+            echo "version_param=" >> $GITHUB_OUTPUT
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "📦 Stable release detected. Using tag $TAG for version."
+            echo "version_param=VERSION=$TAG" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
   build:
+    needs: prepare
     strategy:
       matrix:
         family: [ce, pe, nw, sy]
     runs-on: ubuntu-latest
+    env:
+      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
     steps:
       - name: Test Env
         run: |
@@ -17,6 +42,8 @@ jobs:
           echo "Tag name from github.ref_name: ${{  github.ref_name }}"
           echo "Tag name from github.ref: ${{  github.ref }}"
           echo "Runs name: ${{runner.os}}"
+          echo "Global Version Param is: '${{ env.VERSION_PARAM }}'"
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -49,13 +76,13 @@ jobs:
           password: ${{ secrets.ALIYUN_TOKEN }}
       - name: Prepare Toolchains
         run: |
-#          # GNU Toolchains
-#          curl -Lo arm64.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64.tar.xz && tar -xf arm64.tar.xz
-#          curl -Lo arm.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm.tar.xz && tar -xf arm.tar.xz
-#          # Musl Toolchains
-#          curl -Lo amd64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-musl.tgz && tar xzf amd64-musl.tgz
-#          curl -Lo arm64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64-musl.tgz && tar xzf arm64-musl.tgz
-#          curl -Lo arm-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm-musl.tgz && tar zxf arm-musl.tgz
+          #          # GNU Toolchains
+          #          curl -Lo arm64.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64.tar.xz && tar -xf arm64.tar.xz
+          #          curl -Lo arm.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm.tar.xz && tar -xf arm.tar.xz
+          #          # Musl Toolchains
+          #          curl -Lo amd64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-musl.tgz && tar xzf amd64-musl.tgz
+          #          curl -Lo arm64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64-musl.tgz && tar xzf arm64-musl.tgz
+          #          curl -Lo arm-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm-musl.tgz && tar zxf arm-musl.tgz
           # Synology Toolchains
           curl -Lo armv8-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/armv8-synology.txz && tar -Jvxf armv8-synology.txz
           curl -Lo amd64-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-synology.txz && tar -Jvxf amd64-synology.txz
@@ -65,49 +92,42 @@ jobs:
           GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
           GIT_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         run: |
-          VERSION_TAG=${GITHUB_REF_NAME#v}
-          make release FAMILY=pe VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} GNU=1
-          make release FAMILY=pe VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }}
+          make release FAMILY=pe ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} GNU=1
+          make release FAMILY=pe ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }}
       - name: Build CE Version
         if: matrix.family == 'ce'
         run: |
-          VERSION_TAG=${GITHUB_REF_NAME#v}
-          make release FAMILY=ce VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GNU=1
-          make release FAMILY=ce VERSION=${VERSION_TAG} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1
+          make release FAMILY=ce ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GNU=1
+          make release FAMILY=ce ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1
       - name: Build NW Version
         if: matrix.family == 'nw'
         run: |
-          VERSION_TAG=${GITHUB_REF_NAME#v}
-          # make release FAMILY=nw VERSION=${VERSION_TAG} AMD64=1 ARM64=1 OS=linux HUB=1 GNU=1
-          make release FAMILY=nw VERSION=${VERSION_TAG} AMD64=1 ARM64=1 OS=linux HUB=1
+          make release FAMILY=nw ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 OS=linux HUB=1
       - name: Build SY (Synology) Version
         if: matrix.family == 'sy'
         run: |
-          VERSION_TAG=${GITHUB_REF_NAME#v}
-          make build VERSION=${VERSION_TAG} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 \
-            ARM64_CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
-          
-          make build VERSION=${VERSION_TAG} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 \
-            AMD64_CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
+          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 ARM64_CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
+          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 AMD64_CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
       - name: Flatten Artifact Directories
         run: |
-          # 1. 查找 runtime 目录下深度大于等于 2 的所有文件，并强制移动到 runtime 根目录
           find runtime -mindepth 2 -type f -name 'dpanel-*' -exec mv -f {} runtime/ \; || true
-          
-          # 2. 删除 runtime 下所有的空子目录（清理现场）
           find runtime -mindepth 1 -type d -empty -delete || true
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           files: runtime/*
-          prerelease: false
+          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+
   macos-build:
+    needs: prepare
     strategy:
       matrix:
         platform: [ 'macos-15-intel', 'macos-latest' ]
         go-version: [ '1.25' ]
     runs-on: ${{ matrix.platform }}
+    env:
+      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
     steps:
       - name: Test Env
         run: |
@@ -115,35 +135,38 @@ jobs:
           echo "Tag name from github.ref_name: ${{  github.ref_name }}"
           echo "Tag name from github.ref: ${{  github.ref }}"
           echo "Runs name: ${{runner.os}}"
+          echo "Global Version Param is: '${{ env.VERSION_PARAM }}'"
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
       - name: Install dependencies
-        run: |
-          go get .
+        run: go get .
       - name: Build
         run: |
-          VERSION_TAG=${GITHUB_REF_NAME#v}
           export CC=$(which clang)
           if [ "${{ runner.arch }}" = "X64" ]; then
-            make build VERSION=${VERSION_TAG} AMD64=1 PROJECT_NAME=dpanel-darwin-amd64 AMD64_CC=$CC
+            make build ${{ env.VERSION_PARAM }} AMD64=1 PROJECT_NAME=dpanel-darwin-amd64 AMD64_CC=$CC
           else
-            make build VERSION=${VERSION_TAG} ARM64=1 PROJECT_NAME=dpanel-darwin-arm64 ARM64_CC=$CC
+            make build ${{ env.VERSION_PARAM }} ARM64=1 PROJECT_NAME=dpanel-darwin-arm64 ARM64_CC=$CC
           fi
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           files: runtime/*
-          prerelease: false
+          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+
   windows-build:
+    needs: prepare
     strategy:
       matrix:
         platform: [ 'windows-latest' ]
         go-version: [ '1.25' ]
     runs-on: ${{ matrix.platform }}
+    env:
+      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
     steps:
       - name: Test Env
         run: |
@@ -151,34 +174,36 @@ jobs:
           echo "Tag name from github.ref_name: ${{  github.ref_name }}"
           echo "Tag name from github.ref: ${{  github.ref }}"
           echo "Runs name: ${{runner.os}}"
+          echo "Global Version Param is: '${{ env.VERSION_PARAM }}'"
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
       - name: Install dependencies
-        run: |
-          go get .
+        run: go get .
       - name: Install Make
         run: choco install make -y
       - name: Build
         shell: bash
         run: |
-          VERSION_TAG=${GITHUB_REF_NAME#v}
-          # 强制覆盖 OS=windows，因为 Git Bash 会把 OS 识别为 MINGW64 导致交叉编译失败
-          make build VERSION=${VERSION_TAG} OS=windows AMD64=1 PROJECT_NAME=dpanel.exe AMD64_CC=gcc
+          make build ${{ env.VERSION_PARAM }} OS=windows AMD64=1 PROJECT_NAME=dpanel.exe AMD64_CC=gcc
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           files: runtime/*
-          prerelease: false
+          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+
   xk-build:
+    needs: prepare
     strategy:
       matrix:
         platform: [ 'ubuntu-latest' ]
         go-version: [ '1.25' ]
     runs-on: ${{ matrix.platform }}
+    env:
+      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
     steps:
       - name: Test Env
         run: |
@@ -186,6 +211,7 @@ jobs:
           echo "Tag name from github.ref_name: ${{  github.ref_name }}"
           echo "Tag name from github.ref: ${{  github.ref }}"
           echo "Runs name: ${{runner.os}}"
+          echo "Global Version Param is: '${{ env.VERSION_PARAM }}'"
       - uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -195,20 +221,19 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Install dependencies
-        run: |
-          go get .
+        run: go get .
       - name: Build
         run: |
-          VERSION_TAG=${GITHUB_REF_NAME#v}
           make -C app/pro/tests/xk_open clean libxksssopen.so
           make clean 
-          make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 VERSION=${VERSION_TAG} AMD64=1 AMD64_CC=gcc
+          make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 ${{ env.VERSION_PARAM }} AMD64=1 AMD64_CC=gcc
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           files: runtime/*
-          prerelease: false
+          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+
   push-tags-to-related-repos:
     needs: [ build, macos-build, windows-build, xk-build ]
     runs-on: ubuntu-latest
