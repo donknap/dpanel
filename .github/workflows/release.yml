@@ -33,6 +33,12 @@ jobs:
       fail-fast: true
       matrix:
         family: [ce, nw, sy]
+        libc: [gnu, musl]
+        exclude:
+          - family: nw
+            libc: gnu
+          - family: sy
+            libc: gnu
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -63,6 +69,7 @@ jobs:
         with:
           name: dpanel-context-local-builder
           driver-opts: image=moby/buildkit:master
+          install: true
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -78,8 +85,7 @@ jobs:
       - name: Build CE Version
         if: matrix.family == 'ce'
         run: |
-          make release APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all LIBC=gnu
-          make release APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all LIBC=musl
+          make release APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all LIBC=${{ matrix.libc }}
 
       - name: Build NW Version
         if: matrix.family == 'nw'
@@ -109,6 +115,10 @@ jobs:
 
   build-pe:
     needs: [prepare, build]
+    strategy:
+      fail-fast: true
+      matrix:
+        libc: [gnu, musl]
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -128,6 +138,7 @@ jobs:
         with:
           name: dpanel-context-local-builder
           driver-opts: image=moby/buildkit:master
+          install: true
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -145,8 +156,7 @@ jobs:
           GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
           GIT_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         run: |
-          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=gnu
-          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=musl
+          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=${{ matrix.libc }}
 
       - name: Flatten Artifact Directories
         run: |
@@ -267,7 +277,7 @@ jobs:
           prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
 
   push-tags-to-related-repos:
-    needs: [ build, macos-build, windows-build, xk-build ]
+    needs: [ build, build-pe, macos-build, windows-build, xk-build ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout dpanel-gui
