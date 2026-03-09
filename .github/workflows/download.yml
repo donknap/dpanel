@@ -86,3 +86,6 @@ jobs:
           name: "DPanel Build Resources Collection (Parallel)"
           body: "All-in-one build resources for DPanel."
           files: resources/*
+          draft: false
+          prerelease: false
+          make_latest: false
