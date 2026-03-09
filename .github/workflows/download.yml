@@ -4,21 +4,21 @@ on:
   workflow_dispatch:
 
 jobs:
+  # 任务 1：GNU 工具链 (Glibc)
   download-gnu:
     runs-on: ubuntu-latest
     steps:
       - name: Download GNU
         run: |
           mkdir -p artifacts
-          cd artifacts
-          # GNU 12
-          curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-          curl -SL -o x86_64-gnu-toolchain-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--stable-2023.08-1.tar.bz2
-          # GNU 13
-          curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-          curl -SL -o x86_64-gnu-toolchain-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--bleeding-edge-2023.11-1.tar.bz2
+          # GNU 12 系列
+          curl -SL -o artifacts/arm64-gnu-12.2.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
+          curl -SL -o artifacts/arm-gnu-12.2.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
+          curl -SL -o artifacts/amd64-gnu-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--stable-2023.08-1.tar.bz2
+          # GNU 13 系列
+          curl -SL -o artifacts/arm64-gnu-13.3.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
+          curl -SL -o artifacts/arm-gnu-13.3.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
+          curl -SL -o artifacts/amd64-gnu-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--bleeding-edge-2023.11-1.tar.bz2
       - uses: actions/upload-artifact@v4
         with:
           name: gnu-toolchains
@@ -30,13 +30,14 @@ jobs:
       - name: Download Musl
         run: |
           mkdir -p artifacts
-          cd artifacts
-          curl -SL -o amd64-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--musl--stable-2023.08-1.tar.bz2
-          curl -SL -o arm64-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--musl--stable-2023.08-1.tar.bz2
-          curl -SL -o arm-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7/tarballs/armv7--musl--stable-2023.08-1.tar.bz2
-          curl -SL -o amd64-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--musl--bleeding-edge-2023.11-1.tar.bz2
-          curl -SL -o arm64-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--musl--bleeding-edge-2023.11-1.tar.bz2
-          curl -SL -o arm-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7/tarballs/armv7--musl--bleeding-edge-2023.11-1.tar.bz2
+          # Musl 12.3 (Stable)
+          curl -SL -o artifacts/amd64-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--musl--stable-2023.08-1.tar.bz2
+          curl -SL -o artifacts/arm64-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--musl--stable-2023.08-1.tar.bz2
+          curl -SL -o artifacts/arm-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7/tarballs/armv7--musl--stable-2023.08-1.tar.bz2
+          # Musl 13.2 (Bleeding-edge)
+          curl -SL -o artifacts/amd64-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--musl--bleeding-edge-2023.11-1.tar.bz2
+          curl -SL -o artifacts/arm64-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--musl--bleeding-edge-2023.11-1.tar.bz2
+          curl -SL -o artifacts/arm-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7/tarballs/armv7--musl--bleeding-edge-2023.11-1.tar.bz2
       - uses: actions/upload-artifact@v4
         with:
           name: musl-toolchains
@@ -48,26 +49,22 @@ jobs:
       - name: Download Extra
         run: |
           mkdir -p artifacts
-          cd artifacts
           # Synology
-          curl -SLO https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz 
-          curl -SLO https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
+          curl -SL -o artifacts/arm64-synology-7.1.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz 
+          curl -SL -o artifacts/amd64-synology-7.1.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
           # Docker Tools
           LATEST_ZIP=$(curl -sS https://download.docker.com/win/static/stable/x86_64/ | grep -oE 'docker-[0-9.]+\.zip' | tail -n 1)
-          curl -sSLO "https://download.docker.com/win/static/stable/x86_64/$LATEST_ZIP"
-          unzip -q $LATEST_ZIP && cp docker/docker.exe docker-windows-x86_64.exe
+          curl -sSL "https://download.docker.com/win/static/stable/x86_64/$LATEST_ZIP" -o docker.zip
+          unzip -q docker.zip && mv docker/docker.exe artifacts/amd64-windows-docker.exe
           URL=$(curl -sS https://api.github.com/repos/docker/compose/releases/latest | jq -r '.assets[] | select(.name == "docker-compose-windows-x86_64.exe") | .browser_download_url')
-          curl -sSL -o "docker-compose-windows-x86_64.exe" "$URL"
+          curl -sSL -o "artifacts/amd64-windows-docker-compose.exe" "$URL"
           # fnpack
-          curl -sSL -o fnpack https://static2.fnnas.com/fnpack/fnpack-1.2.0-linux-amd64
-          chmod +x fnpack
+          curl -sSL -o artifacts/amd64-linux-fnpack https://static2.fnnas.com/fnpack/fnpack-1.2.0-linux-amd64
+          chmod +x artifacts/amd64-linux-fnpack
       - uses: actions/upload-artifact@v4
         with:
           name: extra-resources
-          path: |
-            artifacts/*.txz
-            artifacts/*.exe
-            artifacts/fnpack
+          path: artifacts/*
 
   create-release:
     needs: [download-gnu, download-musl, download-extra]
