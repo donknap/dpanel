@@ -158,7 +158,7 @@ DOCKER_PE_LITE_FROM_BASE    := $(if $(filter 1,$(_IS_BETA)),dpanel/dpanel:beta-l
 DOCKER_PE_PROD_FROM_BASE    := $(if $(filter 1,$(_IS_BETA)),dpanel/dpanel:beta$(_TAG_SFX),dpanel/dpanel:latest$(_TAG_SFX))
 
 DOCKER_BUILD_ARGS := --builder dpanel-context-local-builder \
-		--platform $(DOCKER_PLATFORM) \
+		--platform $(DOCKER_PLATFORM) $(DOCKER_EXT_ARGS) \
 		--build-arg APP_VERSION=${APP_VERSION} \
 		--build-arg APP_FAMILY=${APP_FAMILY} \
 		--build-arg HTTP_PROXY=${HTTP_PROXY} \

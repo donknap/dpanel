@@ -84,8 +84,10 @@ jobs:
 
       - name: Build CE Version
         if: matrix.family == 'ce'
+        env:
+          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=ce-${{ matrix.libc }} --cache-to type=gha,mode=max,scope=ce-${{ matrix.libc }}"
         run: |
-          make release APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all LIBC=${{ matrix.libc }}
+          make release APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all LIBC=${{ matrix.libc }} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
 
       - name: Build NW Version
         if: matrix.family == 'nw'
@@ -155,8 +157,9 @@ jobs:
         env:
           GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
           GIT_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=pe-${{ matrix.libc }} --cache-to type=gha,mode=max,scope=pe-${{ matrix.libc }}"
         run: |
-          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=${{ matrix.libc }}
+          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=${{ matrix.libc }} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
 
       - name: Flatten Artifact Directories
         run: |

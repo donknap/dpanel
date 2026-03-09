@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/paths"
-	"github.com/donknap/dpanel/common/library/sanitize"
 )
 
 // PathConvertWinPath2Unix 转换 windows 路径 c:\\my\\path\\shiny 为 /c/my/path/shiny
@@ -54,36 +53,47 @@ func Path2SystemSafe(p string) string {
 }
 
 func PathClean(p string) string {
-	const underscorePlaceholder = "DPanelUnderscorePlaceholder"
-	safeP := strings.ReplaceAll(p, "_", strings.ToLower(underscorePlaceholder))
+	var sb strings.Builder
+	lastWasDash := false
 
-	var cleaned string
-	if runtime.GOOS == "windows" && (filepath.VolumeName(p) != "" || strings.Contains(p, "\\")) {
-		vol := filepath.VolumeName(safeP)
-		rest := safeP[len(vol):]
-
-		// 处理 Windows 内部逻辑
-		cleanedRest := sanitize.Path(filepath.ToSlash(rest))
-		cleanedRest = filepath.FromSlash(cleanedRest)
-
-		// 补回被截掉的根路径分隔符
-		if len(rest) > 0 && (rest[0] == '/' || rest[0] == '\\') {
-			if len(cleanedRest) == 0 || !(cleanedRest[0] == '/' || cleanedRest[0] == '\\') {
-				cleaned = vol + string(filepath.Separator) + cleanedRest
-			} else {
-				cleaned = vol + cleanedRest
+	// 1. 白名单过滤：仅允许安全字符通过，非法字符（如空格、&、|、" 等）替换为 '-'
+	for _, r := range p {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == '/' || r == '\\' || r == ':' || r == '.' || r == '_' || r == '@' {
+			sb.WriteRune(r)
+			lastWasDash = false
+		} else if r == '-' {
+			if !lastWasDash {
+				sb.WriteRune(r)
+				lastWasDash = true
 			}
 		} else {
-			cleaned = vol + cleanedRest
+			// 将不在白名单中的危险/非法字符统一替换为 '-'
+			if !lastWasDash {
+				sb.WriteRune('-')
+				lastWasDash = true
+			}
 		}
-	} else {
-		// 如果是 Linux 系统，或者是 Windows 下的 Linux 风格路径 (如 /etc/nginx)
-		// 直接使用 sanitize 处理，它能完美处理这种斜杠开头的路径
-		cleaned = sanitize.Path(safeP)
 	}
 
-	// 还原下划线
-	cleaned = strings.ReplaceAll(cleaned, strings.ToLower(underscorePlaceholder), "_")
+	cleaned := sb.String()
+
+	if len(cleaned) > 1 {
+		cleaned = strings.TrimRight(cleaned, "-")
+	}
+
+	for strings.Contains(cleaned, "..") {
+		cleaned = strings.ReplaceAll(cleaned, "..", "")
+	}
+
+	if strings.HasPrefix(cleaned, "./") {
+		cleaned = strings.TrimPrefix(cleaned, "./")
+	}
+
+	if cleaned == "" {
+		return "."
+	}
+
 	return cleaned
 }
 
