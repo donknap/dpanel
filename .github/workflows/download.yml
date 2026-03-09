@@ -1,67 +1,82 @@
-name: Download Toolchains
+name: Download DPanel Build Resources
 
 on:
-  workflow_dispatch:  # 仅手动触发
+  workflow_dispatch:
 
 jobs:
-  download_toolchains:
+  download_all:
     runs-on: ubuntu-latest
     steps:
       - name: Create working directory
-        run: mkdir -p toolchains
-      - name: Download GNU 12 Series (Stable & High Compatibility)
+        run: mkdir -p resources
+
+      - name: Download GNU Toolchains
         continue-on-error: true
         run: |
-          cd toolchains
-          echo "--- Downloading GNU 12 Toolchains ---"
-          # ARM64 (Arm Official 12.2)
+          cd resources
+          # GNU 12 系列
           curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          
-          # ARMhf (Arm Official 12.2)
           curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-          
-          # AMD64 (Bootlin GCC 12.3 - Glibc 2.37)
-          curl -SL -o x86_64-gnu-toolchain-12.3-x86_64-linux-gnu.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--stable-2023.08-1.tar.bz2
+          curl -SL -o x86_64-gnu-toolchain-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--stable-2023.08-1.tar.bz2
 
-      - name: Download GNU 13 Series (Modern & Bleeding Edge)
-        continue-on-error: true
-        run: |
-          cd toolchains
-          echo "--- Downloading GNU 13 Toolchains ---"
-          # ARM64 (Arm Official 13.3)
+          # GNU 13 系列
           curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          
-          # ARMhf (Arm Official 13.3)
           curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-          
-          # AMD64 (Bootlin GCC 13.2 - Glibc 2.38)
-          curl -SL -o x86_64-gnu-toolchain-13.2-x86_64-linux-gnu.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--bleeding-edge-2023.11-1.tar.bz2
+          curl -SL -o x86_64-gnu-toolchain-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--bleeding-edge-2023.11-1.tar.bz2
 
-      - name: Download Musl Toolchains (Static CGO Support)
+      - name: Download Musl Toolchains
         continue-on-error: true
         run: |
-          cd toolchains
-          echo "--- Downloading Musl Toolchains ---"
-          curl -SL -o x86_64-linux-musl-cross.tgz https://musl.cc/x86_64-linux-musl-cross.tgz
-          curl -SL -o aarch64-linux-musl-cross.tgz https://musl.cc/aarch64-linux-musl-cross.tgz
-          curl -SL -o arm-linux-musleabihf-cross.tgz https://musl.cc/arm-linux-musleabihf-cross.tgz
+          cd resources
+          # GCC 12.3 系列 (Stable)
+          curl -SL -o amd64-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--musl--stable-2023.08-1.tar.bz2
+          curl -SL -o arm64-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--musl--stable-2023.08-1.tar.bz2
+          curl -SL -o arm-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7/tarballs/armv7--musl--stable-2023.08-1.tar.bz2
+
+          # GCC 13.2 系列 (Bleeding-edge)
+          curl -SL -o amd64-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--musl--bleeding-edge-2023.11-1.tar.bz2
+          curl -SL -o arm64-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--musl--bleeding-edge-2023.11-1.tar.bz2
+          curl -SL -o arm-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7/tarballs/armv7--musl--bleeding-edge-2023.11-1.tar.bz2
 
       - name: Download Synology Toolchains
         continue-on-error: true
         run: |
-          cd toolchains
-          echo "--- Downloading Synology Toolchains ---"
+          cd resources
           curl -SLO https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz 
           curl -SLO https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
+
+      - name: Download Docker Cli & External Tools
+        continue-on-error: true
+        run: |
+          cd resources
+          # docker.exe
+          LATEST_ZIP=$(curl -sS https://download.docker.com/win/static/stable/x86_64/ | grep -oE 'docker-[0-9.]+\.zip' | tail -n 1)
+          curl -sSLO "https://download.docker.com/win/static/stable/x86_64/$LATEST_ZIP"
+          unzip -q $LATEST_ZIP
+          cp docker/docker.exe docker-windows-x86_64.exe
+        
+          # docker-compose.exe
+          URL=$(curl -sS https://api.github.com/repos/docker/compose/releases/latest | jq -r '.assets[] | select(.name == "docker-compose-windows-x86_64.exe") | .browser_download_url')
+          curl -sSL -o "docker-compose-windows-x86_64.exe" "$URL"
+        
+          # fnpack
+          curl -sSL -o fnpack https://static2.fnnas.com/fnpack/fnpack-1.2.0-linux-amd64
+          chmod 755 fnpack && ./fnpack --help
 
       - name: Create Release
         if: always()
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: toolchains-v1
-          name: "DPanel Toolchains Collection"
-          body:  "Pre-built toolchains for ARM, ARM64, AMD64，MUSL and Synology platforms"
-          files: toolchains/*
+          tag_name: dpanel-build-resources
+          name: "DPanel Build Resources Collection"
+          body: |
+            ### 🛠 资源清单：
+            - **GNU 12/13**: 支持 CGO (Arm 官方 & Bootlin)
+            - **Musl**: 全静态编译必备 (Bootlin)
+            - **Synology**: 群晖 DSM 7.x 编译支持
+            - **Docker Tools**: Windows 版 Docker CLI & Compose
+            - **fnpack**: 飞牛私有云打包工具
+          files: resources/*
           draft: false
           prerelease: false
           make_latest: false
