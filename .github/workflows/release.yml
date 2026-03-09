@@ -30,8 +30,9 @@ jobs:
   build:
     needs: prepare
     strategy:
+      fail-fast: true
       matrix:
-        family: [ce, pe, nw, sy]
+        family: [ce, nw, sy]
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -62,7 +63,6 @@ jobs:
         with:
           name: dpanel-context-local-builder
           driver-opts: image=moby/buildkit:master
-          install: true
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -74,23 +74,18 @@ jobs:
           registry: registry.cn-hangzhou.aliyuncs.com
           username: ${{ secrets.ALIYUN_USERNAME }}
           password: ${{ secrets.ALIYUN_TOKEN }}
-      - name: Build PE Version
-        if: matrix.family == 'pe'
-        env:
-          GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
-          GIT_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
-        run: |
-          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=gnu
-          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=musl
+
       - name: Build CE Version
         if: matrix.family == 'ce'
         run: |
           make release APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all LIBC=gnu
           make release APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all LIBC=musl
+
       - name: Build NW Version
         if: matrix.family == 'nw'
         run: |
           make release APP_FAMILY=nw APP_ENV=lite ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 OS=linux PUSH=all
+
       - name: Build SY (Synology) Version
         if: matrix.family == 'sy'
         run: |
@@ -99,10 +94,65 @@ jobs:
           curl -Lo amd64-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/amd64-synology.txz && tar -Jvxf amd64-synology.txz
           make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 CC_ARM64=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
           make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 CC_AMD64=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
+
       - name: Flatten Artifact Directories
         run: |
           find runtime -mindepth 2 -type f -name 'dpanel-*' -exec mv -f {} runtime/ \; || true
           find runtime -mindepth 1 -type d -empty -delete || true
+
+      - name: upload artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: runtime/*
+          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+
+  build-pe:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    env:
+      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          name: dpanel-context-local-builder
+          driver-opts: image=moby/buildkit:master
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to ALiYun
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-hangzhou.aliyuncs.com
+          username: ${{ secrets.ALIYUN_USERNAME }}
+          password: ${{ secrets.ALIYUN_TOKEN }}
+
+      - name: Build PE Version
+        env:
+          GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
+          GIT_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+        run: |
+          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=gnu
+          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=musl
+
+      - name: Flatten Artifact Directories
+        run: |
+          find runtime -mindepth 2 -type f -name 'dpanel-*' -exec mv -f {} runtime/ \; || true
+          find runtime -mindepth 1 -type d -empty -delete || true
+
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
@@ -115,7 +165,6 @@ jobs:
     strategy:
       matrix:
         platform: [ 'macos-15-intel', 'macos-latest' ]
-        go-version: [ '1.25' ]
     runs-on: ${{ matrix.platform }}
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -131,7 +180,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: '1.25'
       - name: Install dependencies
         run: go get .
       - name: Build
@@ -151,11 +200,7 @@ jobs:
 
   windows-build:
     needs: prepare
-    strategy:
-      matrix:
-        platform: [ 'windows-latest' ]
-        go-version: [ '1.25' ]
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
     steps:
@@ -170,7 +215,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: '1.25'
       - name: Install dependencies
         run: go get .
       - name: Install Make
@@ -188,11 +233,7 @@ jobs:
 
   xk-build:
     needs: prepare
-    strategy:
-      matrix:
-        platform: [ 'ubuntu-latest' ]
-        go-version: [ '1.25' ]
-    runs-on: ${{ matrix.platform }}
+    runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
     steps:
@@ -210,7 +251,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: '1.25'
       - name: Install dependencies
         run: go get .
       - name: Build
