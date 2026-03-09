@@ -9,46 +9,58 @@ jobs:
     steps:
       - name: Create working directory
         run: mkdir -p toolchains
-      - name: Download GNU Toolchains (GCC 12.2 - High Compatibility)
+      - name: Download GNU 12 Series (Stable & High Compatibility)
         continue-on-error: true
         run: |
           cd toolchains
-          echo "Downloading GNU ARM64 (AArch64)..."
-          curl -LOC https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          curl -LOC https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          echo "Downloading GNU ARM (armhf)..."
-          curl -LOC https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-          curl -LOC https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-      - name: Download Musl Toolchains (Static Linking)
-        continue-on-error: true
-        run: |
-          cd toolchains
-          echo "Downloading Musl AMD64..."
-          curl -Lo amd64-musl.tgz https://musl.cc/x86_64-linux-musl-cross.tgz
+          echo "--- Downloading GNU 12 Toolchains ---"
+          # ARM64 (Arm Official 12.2)
+          curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
           
-          echo "Downloading Musl ARM64..."
-          curl -Lo arm64-musl.tgz https://musl.cc/aarch64-linux-musl-cross.tgz
+          # ARMhf (Arm Official 12.2)
+          curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
           
-          echo "Downloading Musl ARM (armhf)..."
-          curl -Lo arm-musl.tgz https://musl.cc/arm-linux-musleabihf-cross.tgz
+          # AMD64 (Bootlin GCC 12.3 - Glibc 2.37)
+          curl -SL -o x86_64-gnu-toolchain-12.3-x86_64-linux-gnu.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--stable-2023.08-1.tar.bz2
 
-      - name: Download Synology Toolchains (DSM 7.x compatible)
+      - name: Download GNU 13 Series (Modern & Bleeding Edge)
         continue-on-error: true
         run: |
           cd toolchains
-          # 群晖官方工具链，基于 glibc 2.26，兼容性极强
-          echo "Downloading Synology ARM64 (RTD129x)..."
-          curl -Lo armv8-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz 
+          echo "--- Downloading GNU 13 Toolchains ---"
+          # ARM64 (Arm Official 13.3)
+          curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
           
-          echo "Downloading Synology AMD64 (Geminilake)..."
-          curl -Lo amd64-synology.txz https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
+          # ARMhf (Arm Official 13.3)
+          curl -SLO https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
+          
+          # AMD64 (Bootlin GCC 13.2 - Glibc 2.38)
+          curl -SL -o x86_64-gnu-toolchain-13.2-x86_64-linux-gnu.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--bleeding-edge-2023.11-1.tar.bz2
+
+      - name: Download Musl Toolchains (Static CGO Support)
+        continue-on-error: true
+        run: |
+          cd toolchains
+          echo "--- Downloading Musl Toolchains ---"
+          curl -SL -o x86_64-linux-musl-cross.tgz https://musl.cc/x86_64-linux-musl-cross.tgz
+          curl -SL -o aarch64-linux-musl-cross.tgz https://musl.cc/aarch64-linux-musl-cross.tgz
+          curl -SL -o arm-linux-musleabihf-cross.tgz https://musl.cc/arm-linux-musleabihf-cross.tgz
+
+      - name: Download Synology Toolchains
+        continue-on-error: true
+        run: |
+          cd toolchains
+          echo "--- Downloading Synology Toolchains ---"
+          curl -SLO https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Realtek%20RTD129x%20Linux%204.4.180/rtd1296-gcc850_glibc226_armv8-GPL.txz 
+          curl -SLO https://global.synologydownload.com/download/ToolChain/toolchain/7.1-42661/Intel%20x86%20Linux%204.4.180%20%28GeminiLake%29/geminilake-gcc850_glibc226_x86_64-GPL.txz
+
       - name: Create Release
         if: always()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: toolchains-v1
-          name: "DPanel Toolchains Collection (Glibc 2.36 Compatible)"
-          body: "Pre-built toolchains for ARM, ARM64, AMD64，MUSL and Synology platforms"
+          name: "DPanel Toolchains Collection"
+          body:  "Pre-built toolchains for ARM, ARM64, AMD64，MUSL and Synology platforms"
           files: toolchains/*
           draft: false
           prerelease: false
