@@ -4,27 +4,47 @@ on:
   workflow_dispatch:
 
 jobs:
+  # 初始任务：创建 Release 占位符，确保后续任务可以并行上传文件
+  init-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dpanel-build-resources
+          name: "DPanel Build Resources Collection (Parallel)"
+          body: "All-in-one build resources for DPanel. Files are uploading in parallel..."
+          draft: false
+          prerelease: false
+          make_latest: false
+
   # 任务 1：GNU 工具链 (Glibc)
   download-gnu:
+    needs: init-release
     runs-on: ubuntu-latest
     steps:
       - name: Download GNU
         run: |
           mkdir -p artifacts
-          # GNU 12 系列
-          curl -SL -o artifacts/arm64-gnu-12.2.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          curl -SL -o artifacts/arm-gnu-12.2.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
+          # --- GNU 12.3 系列 ---
           curl -SL -o artifacts/amd64-gnu-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--stable-2023.08-1.tar.bz2
-          # GNU 13 系列
-          curl -SL -o artifacts/arm64-gnu-13.3.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          curl -SL -o artifacts/arm-gnu-13.3.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/13.3.rel1/binrel/arm-gnu-toolchain-13.3.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-          curl -SL -o artifacts/amd64-gnu-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--bleeding-edge-2023.11-1.tar.bz2
-      - uses: actions/upload-artifact@v4
-        with:
-          name: gnu-toolchains
-          path: artifacts/*
+          curl -SL -o artifacts/arm64-gnu-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--glibc--stable-2023.08-1.tar.bz2
+          curl -SL -o artifacts/arm-gnu-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/armv7-eabihf--glibc--stable-2023.08-1.tar.bz2
 
+          # --- GNU 13.2 系列 ---
+          curl -SL -o artifacts/amd64-gnu-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--glibc--bleeding-edge-2023.11-1.tar.bz2
+          curl -SL -o artifacts/arm64-gnu-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--glibc--bleeding-edge-2023.11-1.tar.bz2
+          curl -SL -o artifacts/arm-gnu-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/armv7-eabihf--glibc--bleeding-edge-2023.11-1.tar.bz2
+      - name: Upload GNU to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dpanel-build-resources
+          files: artifacts/*
+          make_latest: false
+
+  # 任务 2：Musl 工具链 (全静态)
   download-musl:
+    needs: init-release
     runs-on: ubuntu-latest
     steps:
       - name: Download Musl
@@ -33,17 +53,21 @@ jobs:
           # Musl 12.3 (Stable)
           curl -SL -o artifacts/amd64-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--musl--stable-2023.08-1.tar.bz2
           curl -SL -o artifacts/arm64-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--musl--stable-2023.08-1.tar.bz2
-          curl -SL -o artifacts/arm-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7/tarballs/armv7--musl--stable-2023.08-1.tar.bz2
+          curl -SL -o artifacts/arm-musl-12.3.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/armv7-eabihf--musl--stable-2023.08-1.tar.bz2
           # Musl 13.2 (Bleeding-edge)
           curl -SL -o artifacts/amd64-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/x86-64/tarballs/x86-64--musl--bleeding-edge-2023.11-1.tar.bz2
           curl -SL -o artifacts/arm64-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--musl--bleeding-edge-2023.11-1.tar.bz2
-          curl -SL -o artifacts/arm-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7/tarballs/armv7--musl--bleeding-edge-2023.11-1.tar.bz2
-      - uses: actions/upload-artifact@v4
+          curl -SL -o artifacts/arm-musl-13.2.tar.bz2 https://toolchains.bootlin.com/downloads/releases/toolchains/armv7-eabihf/tarballs/armv7-eabihf--musl--bleeding-edge-2023.11-1.tar.bz2
+      - name: Upload Musl to Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: musl-toolchains
-          path: artifacts/*
+          tag_name: dpanel-build-resources
+          files: artifacts/*
+          make_latest: false
 
+  # 任务 3：Synology & 其他工具
   download-extra:
+    needs: init-release
     runs-on: ubuntu-latest
     steps:
       - name: Download Extra
@@ -61,28 +85,9 @@ jobs:
           # fnpack
           curl -sSL -o artifacts/amd64-linux-fnpack https://static2.fnnas.com/fnpack/fnpack-1.2.0-linux-amd64
           chmod +x artifacts/amd64-linux-fnpack
-      - uses: actions/upload-artifact@v4
-        with:
-          name: extra-resources
-          path: artifacts/*
-
-  create-release:
-    needs: [download-gnu, download-musl, download-extra]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: resources
-          merge-multiple: true
-
-      - name: Create Release
+      - name: Upload Extra to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: dpanel-build-resources
-          name: "DPanel Build Resources Collection (Parallel)"
-          body: "All-in-one build resources for DPanel."
-          files: resources/*
-          draft: false
-          prerelease: false
+          files: artifacts/*
           make_latest: false
