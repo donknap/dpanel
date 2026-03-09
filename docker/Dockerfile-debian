@@ -1,7 +1,15 @@
-FROM --platform=${BUILDPLATFORM} dpanel/builder:debian AS builder
+ARG LIBC=gnu
+ARG VERSION=12.3
+
+FROM --platform=${BUILDPLATFORM} dpanel/builder:${TARGETARCH}-${LIBC}-${VERSION} AS toolchain
+FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
+
+ARG HTTP_PROXY
+
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    apt-get update && apt-get install -y --no-install-recommends make git
 
 ARG TARGETARCH
-ARG HTTP_PROXY
 ARG APP_VERSION
 ARG APP_FAMILY
 
@@ -10,16 +18,18 @@ COPY ./ /src
 
 RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETARCH} \
     --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
+    --mount=type=bind,from=toolchain,source=/toolchains,target=/toolchains \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
-    COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY-ce} OS=linux GNU=1" && \
+    COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY-ce} OS=linux LIBC=gnu" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
-        make build ${COMMON_ARGS} AMD64=1 AMD64_CC=gcc; \
+        export CC=$(echo /toolchains/*amd64-gnu-*/bin/*-gcc); \
+        make build ${COMMON_ARGS} AMD64=1 ARM64=0 ARMV7=0 CC_AMD64=$CC; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
-        make build ${COMMON_ARGS} ARM64=1 ARM64_CC=$TC_GNU_ARM64; \
+        export CC=$(echo /toolchains/*arm64-gnu-*/bin/*-gcc); \
+        make build ${COMMON_ARGS} AMD64=0 ARM64=1 ARMV7=0 CC_ARM64=$CC; \
     elif [ "$TARGETARCH" = "arm" ]; then \
-        make build ${COMMON_ARGS} ARM7=1 ARM7_CC=$TC_GNU_ARMV7; \
-    else \
-        echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+        export CC=$(echo /toolchains/*arm-gnu-*/bin/*-gcc); \
+        make build ${COMMON_ARGS} AMD64=0 ARM64=0 ARMV7=1 CC_ARMV7=$CC; \
     fi
 
 FROM scratch AS binary-export

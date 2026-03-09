@@ -74,40 +74,31 @@ jobs:
           registry: registry.cn-hangzhou.aliyuncs.com
           username: ${{ secrets.ALIYUN_USERNAME }}
           password: ${{ secrets.ALIYUN_TOKEN }}
-      - name: Prepare Toolchains
-        run: |
-          #          # GNU Toolchains
-          #          curl -Lo arm64.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64.tar.xz && tar -xf arm64.tar.xz
-          #          curl -Lo arm.tar.xz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm.tar.xz && tar -xf arm.tar.xz
-          #          # Musl Toolchains
-          #          curl -Lo amd64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-musl.tgz && tar xzf amd64-musl.tgz
-          #          curl -Lo arm64-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm64-musl.tgz && tar xzf arm64-musl.tgz
-          #          curl -Lo arm-musl.tgz https://github.com/donknap/dpanel/releases/download/toolchains-v1/arm-musl.tgz && tar zxf arm-musl.tgz
-          # Synology Toolchains
-          curl -Lo armv8-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/armv8-synology.txz && tar -Jvxf armv8-synology.txz
-          curl -Lo amd64-synology.txz https://github.com/donknap/dpanel/releases/download/toolchains-v1/amd64-synology.txz && tar -Jvxf amd64-synology.txz
       - name: Build PE Version
         if: matrix.family == 'pe'
         env:
           GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
           GIT_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
         run: |
-          make release FAMILY=pe ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} GNU=1
-          make release FAMILY=pe ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }}
+          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=gnu
+          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=musl
       - name: Build CE Version
         if: matrix.family == 'ce'
         run: |
-          make release FAMILY=ce ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1 GNU=1
-          make release FAMILY=ce ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARM7=1 OS=linux LITE=0 HUB=1
+          make release APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all LIBC=gnu
+          make release APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all LIBC=musl
       - name: Build NW Version
         if: matrix.family == 'nw'
         run: |
-          make release FAMILY=nw ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 OS=linux HUB=1
+          make release APP_FAMILY=nw APP_ENV=lite ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 OS=linux PUSH=all
       - name: Build SY (Synology) Version
         if: matrix.family == 'sy'
         run: |
-          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 ARM64_CC=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
-          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 AMD64_CC=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
+          # Synology Toolchains
+          curl -Lo armv8-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/armv8-synology.txz && tar -Jvxf armv8-synology.txz
+          curl -Lo amd64-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/amd64-synology.txz && tar -Jvxf amd64-synology.txz
+          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 CC_ARM64=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
+          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 CC_AMD64=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
       - name: Flatten Artifact Directories
         run: |
           find runtime -mindepth 2 -type f -name 'dpanel-*' -exec mv -f {} runtime/ \; || true
@@ -147,9 +138,9 @@ jobs:
         run: |
           export CC=$(which clang)
           if [ "${{ runner.arch }}" = "X64" ]; then
-            make build ${{ env.VERSION_PARAM }} AMD64=1 PROJECT_NAME=dpanel-darwin-amd64 AMD64_CC=$CC
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-darwin-amd64 AMD64=1 CC_AMD64=$CC
           else
-            make build ${{ env.VERSION_PARAM }} ARM64=1 PROJECT_NAME=dpanel-darwin-arm64 ARM64_CC=$CC
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-darwin-arm64 ARM64=1 CC_ARM64=$CC
           fi
       - name: upload artifact
         uses: softprops/action-gh-release@v2
@@ -187,7 +178,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          make build ${{ env.VERSION_PARAM }} OS=windows AMD64=1 PROJECT_NAME=dpanel.exe AMD64_CC=gcc
+          make build ${{ env.VERSION_PARAM }} BUILD_OS=windows PROJECT_NAME=dpanel.exe AMD64=1 CC_AMD64=gcc
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:
@@ -226,7 +217,7 @@ jobs:
         run: |
           make -C app/pro/tests/xk_open clean libxksssopen.so
           make clean 
-          make build PROJECT_NAME=dpanel-xk-amd64 FAMILY=xk CGO_ENABLED=1 ${{ env.VERSION_PARAM }} AMD64=1 AMD64_CC=gcc
+          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-xk-amd64 APP_FAMILY=xk AMD64=1 CC_AMD64=gcc
       - name: upload artifact
         uses: softprops/action-gh-release@v2
         with:

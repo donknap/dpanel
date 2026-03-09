@@ -1,14 +1,17 @@
-# syntax=docker/dockerfile:1
-ARG LITE_FROM_BASE=dpanel/dpanel:lite
-ARG PROD_FROM_BASE=dpanel/dpanel:latest
+ARG PE_LITE_FROM_BASE=dpanel/dpanel:lite
+ARG PE_PROD_FROM_BASE=dpanel/dpanel:latest
 
-FROM --platform=$BUILDPLATFORM dpanel/builder:alpine AS source
+ARG LIBC=musl
+ARG VERSION=12.3
+
+FROM --platform=${BUILDPLATFORM} dpanel/builder:${TARGETARCH}-${LIBC}-${VERSION} AS toolchain
+
+FROM --platform=$BUILDPLATFORM alpine AS source
 
 ARG HTTP_PROXY
-ENV HTTP_PROXY=${HTTP_PROXY}
-ENV HTTPS_PROXY=${HTTP_PROXY}
 
-RUN apk add --no-cache git github-cli gcc musl-dev make
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    apk add --no-cache git github-cli
 
 ARG APP_VERSION
 ARG REPO_BRANCH
@@ -32,20 +35,20 @@ RUN --mount=type=secret,id=GIT_TOKEN \
         gh repo clone donknap/dpanel-pro ./app/pro -- --depth 1; \
     else \
         echo ">> REPO_PULL disabled. Using local source code..." ; \
-    fi && \
-    go test -v --run TestGenerateDefines ./app/pro/tests/obfuscate_test.go
+    fi
 
-FROM --platform=$BUILDPLATFORM dpanel/builder:alpine AS builder
+FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
 
 ARG HTTP_PROXY
-ENV HTTP_PROXY=${HTTP_PROXY}
-ENV HTTPS_PROXY=${HTTP_PROXY}
 
-RUN apk add --no-cache make gcc musl-dev git linux-headers && \
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    apt-get update && apt-get install -y --no-install-recommends git && \
     go install mvdan.cc/garble@latest
 
 ARG APP_VERSION
+ARG APP_FAMILY
 ARG TARGETARCH
+
 ENV APP_VERSION=${APP_VERSION}
 
 WORKDIR /src
@@ -55,24 +58,26 @@ COPY --from=source /src /src
 RUN --mount=type=secret,id=GARBLE_SEED \
     --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETARCH} \
     --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
+    --mount=type=bind,from=toolchain,source=/toolchains,target=/toolchains \
     export SEED=$(cat /run/secrets/GARBLE_SEED) && \
-    export HTTP_PROXY=${HTTP_PROXY} && \
-    export HTTPS_PROXY=${HTTP_PROXY} && \
+    export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    go test -v --run TestGenerateDefines ./app/pro/tests/obfuscate_test.go && \
     COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY-pe} OS=linux GARBLE=1 GARBLE_SEED=${SEED}" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
-        make build ${COMMON_ARGS} AMD64=1 AMD64_CC=gcc; \
+        export CC=$(echo /toolchains/*amd64-musl-*/bin/*-gcc); \
+        make build ${COMMON_ARGS} AMD64=1 ARM64=0 ARMV7=0 CC_AMD64=$CC; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
-        make build ${COMMON_ARGS} ARM64=1 ARM64_CC=$TC_MUSL_ARM64; \
+        export CC=$(echo /toolchains/*arm64-musl-*/bin/*-gcc); \
+        make build ${COMMON_ARGS} AMD64=0 ARM64=1 ARMV7=0 CC_ARM64=$CC; \
     elif [ "$TARGETARCH" = "arm" ]; then \
-        make build ${COMMON_ARGS} ARM7=1 ARM7_CC=$TC_MUSL_ARMV7; \
-    else \
-        echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+        export CC=$(echo /toolchains/*arm-musl-*/bin/*-gcc); \
+        make build ${COMMON_ARGS} AMD64=0 ARM64=0 ARMV7=1 CC_ARMV7=$CC; \
     fi
 
 FROM scratch AS binary-export
 COPY --from=builder /src/runtime /
 
-FROM $LITE_FROM_BASE AS lite
+FROM $PE_LITE_FROM_BASE AS lite
 
 ARG APP_FAMILY
 ARG APP_VERSION
@@ -83,7 +88,7 @@ ENV APP_FAMILY=$APP_FAMILY
 
 COPY --from=builder /src/runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
 
-FROM $PROD_FROM_BASE AS production
+FROM $PE_PROD_FROM_BASE AS production
 
 ARG APP_FAMILY
 ARG APP_VERSION

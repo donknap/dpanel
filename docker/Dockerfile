@@ -1,4 +1,13 @@
-FROM --platform=${BUILDPLATFORM} dpanel/builder:alpine AS builder
+ARG LIBC=musl
+ARG VERSION=12.3
+
+FROM --platform=${BUILDPLATFORM} dpanel/builder:${TARGETARCH}-${LIBC}-${VERSION} AS toolchain
+FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
+
+ARG HTTP_PROXY
+
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    apt-get update && apt-get install -y --no-install-recommends make git
 
 ARG TARGETARCH
 ARG APP_VERSION
@@ -9,17 +18,18 @@ COPY ./ /src
 
 RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETARCH} \
     --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
-    export HTTP_PROXY=${HTTP_PROXY} && \
-    export HTTPS_PROXY=${HTTP_PROXY} && \
+    --mount=type=bind,from=toolchain,source=/toolchains,target=/toolchains \
+    export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY-ce} OS=linux" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
-        make build ${COMMON_ARGS} AMD64=1 AMD64_CC=gcc; \
+        export CC=$(echo /toolchains/*amd64-musl-*/bin/*-gcc); \
+        make build ${COMMON_ARGS} AMD64=1 ARM64=0 ARMV7=0 CC_AMD64=$CC; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
-        make build ${COMMON_ARGS} ARM64=1 ARM64_CC=$TC_MUSL_ARM64; \
+        export CC=$(echo /toolchains/*arm64-musl-*/bin/*-gcc); \
+        make build ${COMMON_ARGS} AMD64=0 ARM64=1 ARMV7=0 CC_ARM64=$CC; \
     elif [ "$TARGETARCH" = "arm" ]; then \
-        make build ${COMMON_ARGS} ARM7=1 ARM7_CC=$TC_MUSL_ARMV7; \
-    else \
-        echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+        export CC=$(echo /toolchains/*arm-musl-*/bin/*-gcc); \
+        make build ${COMMON_ARGS} AMD64=0 ARM64=0 ARMV7=1 CC_ARMV7=$CC; \
     fi
 
 FROM scratch AS binary-export
@@ -33,7 +43,7 @@ FROM alpine AS base
 
 ARG HTTP_PROXY
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
+RUN sed -i 's/dl-cdn.alpinelinux111.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && apk add --no-cache --update \
     bash musl docker-cli docker-cli-compose docker-cli-buildx tzdata git openssh-client curl && \
     rm -f /usr/bin/docker-compose && \
