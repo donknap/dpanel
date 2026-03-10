@@ -293,6 +293,7 @@ jobs:
           TAG=${{ github.ref_name }}
           git config user.name "donknap"
           git config user.email "donknap@gmail.com"
+          git push origin --delete "$TAG" || true
           git tag -f "$TAG"
           git push origin "$TAG" --force
 
@@ -309,5 +310,6 @@ jobs:
           TAG=${{ github.ref_name }}
           git config user.name "donknap"
           git config user.email "donknap@gmail.com"
+          git push origin --delete "$TAG" || true
           git tag -f "$TAG"
           git push origin "$TAG" --force
