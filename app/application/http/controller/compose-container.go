@@ -98,6 +98,11 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
 
 	// 如果是远程连接，尝试将本地的 compose 目录数据同步到端
+	// 需要将 windows 地址统一成 linux 地址
+	mountPath := tasker.Project.WorkingDir
+	if v, ok := function.PathConvertWinPath2Unix(tasker.Project.WorkingDir); ok {
+		mountPath = v
+	}
 	if function.InArray([]string{
 		define.DockerRemoteTypeSSH,
 		define.DockerRemoteTypeTcp,
@@ -105,7 +110,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		explorerPlugin, err := plugin.NewPlugin(plugin.ExplorerName, map[string]*plugin.TemplateParser{
 			plugin.ExplorerName: {
 				Volumes: []string{
-					fmt.Sprintf("%s:%s", tasker.Project.WorkingDir, tasker.Project.WorkingDir),
+					fmt.Sprintf("%s:%s", mountPath, mountPath),
 				},
 			},
 		})

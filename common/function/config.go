@@ -65,6 +65,46 @@ func (self ConfigMap) GetStringMapString(path string) map[string]string {
 	return result
 }
 
+func (self ConfigMap) GetSliceConfigMap(path string) []ConfigMap {
+	val := self.getValueInterface(path)
+	if val == nil {
+		return make([]ConfigMap, 0)
+	}
+
+	if slice, ok := val.([]interface{}); ok {
+		result := make([]ConfigMap, 0, len(slice))
+		for _, item := range slice {
+			if m, ok := item.(map[string]interface{}); ok {
+				result = append(result, ConfigMap(m))
+			}
+		}
+		return result
+	}
+
+	var mapData map[string]interface{}
+
+	if m, ok := val.(ConfigMap); ok {
+		mapData = m
+	} else if m, ok := val.(map[string]interface{}); ok {
+		mapData = m
+	}
+
+	if mapData != nil {
+		result := make([]ConfigMap, 0, len(mapData))
+		for i := 0; i < len(mapData); i++ {
+			key := fmt.Sprintf("%d", i)
+			if item, exists := mapData[key]; exists {
+				if childMap, ok := item.(map[string]interface{}); ok {
+					result = append(result, ConfigMap(childMap))
+				}
+			}
+		}
+		return result
+	}
+
+	return make([]ConfigMap, 0)
+}
+
 func (self ConfigMap) getValueInterface(path string) interface{} {
 	if self == nil {
 		return interface{}(nil)

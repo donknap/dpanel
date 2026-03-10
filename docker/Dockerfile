@@ -9,12 +9,18 @@ ARG HTTP_PROXY
 RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     apt-get update && apt-get install -y --no-install-recommends make git
 
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
+    export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    go mod download
+
+COPY ./ /src
+
 ARG TARGETARCH
 ARG APP_VERSION
 ARG APP_FAMILY
-
-WORKDIR /src
-COPY ./ /src
 
 RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETARCH} \
     --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
@@ -49,6 +55,11 @@ RUN sed -i 's/dl-cdn.alpinelinux111.org/mirrors.ustc.edu.cn/g' /etc/apk/reposito
     rm -f /usr/bin/docker-compose && \
     mkdir -p /root/.ssh && chmod 700 /root/.ssh
 
+WORKDIR /app/server
+VOLUME [ "/dpanel" ]
+
+FROM base AS lite
+
 ARG TARGETARCH
 ARG APP_VERSION
 ARG APP_FAMILY
@@ -69,6 +80,7 @@ ENV APP_VERSION=$APP_VERSION
 ENV APP_FAMILY=$APP_FAMILY
 ENV STORAGE_LOCAL_PATH=$DP_SYSTEM_STORAGE_LOCAL_PATH
 ENV DB_DATABASE=$DP_DB_DATABASE
+ENV APP_ENV=lite
 
 COPY --from=builder /src/runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
 COPY ./config.yaml /app/server/config.yaml
@@ -77,25 +89,48 @@ COPY ./docker/task /docker
 
 RUN chmod -R 755 /docker/* /app/server/dpanel
 
-WORKDIR /app/server
-VOLUME [ "/dpanel" ]
-
-FROM base AS lite
-ENV APP_ENV=lite
 EXPOSE 8080
 ENTRYPOINT [ "/docker/entrypoint-lite.sh" ]
 
 FROM base AS production
+
+ARG HTTP_PROXY
+
+COPY ./docker/task /docker
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && apk add --no-cache nginx openssl && \
+    mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private /var/www/challenges && \
+    tar -zxvf /docker/acme.tar.gz -C /docker && cd /docker/acme.sh-master && ./acme.sh --install --config-home /dpanel/acme
+
+ARG TARGETARCH
+ARG APP_VERSION
+ARG APP_FAMILY
+
+ENV TZ=Asia/Shanghai
+ENV PATH="/app/server:${PATH}"
+ENV DOCKER_HOST=unix:///var/run/docker.sock
+
+ENV DP_SYSTEM_STORAGE_LOCAL_PATH=/dpanel
+ENV DP_DB_DATABASE=${DP_SYSTEM_STORAGE_LOCAL_PATH}/dpanel.db
+ENV DP_ACME_CONFIG_HOME=/dpanel/acme
+ENV DP_RUN_IN_CONTAINER=1
+
+# 兼容旧的环境变量
+ENV APP_NAME=dpanel
+ENV APP_SERVER_PORT=8080
+ENV APP_VERSION=$APP_VERSION
+ENV APP_FAMILY=$APP_FAMILY
+ENV STORAGE_LOCAL_PATH=$DP_SYSTEM_STORAGE_LOCAL_PATH
+ENV DB_DATABASE=$DP_DB_DATABASE
 ENV APP_ENV=production
 
-RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && apk add --no-cache nginx openssl && \
-    mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private /var/www/challenges
-
+COPY --from=builder /src/runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
+COPY ./config.yaml /app/server/config.yaml
+COPY ./docker/script /app/script
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/nginx/default.conf /etc/nginx/http.d/default.conf
 COPY ./docker/nginx/include /etc/nginx/conf.d/include
 
-RUN tar -zxvf /docker/acme.tar.gz -C /docker && cd /docker/acme.sh-master && ./acme.sh --install --config-home /dpanel/acme
+RUN chmod -R 755 /docker/* /app/server/dpanel
 
 EXPOSE 443 80 8080
 

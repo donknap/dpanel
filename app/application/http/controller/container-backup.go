@@ -302,9 +302,11 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			}
 		}
 
+		runContainer := false
+		var networkCreate []network.Inspect
+
 		newContainerName := containerInfo.Name
 		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, newContainerName); err != nil {
-			var networkCreate []network.Inspect
 			if !function.IsEmptyArray(item.Network) {
 				for _, s := range item.Network {
 					networkConfigContent, err := b.Reader.ReadBlobsContent(s)
@@ -404,15 +406,8 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-			err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, newContainerName, container.StartOptions{})
-			if err != nil {
-				for _, inspect := range networkCreate {
-					_ = docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, inspect.Name)
-				}
-				_ = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, newContainerName, container.RemoveOptions{})
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
+			// 创建完成后不能启动，要等恢复完数据后才可以
+			runContainer = true
 		}
 
 		for _, volume := range item.Volume {
@@ -435,6 +430,18 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 				}
 			}
 			_ = gzReader.Close()
+		}
+
+		if runContainer {
+			err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, newContainerName, container.StartOptions{})
+			if err != nil {
+				for _, inspect := range networkCreate {
+					_ = docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, inspect.Name)
+				}
+				_ = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, newContainerName, container.RemoveOptions{})
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 	}
 	self.JsonSuccessResponse(http)

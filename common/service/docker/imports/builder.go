@@ -43,10 +43,15 @@ func NewFileImport(targetRootPath string, opts ...ImportFileOption) (*ImportFile
 	}
 	o.tarWrite = tar.NewWriter(o.reader)
 	for _, opt := range opts {
-		err := opt(o)
-		if err != nil {
+		if err := opt(o); err != nil {
+			_ = o.tarWrite.Close()
+			o.Close()
 			return nil, err
 		}
+	}
+	if err := o.tarWrite.Close(); err != nil {
+		o.Close()
+		return nil, err
 	}
 	return o, nil
 }

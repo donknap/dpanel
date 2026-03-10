@@ -13,17 +13,13 @@ ARG HTTP_PROXY
 RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     apk add --no-cache git github-cli
 
-ARG APP_VERSION
+WORKDIR /src
+COPY . .
+
 ARG REPO_BRANCH
 ARG REPO_PULL
-
-ENV APP_VERSION=${APP_VERSION}
 ENV REPO_BRANCH=${REPO_BRANCH:-master}
 ENV REPO_PULL=${REPO_PULL:-false}
-
-WORKDIR /src
-
-COPY . .
 
 RUN --mount=type=secret,id=GIT_TOKEN \
     if [ "$REPO_PULL" = "true" ] || [ "$REPO_PULL" = "1" ]; then \
@@ -45,15 +41,19 @@ RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     apt-get update && apt-get install -y --no-install-recommends git && \
     go install mvdan.cc/garble@latest
 
-ARG APP_VERSION
-ARG APP_FAMILY
-ARG TARGETARCH
-
-ENV APP_VERSION=${APP_VERSION}
-
 WORKDIR /src
 
+COPY --from=source /src/go.mod /src/go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
+    export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    go mod download
+
 COPY --from=source /src /src
+
+ARG TARGETARCH
+ARG APP_VERSION
+ARG APP_FAMILY
+ENV APP_VERSION=${APP_VERSION}
 
 RUN --mount=type=secret,id=GARBLE_SEED \
     --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETARCH} \
@@ -79,9 +79,9 @@ COPY --from=builder /src/runtime /
 
 FROM $PE_LITE_FROM_BASE AS lite
 
-ARG APP_FAMILY
-ARG APP_VERSION
 ARG TARGETARCH
+ARG APP_VERSION
+ARG APP_FAMILY
 
 ENV APP_VERSION=$APP_VERSION
 ENV APP_FAMILY=$APP_FAMILY
@@ -90,9 +90,9 @@ COPY --from=builder /src/runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TA
 
 FROM $PE_PROD_FROM_BASE AS production
 
-ARG APP_FAMILY
-ARG APP_VERSION
 ARG TARGETARCH
+ARG APP_VERSION
+ARG APP_FAMILY
 
 ENV APP_VERSION=$APP_VERSION
 ENV APP_FAMILY=$APP_FAMILY
