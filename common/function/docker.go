@@ -149,11 +149,11 @@ func ImageTag(tag string) *Tag {
 }
 
 func IsRunInDocker() bool {
-	if _, err := os.Stat("/.dockerenv"); err == nil {
+	if v := os.Getenv("DP_RUN_IN_CONTAINER"); v == "1" {
 		return true
 	}
-	if file, err := os.ReadFile("/proc/self/mountinfo"); err == nil {
-		return strings.Contains(string(file), "docker") || strings.Contains(string(file), "containerd")
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
 	}
 	return false
 }
