@@ -40,14 +40,21 @@ func (self Docker) ImageBuildX(messageId string, task accessor.ImageSettingOptio
 		buildx.WithPlatform(task.BuildPlatformType...),
 		buildx.WithOutputImage(task.BuildEnablePush, ""),
 	}
+
+	hasTag := false
 	for _, tag := range task.Tags {
 		if !tag.Enable {
 			continue
 		}
+		hasTag = true
 		if v := (logic.Image{}).GetRegistryConfig(tag.Registry); v != nil {
 			options = append(options, buildx.WithRegistryAuth(v.Config))
 		}
 		options = append(options, buildx.WithTag(tag.Target, tag.Uri()))
+	}
+
+	if !hasTag {
+		return "", define.ErrorImageTagEmpty
 	}
 
 	if task.BuildCacheType != "" {

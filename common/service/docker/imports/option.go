@@ -14,11 +14,21 @@ import (
 	"time"
 )
 
+func getTarName(paths ...string) string {
+	return strings.TrimPrefix(path.Join(paths...), "/")
+}
+
 func WithImportFile(file *os.File, fileName string) ImportFileOption {
 	return func(self *ImportFile) (err error) {
+		if file == nil {
+			return errors.New("invalid file")
+		}
+		defer func() {
+			_ = file.Close()
+		}()
 		fileInfo, _ := file.Stat()
 		err = self.tarWrite.WriteHeader(&tar.Header{
-			Name:    path.Join(self.targetRootPath, fileName),
+			Name:    getTarName(self.targetRootPath, fileName),
 			Size:    fileInfo.Size(),
 			Mode:    int64(fileInfo.Mode()),
 			ModTime: fileInfo.ModTime(),
@@ -40,31 +50,17 @@ func WithImportFilePath(sourcePath string, fileName string) ImportFileOption {
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = file.Close()
-		}()
-		fileInfo, _ := file.Stat()
 		if fileName == "" {
 			fileName = path.Base(sourcePath)
 		}
-		err = self.tarWrite.WriteHeader(&tar.Header{
-			Name:    path.Join(self.targetRootPath, fileName),
-			Size:    fileInfo.Size(),
-			Mode:    int64(fileInfo.Mode()),
-			ModTime: fileInfo.ModTime(),
-		})
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(self.tarWrite, file)
-		return err
+		return WithImportFile(file, fileName)(self)
 	}
 }
 
 func WithImportContent(containerTargetPath string, content []byte, perm os.FileMode) ImportFileOption {
 	return func(self *ImportFile) (err error) {
 		err = self.tarWrite.WriteHeader(&tar.Header{
-			Name:    path.Join(self.targetRootPath, containerTargetPath),
+			Name:    getTarName(self.targetRootPath, containerTargetPath),
 			Size:    int64(len(content)),
 			Mode:    int64(perm),
 			ModTime: time.Now(),
@@ -79,11 +75,16 @@ func WithImportContent(containerTargetPath string, content []byte, perm os.FileM
 
 func WithImportPath(rootPath string) ImportFileOption {
 	return func(self *ImportFile) (err error) {
+		if _, err = os.Stat(rootPath); err != nil {
+			return err
+		}
 		err = filepath.Walk(rootPath, func(pathName string, info os.FileInfo, err error) error {
-			realpath, _ := filepath.Rel(rootPath, pathName)
-			containerTargetPath := filepath.ToSlash(realpath)
-			headerName := path.Join(self.targetRootPath, containerTargetPath)
-			headerName = strings.TrimPrefix(headerName, "/")
+			realPath, _ := filepath.Rel(rootPath, pathName)
+			containerTargetPath := filepath.ToSlash(realPath)
+			headerName := getTarName(self.targetRootPath, containerTargetPath)
+			if headerName == "" {
+				return nil
+			}
 			if info.IsDir() {
 				err = self.tarWrite.WriteHeader(&tar.Header{
 					Typeflag: tar.TypeDir,
@@ -126,13 +127,13 @@ func WithImportZip(reader *zip.Reader) ImportFileOption {
 			if file.FileInfo().IsDir() {
 				err = self.tarWrite.WriteHeader(&tar.Header{
 					Typeflag: tar.TypeDir,
-					Name:     path.Join(self.targetRootPath, file.Name),
+					Name:     getTarName(self.targetRootPath, file.Name),
 					Size:     0,
 					Mode:     int64(file.Mode()),
 				})
 			} else {
 				err = self.tarWrite.WriteHeader(&tar.Header{
-					Name:    path.Join(self.targetRootPath, file.Name),
+					Name:    getTarName(self.targetRootPath, file.Name),
 					Size:    file.FileInfo().Size(),
 					Mode:    int64(file.FileInfo().Mode()),
 					ModTime: file.FileInfo().ModTime(),
@@ -181,7 +182,7 @@ func WithImportTar(reader *tar.Reader) ImportFileOption {
 				slog.Warn("docker import file", "error", err)
 				break
 			}
-			header.Name = strings.TrimPrefix(path.Join(self.targetRootPath, header.Name), "/")
+			header.Name = getTarName(self.targetRootPath, header.Name)
 			err = self.tarWrite.WriteHeader(header)
 			if err != nil {
 				return err

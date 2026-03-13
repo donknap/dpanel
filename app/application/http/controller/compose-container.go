@@ -107,31 +107,32 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		define.DockerRemoteTypeSSH,
 		define.DockerRemoteTypeTcp,
 	}, docker.Sdk.DockerEnv.RemoteType) {
-		explorerPlugin, err := plugin.NewPlugin(plugin.ExplorerName, map[string]*plugin.TemplateParser{
-			plugin.ExplorerName: {
-				Volumes: []string{
-					fmt.Sprintf("%s:%s", mountPath, mountPath),
-				},
+		explorerPlugin, err := plugin.NewPlugin(docker.Sdk, plugin.ExplorerName, plugin.CreateOption{
+			Volumes: []string{
+				fmt.Sprintf("%s:%s", mountPath, mountPath),
 			},
 		})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		name, err := explorerPlugin.Create()
+		err = explorerPlugin.Create()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 		defer func() {
-			_ = explorerPlugin.Destroy()
+			_ = explorerPlugin.Close()
 		}()
 		importFileList, err := imports.NewFileImport(tasker.Project.WorkingDir, imports.WithImportPath(tasker.Project.WorkingDir))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, name, importFileList)
+		defer func() {
+			importFileList.Close()
+		}()
+		err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, explorerPlugin.Name, importFileList.Reader())
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

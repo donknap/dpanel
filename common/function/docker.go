@@ -32,16 +32,28 @@ func SplitCommandArray(cmd string) []string {
 
 func SplitStdout(reader io.Reader) (stdout bytes.Buffer, stderr bytes.Buffer, err error) {
 	newReader := bufio.NewReader(reader)
-	_, err = stdcopy.StdCopy(&stdout, &stderr, newReader)
-	if err != nil {
-		return stdout, stderr, err
+	header, peekErr := newReader.Peek(8)
+	// Docker Header 格式: [8]byte{STREAM_TYPE, 0, 0, 0, SIZE1, SIZE2, SIZE3, SIZE4}
+	// STREAM_TYPE: 1 为 stdout, 2 为 stderr
+	isDockerStream := peekErr == nil &&
+		(header[0] == 1 || header[0] == 2) &&
+		header[1] == 0 && header[2] == 0 && header[3] == 0
+	if isDockerStream {
+		_, err = stdcopy.StdCopy(&stdout, &stderr, newReader)
+		if err != nil {
+			return stdout, stderr, err
+		}
+	} else {
+		_, err = io.Copy(&stdout, newReader)
+		if err != nil {
+			return stdout, stderr, err
+		}
 	}
 	return stdout, stderr, nil
 }
 
 func CombinedStdout(reader io.Reader) (out bytes.Buffer, err error) {
-	newReader := bufio.NewReader(reader)
-	_, err = stdcopy.StdCopy(&out, &out, newReader)
+	out, _, err = SplitStdout(reader)
 	if err != nil {
 		return out, err
 	}

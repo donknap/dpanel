@@ -18,6 +18,7 @@ const (
 	MessageTypeContainerLog          = "container:log:%s"
 	MessageTypeContainerAllStat      = "container:stat"
 	MessageTypeContainerStat         = "container:stat:%s"
+	MessageTypeContainerExplorer     = "container:explorer"
 	MessageTypeDiskUsage             = "stat:diskUsage"
 	MessageTypeContainerBackup       = "container:backup:%d"
 	MessageTypeImagePull             = "image:pull:%s"

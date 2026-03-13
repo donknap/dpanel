@@ -2,76 +2,77 @@ package fs
 
 import (
 	"fmt"
+	"path"
 
-	logic2 "github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/fs/dockerfs"
 	"github.com/donknap/dpanel/common/service/plugin"
-	"github.com/donknap/dpanel/common/service/ssh"
-	"github.com/donknap/dpanel/common/types/define"
 	"github.com/spf13/afero"
-	"github.com/spf13/afero/sftpfs"
 )
 
-func NewContainerExplorer(containerName string) (*afero.Afero, error) {
-	o := &afero.Afero{}
+type CreateFsOption struct {
+	TargetContainerName string
+	TargetVolume        string
+	AttachVolumes       []string
+	WorkingDir          string // 缺省默认目录
+}
 
-	// todo 判断一下是否可以直接使用主机 sftp ，从而替换掉代理容器
+func NewContainerFs(dockerSdk *docker.Client, option CreateFsOption) (*afero.Afero, error) {
+	var explorer *plugin.Plugin
+	var err error
 
-	explorerPlugin, err := plugin.NewPlugin(plugin.ExplorerName, nil)
+	if option.TargetVolume != "" {
+		explorer, err = plugin.NewPlugin(dockerSdk, plugin.ExplorerName, plugin.CreateOption{
+			WorkingDir: option.TargetVolume,
+			ExtService: compose.ExtService{
+				External: compose.ExternalItem{
+					Volumes: option.AttachVolumes,
+				},
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		explorer, err = plugin.NewPlugin(dockerSdk, plugin.ExplorerName, plugin.CreateOption{
+			Volumes: option.AttachVolumes,
+		})
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	pluginName, err := explorerPlugin.Run()
+	err = explorer.Create()
 	if err != nil {
 		return nil, err
 	}
 
-	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerName)
+	if option.TargetContainerName == "" {
+		option.TargetContainerName = plugin.ExplorerName
+	}
+
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(dockerSdk.Ctx, option.TargetContainerName)
 	if err != nil {
 		return nil, err
 	}
+
 	if containerInfo.State.Pid == 0 {
-		return nil, fmt.Errorf("the %s container does not exist or is not running", containerName)
+		return nil, fmt.Errorf("the %s container does not exist or is not running", option.TargetContainerName)
 	}
 
 	dfs, err := dockerfs.New(
-		dockerfs.WithDockerSdk(docker.Sdk),
-		dockerfs.WithProxyContainer(pluginName),
-		dockerfs.WithTargetContainer(containerName, fmt.Sprintf("/proc/%d/root", containerInfo.State.Pid)),
+		dockerfs.WithDockerSdk(dockerSdk),
+		dockerfs.WithProxyContainer(plugin.ExplorerName),
+		dockerfs.WithWorkingDir(option.WorkingDir),
+		dockerfs.WithTargetContainer(option.TargetContainerName, path.Join(fmt.Sprintf("/proc/%d/root", containerInfo.State.Pid))),
 	)
+
 	if err != nil {
 		return nil, err
 	}
-	o.Fs = dfs
-	return o, nil
-}
 
-func NewSshExplorer(dockerEnvName string) (*ssh.Client, *afero.Afero, error) {
-	if dockerEnvName == "local-os-fs" {
-		afs := &afero.Afero{
-			Fs: afero.NewOsFs(),
-		}
-		return nil, afs, nil
-	}
-	dockerEnv, err := logic2.Env{}.GetEnvByName(dockerEnvName)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !dockerEnv.EnableSSH || dockerEnv.SshServerInfo == nil {
-		return nil, nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
-	}
-	option := []ssh.Option{
-		ssh.WithSftpClient(),
-	}
-	option = append(option, ssh.WithServerInfo(dockerEnv.SshServerInfo)...)
-	sshClient, err := ssh.NewClient(option...)
-	if err != nil {
-		return nil, nil, err
-	}
-	afs := &afero.Afero{
-		Fs: sftpfs.New(sshClient.SftpConn),
-	}
-	return sshClient, afs, nil
+	return &afero.Afero{
+		Fs: dfs,
+	}, nil
 }

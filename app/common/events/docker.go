@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
@@ -111,7 +112,15 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		if info, err := sdk.Client.ContainerInspect(sdk.Ctx, dpanelContainerName); err == nil {
 			info.ExecIDs = make([]string, 0)
 			result.ContainerInfo = info
-
+			if v, _, ok := function.PluckArrayItemWalk(info.Mounts, func(item container.MountPoint) bool {
+				return item.Destination == "/dpanel"
+			}); ok {
+				if v.Type == mount.TypeVolume {
+					result.MountPath = v.Name
+				} else {
+					result.MountPath = v.Source
+				}
+			}
 			// 只有在容器才会包含 nginx 功能，如果有网络就自动中入，并重启 nginx
 			if _, err := sdk.Client.NetworkInspect(sdk.Ctx, define.DPanelProxyNetworkName, network.InspectOptions{}); err == nil {
 				_ = sdk.Client.NetworkConnect(sdk.Ctx, define.DPanelProxyNetworkName, info.ID, &network.EndpointSettings{
@@ -142,6 +151,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 				}
 			}
 		} else {
+			result.MountPath = storage.Local{}.GetStorageLocalPath()
 			e.DockerEnv.DockerInfo.InDPanel = false
 			result.ContainerInfo = container.InspectResponse{}
 			slog.Warn("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err)
@@ -170,8 +180,8 @@ func (self Docker) Message(e event.DockerMessagePayload) {
 
 	msgType := string(e.Message.Type) + "/" + string(e.Message.Action)
 	if function.InArray([]string{
-		define.DockerEventContainerDestroy, define.DockerEventContainerCreate,
-		define.DockerEventContainerDie, define.DockerEventContainerStart,
+		define.DockerMessageTypeContainerDestroy, define.DockerMessageTypeContainerCreate,
+		define.DockerMessageTypeContainerDie, define.DockerMessageTypeContainerStart,
 	}, msgType) {
 		crontab.Client.RunByEvent(msgType, []types.EnvItem{
 			types.NewEnvItemFromKV("DP_DOCKER_ENV_NAME", e.DockerEnvName),

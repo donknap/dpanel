@@ -12,4 +12,5 @@ type DPanelInfo struct {
 	ContainerInfo container.InspectResponse `json:"containerInfo"`
 	RunIn         string                    `json:"runIn"`
 	Proxy         string                    `json:"proxy"`
+	MountPath     string                    `json:"mountPath"` // 通过容器创建时是挂载目录，二进制运行时是直接路径
 }

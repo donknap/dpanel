@@ -128,23 +128,27 @@ func (self *Local) RunWithResult() ([]byte, error) {
 
 func (self *Local) RunInPip() (io.ReadCloser, error) {
 	self.debug()
-	stdout, err := self.cmd.StdoutPipe()
-	if err != nil {
+	pr, pw := io.Pipe()
+	self.cmd.Stdout = pw
+	self.cmd.Stderr = pw
+
+	if err := self.cmd.Start(); err != nil {
 		return nil, err
 	}
-	self.cmd.Stderr = self.cmd.Stdout
-	if err = self.cmd.Start(); err != nil {
-		return nil, err
-	}
+
 	go func() {
-		err = self.cmd.Wait()
+		err := self.cmd.Wait()
 		if err != nil {
 			slog.Debug("run command wait", "err", err)
+			pw.CloseWithError(err)
+		} else {
+			pw.Close()
 		}
 	}()
+
 	return readCloser{
 		cmd:  self,
-		Conn: stdout,
+		Conn: pr,
 	}, nil
 }
 

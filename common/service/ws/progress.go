@@ -41,7 +41,7 @@ func NewProgressPip(messageType string) *ProgressPip {
 	return process
 }
 
-// 利用 fd 新建一个公共推送管道，多个 fd 共用一个，直到所有 fd 都退出
+// NewFdProgressPip 利用 fd 新建一个公共推送管道，多个 fd 共用一个，直到所有 fd 都退出
 func NewFdProgressPip(http *gin.Context, messageType string) (*ProgressPip, error) {
 	fd := ""
 	if data, exists := http.Get("userInfo"); exists {

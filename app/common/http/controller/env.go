@@ -2,12 +2,12 @@ package controller
 
 import (
 	"fmt"
-	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
@@ -174,7 +174,7 @@ func (self Env) Create(http *gin.Context) {
 			},
 		}
 		for _, s := range certList {
-			if s.content == "" {
+			if s.content == "" || !strings.Contains(s.content, "-----BEGIN") {
 				continue
 			}
 			path := filepath.Join(storage.Local{}.GetCertPath(), dockerEnv.CertRoot(), s.name)
@@ -210,7 +210,15 @@ func (self Env) Create(http *gin.Context) {
 		return
 	}
 	logic.Env{}.UpdateEnv(dockerEnv)
-	event2.Monitor.Join(dockerEnv)
+
+	time.AfterFunc(1*time.Second, func() {
+		if newDockerEnv, err := (logic.Env{}).GetEnvByName(dockerEnv.Name); err == nil {
+			event2.Monitor.Join(newDockerEnv)
+			facade.Event.Publish(event.PluginDestroyExplorer, event.DockerDaemonPayload{
+				DockerEnv: newDockerEnv,
+			})
+		}
+	})
 
 	// 如果修改的是当前客户端的连接地址，则更新 docker sdk
 	if docker.Sdk.Name == params.Name {
@@ -248,13 +256,11 @@ func (self Env) Switch(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiFailed, "error", err.Error()), 500)
 		return
 	}
-	oldDockerClient.CtxCancelFunc()
-	err = oldDockerClient.Client.Close()
-	if err != nil {
-		slog.Debug("env switch close old", "error", err)
-	}
+	facade.Event.Publish(event.PluginDestroyExplorer, event.DockerDaemonPayload{
+		DockerEnv: oldDockerClient.DockerEnv,
+	})
+	oldDockerClient.Close()
 	docker.Sdk = dockerClient
-
 	self.JsonSuccessResponse(http)
 	return
 }

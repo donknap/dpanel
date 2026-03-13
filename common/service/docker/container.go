@@ -14,7 +14,6 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/types/define"
 )
 
@@ -63,16 +62,13 @@ func (self Client) ContainerByField(ctx context.Context, field string, name ...s
 	return result, nil
 }
 
-func (self Client) ContainerImport(ctx context.Context, containerName string, importFile *imports.ImportFile) error {
+func (self Client) ContainerImport(ctx context.Context, containerName string, reader io.Reader) error {
 	err := self.Client.CopyToContainer(ctx,
 		containerName,
 		"/",
-		importFile.Reader(),
+		reader,
 		container.CopyToContainerOptions{},
 	)
-	defer func() {
-		importFile.Close()
-	}()
 	if err != nil {
 		return err
 	}
@@ -85,10 +81,10 @@ func (self Client) ContainerCopyInspect(ctx context.Context, containerName strin
 	if err != nil {
 		return info, err
 	}
-	return self.ContainerInspectCompat(info)
+	return self.ContainerInspectCompact(info)
 }
 
-func (self Client) ContainerInspectCompat(info container.InspectResponse) (container.InspectResponse, error) {
+func (self Client) ContainerInspectCompact(info container.InspectResponse) (container.InspectResponse, error) {
 	if versions.LessThanOrEqualTo(self.Client.ClientVersion(), "1.44") {
 		macAddress := ""
 		for name, settings := range info.NetworkSettings.Networks {
@@ -105,7 +101,7 @@ func (self Client) ContainerInspectCompat(info container.InspectResponse) (conta
 	return info, nil
 }
 
-// ExecResult 在容器中执行一条命令，返回结果
+// ContainerExecResult 在容器中执行一条命令，返回结果
 func (self Client) ContainerExecResult(ctx context.Context, containerName string, cmd string) (string, error) {
 	execConfig := container.ExecOptions{
 		Privileged:   true,

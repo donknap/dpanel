@@ -9,25 +9,30 @@ import (
 )
 
 type ImportFile struct {
+	tempFilePath   string // 导入存放的临时 tar 文件
 	targetRootPath string
 	tarWrite       *tar.Writer
-	reader         *os.File
+	tarReader      io.ReadCloser
 	io.Closer
 }
 
 func (self ImportFile) Reader() io.Reader {
-	_, _ = self.reader.Seek(0, io.SeekStart)
-	return self.reader
+	f, _ := os.Open(self.tempFilePath)
+	return f
 }
 
 func (self ImportFile) TarReader() *tar.Reader {
-	_, _ = self.reader.Seek(0, io.SeekStart)
-	return tar.NewReader(self.reader)
+	return tar.NewReader(self.Reader())
 }
 
 func (self ImportFile) Close() {
-	_ = self.reader.Close()
-	_ = os.Remove(self.reader.Name())
+	if self.tarReader != nil {
+		_ = self.tarReader.Close()
+	}
+	if self.tarWrite != nil {
+		_ = self.tarWrite.Close()
+	}
+	_ = os.Remove(self.tempFilePath)
 }
 
 type ImportFileOption func(self *ImportFile) (err error)
@@ -37,14 +42,18 @@ func NewFileImport(targetRootPath string, opts ...ImportFileOption) (*ImportFile
 	o := &ImportFile{
 		targetRootPath: targetRootPath,
 	}
-	o.reader, err = storage.Local{}.CreateTempFile("")
+	tempFile, err := storage.Local{}.CreateTempFile("")
 	if err != nil {
 		return nil, err
 	}
-	o.tarWrite = tar.NewWriter(o.reader)
+	o.tempFilePath = tempFile.Name()
+	defer func() {
+		_ = tempFile.Close()
+	}()
+
+	o.tarWrite = tar.NewWriter(tempFile)
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
-			_ = o.tarWrite.Close()
 			o.Close()
 			return nil, err
 		}

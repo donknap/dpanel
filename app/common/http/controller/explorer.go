@@ -19,10 +19,10 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/service/exec/remote"
-	"github.com/donknap/dpanel/common/service/fs"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	fsType "github.com/donknap/dpanel/common/types/fs"
@@ -58,18 +58,11 @@ func (self Explorer) Export(http *gin.Context) {
 		_ = tempFile.Close()
 		_ = os.Remove(tempFile.Name())
 	}()
-
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
-
 	pathInfo := make([]container.PathStat, 0)
 	zipWriter := zip.NewWriter(tempFile)
 
@@ -142,16 +135,11 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 	params.File = function.PathClean(params.File)
 	params.DestPath = function.Path2SystemSafe(params.DestPath)
 
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
 
 	file, err := afs.OpenFile(filepath.Join(params.DestPath, params.File), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o644)
 	if err != nil {
@@ -185,16 +173,11 @@ func (self Explorer) Import(http *gin.Context) {
 		return
 	}
 	params.DestPath = function.Path2SystemSafe(params.DestPath)
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
 
 	for _, item := range params.FileList {
 		err = func() error {
@@ -232,16 +215,11 @@ func (self Explorer) Unzip(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
 	options := make([]imports.ImportFileOption, 0)
 	for _, p := range params.File {
 		p = function.Path2SystemSafe(p)
@@ -335,7 +313,7 @@ func (self Explorer) Delete(http *gin.Context) {
 		safePath = append(safePath, p)
 	}
 
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	sshClient, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -367,16 +345,11 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		return
 	}
 	params.Path = function.Path2SystemSafe(params.Path)
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	sshClient, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
 	if params.Path == "" {
 		params.Path = "/"
 		if sshClient != nil {
@@ -470,16 +443,11 @@ func (self Explorer) GetContent(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
 	params.File = function.Path2SystemSafe(params.File)
 	file, err := afs.OpenFile(params.File, os.O_RDONLY, 0o644)
 	if err != nil {
@@ -529,16 +497,11 @@ func (self Explorer) Chmod(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
 	mode, err := strconv.ParseUint(params.Mod, 8, 32)
 	for _, p := range params.FileList {
 		p = function.Path2SystemSafe(p)
@@ -566,16 +529,11 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
 	params.Path = function.Path2SystemSafe(params.Path)
 	var fileInfo os.FileInfo
 	file, err := afs.OpenFile(params.Path, os.O_RDONLY, 0o644)
@@ -609,17 +567,11 @@ func (self Explorer) GetUserList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
-
 	groups := make([]map[string]any, 0)
 	users := make([]map[string]any, 0)
 
@@ -670,16 +622,12 @@ func (self Explorer) MkDir(http *gin.Context) {
 		return
 	}
 
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
+
 	params.DestPath = function.Path2SystemSafe(params.DestPath)
 	err = afs.MkdirAll(params.DestPath, os.ModePerm)
 	if err != nil {
@@ -707,16 +655,11 @@ func (self Explorer) Copy(http *gin.Context) {
 		params.TargetFile = filepath.Join(filepath.Dir(params.SourceFile), params.TargetFile)
 	}
 
-	sshClient, afs, err := fs.NewSshExplorer(params.Name)
+	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
 
 	if ok, _ := afs.Exists(params.TargetFile); ok {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", filepath.Base(params.TargetFile)), 500)

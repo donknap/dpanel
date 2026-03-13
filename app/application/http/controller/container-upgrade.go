@@ -47,6 +47,7 @@ func (self Container) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerUpgradeDPanel), 500)
 		return
 	}
+	startContainer := containerInfo.State.Running
 
 	bakTime := time.Now().Format(define.DateYmdHis)
 
@@ -181,10 +182,13 @@ func (self Container) Upgrade(http *gin.Context) {
 		_ = dao.Site.Save(siteRow)
 	}
 
-	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, containerInfo.Name, container.StartOptions{})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	// 旧容器如果是停止状态，重建后保持不启动
+	if startContainer {
+		err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, containerInfo.Name, container.StartOptions{})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 
 	facade.GetEvent().Publish(event.ContainerEditEvent, event.ContainerPayload{

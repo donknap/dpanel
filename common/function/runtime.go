@@ -1,6 +1,10 @@
 package function
 
-import "runtime"
+import (
+	"context"
+	"runtime"
+	"time"
+)
 
 func CurrentSystemPlatform() (string, string) {
 	currentOS := runtime.GOOS
@@ -24,4 +28,20 @@ func CurrentSystemPlatform() (string, string) {
 	}
 
 	return currentOS, currentArch
+}
+
+func Wait[T any](ctx context.Context, data T, conditions func(v T) bool) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if done := conditions(data); done {
+				return
+			}
+		}
+	}
 }

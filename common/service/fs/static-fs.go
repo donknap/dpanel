@@ -17,7 +17,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
-func NewHttpFs(fs fs.FS) http.FileSystem {
+func NewStaticFs(fs fs.FS) http.FileSystem {
 	var cacheDir string
 	if os.Getenv("APP_ENV") == "debug" {
 		cacheDir, _ = storage.Local{}.CreateTempDir("dpanel_js_cache")
@@ -28,18 +28,18 @@ func NewHttpFs(fs fs.FS) http.FileSystem {
 	_ = os.RemoveAll(cacheDir)
 	_ = os.MkdirAll(cacheDir, 0755)
 
-	return HttpFs{
+	return StaticFs{
 		fs:       http.FS(fs),
 		cacheDir: cacheDir,
 	}
 }
 
-type HttpFs struct {
+type StaticFs struct {
 	fs       http.FileSystem
 	cacheDir string
 }
 
-func (self HttpFs) Open(name string) (http.File, error) {
+func (self StaticFs) Open(name string) (http.File, error) {
 	if !strings.HasSuffix(name, ".js") && !strings.HasSuffix(name, ".css") {
 		return self.fs.Open(name)
 	}

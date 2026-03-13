@@ -140,6 +140,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 	_ = facade.GetEvent().Subscribe(event.DockerDaemonEvent, events.Docker{}.Daemon)
 	_ = facade.GetEvent().Subscribe(event.DockerMessageEvent, events.Docker{}.Message)
 
+	_ = facade.Event.Subscribe(event.PluginDestroyExplorer, events.Plugin{}.DestroyExplorer)
 	// 启动时，初始化计划任务
 	crontab.Client.Cron.Start()
 

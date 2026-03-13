@@ -5,7 +5,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 type Option func(builder *Builder) error
@@ -67,8 +67,8 @@ func WithDockerFilePath(path string) Option {
 
 func WithTag(name ...string) Option {
 	return func(self *Builder) error {
-		if name == nil {
-			return errors.New("tag name is required")
+		if name == nil || len(name) == 0 {
+			return define.ErrorImageTagEmpty
 		}
 		self.imageBuildOption.Tags = append(self.imageBuildOption.Tags, name...)
 		return nil

@@ -65,13 +65,11 @@ func (self Home) Index(http *gin.Context) {
 	uri := http.Request.URL.String()
 	slog.Debug("http route not found", "ip", http.ClientIP(), "user-agent", http.Request.Header.Get("User-Agent"), "uri", uri)
 	var asset embed.FS
-	if v, ok := http.Get("asset"); !ok {
-		self.JsonResponseWithError(http, errors.New("fatal error, resource file not found, please recompile"), 500)
+	err := facade.GetContainer().NamedResolve(&asset, "asset")
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
-	} else {
-		asset = v.(embed.FS)
 	}
-
 	// 如果没发现语言包返回默认的英文，并提示用户
 	if strings.HasPrefix(uri, "/dpanel/static/asset/i18n") {
 		enUs, _ := asset.ReadFile("asset/static/i18n/en-US.json")
@@ -383,12 +381,11 @@ func (self Home) Info(http *gin.Context) {
 		"clientVersion": docker.Sdk.Client.ClientVersion(),
 		"sdkVersion":    api.DefaultVersion,
 		"dpanel": map[string]interface{}{
-			"version":          DPanelVersion,
-			"family":           facade.GetConfig().GetString("app.family"),
-			"env":              facade.GetConfig().GetString("app.env"),
-			"containerInfo":    containerInfo,
-			"runIn":            dpanelInfo.RunIn,
-			"storageLocalPath": storage.Local{}.GetStorageLocalPath(),
+			"version":       DPanelVersion,
+			"family":        facade.GetConfig().GetString("app.family"),
+			"env":           facade.GetConfig().GetString("app.env"),
+			"containerInfo": containerInfo,
+			"runIn":         dpanelInfo.RunIn,
 		},
 		"dockerEnv": docker.Sdk.DockerEnv,
 		"plugin":    plugin.Wrapper{}.GetPluginList(),

@@ -56,8 +56,10 @@ func (self RunLog) Run(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		defer func() {
+			_ = response.Close()
+		}()
 		out, err := function.CombinedStdout(response)
-		_ = response.Close()
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

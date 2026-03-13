@@ -31,12 +31,12 @@ const (
 )
 
 const (
-	DockerEventContainerStart   = "container/start"
-	DockerEventContainerDie     = "container/die"
-	DockerEventContainerCreate  = "container/create"
-	DockerEventContainerDestroy = "container/destroy"
-	DockerEventDaemonStart      = "daemon/start"
-	DockerEventDaemonDie        = "daemon/die"
+	DockerMessageTypeContainerStart   = "container/start"
+	DockerMessageTypeContainerDie     = "container/die"
+	DockerMessageTypeContainerCreate  = "container/create"
+	DockerMessageTypeContainerDestroy = "container/destroy"
+	DockerMessageTypeDaemonStart      = "daemon/start"
+	DockerMessageTypeDaemonDie        = "daemon/die"
 )
 
 const (

@@ -118,11 +118,6 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 		return "", err
 	}
 
-	err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
-	if err != nil {
-		return response.ID, err
-	}
-
 	// 当前如果新建了容器自身网络，创建完后加入
 	// 如果在创建时加入，则会丢失 bridge 网络
 	if containerOwnerNetwork != "" {
@@ -181,10 +176,16 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 		}
 	}
 
-	if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
-		_, err := docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, response.ID, task.BuildParams.Hook.ContainerCreate)
+	if !task.BuildParams.NoStart {
+		err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
 		if err != nil {
-			slog.Debug("container create run hook", "hook", "container create", "error", err.Error())
+			return response.ID, err
+		}
+		if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
+			_, err := docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, response.ID, task.BuildParams.Hook.ContainerCreate)
+			if err != nil {
+				slog.Debug("container create run hook", "hook", "container create", "error", err.Error())
+			}
 		}
 	}
 	return response.ID, err

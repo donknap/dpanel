@@ -26,6 +26,7 @@ type Fs struct {
 	targetContainerName     string // 目标容器名称
 	targetContainerRootPath string // 目标容器的起始根目录
 	proxyContainerName      string
+	workingDir              string
 }
 
 func New(opts ...Option) (afero.Fs, error) {
@@ -78,12 +79,15 @@ func (self Fs) MkdirAll(p string, perm os.FileMode) error {
 }
 
 func (self Fs) Open(name string) (afero.File, error) {
+	if name == "" {
+		name = self.workingDir
+	}
 	statPath, err := self.sdk.Client.ContainerStatPath(self.sdk.Ctx, self.targetContainerName, name)
 	if err != nil {
 		return nil, err
 	}
 	fileData := &fs.FileData{
-		Path:     filepath.Join(self.targetContainerRootPath, name),
+		Path:     path.Join(self.targetContainerRootPath, name),
 		Name:     name,
 		Mod:      statPath.Mode,
 		ModTime:  statPath.Mtime,

@@ -16,7 +16,7 @@
 _NULL  :=
 _SPACE := $(_NULL) $(_NULL)
 _COMMA := ,
-_CURRENT_TIME := $(shell date +%Y%m%d.%H%M)
+_CURRENT_TIME := $(shell TZ=UTC date +%Y%m%d.%H%M)
 _TRUE_VALUES := 1 y yes true
 __IS_TRUE = $(filter $(strip $(1)),$(_TRUE_VALUES) $(strip $(2)))
 _BLUE      := $(shell printf '\033[1;34m')

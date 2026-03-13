@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gorilla/websocket"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 var (
@@ -86,18 +88,16 @@ func (self *Collection) Leave(c *Client) {
 			}
 			return true
 		})
-		// 没有任何用户时，中断 docker 的所有请求
 		slog.Debug("docker client cancel")
-
+		facade.Event.Publish(event.PluginDestroyExplorer, event.DockerDaemonPayload{
+			DockerEnv: docker.Sdk.DockerEnv,
+		})
 		//docker.Sdk.CtxCancelFunc()
 		//docker.Sdk.Client.Close()
 		//ctx, cancelFunc := context.WithCancel(context.Background())
 		//docker.Sdk.Ctx = ctx
 		//docker.Sdk.CtxCancelFunc = cancelFunc
 		//go logic.EventLogic{}.MonitorLoop()
-		if explorer, err := plugin.NewPlugin(plugin.ExplorerName, nil); err == nil {
-			_ = explorer.Destroy()
-		}
 	}
 }
 

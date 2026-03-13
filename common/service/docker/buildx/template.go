@@ -7,6 +7,8 @@ import (
 
 const buildShellTmpl = `
 set -e
+set -o pipefail
+
 echo "Starting ..."
 
 {{- if .Push }}
@@ -19,7 +21,7 @@ CONTEXT_NAME="{{.Name}}"
 BUILDER_NAME="$CONTEXT_NAME-builder"
 
 if docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
-    docker buildx inspect --bootstrap >/dev/null 2>&1
+    docker buildx inspect --bootstrap >/dev/null
 fi
 
 {{- range .Target }}
@@ -46,7 +48,7 @@ if docker buildx build --builder "$BUILDER_NAME" --progress plain --metadata-fil
     echo "DPANEL_BUILD_RESULT|${TARGET_NAME}|$(cat "$META_TEMP")"
     rm -f "$META_TEMP"
 else
-    echo "Error: Build failed for target $TARGET_NAME"
+    echo "Error: Build failed for target $TARGET_NAME" >&2
     rm -f "$META_TEMP"
     exit 1
 fi

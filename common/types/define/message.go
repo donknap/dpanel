@@ -1,5 +1,7 @@
 package define
 
+import "errors"
+
 const (
 	ErrorMessageUnknow                                      = ".unknow"
 	ErrorMessageCommonDataNotFoundOrDeleted                 = ".commonDataNotFoundOrDeleted"
@@ -67,4 +69,8 @@ const (
 
 const (
 	InfoMessageCommonExportInPath = ".commonExportInPath"
+)
+
+var (
+	ErrorImageTagEmpty = errors.New("image tag name is required")
 )

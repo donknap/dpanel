@@ -1,5 +1,6 @@
 ARG LIBC=gnu
 ARG VERSION=12.3
+ARG TARGETARCH
 
 FROM --platform=${BUILDPLATFORM} dpanel/builder:${TARGETARCH}-${LIBC}-${VERSION} AS toolchain
 FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
@@ -12,7 +13,7 @@ RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
 WORKDIR /src
 
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
+RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     go mod download
 

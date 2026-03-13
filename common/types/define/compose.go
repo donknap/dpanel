@@ -11,6 +11,7 @@ const (
 	DPanelLabelContainerTitle      = "com.dpanel.container.title"
 	DPanelLabelContainerHidden     = "com.dpanel.container.hidden"
 	DPanelLabelContainerDPanelSelf = "com.dpanel.container.dpanel_self" // 表示当前容器为 DPanel 自身限制管理
+	DPanelLabelContainerHash       = "com.dpanel.container.hash"        // 容器配置 hash 用于判断当前容器是否是同一个配置创建
 
 	ComposeProjectPrefix = "dpanel-c-"                 // Deprecated
 	ComposeProjectName   = ComposeProjectPrefix + "%s" // Deprecated

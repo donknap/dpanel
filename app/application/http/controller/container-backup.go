@@ -396,12 +396,12 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					networkingConfig.EndpointsConfig[name] = settings
 				}
 			}
-			compatContainerInfo, err := docker.Sdk.ContainerInspectCompat(containerInfo)
+			compactContainerInfo, err := docker.Sdk.ContainerInspectCompact(containerInfo)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-			_, err = docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, compatContainerInfo.Config, compatContainerInfo.HostConfig, networkingConfig, &v1.Platform{}, newContainerName)
+			_, err = docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, compactContainerInfo.Config, compactContainerInfo.HostConfig, networkingConfig, &v1.Platform{}, newContainerName)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
@@ -422,8 +422,9 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			reader, _ := b.Reader.ReadBlobs(volume)
 			gzReader, _ := gzip.NewReader(reader)
 			tarReader := tar.NewReader(gzReader)
-			if options, err := imports.NewFileImport(destPath, imports.WithImportTar(tarReader)); err == nil {
-				err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, newContainerName, options)
+			if importFiles, err := imports.NewFileImport(destPath, imports.WithImportTar(tarReader)); err == nil {
+				err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, newContainerName, importFiles.Reader())
+				importFiles.Close()
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return

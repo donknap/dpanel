@@ -94,7 +94,7 @@ type Client struct {
 	DockerEnv     *types.DockerEnv
 }
 
-func (self Client) Close() {
+func (self *Client) Close() {
 	if self.CtxCancelFunc != nil {
 		self.CtxCancelFunc()
 	}
@@ -104,7 +104,7 @@ func (self Client) Close() {
 }
 
 // GetTryCtx 获取一个有超时的上下文，用于测试 docker 连接是否正常
-func (self Client) GetTryCtx() context.Context {
+func (self *Client) GetTryCtx() context.Context {
 	timeout := define.DockerConnectServerTimeout
 	// 如果使用 docker.sock 则不要超时时间，某些系统可能启动慢
 	if strings.HasSuffix(self.DockerEnv.Address, "docker.sock") {

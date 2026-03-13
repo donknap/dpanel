@@ -25,3 +25,10 @@ func WithDockerSdk(sdk *docker.Client) Option {
 		return nil
 	}
 }
+
+func WithWorkingDir(workingDir string) Option {
+	return func(self *Fs) error {
+		self.workingDir = workingDir
+		return nil
+	}
+}

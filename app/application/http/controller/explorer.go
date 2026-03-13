@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -15,13 +14,11 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/imports"
-	"github.com/donknap/dpanel/common/service/fs"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	fs2 "github.com/donknap/dpanel/common/types/fs"
@@ -158,7 +155,8 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile)
+	defer importFile.Close()
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile.Reader())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -200,7 +198,8 @@ func (self Explorer) Import(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile)
+	defer importFile.Close()
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile.Reader())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -253,7 +252,8 @@ func (self Explorer) Unzip(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile)
+	defer importFile.Close()
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile.Reader())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -281,7 +281,8 @@ func (self Explorer) Delete(http *gin.Context) {
 			return
 		}
 	}
-	afs, err := fs.NewContainerExplorer(params.Name)
+
+	afs, _, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -308,23 +309,23 @@ func (self Explorer) GetPathList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Name)
+
+	afs, containerName, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.Path == "" && containerInfo.Config != nil {
-		params.Path = containerInfo.Config.WorkingDir
-	}
-	if params.Path == "" {
-		params.Path = "/"
-	}
-	afs, err := fs.NewContainerExplorer(params.Name)
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+
 	list, err := afs.ReadDir(params.Path)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	result := make([]*fs2.FileData, 0)
 	for _, info := range list {
 		result = append(result, info.Sys().(*fs2.FileData))
@@ -385,6 +386,10 @@ func (self Explorer) GetPathList(http *gin.Context) {
 			return "", false
 		})...)
 	}
+
+	if params.Path == "" {
+		params.Path = containerInfo.Config.WorkingDir
+	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"currentPath": params.Path,
 		"list":        result,
@@ -402,8 +407,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Name, params.File)
-	if pathStat.Size >= 1024*1024 {
+	if pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Name, params.File); err == nil && pathStat.Size >= 1024*1024 {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerEditFileMaxSize), 500)
 		return
 	}
@@ -458,7 +462,7 @@ func (self Explorer) Chmod(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	afs, err := fs.NewContainerExplorer(params.Name)
+	afs, _, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -525,7 +529,7 @@ func (self Explorer) GetUserList(http *gin.Context) {
 		return
 	}
 
-	afs, err := fs.NewContainerExplorer(params.Name)
+	afs, _, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -579,7 +583,7 @@ func (self Explorer) MkDir(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	afs, err := fs.NewContainerExplorer(params.Name)
+	afs, _, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -621,13 +625,14 @@ func (self Explorer) Copy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile)
+	defer importFile.Close()
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile.Reader())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	if params.IsMove {
-		afs, err := fs.NewContainerExplorer(params.Name)
+		afs, _, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -635,62 +640,4 @@ func (self Explorer) Copy(http *gin.Context) {
 		_ = afs.RemoveAll(params.SourceFile)
 	}
 	self.JsonSuccessResponse(http)
-}
-
-func (self Explorer) AttachVolume(http *gin.Context) {
-	type ParamsValidate struct {
-		Name string `json:"name" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	_, err := docker.Sdk.Client.VolumeInspect(docker.Sdk.Ctx, params.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	_ = notice.Message{}.Info(".volumeMountSomeVolume")
-	path := fmt.Sprintf("/%s", function.Md5(params.Name))
-	explorerPlugin, err := plugin.NewPlugin(plugin.ExplorerName, map[string]*plugin.TemplateParser{
-		plugin.ExplorerName: {
-			WorkingDir: path,
-			ExtService: compose.ExtService{
-				External: compose.ExternalItem{
-					Volumes: []string{
-						fmt.Sprintf("%s:%s", params.Name, path),
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if explorerPlugin.Exists() {
-		_ = explorerPlugin.Destroy()
-	}
-	pluginName, err := explorerPlugin.Run()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"containerName": pluginName,
-		"path":          path,
-	})
-}
-
-func (self Explorer) DestroyProxyContainer(http *gin.Context) {
-	explorerPlugin, err := plugin.NewPlugin(plugin.ExplorerName, nil)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if explorerPlugin.Exists() {
-		_ = explorerPlugin.Destroy()
-	}
-	self.JsonSuccessResponse(http)
-	return
 }

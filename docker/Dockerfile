@@ -1,5 +1,6 @@
 ARG LIBC=musl
 ARG VERSION=12.3
+ARG TARGETARCH
 
 FROM --platform=${BUILDPLATFORM} dpanel/builder:${TARGETARCH}-${LIBC}-${VERSION} AS toolchain
 FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
@@ -12,7 +13,7 @@ RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
 WORKDIR /src
 
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
+RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     go mod download
 
@@ -39,22 +40,16 @@ RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETA
     fi
 
 FROM scratch AS binary-export
-
-ARG TARGETARCH
-ARG APP_FAMILY
-
 COPY --from=builder /src/runtime /
 
 FROM alpine AS base
 
 ARG HTTP_PROXY
-
 RUN sed -i 's/dl-cdn.alpinelinux111.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && apk add --no-cache --update \
     bash musl docker-cli docker-cli-compose docker-cli-buildx tzdata git openssh-client curl && \
     rm -f /usr/bin/docker-compose && \
     mkdir -p /root/.ssh && chmod 700 /root/.ssh
-
 WORKDIR /app/server
 VOLUME [ "/dpanel" ]
 
@@ -93,7 +88,6 @@ EXPOSE 8080
 ENTRYPOINT [ "/docker/entrypoint-lite.sh" ]
 
 FROM base AS production
-
 ARG HTTP_PROXY
 
 COPY ./docker/task /docker

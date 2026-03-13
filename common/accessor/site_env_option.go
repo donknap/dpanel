@@ -48,4 +48,5 @@ type SiteEnvOption struct {
 	Restart         string                   `json:"restart,omitempty"` // Deprecated: instead RestartPolicy
 	GroupAdd        []string                 `json:"groupAdd,omitempty"`
 	Init            bool                     `json:"init,omitempty"`
+	NoStart         bool                     `json:"noStart"`
 }

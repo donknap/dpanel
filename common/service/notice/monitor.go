@@ -49,11 +49,15 @@ type client struct {
 
 func (self *client) Close() {
 	self.ctxCancel()
+	self.Clear()
+	// 因为需要重复的使用监控 client，关掉旧的后，还需要再新建一个新的上下文
+	//self.ctx, self.ctxCancel = context.WithCancel(context.Background())
+}
+
+func (self *client) Clear() {
 	if self.dockerClient != nil {
 		self.dockerClient.Close()
 	}
-	// 因为需要重复的使用监控 client，关掉旧的后，还需要再新建一个新的上下文
-	self.ctx, self.ctxCancel = context.WithCancel(context.Background())
 }
 
 type monitor struct {
@@ -97,8 +101,8 @@ func (self *monitor) Leave(name string) {
 func (self *monitor) Clients() map[string]*docker.Client {
 	clients := make(map[string]*docker.Client)
 	self.clients.Range(func(key, value interface{}) bool {
-		if client, ok := value.(*docker.Client); ok {
-			clients[key.(string)] = client
+		if c, ok := value.(*client); ok && c.dockerClient != nil {
+			clients[key.(string)] = c.dockerClient
 		}
 		return true
 	})
@@ -117,27 +121,39 @@ func (self *monitor) listen(c *client) {
 					Available: false,
 				},
 			})
+			select {
+			case <-time.After(10 * time.Second):
+
+			case <-c.ctx.Done():
+				slog.Debug("Monitor closed by monitor", "name", c.dockerEnv.Name, "error", initErr)
+				return
+			case <-self.ctx.Done():
+				slog.Debug("Monitor closed", "error", initErr)
+				return
+			}
 		}
-		time.Sleep(10 * time.Second)
 		// 如果数据找不到或是当前循环的环境时间早于存储中的 Clients
 		// 时间早说明当前环境已经变更了，不需要再继续循环了
 		if v, ok := self.clients.Load(c.dockerEnv.Name); !ok || v.(*client).createdAt.After(c.createdAt) {
 			slog.Debug("Monitor client not found or updated", "name", c.dockerEnv.Name, "error", initErr)
 			c.Close()
 			return
+		} else {
+			oldClient := v.(*client)
+			fmt.Printf("listen %v \n", oldClient.createdAt.Format(define.DateShowYmdHis))
 		}
 
 		if os.Getenv("APP_ENV") == "debug" {
-			slog.Debug("Monitor start", "name", c.dockerEnv.Name, "error", initErr)
+			slog.Debug("Monitor start", "name", c.dockerEnv, "error", initErr)
 		}
 
 		if c.dockerClient, initErr = docker.NewClientWithDockerEnv(c.dockerEnv); initErr != nil {
-			c.Close()
+			c.Clear()
 			continue
 		}
 
 		if _, initErr = c.dockerClient.Client.Ping(self.ctx); initErr != nil {
-			c.Close()
+			c.Clear()
 			continue
 		}
 
@@ -149,7 +165,7 @@ func (self *monitor) listen(c *client) {
 			},
 		})
 
-		eventChan, errChan := c.dockerClient.Client.Events(context.Background(), events.ListOptions{})
+		eventChan, errChan := c.dockerClient.Client.Events(c.ctx, events.ListOptions{})
 
 	eventLoop:
 		for {

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	ioFs "io/fs"
 	"log/slog"
 	"os"
 	"path"
@@ -13,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/types/fs"
 	"github.com/mcuadros/go-version"
@@ -128,4 +130,18 @@ func getFileListFromTar(tarReader *tar.Reader) (files []*fs.FileData, err error)
 		}
 	}
 	return files, nil
+}
+
+func (self Client) ImageLoadFsFile(ctx context.Context, file ioFs.File) error {
+	reader, err := self.Client.ImageLoad(ctx, file, client.ImageLoadWithQuiet(false))
+	if err != nil {
+		return err
+	}
+	defer reader.Body.Close()
+
+	_, err = io.Copy(io.Discard, reader.Body)
+	if err != nil {
+		return err
+	}
+	return nil
 }

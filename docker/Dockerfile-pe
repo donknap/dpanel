@@ -3,9 +3,9 @@ ARG PE_PROD_FROM_BASE=dpanel/dpanel:latest
 
 ARG LIBC=musl
 ARG VERSION=12.3
+ARG TARGETARCH
 
 FROM --platform=${BUILDPLATFORM} dpanel/builder:${TARGETARCH}-${LIBC}-${VERSION} AS toolchain
-
 FROM --platform=$BUILDPLATFORM alpine AS source
 
 ARG HTTP_PROXY
@@ -44,7 +44,7 @@ RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
 WORKDIR /src
 
 COPY --from=source /src/go.mod /src/go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
+RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     go mod download
 

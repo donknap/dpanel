@@ -16,8 +16,7 @@ type PortsItem struct {
 }
 
 type ExtService struct {
-	ImageTar   map[string]string `yaml:"image_tar,omitempty" json:"image_tar"`
-	AutoRemove bool              `yaml:"auto_remove,omitempty" json:"auto_remove"`
-	External   ExternalItem      `yaml:"external,omitempty" json:"external"` // 关联外部容器资源
-	Ports      PortsItem         `yaml:"ports,omitempty" json:"ports"`
+	ImageTar map[string]string `yaml:"image_tar,omitempty" json:"image_tar"`
+	External ExternalItem      `yaml:"external,omitempty" json:"external"` // 关联外部容器资源
+	Ports    PortsItem         `yaml:"ports,omitempty" json:"ports"`
 }

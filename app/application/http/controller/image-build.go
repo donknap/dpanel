@@ -106,6 +106,10 @@ func (self ImageBuild) Create(http *gin.Context) {
 		messageId := fmt.Sprintf(ws.MessageTypeImageBuild, params.Id)
 		if params.BuildEngine == define.ImageBuildBuildX {
 			log, err = task.Docker{}.ImageBuildX(messageId, params.ImageSettingOption)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 			// 检测是否成功
 			matches := regexp.MustCompile(`"containerimage\.digest"\s*:\s*"(sha256:[a-f0-9]+)"`).FindAllStringSubmatch(log, -1)
 			imageId = strings.Join(function.PluckArrayWalk(matches, func(item []string) (string, bool) {
