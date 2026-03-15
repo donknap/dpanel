@@ -33,6 +33,16 @@ type DockerEnv struct {
 	DockerStatus      *DockerStatus   `json:"dockerStatus,omitempty"`
 }
 
+func (self DockerEnv) IsLocal() bool {
+	if self.DockerType == define.DockerRemoteTypeSock {
+		return true
+	}
+	if self.DockerType == define.DockerRemoteTypeSSH {
+		return false
+	}
+	return strings.HasPrefix(self.Address, "127.0.0.1") || strings.HasPrefix(self.Address, "localhost")
+}
+
 func (self DockerEnv) CommandEnv() []string {
 	result := make([]string, 0)
 	if runtime.GOOS == "windows" {

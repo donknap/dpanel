@@ -239,7 +239,7 @@ func (self Fs) readDirFromContainer(rootPath string) ([]os.FileInfo, error) {
 			}
 			rel, _ := filepath.Rel(self.targetContainerRootPath, rootPath)
 			// 因为路径使终是从 Linux 容器或是系统中获取，不能使用 filepath，使用 path 保持路径 / 分隔
-			fileData.Path = path.Join("/", rel, fileData.Name)
+			fileData.Path = filepath.ToSlash(path.Join("/", rel, fileData.Name))
 			fileData.IsDir = fileData.Mod.IsDir()
 			fileData.IsSymlink = fileData.CheckIsSymlink()
 			fileList = append(fileList, fs.NewFileInfo(fileData))

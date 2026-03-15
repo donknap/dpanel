@@ -15,7 +15,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 var (
@@ -186,9 +186,10 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 
 func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 	var asset embed.FS
-	err := facade.GetContainer().NamedResolve(&asset, "asset")
-	if err != nil {
-		return err
+	if v, ok := storage.Cache.Get(storage.CacheKeyAsset); ok {
+		asset = v.(embed.FS)
+	} else {
+		return define.ErrorAssetEmpty
 	}
 
 	confFileName := setting.VHostFilename()
@@ -235,9 +236,10 @@ func (self Site) MakeNginxConf(setting accessor.SiteDomainSettingOption) error {
 
 func (self Site) MakeNginxResolver() error {
 	var asset embed.FS
-	err := facade.GetContainer().NamedResolve(&asset, "asset")
-	if err != nil {
-		return err
+	if v, ok := storage.Cache.Get(storage.CacheKeyAsset); ok {
+		asset = v.(embed.FS)
+	} else {
+		return define.ErrorAssetEmpty
 	}
 	parser, err := template.ParseFS(asset, "asset/nginx/*.tpl")
 	if err != nil {

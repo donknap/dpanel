@@ -214,9 +214,6 @@ func (self Env) Create(http *gin.Context) {
 	time.AfterFunc(1*time.Second, func() {
 		if newDockerEnv, err := (logic.Env{}).GetEnvByName(dockerEnv.Name); err == nil {
 			event2.Monitor.Join(newDockerEnv)
-			facade.Event.Publish(event.PluginDestroyExplorer, event.DockerDaemonPayload{
-				DockerEnv: newDockerEnv,
-			})
 		}
 	})
 

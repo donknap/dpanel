@@ -657,6 +657,7 @@
   "components.dockerEnvCreate.formTitle": "名前",
   "components.dockerEnvCreate.formTlsCa": "CA証明書アップロード",
   "components.explorer.commonMessageCreateExplorerPlugin": "ファイル管理を初期化中。終了時に自動破棄。",
+  "components.explorer.commonMessageDestroyExplorerPlugin": "Terminating File Explorer plugin...",
   "components.explorer.drawerTitle": "ファイル管理 - {name}",
   "components.explorer.editFileMessageNotSupport": "編集非対応",
   "components.explorer.editFileNewName": "ファイル名",

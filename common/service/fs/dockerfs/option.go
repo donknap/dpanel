@@ -28,6 +28,9 @@ func WithDockerSdk(sdk *docker.Client) Option {
 
 func WithWorkingDir(workingDir string) Option {
 	return func(self *Fs) error {
+		if workingDir == "" {
+			workingDir = "/"
+		}
 		self.workingDir = workingDir
 		return nil
 	}

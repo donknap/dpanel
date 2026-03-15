@@ -657,6 +657,7 @@
   "components.dockerEnvCreate.formTitle": "Title",
   "components.dockerEnvCreate.formTlsCa": "Upload CA",
   "components.explorer.commonMessageCreateExplorerPlugin": "Initializing File Explorer. Auto-destructs upon exit.",
+  "components.explorer.commonMessageDestroyExplorerPlugin": "Terminating File Explorer plugin...",
   "components.explorer.drawerTitle": "File Manager - {name}",
   "components.explorer.editFileMessageNotSupport": "Unsupported file type",
   "components.explorer.editFileNewName": "Filename",

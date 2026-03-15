@@ -21,30 +21,34 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 const ExplorerName = "dpanel-plugin-explorer"
 
 type CreateOption struct {
-	Volumes    []string `json:"volumes"`
-	Command    []string `json:"command"`
-	WorkingDir string   `json:"workingDir"`
-	Hash       string   `json:"hash"`
+	RandomProxyContainerName bool               `json:"-"`
+	Volumes                  []types.VolumeItem `json:"volumes"`
+	VolumesFrom              []string           `json:"volumesFrom"`
+	Command                  []string           `json:"command"`
+	WorkingDir               string             `json:"workingDir"`
+	Hash                     string             `json:"hash"`
 	compose.ExtService
 }
 
 func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plugin, error) {
 	p := &Plugin{
-		dockerSdk: dockerSdk,
-		Name:      name,
+		dockerSdk:     dockerSdk,
+		Name:          name,
+		containerName: name, // 默认与任务名称保持一致
 	}
+
 	option.Hash = function.Sha256Struct(option)
 
 	var asset embed.FS
-	err := facade.GetContainer().NamedResolve(&asset, "asset")
-	if err != nil {
-		return nil, err
+	if v, ok := storage.Cache.Get(storage.CacheKeyAsset); ok {
+		asset = v.(embed.FS)
+	} else {
+		return nil, define.ErrorAssetEmpty
 	}
 
 	yamlTpl, err := asset.ReadFile("asset/plugin/" + name + "/compose.yaml")
@@ -76,6 +80,14 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 		return nil, err
 	}
 
+	if option.RandomProxyContainerName {
+		p.containerName = ""
+	} else if service.ContainerName != "" {
+		p.containerName = service.ContainerName
+	} else {
+		p.containerName = name
+	}
+
 	dockerVersion, _ := dockerSdk.Client.ServerVersion(dockerSdk.Ctx)
 	if imageTarUrl, ok := serviceExt.ImageTar[dockerVersion.Arch]; ok {
 		if imageTarUrl != "" && strings.HasPrefix(imageTarUrl, "asset/plugin") {
@@ -97,11 +109,11 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 }
 
 type Plugin struct {
-	Name        string
-	mu          sync.Mutex
-	dockerSdk   *docker.Client
-	composeTask *compose.Task
-	containerId string
+	Name          string
+	containerName string
+	mu            sync.Mutex
+	dockerSdk     *docker.Client
+	composeTask   *compose.Task
 }
 
 func (self *Plugin) Create() error {
@@ -119,9 +131,8 @@ func (self *Plugin) Create() error {
 		if !containerInfo.State.Running {
 			if err = self.dockerSdk.Client.ContainerStart(self.dockerSdk.Ctx, containerInfo.ID, container.StartOptions{}); err == nil {
 				return nil
-			} else {
-				goto recreate
 			}
+			goto recreate
 		}
 		if v, ok := containerInfo.Config.Labels[define.DPanelLabelContainerHash]; ok && v == service.Labels[define.DPanelLabelContainerHash] {
 			return nil
@@ -139,7 +150,7 @@ recreate:
 
 	options := []builder.Option{
 		builder.WithImage(service.Image, false),
-		builder.WithContainerName(service.ContainerName),
+		builder.WithContainerName(self.containerName),
 		builder.WithLabel(function.PluckMapWalkArray(service.Labels, func(key string, value string) (types.ValueItem, bool) {
 			return types.ValueItem{
 				Name:  key,
@@ -187,6 +198,7 @@ recreate:
 		return err
 	}
 
+	self.containerName = response.ID
 	function.Wait(self.dockerSdk.Ctx, response.ID, func(v string) bool {
 		if info, err := self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, v); err == nil && info.State.Running {
 			return true
@@ -202,13 +214,13 @@ func (self *Plugin) Close() error {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
-	if containerInfo, err := self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, self.Name); err == nil {
+	if containerInfo, err := self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, self.containerName); err == nil {
 		if containerInfo.State.Running {
-			if err = self.dockerSdk.Client.ContainerStop(self.dockerSdk.Ctx, self.Name, container.StopOptions{}); err != nil {
+			if err = self.dockerSdk.Client.ContainerStop(self.dockerSdk.Ctx, containerInfo.ID, container.StopOptions{}); err != nil {
 				return err
 			}
 		}
-		if err = self.dockerSdk.Client.ContainerRemove(self.dockerSdk.Ctx, self.Name, container.RemoveOptions{
+		if err = self.dockerSdk.Client.ContainerRemove(self.dockerSdk.Ctx, containerInfo.ID, container.RemoveOptions{
 			Force: true,
 		}); err != nil {
 			return err
@@ -240,7 +252,7 @@ func importImage(sdk *docker.Client, imageName string, imageFile fs.File) error 
 	if v, ok := storage.Cache.Get(storage.CacheKeyCommonServerStartTime); ok {
 		serverStartTime = v.(time.Time)
 	}
-	tag := fmt.Sprintf("%s-%s", imageName, serverStartTime.Format(define.DateShowVersion))
+	tag := fmt.Sprintf("%s-%s:latest", imageName, serverStartTime.Format(define.DateShowVersion))
 
 	if imageInfo, err := sdk.Client.ImageInspect(sdk.Ctx, imageName); err != nil || !function.InArray(imageInfo.RepoTags, tag) {
 		if _, err = docker.Sdk.Client.ImageRemove(sdk.Ctx, imageName, image.RemoveOptions{

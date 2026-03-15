@@ -19,6 +19,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	fs2 "github.com/donknap/dpanel/common/types/fs"
@@ -282,7 +283,9 @@ func (self Explorer) Delete(http *gin.Context) {
 		}
 	}
 
-	afs, _, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
+	afs, err := logic.Explorer{}.Afs(docker.Sdk, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -304,18 +307,23 @@ func (self Explorer) GetPathList(http *gin.Context) {
 	type ParamsValidate struct {
 		Name string `json:"name" binding:"required"`
 		Path string `json:"path"`
+		Type string `json:"type"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
-	afs, containerName, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
+	// 只需要在第一次访问的时候才需要确认类型，后续的操作归一到容器中
+	afs, err := logic.Explorer{}.Afs(docker.Sdk, logic.AfsCreateOption{
+		MountPoint: params.Type,
+		Init:       true,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerName)
+	containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -391,7 +399,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		params.Path = containerInfo.Config.WorkingDir
 	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"currentPath": params.Path,
+		"currentPath": filepath.ToSlash(params.Path),
 		"list":        result,
 		"rootDirs":    rootDirs,
 	})
@@ -462,7 +470,9 @@ func (self Explorer) Chmod(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	afs, _, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
+	afs, err := logic.Explorer{}.Afs(docker.Sdk, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -529,7 +539,9 @@ func (self Explorer) GetUserList(http *gin.Context) {
 		return
 	}
 
-	afs, _, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
+	afs, err := logic.Explorer{}.Afs(docker.Sdk, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -583,7 +595,9 @@ func (self Explorer) MkDir(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	afs, _, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
+	afs, err := logic.Explorer{}.Afs(docker.Sdk, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -632,7 +646,9 @@ func (self Explorer) Copy(http *gin.Context) {
 		return
 	}
 	if params.IsMove {
-		afs, _, err := logic.Explorer{}.Afs(docker.Sdk, params.Name)
+		afs, err := logic.Explorer{}.Afs(docker.Sdk, logic.AfsCreateOption{
+			MountPoint: params.Name,
+		})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -640,4 +656,17 @@ func (self Explorer) Copy(http *gin.Context) {
 		_ = afs.RemoveAll(params.SourceFile)
 	}
 	self.JsonSuccessResponse(http)
+}
+
+func (self Explorer) DestroyProxyContainer(http *gin.Context) {
+	explorer, err := plugin.NewPlugin(docker.Sdk, plugin.ExplorerName, plugin.CreateOption{})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if explorer.Exists() {
+		_ = explorer.Close()
+	}
+	self.JsonSuccessResponse(http)
+	return
 }

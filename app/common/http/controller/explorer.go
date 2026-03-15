@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"log/slog"
 	"os"
 	"path"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -58,7 +58,10 @@ func (self Explorer) Export(http *gin.Context) {
 		_ = tempFile.Close()
 		_ = os.Remove(tempFile.Name())
 	}()
-	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
+
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -135,13 +138,15 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 	params.File = function.PathClean(params.File)
 	params.DestPath = function.Path2SystemSafe(params.DestPath)
 
-	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
-	file, err := afs.OpenFile(filepath.Join(params.DestPath, params.File), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o644)
+	file, err := afs.OpenFile(path.Join(params.DestPath, params.File), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o644)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -173,7 +178,10 @@ func (self Explorer) Import(http *gin.Context) {
 		return
 	}
 	params.DestPath = function.Path2SystemSafe(params.DestPath)
-	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
+
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -190,7 +198,7 @@ func (self Explorer) Import(http *gin.Context) {
 				_ = realPath.Close()
 				_ = os.Remove(realPath.Name())
 			}()
-			err = afs.WriteReader(filepath.Join(params.DestPath, item.Name), realPath)
+			err = afs.WriteReader(path.Join(params.DestPath, item.Name), realPath)
 			if err != nil {
 				return err
 			}
@@ -215,7 +223,10 @@ func (self Explorer) Unzip(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
+
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -231,7 +242,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 		defer func() {
 			file.Close()
 		}()
-		switch filepath.Ext(file.Name()) {
+		switch path.Ext(file.Name()) {
 		case ".zip":
 			fileInfo, _ := file.Stat()
 			zipReader, err := zip.NewReader(file, fileInfo.Size())
@@ -255,7 +266,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			options = append(options, imports.WithImportTar(tarReader))
 			break
 		default:
-			slog.Debug("explorer unzip ", "filetype", filepath.Ext(file.Name()))
+			slog.Debug("explorer unzip ", "filetype", path.Ext(file.Name()))
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerUnzipTargetUnsupportedType), 500)
 			return
 		}
@@ -313,7 +324,9 @@ func (self Explorer) Delete(http *gin.Context) {
 		safePath = append(safePath, p)
 	}
 
-	sshClient, afs, err := logic.Explorer{}.Afs(http, params.Name)
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	sshClient, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -344,13 +357,16 @@ func (self Explorer) GetPathList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	params.Path = function.Path2SystemSafe(params.Path)
-	sshClient, afs, err := logic.Explorer{}.Afs(http, params.Name)
+	params.Path = function.PathClean(params.Path)
+
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	sshClient, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.Path == "" {
+	if params.Path == "" || params.Path == "." {
 		params.Path = "/"
 		if sshClient != nil {
 			if defaultPath, err := remote.QuickRun(sshClient, "pwd"); err == nil {
@@ -362,6 +378,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 			}
 		}
 	}
+
 	list, err := afs.ReadDir(params.Path)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -422,13 +439,8 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		}
 		return result[i].Name < result[j].Name
 	})
-	currentPath := params.Path
-	// 如果当前是 windows 系统也转换成 linux 类的目录返回
-	if v, ok := function.PathConvertWinPath2Unix(params.Path); ok {
-		currentPath = v
-	}
 	self.JsonResponseWithoutError(http, gin.H{
-		"currentPath": currentPath,
+		"currentPath": params.Path,
 		"list":        result,
 	})
 	return
@@ -443,7 +455,10 @@ func (self Explorer) GetContent(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
+
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -497,7 +512,10 @@ func (self Explorer) Chmod(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
+
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -529,7 +547,10 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
+
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -553,7 +574,7 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 		"info": gin.H{
 			"isDir":  fileInfo.Mode().IsDir(),
 			"target": params.Path,
-			"name":   filepath.Base(params.Path),
+			"name":   path.Base(params.Path),
 		},
 	})
 	return
@@ -567,7 +588,10 @@ func (self Explorer) GetUserList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
+
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -622,7 +646,9 @@ func (self Explorer) MkDir(http *gin.Context) {
 		return
 	}
 
-	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -651,18 +677,20 @@ func (self Explorer) Copy(http *gin.Context) {
 
 	params.SourceFile = function.Path2SystemSafe(params.SourceFile)
 	params.TargetFile = function.Path2SystemSafe(params.TargetFile)
-	if !filepath.IsAbs(params.TargetFile) {
-		params.TargetFile = filepath.Join(filepath.Dir(params.SourceFile), params.TargetFile)
+	if !path.IsAbs(params.TargetFile) {
+		params.TargetFile = path.Join(path.Dir(params.SourceFile), params.TargetFile)
 	}
 
-	_, afs, err := logic.Explorer{}.Afs(http, params.Name)
+	ctx, ctxCancel := context.WithCancel(http)
+	defer ctxCancel()
+	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
 	if ok, _ := afs.Exists(params.TargetFile); ok {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", filepath.Base(params.TargetFile)), 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", path.Base(params.TargetFile)), 500)
 		return
 	}
 
@@ -696,15 +724,15 @@ func (self Explorer) Copy(http *gin.Context) {
 				defer func() {
 					waitGroup.Done()
 				}()
-				newFileName := filepath.Base(info.Name())
+				newFileName := path.Base(info.Name())
 				if info.IsDir() {
-					err = afs.Mkdir(filepath.Join(targetFileRoot, newFileName), info.Mode())
+					err = afs.Mkdir(path.Join(targetFileRoot, newFileName), info.Mode())
 					if err != nil {
 						errs = append(errs, err)
 						return
 					}
 				} else {
-					tf, err := afs.OpenFile(filepath.Join(targetFileRoot, newFileName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, info.Mode())
+					tf, err := afs.OpenFile(path.Join(targetFileRoot, newFileName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, info.Mode())
 					if err != nil {
 						errs = append(errs, err)
 						return
@@ -712,7 +740,7 @@ func (self Explorer) Copy(http *gin.Context) {
 					defer func() {
 						_ = tf.Close()
 					}()
-					sf, err := afs.Open(filepath.Join(params.SourceFile, info.Name()))
+					sf, err := afs.Open(path.Join(params.SourceFile, info.Name()))
 					if err != nil {
 						errs = append(errs, err)
 						return
@@ -755,8 +783,8 @@ func (self Explorer) Copy(http *gin.Context) {
 	self.JsonSuccessResponse(http)
 }
 
-func (self Explorer) deleteAll(afs *afero.Afero, path string) error {
-	file, err := afs.Open(path)
+func (self Explorer) deleteAll(afs *afero.Afero, filepath string) error {
+	file, err := afs.Open(filepath)
 	if err != nil {
 		return err
 	}
@@ -764,16 +792,16 @@ func (self Explorer) deleteAll(afs *afero.Afero, path string) error {
 	// 删除文件之前需要先关闭，否则 windows 会报错文件被占用
 	_ = file.Close()
 	if fileInfo.IsDir() {
-		files, err := afs.ReadDir(path)
+		files, err := afs.ReadDir(filepath)
 		if err != nil {
 			return err
 		}
 		for _, item := range files {
-			err = self.deleteAll(afs, filepath.Join(path, item.Name()))
+			err = self.deleteAll(afs, path.Join(filepath, item.Name()))
 			if err != nil {
 				return err
 			}
 		}
 	}
-	return afs.Remove(path)
+	return afs.Remove(filepath)
 }

@@ -183,6 +183,10 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 			DisableKeepAlives: false,
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				lock.Lock()
+				if serverInfo == nil {
+					slog.Debug("ssh client nil", "name", self.Name, "dockerEnv", self.DockerEnv)
+					return nil, errors.New("nil serverInfo")
+				}
 				opts := ssh.WithServerInfo(serverInfo)
 				opts = append(opts, ssh.WithContext(ctx))
 				opts = append(opts, ssh.WithTimeout(timeout))

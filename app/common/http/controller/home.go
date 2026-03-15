@@ -65,9 +65,10 @@ func (self Home) Index(http *gin.Context) {
 	uri := http.Request.URL.String()
 	slog.Debug("http route not found", "ip", http.ClientIP(), "user-agent", http.Request.Header.Get("User-Agent"), "uri", uri)
 	var asset embed.FS
-	err := facade.GetContainer().NamedResolve(&asset, "asset")
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	if v, ok := storage.Cache.Get(storage.CacheKeyAsset); ok {
+		asset = v.(embed.FS)
+	} else {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUnknow, "error", define.ErrorAssetEmpty.Error()), 500)
 		return
 	}
 	// 如果没发现语言包返回默认的英文，并提示用户

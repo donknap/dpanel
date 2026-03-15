@@ -3,6 +3,7 @@ package controller
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -24,6 +26,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/backup"
 	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -410,27 +413,43 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			runContainer = true
 		}
 
-		for _, volume := range item.Volume {
-			destPath := "/"
-			for _, mount := range containerInfo.Mounts {
-				if strings.HasSuffix(function.Sha256([]byte(mount.Destination)), path.Base(volume)) {
-					// 导出的数据是按最后一个目录或是文件名存放，所以需要脱一级目录做为根目录
-					destPath = path.Dir(mount.Destination)
-					break
-				}
-			}
-			reader, _ := b.Reader.ReadBlobs(volume)
-			gzReader, _ := gzip.NewReader(reader)
-			tarReader := tar.NewReader(gzReader)
-			if importFiles, err := imports.NewFileImport(destPath, imports.WithImportTar(tarReader)); err == nil {
-				err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, newContainerName, importFiles.Reader())
-				importFiles.Close()
+		if !function.IsEmptyArray(item.Volume) {
+			func() {
+				ctx, ctxCancel := context.WithCancel(docker.Sdk.Ctx)
+				defer ctxCancel()
+
+				proxyContainerName, err := plugin.NewHostExplorer(ctx, docker.Sdk)
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return
 				}
-			}
-			_ = gzReader.Close()
+				for _, volume := range item.Volume {
+					destPath := "/"
+					for _, mount := range containerInfo.Mounts {
+						if strings.HasSuffix(function.Sha256([]byte(mount.Destination)), path.Base(volume)) {
+							// 导出的数据是按最后一个目录或是文件名存放，所以需要脱一级目录做为根目录
+							if mount.Type == types.VolumeTypeBind {
+								destPath = path.Join("/", "mnt", "host", path.Dir(mount.Source))
+							} else {
+								destPath = path.Dir(mount.Destination)
+							}
+							break
+						}
+					}
+					reader, _ := b.Reader.ReadBlobs(volume)
+					gzReader, _ := gzip.NewReader(reader)
+					tarReader := tar.NewReader(gzReader)
+					if importFiles, err := imports.NewFileImport(destPath, imports.WithImportTar(tarReader)); err == nil {
+						err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, proxyContainerName, importFiles.Reader())
+						importFiles.Close()
+						if err != nil {
+							self.JsonResponseWithError(http, err, 500)
+							return
+						}
+					}
+					_ = gzReader.Close()
+				}
+			}()
 		}
 
 		if runContainer {

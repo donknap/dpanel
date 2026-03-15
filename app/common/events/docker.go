@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 
+	types3 "github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
@@ -109,16 +110,16 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		}
 		// 面板信息总是从默认环境中获取
 		dpanelContainerName := facade.GetConfig().GetString("app.name")
-		if info, err := sdk.Client.ContainerInspect(sdk.Ctx, dpanelContainerName); err == nil {
+		if info, err := sdk.Client.ContainerInspect(sdk.Ctx, dpanelContainerName); err == nil && function.IsRunInDocker() {
 			info.ExecIDs = make([]string, 0)
 			result.ContainerInfo = info
 			if v, _, ok := function.PluckArrayItemWalk(info.Mounts, func(item container.MountPoint) bool {
 				return item.Destination == "/dpanel"
 			}); ok {
-				if v.Type == mount.TypeVolume {
-					result.MountPath = v.Name
-				} else {
-					result.MountPath = v.Source
+				result.Mount = types.VolumeItem{
+					Host: v.Source,
+					Dest: v.Destination,
+					Type: string(v.Type),
 				}
 			}
 			// 只有在容器才会包含 nginx 功能，如果有网络就自动中入，并重启 nginx
@@ -151,7 +152,19 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 				}
 			}
 		} else {
-			result.MountPath = storage.Local{}.GetStorageLocalPath()
+			// 如果在 windows 默认是远程 docker 那么需要转换一个安全路径
+			// 否则保持原样就可以了
+			result.Mount = types.VolumeItem{
+				Host: storage.Local{}.GetStorageLocalPath(),
+				Dest: "/dpanel",
+				Type: types3.VolumeTypeBind,
+			}
+			if !e.DockerEnv.IsLocal() && runtime.GOOS == "windows" {
+				if v, ok := function.PathConvertWinPath2Unix(storage.Local{}.GetStorageLocalPath()); ok {
+					result.Mount.Host = v
+				}
+			}
+
 			e.DockerEnv.DockerInfo.InDPanel = false
 			result.ContainerInfo = container.InspectResponse{}
 			slog.Warn("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err)

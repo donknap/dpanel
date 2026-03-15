@@ -2,7 +2,7 @@ services:
   dpanel-plugin-explorer:
     image: dpanel/explorer
     container_name: dpanel-plugin-explorer
-    restart: none
+    restart: "no"
     privileged: true
     pid: host
     labels:
@@ -11,8 +11,8 @@ services:
       - "com.dpanel.container.hash={{.hash}}"
 #{{if .volumes}}
     volumes:
-#{{- range $key, $val := .volumes }}
-      - {{ $val }}
+#{{- range $item := .volumes }}
+      - {{ $item.host }}:{{ $item.dest }}
 #{{- end}}
 #{{- end}}
 #{{if .workingDir}}
@@ -24,7 +24,30 @@ services:
         arm64: asset/plugin/dpanel-plugin-explorer/image-arm64.tar
         arm: asset/plugin/dpanel-plugin-explorer/image-arm.tar
       external:
+#{{if .external.volumes}}
         volumes:
 #{{- range $key, $val := .external.volumes}}
           - {{ $val }}
 #{{- end}}
+#{{- end}}
+#{{if .external.volumes_from}}
+      volumes_from:
+#{{- range $key, $val := .external.volumes_from}}
+        - {{ $val }}
+#{{- end}}
+#{{- end}}
+
+#{{- $hasNamedVolume := false -}}
+#{{- range $item := .volumes -}}
+#  {{- if eq $item.type "volume" -}}
+#    {{- $hasNamedVolume = true -}}
+#  {{- end -}}
+#{{- end -}}
+#{{- if $hasNamedVolume }}
+volumes:
+  #{{- range $item := .volumes -}}
+    #  {{- if eq $item.type "volume" }}
+    {{ $item.host }}: {}
+#  {{- end -}}
+#{{- end -}}
+#{{- end }}

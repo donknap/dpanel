@@ -12,7 +12,7 @@ type VolumeItem struct {
 	Dest       string `json:"dest"`
 	Permission string `json:"permission"` // readonly or write
 	InImage    bool   `json:"inImage,omitempty"`
-	Type       string `json:"type,omitempty"`
+	Type       string `json:"type,omitempty"` // bind volume
 }
 
 type LinkItem struct {

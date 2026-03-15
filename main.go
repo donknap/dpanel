@@ -98,9 +98,7 @@ func main() {
 	dao.SetDefault(db)
 
 	// 注册资源
-	_ = facade.GetContainer().NamedSingleton("asset", func() embed.FS {
-		return Asset
-	})
+	storage.Cache.Set(storage.CacheKeyAsset, Asset, cache.DefaultExpiration)
 
 	if isAppServer() {
 		slog.Warn(dpanelBanner)

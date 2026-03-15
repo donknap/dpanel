@@ -657,6 +657,7 @@
   "components.dockerEnvCreate.formTitle": "名称",
   "components.dockerEnvCreate.formTlsCa": "上传客户端证书",
   "components.explorer.commonMessageCreateExplorerPlugin": "正在初始化文件管理助手，退出所有页面后自动销毁。",
+  "components.explorer.commonMessageDestroyExplorerPlugin": "正在卸载文件资源管理器插件...",
   "components.explorer.drawerTitle": "文件管理 - {name}",
   "components.explorer.editFileMessageNotSupport": "不支持编辑的文件类型",
   "components.explorer.editFileNewName": "文件名",

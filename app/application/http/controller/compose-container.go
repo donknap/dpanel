@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
@@ -98,33 +100,24 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
 
 	// 如果是远程连接，尝试将本地的 compose 目录数据同步到端
-	// 需要将 windows 地址统一成 linux 地址
-	mountPath := tasker.Project.WorkingDir
-	if v, ok := function.PathConvertWinPath2Unix(tasker.Project.WorkingDir); ok {
-		mountPath = v
-	}
 	if function.InArray([]string{
 		define.DockerRemoteTypeSSH,
 		define.DockerRemoteTypeTcp,
 	}, docker.Sdk.DockerEnv.RemoteType) {
-		explorerPlugin, err := plugin.NewPlugin(docker.Sdk, plugin.ExplorerName, plugin.CreateOption{
-			Volumes: []string{
-				fmt.Sprintf("%s:%s", mountPath, mountPath),
-			},
+		_, err := logic.Explorer{}.Afs(docker.Sdk, logic.AfsCreateOption{
+			MountPoint: plugin.ExplorerName,
+			Init:       true,
 		})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		err = explorerPlugin.Create()
+		rel, err := filepath.Rel(storage.Local{}.GetStorageLocalPath(), tasker.Project.WorkingDir)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		defer func() {
-			_ = explorerPlugin.Close()
-		}()
-		importFileList, err := imports.NewFileImport(tasker.Project.WorkingDir, imports.WithImportPath(tasker.Project.WorkingDir))
+		importFileList, err := imports.NewFileImport(path.Join("/dpanel", filepath.ToSlash(rel)), imports.WithImportPath(tasker.Project.WorkingDir))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -132,7 +125,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		defer func() {
 			importFileList.Close()
 		}()
-		err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, explorerPlugin.Name, importFileList.Reader())
+		err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, plugin.ExplorerName, importFileList.Reader())
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

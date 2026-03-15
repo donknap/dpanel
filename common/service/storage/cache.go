@@ -9,6 +9,7 @@ import (
 
 var (
 	CacheKeyExplorerUsername      = "explorer:%s:uid:%d"
+	CacheKeyExplorerAfs           = "explorer:%s"
 	CacheKeyCommonUserInfo        = "user:%d"
 	CacheKeyCommonServerStartTime = "server:startTime"
 	CacheKeyXkStorageInfo         = "xk:storageInfo"
@@ -21,10 +22,11 @@ var (
 	CacheKeyDockerEvents          = "docker:events"
 	CacheKeyConsoleData           = "console:data:%s" // 用于脚本存储一些自定义数据
 	CacheKeyCronTaskStatus        = "cron:task:status:%d"
-	// CacheKeyDockerEventJob        = "docker:event:%s:%s"
-	CacheKeyRsaKey = "rsa:key"
-	CacheKeyRsaPub = "rsa:pub"
-	CacheKeyAttach = "attach:%s"
+	CacheKeyDockerEventJob        = "docker:event:%s:%s"
+	CacheKeyRsaKey                = "rsa:key"
+	CacheKeyRsaPub                = "rsa:pub"
+	CacheKeyAttach                = "attach:%s"
+	CacheKeyAsset                 = "asset"
 )
 
 var (

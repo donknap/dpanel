@@ -73,4 +73,5 @@ const (
 
 var (
 	ErrorImageTagEmpty = errors.New("image tag name is required")
+	ErrorAssetEmpty    = errors.New("static resources not initialized")
 )
