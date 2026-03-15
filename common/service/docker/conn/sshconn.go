@@ -14,6 +14,7 @@ package sshconn
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -114,15 +115,15 @@ func (c *sshConn) kill() {
 	done := make(chan error, 1)
 	go func() { done <- c.session.Wait() }()
 
-	var werr error
 	select {
-	case werr = <-done:
+	case werr := <-done:
+		c.cmdWaitErr = werr
 	case <-time.After(3 * time.Second):
-		_ = c.session.Close() // force close
-		werr = <-done
+		// 【关键修复】：超时强制 Close()，且不等待 done 避免卡死
+		_ = c.session.Close()
+		c.cmdWaitErr = errors.New("ssh session wait timeout")
 	}
 
-	c.cmdWaitErr = werr
 	c.cmdExited.Store(true)
 }
 
@@ -144,16 +145,13 @@ func (c *sshConn) handleEOF(err error) error {
 		select {
 		case werr = <-done:
 			c.cmdWaitErr = werr
-			c.cmdExited.Store(true)
-		case <-time.After(10 * time.Second):
-			c.stderrMu.Lock()
-			stderr := c.stderr.String()
-			c.stderrMu.Unlock()
-			return fmt.Errorf(
-				"ssh command %q did not exit after EOF within 10s: stderr=%q",
-				c.fullCmd, stderr,
-			)
+		case <-time.After(3 * time.Second):
+			// 【关键修复】：同样强制关闭并放行协程
+			_ = c.session.Close()
+			c.cmdWaitErr = errors.New("ssh session wait timeout on EOF")
+			werr = c.cmdWaitErr
 		}
+		c.cmdExited.Store(true)
 	}
 
 	if werr == nil {
@@ -194,6 +192,7 @@ func (c *sshConn) Close() error {
 	_ = c.stdin.Close()
 
 	c.kill()
+	// 当 HTTP 请求结束，这里会触发底层 SSH Client 断开，回收一切资源
 	c.client.Close()
 	return nil
 }

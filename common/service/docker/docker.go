@@ -1,13 +1,13 @@
 package docker
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -64,15 +64,15 @@ func NewClient(opts ...Option) (*Client, error) {
 		Client: &dockerclient.Client{},
 	}
 
+	if c.Ctx == nil {
+		c.Ctx, c.CtxCancelFunc = context.WithCancel(context.Background())
+	}
+
 	for _, opt := range opts {
 		err := opt(c)
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	if c.Ctx == nil {
-		c.Ctx, c.CtxCancelFunc = context.WithCancel(context.Background())
 	}
 
 	obj, err := dockerclient.NewClientWithOpts(c.Option...)
@@ -180,10 +180,12 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 		}
 		lock := sync.Mutex{}
 		transport := &http.Transport{
-			DisableKeepAlives: false,
+			// 【关键优化】：禁止长连接复用，确保请求完成后立即销毁 SSH 物理通道，防止协程堆积泄露
+			DisableKeepAlives: true,
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				lock.Lock()
 				if serverInfo == nil {
+					lock.Unlock()
 					slog.Debug("ssh client nil", "name", self.Name, "dockerEnv", self.DockerEnv)
 					return nil, errors.New("nil serverInfo")
 				}
@@ -195,25 +197,36 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 				if err != nil {
 					return nil, err
 				}
-				go func() {
-					defer func() {
-						sshClient.Close()
-					}()
-					select {
-					case <-ctx.Done():
-						return
-					case <-sshClient.Ctx().Done():
-						return
-					case <-self.Ctx.Done():
-						return
-					}
-				}()
-				return sshconn.New(sshClient, cmdName, "system", "dial-stdio")
+
+				// 直接返回包装好的 Conn，完全由 http.Client 的生命周期来控制底层 SSH Client 的闭合，去掉了之前导致泄漏的监听协程
+				conn, err := sshconn.New(sshClient, cmdName, "system", "dial-stdio")
+				if err != nil {
+					sshClient.Close()
+					return nil, err
+				}
+				return conn, nil
 			},
 		}
 		self.Option = append(self.Option, dockerclient.WithHTTPClient(&http.Client{Transport: transport}))
 		return nil
 	}
+}
+
+// 【新增结构体】：延迟加载底层的 Transport
+// 避免在 Client 尚未完全构建完成时发生 HTTPClient() 的空指针异常
+type lazyProxyTransport struct {
+	client *Client
+}
+
+func (t *lazyProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// 在请求真正发生时，Docker Client 一定已经初始化完毕
+	if t.client != nil && t.client.Client != nil {
+		hc := t.client.Client.HTTPClient()
+		if hc != nil && hc.Transport != nil {
+			return hc.Transport.RoundTrip(req)
+		}
+	}
+	return http.DefaultTransport.RoundTrip(req)
 }
 
 func WithSockProxy() Option {
@@ -239,69 +252,41 @@ func WithSockProxy() Option {
 		}
 
 		go func() {
-			for {
-				if self.Ctx != nil {
-					break
-				}
-				fmt.Printf("Anonymous function %v \n", "wait")
-				time.Sleep(time.Millisecond * 10)
-			}
 			<-self.Ctx.Done()
 			_ = localSock.Close()
 		}()
 
-		go func() {
-			for {
-				localConn, err := localSock.Accept()
-				if err != nil {
-					slog.Debug("local sock", "err", err)
-					return
+		// 【关键优化】：使用标准库 httputil.ReverseProxy 替代原先手写的残缺版代理逻辑
+		proxy := &httputil.ReverseProxy{
+			Director: func(req *http.Request) {
+				req.URL.Scheme = "http"
+				req.URL.Host = "api.dpanel.localhost"
+				// 必须清空 RequestURI，否则 http.Client 拨号会报错
+				req.RequestURI = ""
+			},
+			// 【修复点 2】：利用上面定义的延迟加载器，代替直接读取 self.Client.HTTPClient().Transport
+			Transport: &lazyProxyTransport{client: self},
+			ModifyResponse: func(r *http.Response) error {
+				return nil
+			},
+			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+				if err != context.Canceled {
+					slog.Debug("proxy error", "err", err)
 				}
-				go func() {
-					err = func() error {
-						defer func() {
-							err = localConn.Close()
-							if err != nil {
-								slog.Debug("local conn close", err)
-							}
-						}()
-						req, err := http.ReadRequest(bufio.NewReader(localConn))
-						if err != nil {
-							return err
-						}
-						slog.Debug("local conn request", "url", req.URL, "host", req.Host)
-						defer func() {
-							_ = req.Body.Close()
-						}()
-						req.URL.Scheme = "http"
-						req.URL.Host = "api.dpanel.localhost"
-						req.RequestURI = ""
-						resp, err := self.Client.HTTPClient().Do(req)
-						if err != nil {
-							return err
-						}
-						defer func() {
-							_ = resp.Body.Close()
-						}()
-						go func() {
-							buf := make([]byte, 1)
-							_, err = localConn.Read(buf)
-							if err != nil {
-								_ = resp.Body.Close()
-							}
-						}()
-						err = resp.Write(localConn)
-						if err != nil {
-							return err
-						}
-						return nil
-					}()
-					if err != nil {
-						slog.Debug("local sock", "err", err)
-					}
-				}()
+			},
+		}
+
+		go func() {
+			server := &http.Server{
+				Handler: proxy,
+			}
+			err := server.Serve(localSock)
+			// 过滤掉因为正常关闭而产生的日志噪音
+			if err != nil && err != http.ErrServerClosed && !strings.Contains(err.Error(), "use of closed network connection") {
+				slog.Debug("local sock proxy exited", "err", err)
 			}
 		}()
+
 		return nil
 	}
 }
