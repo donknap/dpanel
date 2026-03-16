@@ -243,14 +243,15 @@ release: debug
 	fi
 
 test:
-	@printf "$(_CYAN)>> Reversing garble obfuscation via Docker container...$(_RESET)\n"
-	cat "$(LOG_FILE)" | docker run -i --rm \
-                           -e GIT_TOKEN=$(GIT_TOKEN) \
-                           -e GARBLE_SEED=$(GARBLE_SEED) \
-                           -e TARGET_BRANCH=$(TARGET_BRANCH) \
-                           -e HTTP_PROXY=$(HTTP_PROXY) \
-                           -e HTTPS_PROXY=$(HTTP_PROXY) \
-                           dpanel/builder:garble
+	@printf "$(_CYAN)>> 开始同步 Tag [$(TARGET_TAG)] 代码并执行反向解析...$(_RESET)\n"
+	docker buildx build --target reverse-export \
+		--build-arg REPO_BRANCH=$(TARGET_TAG) \
+		--build-arg REPO_PULL=true \
+		--build-arg LOG_PATH=$(LOG_FILE) \
+		--output type=local,dest=$(PROJECT_GO_TARGET) \
+		$(DOCKER_BUILD_ARGS)
+
+	@printf "$(_GREEN)>> 解析成功！Tag: $(TARGET_TAG) | 产物: $(PROJECT_GO_TARGET)/reversed.log$(_RESET)\n"
 
 _IS_DOCKER_MODE := $(filter release,$(MAKECMDGOALS))
 _IS_LOCAL_MODE  := $(filter build,$(MAKECMDGOALS))

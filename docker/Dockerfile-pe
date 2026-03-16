@@ -23,12 +23,12 @@ ENV REPO_PULL=${REPO_PULL:-false}
 
 RUN --mount=type=secret,id=GIT_TOKEN \
     if [ "$REPO_PULL" = "true" ] || [ "$REPO_PULL" = "1" ]; then \
-        echo ">> REPO_PULL enabled. Clearing local files and pulling from remote..." && \
+        echo ">> REPO_PULL enabled. Clearing local files and pulling from remote [Branch/Tag: ${REPO_BRANCH}]..." && \
         rm -rf ./* ./.[!.]* 2>/dev/null || true && \
         export GH_TOKEN=$(cat /run/secrets/GIT_TOKEN) && \
         gh repo clone donknap/dpanel . -- -b ${REPO_BRANCH} --depth 1 && \
         rm -rf ./app/pro && \
-        gh repo clone donknap/dpanel-pro ./app/pro -- --depth 1; \
+        gh repo clone donknap/dpanel-pro ./app/pro -- -b ${REPO_BRANCH} --depth 1; \
     else \
         echo ">> REPO_PULL disabled. Using local source code..." ; \
     fi
@@ -76,6 +76,43 @@ RUN --mount=type=secret,id=GARBLE_SEED \
 
 FROM scratch AS binary-export
 COPY --from=builder /src/runtime /
+
+FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS reverse
+
+ARG HTTP_PROXY
+
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    apt-get update && apt-get install -y --no-install-recommends git && \
+    go install mvdan.cc/garble@latest
+
+WORKDIR /src
+
+COPY --from=source /src/go.mod /src/go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache \
+    export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    go mod download
+
+COPY --from=source /src /src
+
+ARG LOG_PATH
+ARG TARGETARCH
+ARG APP_VERSION
+ARG APP_FAMILY
+ENV APP_VERSION=${APP_VERSION}
+
+COPY ${LOG_PATH} /tmp/run.log
+
+RUN --mount=type=secret,id=GARBLE_SEED \
+    --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETARCH} \
+    --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
+    export SEED=$(cat /run/secrets/GARBLE_SEED) && \
+    mkdir -p /src/runtime && \
+    GOGARBLE="*" garble -seed="$SEED" reverse \
+    -tags "${APP_FAMILY-pe},w7_rangine_release,containers_image_openpgp" \
+    /src/*.go < /tmp/run.log > /src/runtime/reversed.log
+
+FROM scratch AS reverse-export
+COPY --from=reverse /src/runtime/reversed.log /
 
 FROM $PE_LITE_FROM_BASE AS lite
 

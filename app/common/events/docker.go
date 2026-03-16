@@ -42,6 +42,7 @@ type Docker struct {
 
 func (self Docker) Daemon(e event.DockerDaemonPayload) {
 	if e.DockerEnv == nil {
+		slog.Debug("docker daemon/event", "error", "docker env is nil")
 		return
 	}
 	dockerStatusCacheKey := fmt.Sprintf(storage.CacheKeyDockerStatus, e.DockerEnv.Name)
