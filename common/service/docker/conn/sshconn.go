@@ -193,7 +193,9 @@ func (c *sshConn) Close() error {
 
 	c.kill()
 	// 当 HTTP 请求结束，这里会触发底层 SSH Client 断开，回收一切资源
-	c.client.Close()
+	if c.client != nil {
+		c.client.Close()
+	}
 	return nil
 }
 

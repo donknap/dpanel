@@ -186,7 +186,7 @@ define go_build
 	@cp ${PROJECT_GO_DIR}/config.yaml ${PROJECT_GO_TARGET}/config.yaml
 endef
 
-.PHONY: build build-js build-explorer-image build-builder release clean debug
+.PHONY: build build-js build-explorer-image build-builder release clean debug test
 
 build-explorer-image:
 	@echo ">> Downloading and repackaging images for all architectures using pure Docker..."
@@ -241,6 +241,16 @@ release: debug
 		echo ">> Building [Production] edition..."; \
 		docker buildx build --target production $(DOCKER_TAG_PROD) $(DOCKER_BUILD_ARGS) --push; \
 	fi
+
+test:
+	@printf "$(_CYAN)>> Reversing garble obfuscation via Docker container...$(_RESET)\n"
+	cat "$(LOG_FILE)" | docker run -i --rm \
+                           -e GIT_TOKEN=$(GIT_TOKEN) \
+                           -e GARBLE_SEED=$(GARBLE_SEED) \
+                           -e TARGET_BRANCH=$(TARGET_BRANCH) \
+                           -e HTTP_PROXY=$(HTTP_PROXY) \
+                           -e HTTPS_PROXY=$(HTTP_PROXY) \
+                           dpanel/builder:garble
 
 _IS_DOCKER_MODE := $(filter release,$(MAKECMDGOALS))
 _IS_LOCAL_MODE  := $(filter build,$(MAKECMDGOALS))

@@ -180,8 +180,15 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 		}
 		lock := sync.Mutex{}
 		transport := &http.Transport{
-			// 【关键优化】：禁止长连接复用，确保请求完成后立即销毁 SSH 物理通道，防止协程堆积泄露
-			DisableKeepAlives: true,
+			// 放开长连接复用，提升并发性能
+			DisableKeepAlives: false,
+			// 设置空闲回收时间。如果一个 SSH 连接 1 分钟没请求，自动回收
+			IdleConnTimeout: 1 * time.Minute,
+			// 限制针对该宿主机的最大闲置连接数
+			// 确保在高并发后，池子里最多只留几个连接备用，多余的会立即物理断开
+			MaxIdleConnsPerHost: 5,
+			// 限制总闲置连接数
+			MaxIdleConns: 100,
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				lock.Lock()
 				if serverInfo == nil {
