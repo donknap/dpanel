@@ -25,7 +25,7 @@ log:
     level: warn
   console:
     driver: console
-    level: debug
+    level: ${DP_LOG_CONSOLE_LEVEL-info}
 database:
   default:
     driver: sqlite

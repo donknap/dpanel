@@ -253,8 +253,8 @@ func (self Swarm) Log(http *gin.Context) {
 		}
 		select {
 		case <-progress.Done():
-			slog.Debug("service run log response close", "err", fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id))
-			_ = response.Close()
+			err = response.Close()
+			slog.Info("service run log response close", "id", fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id), "err", err)
 		}
 	}()
 	_, err = io.Copy(progress, response)

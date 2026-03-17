@@ -115,7 +115,7 @@ func (self Client) ContainerExecResult(ctx context.Context, containerName string
 			cmd,
 		},
 	}
-	slog.Debug("command", "exec", []string{
+	slog.Info("command", "exec", []string{
 		"/bin/sh",
 		"-c",
 		cmd,
@@ -138,7 +138,7 @@ func (self Client) ContainerExecResult(ctx context.Context, containerName string
 
 // ContainerExec 在容器内执行一条 shell 命令
 func (self Client) ContainerExec(ctx context.Context, containerName string, option container.ExecOptions) (types.HijackedResponse, error) {
-	slog.Debug("docker exec", "command", option)
+	slog.Info("docker exec", "command", option)
 	exec, err := self.Client.ContainerExecCreate(ctx, containerName, option)
 	if err != nil {
 		return types.HijackedResponse{}, err

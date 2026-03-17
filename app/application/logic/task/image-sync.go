@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"math"
-	"os"
 	"time"
 
 	"github.com/donknap/dpanel/common/function"
@@ -31,9 +30,7 @@ func (self Docker) ImageSync(w *ws.ProgressPip, r io.ReadCloser) error {
 			p = lastJsonStr.String() + p
 			lastJsonStr.Reset()
 		}
-		if os.Getenv("APP_ENV") == "debug" {
-			slog.Debug("image pull task", "data", p)
-		}
+		slog.Debug("image pull task", "data", p)
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
 		pd := types.BuildMessage{}
 		for {

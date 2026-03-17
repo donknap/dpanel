@@ -193,7 +193,7 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 				lock.Lock()
 				if serverInfo == nil {
 					lock.Unlock()
-					slog.Debug("ssh client nil", "name", self.Name, "dockerEnv", self.DockerEnv)
+					slog.Warn("ssh client nil", "name", self.Name, "dockerEnv", self.DockerEnv)
 					return nil, errors.New("nil serverInfo")
 				}
 				opts := ssh.WithServerInfo(serverInfo)
@@ -249,7 +249,7 @@ func WithSockProxy() Option {
 			sockPath = self.Name
 		} else {
 			localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
-			slog.Debug("local sock path remove", "path", localProxySock)
+			slog.Info("local sock path remove", "path", localProxySock)
 			_ = os.Remove(localProxySock)
 			sockPath = localProxySock
 		}
@@ -277,8 +277,8 @@ func WithSockProxy() Option {
 				return nil
 			},
 			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-				if err != context.Canceled {
-					slog.Debug("proxy error", "err", err)
+				if !errors.Is(err, context.Canceled) {
+					slog.Warn("proxy error", "err", err)
 				}
 			},
 		}
@@ -290,7 +290,7 @@ func WithSockProxy() Option {
 			err := server.Serve(localSock)
 			// 过滤掉因为正常关闭而产生的日志噪音
 			if err != nil && err != http.ErrServerClosed && !strings.Contains(err.Error(), "use of closed network connection") {
-				slog.Debug("local sock proxy exited", "err", err)
+				slog.Warn("local sock proxy exited", "err", err)
 			}
 		}()
 

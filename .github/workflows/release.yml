@@ -313,3 +313,21 @@ jobs:
           git push origin --delete "$TAG" || true
           git tag -f "$TAG"
           git push origin "$TAG" --force
+
+      - name: Push tag to dpanel-pro
+        uses: actions/checkout@v4
+        with:
+          repository: donknap/dpanel-pro
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
+          path: dpanel-pro
+          fetch-depth: 1
+
+      - name: Push tag to dpanel-pro
+        working-directory: ./dpanel-pro
+        run: |
+          TAG=${{ github.ref_name }}
+          git config user.name "donknap"
+          git config user.email "donknap@gmail.com"
+          git push origin --delete "$TAG" || true
+          git tag -f "$TAG"
+          git push origin "$TAG" --force

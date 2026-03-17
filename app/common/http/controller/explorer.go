@@ -266,7 +266,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			options = append(options, imports.WithImportTar(tarReader))
 			break
 		default:
-			slog.Debug("explorer unzip ", "filetype", path.Ext(file.Name()))
+			slog.Info("explorer unzip ", "filetype", path.Ext(file.Name()))
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerUnzipTargetUnsupportedType), 500)
 			return
 		}
@@ -410,7 +410,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 					fileData.User = strings.TrimSpace(string(username))
 					_ = storage.Cache.Add(cacheKey, string(username), time.Hour)
 				} else {
-					slog.Debug("explorer GetPathList username", "err", err)
+					slog.Warn("explorer GetPathList username", "err", err)
 					fileData.User = strconv.Itoa(int(v.UID))
 				}
 			}
@@ -613,7 +613,7 @@ func (self Explorer) GetUserList(http *gin.Context) {
 			}, true
 		})
 	} else {
-		slog.Debug("explorer get user list", "err", err)
+		slog.Warn("explorer get user list", "err", err)
 	}
 
 	if group, err := afs.ReadFile("/etc/group"); err == nil && string(group) != "" {

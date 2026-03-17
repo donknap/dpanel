@@ -363,13 +363,13 @@ func (self Container) Delete(http *gin.Context) {
 		// 如果查找不到容器信息，可能是有错误的容器，强制删除
 		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, params.Md5, container.StopOptions{})
 		if err != nil {
-			slog.Debug("container delete not info container", "error", err)
+			slog.Warn("container delete not info container", "error", err)
 		}
 		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, params.Md5, container.RemoveOptions{
 			Force: true,
 		})
 		if err != nil {
-			slog.Debug("container delete not info container", "error", err)
+			slog.Warn("container delete not info container", "error", err)
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
@@ -419,7 +419,7 @@ func (self Container) Delete(http *gin.Context) {
 	for _, domain := range domainList {
 		err = os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), domain.Setting.VHostFilename()))
 		if err != nil {
-			slog.Debug("container delete domain", "error", err)
+			slog.Warn("container delete domain", "error", err)
 		}
 	}
 
@@ -457,7 +457,7 @@ func (self Container) Delete(http *gin.Context) {
 			if item.Type == mount.TypeVolume {
 				err = docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, item.Name, false)
 				if err != nil {
-					slog.Debug("remove container volume", err.Error())
+					slog.Warn("remove container volume", err.Error())
 				}
 			}
 		}

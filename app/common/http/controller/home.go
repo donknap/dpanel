@@ -108,7 +108,7 @@ func (self Home) WsNotice(http *gin.Context) {
 		Data: client.Fd,
 	})
 	if err != nil {
-		slog.Error("websocket", "connect", err.Error())
+		slog.Warn("websocket", "connect", err.Error())
 	}
 }
 
@@ -148,16 +148,16 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 			var cmd command
 			err = json.Unmarshal(recvMessage.Message, &cmd)
 			if err != nil {
-				slog.Error("console", "json unmarshal", err.Error())
+				slog.Warn("console", "json unmarshal", err.Error())
 			}
 			if shell.Conn == nil {
-				slog.Debug("console", "shell is nil", err.Error())
+				slog.Warn("console", "shell is nil", err.Error())
 				return
 			}
 			if cmd.Content.Command != "" {
 				_, err = shell.Conn.Write([]byte(cmd.Content.Command))
 				if err != nil {
-					slog.Error("console", "shell read", err.Error())
+					slog.Warn("console", "shell read", err.Error())
 				}
 			}
 			if cmd.Size.Height > 0 && cmd.Size.Width > 0 {
@@ -166,7 +166,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 					Width:  uint(cmd.Size.Width),
 				})
 				if err != nil {
-					slog.Warn("console", "container tty resize", cmd.Size, "err", err)
+					slog.Warn("console container tty", "resize", cmd.Size, "error", err)
 				}
 			}
 		}),
@@ -227,7 +227,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 				Data: string(out[:n]),
 			})
 			if err != nil {
-				slog.Error("websocket", "shell write", err.Error())
+				slog.Warn("websocket shell write", "error", err.Error())
 				return
 			}
 		}
@@ -267,12 +267,12 @@ func (self Home) WsHostConsole(http *gin.Context) {
 			var cmd command
 			err = json.Unmarshal(recvMessage.Message, &cmd)
 			if err != nil {
-				slog.Error("console", "json unmarshal", err.Error())
+				slog.Warn("console", "json unmarshal", err.Error())
 			}
 			if cmd.Content.Command != "" {
 				_, err = write.Write([]byte(cmd.Content.Command))
 				if err != nil {
-					slog.Error("console", "json unmarshal", err.Error())
+					slog.Warn("console", "json unmarshal", err.Error())
 				}
 			}
 			if cmd.Size.Width > 0 && cmd.Size.Height > 0 {
@@ -327,7 +327,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 				Data: string(out[:n]),
 			})
 			if err != nil {
-				slog.Error("websocket", "shell write", err.Error())
+				slog.Warn("websocket", "shell write", err.Error())
 				return
 			}
 		}

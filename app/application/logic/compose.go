@@ -219,7 +219,7 @@ func (self Compose) LsItem(name string) *compose.ProjectResult {
 // FindPathTask 查询 docker 环境下 compose 目录下的所有任务
 func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 	if _, err := os.Stat(rootDir); err != nil {
-		slog.Error("compose sync path not found", "error", err)
+		slog.Warn("compose sync path not found", "error", err)
 		return make(map[string]*entity.Compose)
 	}
 
@@ -231,7 +231,7 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 		}
 	}
 
-	slog.Debug("compose find yaml in path", "path", rootDir, "link path", linkRealPath)
+	slog.Info("compose find yaml in path", "path", rootDir, "link path", linkRealPath)
 
 	findComposeList := make(map[string]*entity.Compose)
 	pathList, err := os.ReadDir(rootDir)
@@ -347,7 +347,7 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
 			err = os.Symlink(workingDir, linkComposePath)
 			if err != nil {
-				slog.Debug("db compose make path symlink", "workdir", workingDir, "target", linkComposePath, "error", err)
+				slog.Warn("db compose make path symlink", "workdir", workingDir, "target", linkComposePath, "error", err)
 			}
 		}
 		workingDir = linkComposePath

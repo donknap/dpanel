@@ -3,6 +3,8 @@ package ws
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
@@ -129,4 +131,8 @@ func (self *ProgressPip) Context() context.Context {
 func (self *ProgressPip) KeepAlive() *ProgressPip {
 	self.IsKeepAlive = true
 	return self
+}
+
+func (self *ProgressPip) String() string {
+	return fmt.Sprintf("messageType: %s, fd: %s", self.messageType, strings.Join(self.fd, ","))
 }

@@ -72,7 +72,7 @@ func (self *Collection) Leave(c *Client) {
 					})
 					if !hasConnect {
 						storage.Cache.Delete(key)
-						slog.Debug("ws leave delete cache userinfo", "key", key, "user", v)
+						slog.Info("ws leave delete cache userinfo", "key", key, "user", v)
 					}
 				}
 			}
@@ -88,9 +88,9 @@ func (self *Collection) Leave(c *Client) {
 			}
 			return true
 		})
-		slog.Debug("docker client cancel")
+		slog.Info("docker client cancel")
 		facade.Event.Publish(event.PluginDestroyExplorer, event.DockerDaemonPayload{
-			DockerEnv: docker.Sdk.DockerEnv,
+			DockerEnvName: docker.Sdk.DockerEnv.Name,
 		})
 		//docker.Sdk.CtxCancelFunc()
 		//docker.Sdk.Client.Close()
@@ -112,7 +112,7 @@ func (self *Collection) sendMessage(message *RespMessage) {
 		}
 		err := c.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
 		if err != nil {
-			slog.Debug("ws broadcast error", "fd", c.Fd, "error", err.Error())
+			slog.Warn("ws broadcast error", "fd", c.Fd, "error", err.Error())
 			self.Leave(c)
 		}
 		return true

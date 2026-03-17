@@ -154,7 +154,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			} else {
 				task.Setting.JobIds = make([]cron.EntryID, 0)
 				if err != nil {
-					slog.Debug("init crontab task error", "error", err.Error())
+					slog.Warn("init crontab task error", "error", err.Error())
 				}
 			}
 			_ = dao.Cron.Save(task)

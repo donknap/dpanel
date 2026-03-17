@@ -102,9 +102,8 @@ func main() {
 
 	if isAppServer() {
 		slog.Warn(dpanelBanner)
-		slog.Debug("config", "env", facade.GetConfig().GetString("app.env"))
-		slog.Debug("config", "version", DPanelVersion)
-		slog.Debug("config", "storage", storage.Local{}.GetStorageLocalPath())
+		slog.Info("config", "env", facade.GetConfig().GetString("app.env"), "version", DPanelVersion, "date", time.Now())
+		slog.Info("config", "storage", storage.Local{}.GetStorageLocalPath())
 
 		err = initDb()
 		if err != nil {
@@ -212,10 +211,10 @@ func initDb() error {
 		&migrate.Upgrade20250521{},
 	}
 	for _, updater := range migrateTableData {
-		slog.Debug("main", "migrate", updater.Version())
+		slog.Info("main", "migrate", updater.Version())
 		err = updater.Upgrade()
 		if err != nil {
-			slog.Debug("main", "migrate", err)
+			slog.Warn("main", "migrate", err)
 		}
 	}
 
@@ -331,7 +330,7 @@ func initDocker() error {
 				dockerClient.Close()
 			}
 		} else {
-			slog.Debug("init docker", "error", err, "env", defaultDockerEnv)
+			slog.Warn("init docker", "env", defaultDockerEnv, "error", err)
 		}
 	}()
 	dockerEnvList := make(map[string]*types.DockerEnv)

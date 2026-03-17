@@ -243,7 +243,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			options = append(options, imports.WithImportTarGzFile(targetFile.Name()))
 			break
 		default:
-			slog.Debug("explorer unzip ", "filetype", fileType, "err", err)
+			slog.Warn("explorer unzip ", "filetype", fileType, "err", err)
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerUnzipTargetUnsupportedType), 500)
 			return
 		}
@@ -421,7 +421,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 	}
 	tempFile, err := storage.Local{}.CreateTempFile("")
 	if err != nil {
-		slog.Error("explorer", "get content", err)
+		slog.Warn("explorer get content", "error", err)
 	}
 	defer func() {
 		_ = os.Remove(tempFile.Name())
@@ -563,7 +563,7 @@ func (self Explorer) GetUserList(http *gin.Context) {
 			}, true
 		})
 	} else {
-		slog.Debug("explorer get user list", "err", err)
+		slog.Warn("explorer get user list", "err", err)
 	}
 
 	if group, err := afs.ReadFile("/etc/group"); err == nil && string(group) != "" {

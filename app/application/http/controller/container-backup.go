@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -265,8 +266,9 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		}
 		containerInfo := container.InspectResponse{}
 		err = json.Unmarshal(config, &containerInfo)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
+		if err != nil || containerInfo.ContainerJSONBase == nil {
+			slog.Warn("container backup restore parse container", "json", string(config), "error", err)
+			self.JsonResponseWithError(http, errors.Join(errors.New("failed to parse container configuration"), err), 500)
 			return
 		}
 		if _, err = docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, containerInfo.Config.Image); err != nil {
@@ -391,14 +393,18 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					settings.EndpointID = ""
 					settings.NetworkID = ""
 
-					settings.IPAMConfig.IPv6Address = ""
-					settings.IPAMConfig.IPv4Address = ""
+					if settings.IPAMConfig != nil {
+						settings.IPAMConfig.IPv6Address = ""
+						settings.IPAMConfig.IPv4Address = ""
+					}
+
 					settings.Gateway = ""
 					settings.IPAddress = "" // 这里把 Ip 置空，直接采用网络的子网自动分配，否则可能会造成 ip 与网络不
 
 					networkingConfig.EndpointsConfig[name] = settings
 				}
 			}
+
 			compactContainerInfo, err := docker.Sdk.ContainerInspectCompact(containerInfo)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
@@ -424,23 +430,30 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					return
 				}
 				for _, volume := range item.Volume {
-					destPath := "/"
-					for _, mount := range containerInfo.Mounts {
+					targetImportContainerName := newContainerName
+					targetImportPath := "/"
+					// 找到对应的备份数据
+					if v, _, ok := function.PluckArrayItemWalk(containerInfo.Mounts, func(mount container.MountPoint) bool {
 						if strings.HasSuffix(function.Sha256([]byte(mount.Destination)), path.Base(volume)) {
-							// 导出的数据是按最后一个目录或是文件名存放，所以需要脱一级目录做为根目录
-							if mount.Type == types.VolumeTypeBind {
-								destPath = path.Join("/", "mnt", "host", path.Dir(mount.Source))
-							} else {
-								destPath = path.Dir(mount.Destination)
-							}
-							break
+							return true
+						}
+						return false
+					}); ok {
+						// 导出的数据是按最后一个目录或是文件名存放，所以需要脱一级目录做为根目录
+						if v.Type == types.VolumeTypeBind {
+							targetImportPath = path.Join("/", "mnt", "host", path.Dir(v.Source))
+							targetImportContainerName = proxyContainerName
+						} else {
+							targetImportPath = path.Dir(v.Destination)
+							targetImportContainerName = newContainerName
 						}
 					}
+
 					reader, _ := b.Reader.ReadBlobs(volume)
 					gzReader, _ := gzip.NewReader(reader)
 					tarReader := tar.NewReader(gzReader)
-					if importFiles, err := imports.NewFileImport(destPath, imports.WithImportTar(tarReader)); err == nil {
-						err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, proxyContainerName, importFiles.Reader())
+					if importFiles, err := imports.NewFileImport(targetImportPath, imports.WithImportTar(tarReader)); err == nil {
+						err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, targetImportContainerName, importFiles.Reader())
 						importFiles.Close()
 						if err != nil {
 							self.JsonResponseWithError(http, err, 500)

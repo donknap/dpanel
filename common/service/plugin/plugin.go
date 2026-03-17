@@ -124,7 +124,7 @@ func (self *Plugin) Create() error {
 
 	containerInfo, err := self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, service.ContainerName)
 	if err == nil {
-		slog.Debug("plugin", "create-explorer", containerInfo.ID)
+		slog.Info("plugin", "create-explorer", containerInfo.ID)
 		if containerInfo.State.Restarting {
 			goto recreate
 		}
@@ -259,7 +259,7 @@ func importImage(sdk *docker.Client, imageName string, imageFile fs.File) error 
 			Force:         true,
 			PruneChildren: true,
 		}); err != nil {
-			slog.Debug("plugin create explorer", "delete old image", imageName)
+			slog.Warn("plugin create explorer", "delete old image", imageName, "error", err)
 		}
 		err = sdk.ImageLoadFsFile(sdk.Ctx, imageFile)
 		if err != nil {

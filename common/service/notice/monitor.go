@@ -115,7 +115,7 @@ func (self *monitor) listen(c *client) {
 	for {
 		if initErr != nil {
 			facade.GetEvent().Publish(event.DockerDaemonEvent, event.DockerDaemonPayload{
-				DockerEnv: c.dockerEnv,
+				DockerEnvName: c.dockerEnv.Name,
 				Status: types.DockerStatus{
 					Message:   fmt.Sprintf("%s, at %s", initErr.Error(), time.Now().Format(define.DateShowYmdHis)),
 					Available: false,
@@ -125,17 +125,17 @@ func (self *monitor) listen(c *client) {
 			case <-time.After(10 * time.Second):
 
 			case <-c.ctx.Done():
-				slog.Debug("Monitor closed by monitor", "name", c.dockerEnv.Name, "error", initErr)
+				slog.Debug("monitor closed by monitor", "name", c.dockerEnv.Name, "error", initErr)
 				return
 			case <-self.ctx.Done():
-				slog.Debug("Monitor closed", "error", initErr)
+				slog.Debug("monitor closed", "error", initErr)
 				return
 			}
 		}
 		// 如果数据找不到或是当前循环的环境时间早于存储中的 Clients
 		// 时间早说明当前环境已经变更了，不需要再继续循环了
 		if v, ok := self.clients.Load(c.dockerEnv.Name); !ok || v.(*client).createdAt.After(c.createdAt) {
-			slog.Debug("Monitor client not found or updated", "name", c.dockerEnv.Name, "error", initErr)
+			slog.Debug("monitor client not found or updated", "name", c.dockerEnv.Name, "error", initErr)
 			c.Close()
 			return
 		} else {
@@ -143,9 +143,7 @@ func (self *monitor) listen(c *client) {
 			fmt.Printf("listen %v \n", oldClient.createdAt.Format(define.DateShowYmdHis))
 		}
 
-		if os.Getenv("APP_ENV") == "debug" {
-			slog.Debug("Monitor start", "name", c.dockerEnv, "error", initErr)
-		}
+		slog.Debug("monitor start", "name", c.dockerEnv, "error", initErr)
 
 		if c.dockerClient, initErr = docker.NewClientWithDockerEnv(c.dockerEnv); initErr != nil {
 			c.Clear()
@@ -157,8 +155,9 @@ func (self *monitor) listen(c *client) {
 			continue
 		}
 
+		slog.Debug("monitor publish event", "name", c.dockerEnv.Name)
 		facade.GetEvent().Publish(event.DockerDaemonEvent, event.DockerDaemonPayload{
-			DockerEnv: c.dockerEnv,
+			DockerEnvName: c.dockerEnv.Name,
 			Status: types.DockerStatus{
 				Message:   "",
 				Available: true,
@@ -171,11 +170,11 @@ func (self *monitor) listen(c *client) {
 		for {
 			select {
 			case <-c.ctx.Done():
-				slog.Debug("Monitor closed by monitor", "name", c.dockerEnv.Name)
+				slog.Debug("monitor closed by monitor", "name", c.dockerEnv.Name)
 				c.Close()
 				break eventLoop
 			case <-self.ctx.Done():
-				slog.Debug("Monitor closed")
+				slog.Debug("monitor closed")
 				self.Close()
 				return
 			case message, ok := <-eventChan:
@@ -184,7 +183,7 @@ func (self *monitor) listen(c *client) {
 						return strings.HasPrefix(string(message.Action), item)
 					}); !ok {
 						message.Actor.Attributes = function.PluckMapWithKeys(message.Actor.Attributes, keepAttribute)
-						slog.Debug("Monitor message", "name", c.dockerEnv.Name, "message", message)
+						slog.Debug("monitor message", "name", c.dockerEnv.Name, "message", message)
 					}
 				}
 				if !ok {
@@ -193,7 +192,7 @@ func (self *monitor) listen(c *client) {
 				self.processor(c.dockerEnv.Name, message)
 			case err, ok := <-errChan:
 				if !ok {
-					slog.Debug("Monitor error", "name", c.dockerEnv.Name, "error", err)
+					slog.Warn("monitor error", "name", c.dockerEnv.Name, "error", err)
 					break eventLoop
 				}
 			}

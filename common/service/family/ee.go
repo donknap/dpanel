@@ -14,7 +14,7 @@ type Provider struct {
 }
 
 func (self Provider) Register(httpServer *server.Server) {
-	slog.Debug("provider load enterprise edition")
+	slog.Info("provider load enterprise edition")
 	new(ee.Provider).Register(httpServer)
 }
 

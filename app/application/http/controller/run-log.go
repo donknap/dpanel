@@ -45,7 +45,7 @@ func (self RunLog) Run(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
+	slog.Debug("container run log progress", "detail", progress.String())
 	if progress.IsShadow() {
 		option.Follow = false
 	}

@@ -254,7 +254,7 @@ func (self Env) Switch(http *gin.Context) {
 		return
 	}
 	facade.Event.Publish(event.PluginDestroyExplorer, event.DockerDaemonPayload{
-		DockerEnv: oldDockerClient.DockerEnv,
+		DockerEnvName: oldDockerClient.DockerEnv.Name,
 	})
 	oldDockerClient.Close()
 	docker.Sdk = dockerClient

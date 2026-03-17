@@ -16,7 +16,7 @@ type Provider struct {
 }
 
 func (self Provider) Register(httpServer *server.Server) {
-	slog.Debug("provider load community edition")
+	slog.Info("provider load community edition")
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		engine.POST(path.Join(function.RouterRootApi(), "/pro/*path"), notSupportedApi)
 	})

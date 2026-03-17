@@ -28,7 +28,7 @@ func NewClient(ctx *gin.Context, options ...Option) (*Client, error) {
 			Type string `json:"type"`
 			Data string `json:"data"`
 		}{}
-		slog.Debug("ws event", "event", MessageTypeProgressClose, "fd", fd, "message", string(message.Message))
+		slog.Info("ws event", "event", MessageTypeProgressClose, "fd", fd, "message", string(message.Message))
 		if err := json.Unmarshal(message.Message, &closeMessage); err == nil {
 			if p, ok := collect.progressPip.Load(closeMessage.Data); ok {
 				if v, ok := p.(*ProgressPip); ok {

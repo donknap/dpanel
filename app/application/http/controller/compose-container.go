@@ -158,6 +158,10 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 	_, err = io.Copy(progress, response)
 	if err != nil {
+		// copy 出错的只记录日志，不提示用户
+		slog.Warn("compose container deploy copy", "error", err)
+	}
+	if err != nil {
 		if function.ErrorHasKeyword(err, "denied: You may not login") {
 			_ = notice.Message{}.Error(".imagePullInvalidAuth")
 		} else if function.ErrorHasKeyword(err, "Mounts denied") {
@@ -171,11 +175,6 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 	if composeRow.ID > 0 {
 		_ = dao.Compose.Save(composeRow)
-	}
-
-	if err != nil {
-		// copy 出错的只记录日志，不提示用户
-		slog.Debug("compose container deploy copy", "error", err)
 	}
 
 	// 查看当前任务下的容器 hash 值是否部署成功
@@ -298,7 +297,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	if params.DeleteData {
 		_, err := dao.Compose.Where(dao.Compose.ID.Eq(composeRow.ID)).Delete()
 		if err != nil {
-			slog.Debug("compose", "destroy", err)
+			slog.Info("compose", "destroy", err)
 		} else {
 			facade.GetEvent().Publish(event.ComposeDeleteEvent, event.ComposePayload{
 				Compose: composeRow,
@@ -318,7 +317,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		}
 		err := os.RemoveAll(filepath.Dir(composeRow.Setting.GetUriFilePath()))
 		if err != nil {
-			slog.Debug("compose", "destroy", err)
+			slog.Info("compose", "destroy", err)
 		}
 	}
 	_ = notice.Message{}.Info(".composeDestroy", "name", composeRow.Name)
@@ -361,7 +360,7 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 	}()
 	_, err = io.Copy(progress, response)
 	if err != nil {
-		slog.Error("compose", "destroy copy error", err)
+		slog.Warn("compose destroy copy", "error", err)
 	}
 
 	self.JsonSuccessResponse(http)
@@ -418,7 +417,7 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		case <-wsBuffer.Done():
 			err = response.Close()
 			if err != nil {
-				slog.Debug("compose", "run log  response close", fmt.Sprintf(ws.MessageTypeComposeLog, params.Id), "error", err)
+				slog.Warn("compose run log ws buffer close", "id", fmt.Sprintf(ws.MessageTypeComposeLog, params.Id), "error", err)
 			}
 		}
 	}()

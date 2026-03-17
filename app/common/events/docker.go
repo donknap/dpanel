@@ -19,6 +19,7 @@ import (
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
@@ -41,24 +42,35 @@ type Docker struct {
 }
 
 func (self Docker) Daemon(e event.DockerDaemonPayload) {
-	if e.DockerEnv == nil {
-		slog.Debug("docker daemon/event", "error", "docker env is nil")
+	slog.Debug("docker daemon/event start", "info", e)
+
+	if e.DockerEnvName == "" {
+		slog.Warn("docker daemon/event", "error", "docker env is nil")
 		return
 	}
-	dockerStatusCacheKey := fmt.Sprintf(storage.CacheKeyDockerStatus, e.DockerEnv.Name)
 
-	slog.Debug("docker daemon/event status", "cacheKey", dockerStatusCacheKey, e.DockerEnv.Name, e.Status)
+	dockerStatusCacheKey := fmt.Sprintf(storage.CacheKeyDockerStatus, e.DockerEnvName)
 	storage.Cache.Set(dockerStatusCacheKey, e.Status, cache.DefaultExpiration)
+
+	slog.Debug("docker daemon/event status", "cacheKey", dockerStatusCacheKey, "status", e.Status)
 
 	// 如果有错误记录缓存返回,并删除缓存信息，默认为的状态为 false
 	if !e.Status.Available {
+		slog.Debug("docker daemon/event delete cache", "name", e.Status)
 		storage.Cache.Delete(dockerStatusCacheKey)
 		return
 	}
-	// 连接成功后，并且判断一下是否是当前连接。更新一下状态
-	if docker.Sdk.Name == e.DockerEnv.Name {
+
+	// 默认环境的配置可能会被更改，重新获取最新的配置再填充 DPanel 容器数据
+	dockerEnv, err := logic.Env{}.GetEnvByName(e.DockerEnvName)
+	if err != nil {
+		slog.Warn("docker daemon/event env not found", "error", err)
+		return
+	}
+	// 连接成功后，并且判断一下是否是当前连接, 如果当前连接不通，就重置一下
+	if docker.Sdk.Name == e.DockerEnvName {
 		if _, err := docker.Sdk.Client.Ping(docker.Sdk.Ctx); err != nil {
-			if v, err := docker.NewClientWithDockerEnv(e.DockerEnv, docker.WithSockProxy()); err == nil {
+			if v, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithSockProxy()); err == nil {
 				docker.Sdk = v
 				slog.Debug("docker daemon/event update docker.Sdk")
 			}
@@ -69,15 +81,11 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		})
 	}
 
-	if e.DockerEnv.Name != define.DockerDefaultClientName {
+	if e.DockerEnvName != define.DockerDefaultClientName {
 		return
 	}
-	// 默认环境的配置可能会被更改，重新获取最新的配置再填充 DPanel 容器数据
-	if v, err := (logic.Env{}).GetDefaultEnv(); err == nil {
-		e.DockerEnv = v
-	}
 
-	sdk, err := docker.NewClientWithDockerEnv(e.DockerEnv)
+	sdk, err := docker.NewClientWithDockerEnv(dockerEnv)
 	if err != nil {
 		return
 	}
@@ -88,7 +96,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 	if result.Proxy != "" {
 		_ = os.Setenv("HTTP_PROXY", result.Proxy)
 		_ = os.Setenv("HTTPS_PROXY", result.Proxy)
-		slog.Debug("init dpanel proxy", "url", result.Proxy)
+		slog.Info("init dpanel proxy", "url", result.Proxy)
 	}
 	if function.IsRunInDocker() {
 		result.RunIn = types2.DPanelRunInContainer
@@ -96,7 +104,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		result.RunIn = types2.DPanelRunInHost
 	}
 	if dockerInfo, err := sdk.Client.Info(sdk.Ctx); err == nil {
-		e.DockerEnv.DockerInfo = &types.DockerInfo{
+		dockerEnv.DockerInfo = &types.DockerInfo{
 			ID:              dockerInfo.ID,
 			Name:            dockerInfo.Name,
 			KernelVersion:   dockerInfo.KernelVersion,
@@ -131,24 +139,24 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 					},
 				})
 				var nginxErr error
+				var cmd exec.Executor
 				if facade.GetConfig().Get("app.env") == define.PanelAppEnvStandard {
 					err = logic2.Site{}.MakeNginxResolver()
 					if err != nil {
-						slog.Debug("init nginx make resolver", "error", err)
+						slog.Warn("init nginx make resolver", "error", err)
 					}
-					if b, _ := local.QuickCheckRunning("nginx"); b {
-						_, nginxErr = local.QuickRun("nginx -s reload")
-					} else {
+					_, nginxErr = local.QuickRun("nginx -s reload")
+					if nginxErr != nil {
 						// 尝试启动 nginx
-						if cmd, nginxErr := local.New(
+						if cmd, err = local.New(
 							local.WithCommandName("nginx"),
 							local.WithArgs("-g", "daemon on;"),
-						); nginxErr == nil {
-							err = cmd.Run()
+						); err == nil {
+							nginxErr = cmd.Run()
+							if nginxErr != nil {
+								slog.Warn("init nginx make resolver", "error", nginxErr)
+							}
 						}
-					}
-					if nginxErr != nil {
-						slog.Debug("init nginx", "error", nginxErr)
 					}
 				}
 			}
@@ -160,13 +168,13 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 				Dest: "/dpanel",
 				Type: types3.VolumeTypeBind,
 			}
-			if !e.DockerEnv.IsLocal() && runtime.GOOS == "windows" {
+			if !dockerEnv.IsLocal() && runtime.GOOS == "windows" {
 				if v, ok := function.PathConvertWinPath2Unix(storage.Local{}.GetStorageLocalPath()); ok {
 					result.Mount.Host = v
 				}
 			}
 
-			e.DockerEnv.DockerInfo.InDPanel = false
+			dockerEnv.DockerInfo.InDPanel = false
 			result.ContainerInfo = container.InspectResponse{}
 			slog.Warn("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err)
 		}
@@ -177,7 +185,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 				DPanelInfo: &result,
 			},
 		})
-		logic.Env{}.UpdateEnv(e.DockerEnv)
+		logic.Env{}.UpdateEnv(dockerEnv)
 	}
 }
 

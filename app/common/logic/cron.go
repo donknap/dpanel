@@ -193,7 +193,7 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 			go func() {
 				select {
 				case <-runCtx.Done():
-					slog.Debug("cron run timeout", "timeout", task.Setting.ScriptRunTimeout, "task", task)
+					slog.Info("cron run timeout", "timeout", task.Setting.ScriptRunTimeout, "task", task)
 					_ = cmd.Close()
 				}
 			}()
