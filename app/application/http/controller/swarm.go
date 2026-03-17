@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"log/slog"
@@ -215,35 +214,23 @@ func (self Swarm) Log(http *gin.Context) {
 	}
 	var response io.ReadCloser
 	if params.Type == "service" {
-		response, err = docker.Sdk.Client.ServiceLogs(docker.Sdk.Ctx, params.Id, option)
+		response, err = docker.Sdk.ServiceLogs(docker.Sdk.Ctx, params.Id, option)
 	} else {
-		response, err = docker.Sdk.Client.TaskLogs(docker.Sdk.Ctx, params.Id, option)
+		response, err = docker.Sdk.TaskLogs(docker.Sdk.Ctx, params.Id, option)
 	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	if params.Download {
-		buffer, err := function.CombinedStdout(response)
-		_ = response.Close()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
 		http.Header("Content-Type", "text/plain")
 		http.Header("Content-Disposition", "attachment; filename="+params.Id+".log")
-		http.Data(200, "text/plain", buffer.Bytes())
+		http.DataFromReader(200, 0, "text/plain", response, nil)
 		return
 	}
 
 	progress.OnWrite = func(p string) error {
-		newReader := bytes.NewReader([]byte(p))
-		stdout, err := function.CombinedStdout(newReader)
-		if err != nil {
-			progress.BroadcastMessage(p)
-		} else {
-			progress.BroadcastMessage(stdout.String())
-		}
+		progress.BroadcastMessage(p)
 		return nil
 	}
 

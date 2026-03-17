@@ -1,14 +1,12 @@
 package controller
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"log/slog"
 	"strconv"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/gin-gonic/gin"
@@ -51,7 +49,7 @@ func (self RunLog) Run(http *gin.Context) {
 	}
 
 	if params.Download {
-		response, err := docker.Sdk.Client.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
+		response, err := docker.Sdk.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -59,30 +57,19 @@ func (self RunLog) Run(http *gin.Context) {
 		defer func() {
 			_ = response.Close()
 		}()
-		out, err := function.CombinedStdout(response)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
 		http.Header("Content-Type", "text/plain")
 		http.Header("Content-Disposition", "attachment; filename="+params.Id+".log")
-		http.Data(200, "text/plain", out.Bytes())
+		http.DataFromReader(200, 0, "text/plain", response, nil)
 		return
 	}
 
-	response, err := docker.Sdk.Client.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
+	response, err := docker.Sdk.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	progress.OnWrite = func(p string) error {
-		newReader := bytes.NewReader([]byte(p))
-		stdout, err := function.CombinedStdout(newReader)
-		if err != nil {
-			progress.BroadcastMessage(p)
-		} else {
-			progress.BroadcastMessage(stdout.String())
-		}
+		progress.BroadcastMessage(p)
 		return nil
 	}
 

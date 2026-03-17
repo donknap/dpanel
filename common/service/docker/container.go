@@ -2,6 +2,7 @@ package docker
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/versions"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/types/define"
 )
@@ -108,7 +110,7 @@ func (self Client) ContainerExecResult(ctx context.Context, containerName string
 		Tty:          false,
 		AttachStdin:  false,
 		AttachStdout: true,
-		AttachStderr: false,
+		AttachStderr: true,
 		Cmd: []string{
 			"/bin/sh",
 			"-c",
@@ -126,7 +128,8 @@ func (self Client) ContainerExecResult(ctx context.Context, containerName string
 	}
 	defer response.Close()
 
-	stdout, stderr, err := function.SplitStdout(response.Reader)
+	var stdout, stderr bytes.Buffer
+	_, err = stdcopy.StdCopy(&stdout, &stderr, response.Reader)
 	if err != nil {
 		return "", err
 	}
@@ -186,4 +189,20 @@ func (self Client) ContainerReadFile(ctx context.Context, containerName string, 
 
 	_ = targetFile.Chmod(file.FileInfo().Mode())
 	return nil, nil
+}
+
+func (self Client) ContainerLogs(ctx context.Context, containerId string, options container.LogsOptions) (io.ReadCloser, error) {
+	inspectInfo, err := self.Client.ContainerInspect(ctx, containerId)
+	if err != nil {
+		return nil, err
+	}
+	reader, err := self.Client.ContainerLogs(ctx, containerId, options)
+	if err != nil {
+		return nil, err
+	}
+	if inspectInfo.Config.Tty {
+		return reader, nil
+	}
+
+	return function.DockerCombinedStream(reader), nil
 }

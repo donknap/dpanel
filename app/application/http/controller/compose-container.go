@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -423,13 +422,7 @@ func (self Compose) ContainerLog(http *gin.Context) {
 	}()
 
 	wsBuffer.OnWrite = func(p string) error {
-		newReader := bytes.NewReader([]byte(p))
-		stdout, err := function.CombinedStdout(newReader)
-		if err != nil {
-			wsBuffer.BroadcastMessage(p)
-		} else {
-			wsBuffer.BroadcastMessage(stdout.String())
-		}
+		wsBuffer.BroadcastMessage(p)
 		return nil
 	}
 	_, err = io.Copy(wsBuffer, response)
