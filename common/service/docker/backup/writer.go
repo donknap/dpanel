@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/mholt/archives"
 )
 
@@ -76,7 +77,7 @@ func (self writer) WriteBlobReader(sha256 string, reader io.ReadCloser) (path st
 	if err != nil {
 		return path, err
 	}
-	tempFile, err = os.OpenFile(filepath.Join(filepath.Dir(self.file.Name()), fmt.Sprintf("%s.%s.temp", filepath.Base(self.file.Name()), filepath.Base(path))), os.O_CREATE|os.O_RDWR, 0o644)
+	tempFile, err = storage.Local{}.CreateTempFile(fmt.Sprintf("%s.%s.temp", filepath.Base(self.file.Name()), filepath.Base(path)))
 	if err != nil {
 		return path, err
 	}
@@ -128,7 +129,7 @@ func (self writer) WriteBlobFiles(sha256 string, files []archives.FileInfo) (pat
 	if err != nil {
 		return path, err
 	}
-	tempFile, err = os.OpenFile(filepath.Join(filepath.Dir(self.file.Name()), fmt.Sprintf("%s.%s.temp", filepath.Base(self.file.Name()), filepath.Base(path))), os.O_CREATE|os.O_RDWR, 0o644)
+	tempFile, err = storage.Local{}.CreateTempFile(fmt.Sprintf("%s.%s.temp", filepath.Base(self.file.Name()), filepath.Base(path)))
 	if err != nil {
 		return path, err
 	}

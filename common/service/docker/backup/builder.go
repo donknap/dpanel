@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"io/fs"
 	"log/slog"
 
 	"github.com/docker/docker/api/types"
@@ -63,10 +64,18 @@ func (self Builder) Close() (err error) {
 }
 
 type Manifest struct {
-	Config  string   `json:"config"`
-	Image   string   `json:"image"`
-	Volume  []string `json:"volume"`
-	Network []string `json:"network"`
+	Config     string               `json:"config"`
+	Image      string               `json:"image"`
+	Volume     []string             `json:"volume"` // Deprecated: instead VolumeList
+	Network    []string             `json:"network"`
+	VolumeList []ManifestVolumeInfo `json:"volumeList"`
+}
+
+type ManifestVolumeInfo struct {
+	Destination string      `json:"destination"`
+	Source      string      `json:"source"`
+	SavePath    string      `json:"savePath"`
+	Mode        fs.FileMode `json:"type"` // file dir
 }
 
 type Info struct {

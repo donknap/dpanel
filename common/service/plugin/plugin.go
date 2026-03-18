@@ -228,7 +228,7 @@ func (self *Plugin) Close() error {
 
 		function.Wait(self.dockerSdk.Ctx, containerInfo.ID, func(v string) bool {
 			if _, err = self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, v); err != nil {
-				fmt.Printf("delete explorer  %v \n", v)
+				slog.Debug("plugin delete explorer", "id", containerInfo.Name)
 				return true
 			}
 			return false

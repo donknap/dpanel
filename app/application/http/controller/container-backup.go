@@ -12,10 +12,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
-	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -68,7 +68,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		ContainerID: params.Id,
 		Setting: &accessor.BackupSettingOption{
 			BackupTargetType: define.DockerContainerBackupTypeSnapshot,
-			BackupTar:        backupRelTar,
+			BackupTar:        filepath.ToSlash(backupRelTar),
 			VolumePathList:   make([]string, 0),
 			Status:           define.DockerImageBuildStatusProcess,
 		},
@@ -92,7 +92,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 	go func() {
 		select {
 		case <-progress.Done():
-			_ = notice.Message{}.Info(".containerBackupFinish", "name", containerInfo.Name)
+			_ = notice.Message{}.Info(".containerBackupFinish", "name", strings.TrimLeft(containerInfo.Name, "/"))
 			if closeErr := b.Close(); closeErr != nil {
 				backupRow.Setting.Status = define.DockerImageBuildStatusError
 				backupRow.Setting.Error = closeErr.Error()
@@ -109,7 +109,8 @@ func (self ContainerBackup) Create(http *gin.Context) {
 	}
 
 	manifest := make([]backup.Manifest, 0)
-	err = func() error {
+	createErr := func() error {
+		var err error
 		item := backup.Manifest{}
 		if params.EnableBackupImage {
 			imageId := containerInfo.Image
@@ -159,20 +160,38 @@ func (self ContainerBackup) Create(http *gin.Context) {
 					if !function.IsEmptyArray(params.BackupVolumeList) && !function.InArray(params.BackupVolumeList, mount.Destination) {
 						continue
 					}
-					backupRow.Setting.VolumePathList = append(backupRow.Setting.VolumePathList, mount.Destination)
+					stat, err := docker.Sdk.Client.ContainerStatPath(progress.Context(), params.Id, mount.Destination)
+					if err != nil {
+						return err
+					}
 
 					out, info, err := docker.Sdk.Client.CopyFromContainer(progress.Context(), params.Id, mount.Destination)
 					if err != nil {
 						return err
 					}
+
 					if info.Size > 0 {
-						path, err := b.Writer.WriteBlobReader(function.Sha256([]byte(mount.Destination)), out)
+						savePath, err := b.Writer.WriteBlobReader(function.Sha256([]byte(mount.Destination)), out)
 						if err != nil {
 							return err
 						}
-						item.Volume = append(item.Volume, path)
+						item.VolumeList = append(item.VolumeList, backup.ManifestVolumeInfo{
+							SavePath:    savePath,
+							Destination: mount.Destination,
+							Source:      mount.Source,
+							Mode:        stat.Mode,
+						})
+						item.Volume = append(item.Volume, savePath)
 					}
+
+					backupRow.Setting.VolumePathList = append(backupRow.Setting.VolumePathList, mount.Destination)
 				}
+				sort.Slice(item.VolumeList, func(i, j int) bool {
+					if item.VolumeList[i].Mode.IsDir() != item.VolumeList[j].Mode.IsDir() {
+						return !item.VolumeList[i].Mode.IsDir()
+					}
+					return item.VolumeList[i].Source < item.VolumeList[j].Source
+				})
 			}
 		}
 
@@ -198,8 +217,8 @@ func (self ContainerBackup) Create(http *gin.Context) {
 	}()
 
 	backupRow.Setting.Status = define.DockerImageBuildStatusError
-	if err != nil {
-		backupRow.Setting.Error = err.Error()
+	if createErr != nil {
+		backupRow.Setting.Error = createErr.Error()
 	} else {
 		err = b.Writer.WriteConfigFile("manifest.json", manifest)
 		if err != nil {
@@ -217,6 +236,10 @@ func (self ContainerBackup) Create(http *gin.Context) {
 	err = b.Writer.WriteConfigFile("info.json", info)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if createErr != nil {
+		self.JsonResponseWithError(http, createErr, 500)
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{
@@ -419,37 +442,56 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			runContainer = true
 		}
 
-		if !function.IsEmptyArray(item.Volume) {
-			func() {
-				ctx, ctxCancel := context.WithCancel(docker.Sdk.Ctx)
-				defer ctxCancel()
-
-				proxyContainerName, err := plugin.NewHostExplorer(ctx, docker.Sdk)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
+		// 兼容旧的数据
+		if !function.IsEmptyArray(item.Volume) && function.IsEmptyArray(item.VolumeList) {
+			item.VolumeList = function.PluckArrayWalk(item.Volume, func(volume string) (backup.ManifestVolumeInfo, bool) {
+				mount, _, ok := function.PluckArrayItemWalk(containerInfo.Mounts, func(item container.MountPoint) bool {
+					return strings.HasSuffix(function.Sha256([]byte(item.Destination)), path.Base(volume))
+				})
+				if !ok {
+					return backup.ManifestVolumeInfo{}, false
 				}
-				for _, volume := range item.Volume {
+				return backup.ManifestVolumeInfo{
+					Destination: mount.Destination,
+					Source:      mount.Source,
+					SavePath:    volume,
+					Mode:        os.ModeDir,
+				}, true
+			})
+		}
+
+		if !function.IsEmptyArray(item.VolumeList) {
+			func() {
+				var proxyContainerName string
+
+				// 仅当有挂载文件的时候才新建文件管理助手
+				if _, _, ok := function.PluckArrayItemWalk(item.VolumeList, func(item backup.ManifestVolumeInfo) bool {
+					return item.Mode.IsRegular()
+				}); ok {
+					ctx, ctxCancel := context.WithCancel(docker.Sdk.Ctx)
+					defer ctxCancel()
+					proxyContainerName, err = plugin.NewHostExplorer(ctx, docker.Sdk)
+					if err != nil {
+						self.JsonResponseWithError(http, err, 500)
+						return
+					}
+				}
+
+				for _, volume := range item.VolumeList {
 					targetImportContainerName := newContainerName
 					targetImportPath := "/"
-					// 找到对应的备份数据
-					if v, _, ok := function.PluckArrayItemWalk(containerInfo.Mounts, func(mount container.MountPoint) bool {
-						if strings.HasSuffix(function.Sha256([]byte(mount.Destination)), path.Base(volume)) {
-							return true
-						}
-						return false
-					}); ok {
-						// 导出的数据是按最后一个目录或是文件名存放，所以需要脱一级目录做为根目录
-						if v.Type == types.VolumeTypeBind {
-							targetImportPath = path.Join("/", "mnt", "host", path.Dir(v.Source))
-							targetImportContainerName = proxyContainerName
-						} else {
-							targetImportPath = path.Dir(v.Destination)
-							targetImportContainerName = newContainerName
-						}
+
+					// 因为从 docker 导出目录的时候，不会存储一级目录，而是从二级目录开始。
+					// 例如 docker cp caddy:/etc/caddy/ . 只会保存 caddy 目录，那么这里恢复的时候，也需要脱去一层目录
+					if volume.Mode.IsRegular() {
+						targetImportPath = path.Join("/", "mnt", "host", path.Dir(volume.Source))
+						targetImportContainerName = proxyContainerName
+					} else {
+						targetImportPath = path.Dir(volume.Destination)
+						targetImportContainerName = newContainerName
 					}
 
-					reader, _ := b.Reader.ReadBlobs(volume)
+					reader, _ := b.Reader.ReadBlobs(volume.SavePath)
 					gzReader, _ := gzip.NewReader(reader)
 					tarReader := tar.NewReader(gzReader)
 					if importFiles, err := imports.NewFileImport(targetImportPath, imports.WithImportTar(tarReader)); err == nil {

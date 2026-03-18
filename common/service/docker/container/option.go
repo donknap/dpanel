@@ -35,6 +35,10 @@ func WithContainerName(name string) Option {
 	return func(self *Builder) error {
 		self.containerConfig.Hostname = name
 		self.containerName = name
+		// 恢复一些默认值
+		self.hostConfig.NetworkMode = network.NetworkDefault
+		self.hostConfig.PidMode = ""
+
 		//  防止退出
 		self.containerConfig.AttachStdin = true
 		self.containerConfig.AttachStdout = true
