@@ -23,7 +23,7 @@ jobs:
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
           else
             echo "📦 Stable release detected. Using tag $TAG for version."
-            echo "version_param=VERSION=$TAG" >> $GITHUB_OUTPUT
+            echo "version_param=APP_VERSION=$TAG" >> $GITHUB_OUTPUT
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
 
