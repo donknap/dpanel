@@ -116,7 +116,10 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		importFileList, err := imports.NewFileImport(path.Join("/dpanel", filepath.ToSlash(rel)), imports.WithImportPath(tasker.Project.WorkingDir))
+		importRootPath := path.Join("/dpanel", filepath.ToSlash(rel))
+		slog.Debug("compose container sync path", "path", importRootPath)
+
+		importFileList, err := imports.NewFileImport(importRootPath, imports.WithImportPath(tasker.Project.WorkingDir))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
