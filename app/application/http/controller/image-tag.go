@@ -13,10 +13,10 @@ import (
 	"github.com/donknap/dpanel/app/application/logic/task"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
+	"github.com/we7coreteam/registry-go-sdk"
 )
 
 func (self Image) TagSync(http *gin.Context) {
@@ -47,7 +47,7 @@ func (self Image) TagSync(http *gin.Context) {
 			if !function.IpIsLocalhost(s) {
 				reg := registry.New(
 					registry.WithAddress(s),
-					registry.WithCredentialsWithBasic(registryConfig.Config.Username, registryConfig.Config.Password),
+					registry.WithCredentials(registryConfig.Credential()),
 				)
 				if err = reg.Client().Ping(); err != nil {
 					slog.Debug("image remote select registry url", "error", err)
@@ -55,7 +55,7 @@ func (self Image) TagSync(http *gin.Context) {
 				}
 			}
 			pullOption := image.PullOptions{
-				RegistryAuth: registryConfig.GetAuthString(),
+				RegistryAuth: registryConfig.AuthString(),
 			}
 			if params.Platform != "" {
 				pullOption.Platform = params.Platform
@@ -69,7 +69,7 @@ func (self Image) TagSync(http *gin.Context) {
 			// 自建仓库不需要添加 library
 			// 即使推送 hub 镜像，library 命名空间属于官方空间，也不应该添加
 			out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, params.Tag, image.PushOptions{
-				RegistryAuth: registryConfig.GetAuthString(),
+				RegistryAuth: registryConfig.AuthString(),
 			})
 		}
 		if err == nil {
@@ -189,7 +189,7 @@ func (self Image) TagPushBatch(http *gin.Context) {
 	for _, address := range params.RegistryServerAddress {
 		registryConfig := logic.Image{}.GetRegistryConfig(address)
 		imagePushOption := image.PushOptions{
-			RegistryAuth: registryConfig.GetAuthString(),
+			RegistryAuth: registryConfig.AuthString(),
 		}
 		for _, md5 := range params.Md5 {
 			imageDetail, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, md5)

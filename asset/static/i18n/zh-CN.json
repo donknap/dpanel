@@ -1557,7 +1557,7 @@
   "system.home.overview.basicDockerTitleSystemTime": "系统时间",
   "system.home.overview.basicDockerTitleSystemVersion": "系统架构",
   "system.home.overview.basicDockerTitleVersion": "Docker 版本",
-  "system.home.overview.basicDPanelTitleUpgradeInfo": "面板更新日志",
+  "system.home.overview.basicDPanelTitleUpgradeInfo": "面板更新日志: v{version}",
   "system.home.overview.basicDPanelTitleVersion": "面板信息",
   "system.home.overview.basicEnvSettingDefaultEnv": "编辑当前连接配置",
   "system.home.overview.basicInfo": "",

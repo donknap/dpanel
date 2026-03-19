@@ -38,6 +38,9 @@ func WithContainerName(name string) Option {
 		// 恢复一些默认值
 		self.hostConfig.NetworkMode = network.NetworkDefault
 		self.hostConfig.PidMode = ""
+		self.hostConfig.ExtraHosts = []string{
+			"host.dpanel.local:host-gateway",
+		}
 
 		//  防止退出
 		self.containerConfig.AttachStdin = true
@@ -405,8 +408,9 @@ func WithLabel(item ...types.ValueItem) Option {
 
 func WithExtraHosts(item ...types.ValueItem) Option {
 	return func(self *Builder) error {
-		self.hostConfig.ExtraHosts = make([]string, 0)
-
+		if self.hostConfig.ExtraHosts == nil {
+			self.hostConfig.ExtraHosts = make([]string, 0)
+		}
 		for _, valueItem := range item {
 			host := fmt.Sprintf("%s:%s", valueItem.Name, valueItem.Value)
 			if !function.InArray(self.hostConfig.ExtraHosts, host) {

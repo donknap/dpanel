@@ -127,7 +127,7 @@ func (self ImageBuild) Create(http *gin.Context) {
 				for _, tag := range params.ImageSettingOption.Tags {
 					pushOption := image.PushOptions{}
 					if v := (logic.Image{}).GetRegistryConfig(tag.Registry); v != nil {
-						pushOption.RegistryAuth = v.GetAuthString()
+						pushOption.RegistryAuth = v.AuthString()
 					}
 					reader, err := docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, tag.Uri(), pushOption)
 					if err != nil {

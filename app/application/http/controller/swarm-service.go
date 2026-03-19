@@ -120,8 +120,8 @@ func (self Swarm) ServiceScaling(http *gin.Context) {
 	if serviceInfo.Spec.Labels != nil {
 		if v, ok := serviceInfo.Spec.Labels[define.SwarmLabelServiceImageRegistry]; ok {
 			registryConfig := logic.Image{}.GetRegistryConfig(v)
-			if registryConfig != nil && registryConfig.GetAuthString() != "" {
-				updateOptions.EncodedRegistryAuth = registryConfig.GetAuthString()
+			if registryConfig != nil && registryConfig.AuthString() != "" {
+				updateOptions.EncodedRegistryAuth = registryConfig.AuthString()
 			}
 		}
 	}
@@ -200,7 +200,7 @@ func (self Swarm) ServiceCreate(http *gin.Context) {
 	if buildParams.ImageRegistry > 0 {
 		if registryInfo, err := dao.Registry.Where(dao.Registry.ID.Eq(buildParams.ImageRegistry)).First(); err == nil {
 			registryConfig := logic.Image{}.GetRegistryConfig(registryInfo.ServerAddress)
-			options = append(options, swarm2.WithRegistryAuth(registryConfig.GetAuthString()))
+			options = append(options, swarm2.WithRegistryAuth(registryConfig.AuthString()))
 			options = append(options, swarm2.WithLabel(types.ValueItem{
 				Name:  define.SwarmLabelServiceImageRegistry,
 				Value: registryInfo.ServerAddress,

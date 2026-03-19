@@ -7,3 +7,7 @@ const (
 	PanelAppEnvLite     = "lite"
 	PanelAppEnvStandard = "production"
 )
+
+const (
+	PanelLabelVersion = "com.dpanel.version"
+)

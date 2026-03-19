@@ -211,13 +211,18 @@ func WithOutputImage(push bool, compression string) Option {
 	}
 }
 
-func WithRegistryAuth(auth ...registry.AuthConfig) Option {
+func WithRegistryAuth(auth ...string) Option {
 	return func(self *Builder) error {
-		for _, config := range auth {
-			if ok := function.InArrayWalk(self.options.RegistryAuth, func(item registry.AuthConfig) bool {
-				return item.ServerAddress == config.ServerAddress
+		for _, authStr := range auth {
+			authConfig, err := registry.DecodeAuthConfig(authStr)
+			if err != nil {
+				slog.Warn("buildx with registry auth", "auth", authStr, "error", err)
+				continue
+			}
+			if ok := function.InArrayWalk(self.options.RegistryAuth, func(item *registry.AuthConfig) bool {
+				return item.ServerAddress == authConfig.ServerAddress
 			}); !ok {
-				self.options.RegistryAuth = append(self.options.RegistryAuth, config)
+				self.options.RegistryAuth = append(self.options.RegistryAuth, authConfig)
 			}
 		}
 		return nil

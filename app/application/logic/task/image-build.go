@@ -48,7 +48,7 @@ func (self Docker) ImageBuildX(messageId string, task accessor.ImageSettingOptio
 		}
 		hasTag = true
 		if v := (logic.Image{}).GetRegistryConfig(tag.Registry); v != nil {
-			options = append(options, buildx.WithRegistryAuth(v.Config))
+			options = append(options, buildx.WithRegistryAuth(v.AuthString()))
 		}
 		options = append(options, buildx.WithTag(tag.Target, tag.Uri()))
 	}

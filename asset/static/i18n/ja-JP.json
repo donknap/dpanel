@@ -1557,7 +1557,7 @@
   "system.home.overview.basicDockerTitleSystemTime": "時刻",
   "system.home.overview.basicDockerTitleSystemVersion": "OSアーキ",
   "system.home.overview.basicDockerTitleVersion": "Engine",
-  "system.home.overview.basicDPanelTitleUpgradeInfo": "更新ログ",
+  "system.home.overview.basicDPanelTitleUpgradeInfo": "更新ログ: v{version}",
   "system.home.overview.basicDPanelTitleVersion": "DPanel Ver",
   "system.home.overview.basicEnvSettingDefaultEnv": "デフォルト設定",
   "system.home.overview.basicInfo": "",

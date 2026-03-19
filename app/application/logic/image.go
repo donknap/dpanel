@@ -2,18 +2,43 @@ package logic
 
 import (
 	"fmt"
+	"log/slog"
 
+	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	registry2 "github.com/donknap/dpanel/common/service/docker/registry"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/we7coreteam/registry-go-sdk/types"
 )
+
+type Registry struct {
+	config  registry.AuthConfig
+	Address []string
+}
+
+// AuthString Docker pull/push 权限
+func (self Registry) AuthString() string {
+	authString, err := registry.EncodeAuthConfig(self.config)
+	if err != nil {
+		slog.Debug("get registry auth string", err.Error())
+		return ""
+	}
+	return authString
+}
+
+// Credential registry 仓库权限
+func (self Registry) Credential() types.Credential {
+	return types.Credential{
+		AccessKey:    self.config.Username,
+		AccessSecret: self.config.Password,
+	}
+}
 
 type Image struct {
 }
 
-func (self Image) GetRegistryConfig(registryUrl string) *registry2.Registry {
+func (self Image) GetRegistryConfig(registryUrl string) *Registry {
 	if docker.Sdk.Client != nil && registryUrl == define.RegistryDefaultName {
 		// 获取 docker 配置中的加速地址
 		// 暂时注释掉，直接取 daemon.json 的镜像地址问题太多
@@ -21,37 +46,37 @@ func (self Image) GetRegistryConfig(registryUrl string) *registry2.Registry {
 		//	result.Proxy = dockerInfo.RegistryConfig.Mirrors
 		//}
 	}
-	registryRow, err := dao.Registry.Where(dao.Registry.ServerAddress.Eq(registryUrl)).First()
-	if err != nil || registryRow == nil || registryRow.Setting == nil {
-		return registry2.NewRegistry(
-			registry2.WithHost(registryUrl),
-			registry2.WithAddress(registryUrl),
-		)
+	result := &Registry{
+		Address: make([]string, 0),
+		config: registry.AuthConfig{
+			ServerAddress: registryUrl,
+		},
 	}
 
-	proxy := make([]string, 0)
+	registryRow, err := dao.Registry.Where(dao.Registry.ServerAddress.Eq(registryUrl)).First()
+	if err != nil || registryRow == nil || registryRow.Setting == nil {
+		result.Address = append(result.Address, registryUrl)
+		return result
+	}
+
 	if registryRow.Setting.EnableHttp {
-		proxy = append(proxy, fmt.Sprintf("http://"+registryRow.ServerAddress))
+		result.Address = append(result.Address, fmt.Sprintf("http://"+registryRow.ServerAddress))
 	}
 
 	if !function.IsEmptyArray(registryRow.Setting.Proxy) {
-		proxy = append(proxy, registryRow.Setting.Proxy...)
+		result.Address = append(result.Address, registryRow.Setting.Proxy...)
 	}
 
-	if !function.InArray(proxy, registryUrl) {
-		proxy = append(proxy, registryUrl)
-	}
-
-	option := []registry2.Option{
-		registry2.WithAddress(proxy...),
-		registry2.WithHost(registryUrl),
+	if !function.InArray(result.Address, registryUrl) {
+		result.Address = append(result.Address, registryUrl)
 	}
 
 	if registryRow.Setting != nil {
 		if username, password, ok := registryRow.Setting.Auth(); ok {
-			option = append(option, registry2.WithBasicAuth(username, password))
+			result.config.Username = username
+			result.config.Password = password
 		}
 	}
 
-	return registry2.NewRegistry(option...)
+	return result
 }

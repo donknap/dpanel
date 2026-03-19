@@ -31,7 +31,6 @@ import (
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
-	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
@@ -39,6 +38,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/mcuadros/go-version"
+	"github.com/we7coreteam/registry-go-sdk"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	ssh2 "golang.org/x/crypto/ssh"
@@ -382,7 +382,7 @@ func (self Home) Info(http *gin.Context) {
 		"clientVersion": docker.Sdk.Client.ClientVersion(),
 		"sdkVersion":    api.DefaultVersion,
 		"dpanel": map[string]interface{}{
-			"version":       DPanelVersion,
+			"version":       facade.GetConfig().GetString("app.version"),
 			"family":        facade.GetConfig().GetString("app.family"),
 			"env":           facade.GetConfig().GetString("app.env"),
 			"containerInfo": containerInfo,
@@ -398,17 +398,23 @@ func (self Home) Info(http *gin.Context) {
 }
 
 func (self Home) CheckNewVersion(http *gin.Context) {
-	var tags []string
 	currentVersion := facade.GetConfig().GetString("app.version")
 	newVersion := ""
-
+	reference := "latest"
+	if strings.Index(currentVersion, ".") == 8 {
+		reference = "beta"
+	}
 	option := make([]registry.Option, 0)
-	option = append(option, registry.WithAddress("registry.cn-hangzhou.aliyuncs.com"))
+	option = append(option, registry.WithAddress("registry.cn-hangzhou.aliyuncs.com", registry.RegistryDefaultHost))
 	reg := registry.New(option...)
-	tags, _ = reg.Client().ListTags("dpanel/dpanel")
-	for _, ver := range tags {
-		if !strings.Contains(ver, "-") && version.Compare(ver, currentVersion, ">") {
-			newVersion = ver
+	if manifest, _, err := reg.Client().PullManifest("dpanel/dpanel", reference); err == nil {
+		for _, descriptor := range manifest.References() {
+			if ver, ok := descriptor.Annotations[define.PanelLabelVersion]; ok {
+				if version.Compare(ver, currentVersion, ">") {
+					newVersion = ver
+				}
+				break
+			}
 		}
 	}
 

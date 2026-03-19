@@ -1557,7 +1557,7 @@
   "system.home.overview.basicDockerTitleSystemTime": "Time",
   "system.home.overview.basicDockerTitleSystemVersion": "OS",
   "system.home.overview.basicDockerTitleVersion": "Engine",
-  "system.home.overview.basicDPanelTitleUpgradeInfo": "Update Logs",
+  "system.home.overview.basicDPanelTitleUpgradeInfo": "Update Logs: v{version}",
   "system.home.overview.basicDPanelTitleVersion": "DPanel Version",
   "system.home.overview.basicEnvSettingDefaultEnv": "Set Default Server",
   "system.home.overview.basicInfo": "",

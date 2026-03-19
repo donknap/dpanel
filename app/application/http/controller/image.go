@@ -27,12 +27,12 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/registry"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
+	"github.com/we7coreteam/registry-go-sdk"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
@@ -552,7 +552,7 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Registry)
 
 	option := make([]registry.Option, 0)
-	option = append(option, registry.WithCredentialsWithBasic(registryConfig.Config.Username, registryConfig.Config.Password))
+	option = append(option, registry.WithCredentials(registryConfig.Credential()))
 	option = append(option, registry.WithAddress(registryConfig.Address...))
 	reg := registry.New(option...)
 	if ok, desc, err := reg.Client().ManifestExist(imageNameDetail.BaseName, imageNameDetail.Version); err == nil && ok {

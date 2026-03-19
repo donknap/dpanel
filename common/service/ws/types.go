@@ -39,6 +39,18 @@ type RespMessage struct {
 }
 
 func (self RespMessage) ToJson() []byte {
+	// 防止传递的值是指针，发广播时数据发生变生产生 panic
+	// 先复制成副本再操作
+	if self.Data != nil {
+		switch v := self.Data.(type) {
+		case json.RawMessage, string, int, int64, float64, bool:
+			break
+		default:
+			if b, err := json.Marshal(v); err == nil {
+				self.Data = json.RawMessage(b)
+			}
+		}
+	}
 	jsonStr, _ := json.Marshal(self)
 	return jsonStr
 }

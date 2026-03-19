@@ -27,7 +27,7 @@ func New(ctx context.Context, client *docker.Client, opts ...Option) (*Builder, 
 		options: &BuildOptions{
 			Labels:       make([]string, 0),
 			Name:         fmt.Sprintf(define.DockerContextName, client.DockerEnv.Name),
-			RegistryAuth: make([]registry.AuthConfig, 0),
+			RegistryAuth: make([]*registry.AuthConfig, 0),
 		},
 	}
 
@@ -84,7 +84,7 @@ func (self Builder) Execute() (exec.Executor, error) {
 
 type BuildOptions struct {
 	Name         string // 自动生成的临时名称
-	RegistryAuth []registry.AuthConfig
+	RegistryAuth []*registry.AuthConfig
 	WorkDir      string // 构建上下文路径 (即最后的 .)
 
 	Annotation []string // --annotation: 为镜像添加 OCI 注解
