@@ -44,7 +44,7 @@ func IpIsLocalhost(address string) bool {
 }
 
 func SystemResolver(defaultDnsIps ...string) []string {
-	var resolvers = make([]string, 0)
+	resolvers := make([]string, 0, 3)
 	file, err := os.Open("/etc/resolv.conf")
 	if err != nil {
 		return defaultDnsIps
@@ -54,14 +54,21 @@ func SystemResolver(defaultDnsIps ...string) []string {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "#") {
+		if !strings.HasPrefix(line, "nameserver") {
 			continue
 		}
-		if strings.HasPrefix(line, "nameserver") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				resolvers = append(resolvers, fields[1])
-			}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		rawIp := fields[1]
+		ip := net.ParseIP(rawIp)
+		if ip == nil {
+			continue
+		}
+		if ipv4 := ip.To4(); ipv4 != nil {
+			ipStr := ipv4.String()
+			resolvers = append(resolvers, ipStr)
 		}
 	}
 	if len(resolvers) == 0 {

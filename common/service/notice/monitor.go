@@ -138,9 +138,6 @@ func (self *monitor) listen(c *client) {
 			slog.Debug("monitor client not found or updated", "name", c.dockerEnv.Name, "error", initErr)
 			c.Close()
 			return
-		} else {
-			oldClient := v.(*client)
-			fmt.Printf("listen %v \n", oldClient.createdAt.Format(define.DateShowYmdHis))
 		}
 
 		slog.Debug("monitor start", "name", c.dockerEnv, "error", initErr)

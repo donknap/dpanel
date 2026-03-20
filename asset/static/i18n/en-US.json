@@ -283,6 +283,7 @@
   "components.appDomain.createFormTypeOption.proxy": "Reverse Proxy",
   "components.appDomain.createFormTypeOption.redirect": "Redirect",
   "components.appDomain.createSelectContainer": "Select Container",
+  "components.appDomain.createSelectContainerDisabledTip": "When using host networking (--network host), forwarding is only supported via IP:Port",
   "components.appDomain.createTitle": "Edit Forwarding Rule",
   "components.appDomain.createTriggerButton": "Add Proxy",
   "components.appDomain.createUser": "Custom",

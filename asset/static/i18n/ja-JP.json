@@ -283,6 +283,7 @@
   "components.appDomain.createFormTypeOption.proxy": "リバースプロキシ",
   "components.appDomain.createFormTypeOption.redirect": "リダイレクト",
   "components.appDomain.createSelectContainer": "コンテナ選択",
+  "components.appDomain.createSelectContainerDisabledTip": "ホストネットワーク (--network host) 使用時は、IP:Port 形式による転送のみサポートされます",
   "components.appDomain.createTitle": "ルール編集",
   "components.appDomain.createTriggerButton": "プロキシ追加",
   "components.appDomain.createUser": "カスタム",

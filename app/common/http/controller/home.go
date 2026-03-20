@@ -361,6 +361,9 @@ func (self Home) Info(http *gin.Context) {
 		containerInfo = gin.H{
 			"Id":   dpanelInfo.ContainerInfo.ID,
 			"Name": dpanelInfo.ContainerInfo.Name,
+			"HostConfig": gin.H{
+				"NetworkMode": dpanelInfo.ContainerInfo.HostConfig.NetworkMode,
+			},
 		}
 	}
 

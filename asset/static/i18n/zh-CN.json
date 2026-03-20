@@ -283,6 +283,7 @@
   "components.appDomain.createFormTypeOption.proxy": "反向代理",
   "components.appDomain.createFormTypeOption.redirect": "重定向",
   "components.appDomain.createSelectContainer": "选择容器",
+  "components.appDomain.createSelectContainerDisabledTip": "使用宿主机网络模式 (--network host) 时，仅支持通过 IP:Port 方式进行转发",
   "components.appDomain.createTitle": "编辑转发规则",
   "components.appDomain.createTriggerButton": "添加域名转发",
   "components.appDomain.createUser": "自定义",
