@@ -68,7 +68,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		return
 	}
 	// 连接成功后，并且判断一下是否是当前连接, 如果当前连接不通，就重置一下
-	if docker.Sdk.Name == e.DockerEnvName {
+	if docker.Sdk.Name == dockerEnv.Name {
 		if _, err := docker.Sdk.Client.Ping(docker.Sdk.Ctx); err != nil {
 			if v, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithSockProxy()); err == nil {
 				docker.Sdk = v
@@ -81,9 +81,11 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		})
 	}
 
-	if e.DockerEnvName != define.DockerDefaultClientName {
+	if dockerEnv.Name != define.DockerDefaultClientName {
 		return
 	}
+
+	slog.Debug("docker daemon/event update dpanel info", "name", facade.GetConfig().GetString("app.name"))
 
 	sdk, err := docker.NewClientWithDockerEnv(dockerEnv)
 	if err != nil {
@@ -92,17 +94,20 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 	defer func() {
 		sdk.Close()
 	}()
+
 	result := logic.Setting{}.GetDPanelInfo()
 	if result.Proxy != "" {
 		_ = os.Setenv("HTTP_PROXY", result.Proxy)
 		_ = os.Setenv("HTTPS_PROXY", result.Proxy)
 		slog.Info("init dpanel proxy", "url", result.Proxy)
 	}
+
 	if function.IsRunInDocker() {
 		result.RunIn = types2.DPanelRunInContainer
 	} else {
 		result.RunIn = types2.DPanelRunInHost
 	}
+
 	if dockerInfo, err := sdk.Client.Info(sdk.Ctx); err == nil {
 		dockerEnv.DockerInfo = &types.DockerInfo{
 			ID:              dockerInfo.ID,

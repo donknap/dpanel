@@ -10,8 +10,8 @@ const (
 )
 
 type DockerDaemonPayload struct {
-	DockerEnvName string
-	Status        types.DockerStatus
+	DockerEnvName string             `json:"dockerEnvName"`
+	Status        types.DockerStatus `json:"status"`
 }
 
 const (
