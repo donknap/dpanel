@@ -27,8 +27,8 @@ log:
     driver: console
     level: ${DP_LOG_CONSOLE_LEVEL-info}
 database:
-  default:
-    driver: sqlite
+  default1:
+    driver: mysql
     user_name: ${DB_USERNAME-root}
     password: ${DB_PASSWORD-123456}
     db_name: ${STORAGE_LOCAL_PATH}/dpanel.db
@@ -37,6 +37,15 @@ database:
     options:
       mode: ${DP_DB_MODE-rwc}
       _journal_mode: ${DP_DB_JOURNAL-DELETE} # WAL
+  default:
+    driver: mysql
+    user_name: ${MYSQL_USERNAME-root}
+    password: ${MYSQL_PASSWORD-123456}
+    host: ${MYSQL_ADDRESS-172.16.1.151}
+    port: 3306
+    db_name: ${MYSQL_DATABASE-dpanel}
+    charset: utf8mb4
+    prefix: ims_
 system:
   baseurl: ${DP_SYSTEM_BASEURL}
   storage:

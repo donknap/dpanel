@@ -135,6 +135,9 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 					Dest: v.Destination,
 					Type: string(v.Type),
 				}
+				if v.Type == types3.VolumeTypeVolume {
+					result.Mount.Host = v.Name
+				}
 			}
 			// 只有在容器才会包含 nginx 功能，如果有网络就自动中入，并重启 nginx
 			if _, err := sdk.Client.NetworkInspect(sdk.Ctx, define.DPanelProxyNetworkName, network.InspectOptions{}); err == nil {
