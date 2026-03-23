@@ -30,7 +30,6 @@ import (
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/family"
 	fs2 "github.com/donknap/dpanel/common/service/fs"
-	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-contrib/gzip"
@@ -333,10 +332,5 @@ func initDocker() error {
 			slog.Warn("init docker", "env", defaultDockerEnv, "error", err)
 		}
 	}()
-	dockerEnvList := make(map[string]*types.DockerEnv)
-	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDocker, &dockerEnvList)
-	for _, env := range dockerEnvList {
-		notice.Monitor.Join(env)
-	}
 	return nil
 }

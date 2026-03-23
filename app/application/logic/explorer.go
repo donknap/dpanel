@@ -71,10 +71,12 @@ func (self Explorer) Afs(dockerSdk *docker.Client, option AfsCreateOption) (*afe
 	default:
 		targetContainerName = mountTarget
 		dpanelInfo := logic.Setting{}.GetDPanelInfo()
-		pluginOption = plugin.CreateOption{
-			Volumes: []types.VolumeItem{
-				dpanelInfo.Mount,
-			},
+		if dpanelInfo.Mount.Host != "" {
+			pluginOption = plugin.CreateOption{
+				Volumes: []types.VolumeItem{
+					dpanelInfo.Mount,
+				},
+			}
 		}
 	}
 

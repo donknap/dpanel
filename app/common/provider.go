@@ -11,7 +11,9 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	common "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/service/crontab"
+	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/family"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/types"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
@@ -159,5 +161,12 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			}
 			_ = dao.Cron.Save(task)
 		}
+	}
+
+	// 启动全局的监控
+	dockerEnvList := make(map[string]*types2.DockerEnv)
+	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDocker, &dockerEnvList)
+	for _, env := range dockerEnvList {
+		notice.Monitor.Join(env)
 	}
 }

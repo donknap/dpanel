@@ -75,11 +75,7 @@ func (self Registry) Create(http *gin.Context) {
 		Email:         params.Email,
 	}
 	// 未设置用户名及密码时，这些匿名仓库不做登录操作，因为有可能无法访问
-	if !function.InArray([]string{
-		"docker.io",
-		"quay.io",
-		"ghcr.io",
-	}, params.ServerAddress) || params.Username != "" {
+	if params.Username != "" && params.Password != "" {
 		response, err = docker.Sdk.Client.RegistryLogin(docker.Sdk.Ctx, authConfig)
 	}
 
@@ -96,16 +92,18 @@ func (self Registry) Create(http *gin.Context) {
 		Title:         params.Title,
 		ServerAddress: params.ServerAddress,
 		Setting: &accessor.RegistrySettingOption{
-			Username:   params.Username,
 			Email:      params.Email,
 			Proxy:      params.Proxy,
-			Password:   "",
 			EnableHttp: params.EnableHttp,
 		},
 	}
-	if params.Password != "" {
-		code, _ := function.RSAEncode(params.Password)
-		registryNew.Setting.Password = code
+
+	if strings.Contains(response.Status, "Login Succeeded") {
+		if params.Password != "" {
+			code, _ := function.RSAEncode(params.Password)
+			registryNew.Setting.Password = code
+		}
+		registryNew.Setting.Username = params.Username
 	}
 
 	if params.Id <= 0 {

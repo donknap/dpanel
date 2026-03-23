@@ -102,12 +102,6 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		slog.Info("init dpanel proxy", "url", result.Proxy)
 	}
 
-	if function.IsRunInDocker() {
-		result.RunIn = types2.DPanelRunInContainer
-	} else {
-		result.RunIn = types2.DPanelRunInHost
-	}
-
 	if dockerInfo, err := sdk.Client.Info(sdk.Ctx); err == nil {
 		dockerEnv.DockerInfo = &types.DockerInfo{
 			ID:              dockerInfo.ID,
@@ -118,57 +112,65 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 			OperatingSystem: dockerInfo.OperatingSystem,
 			InDPanel:        true,
 		}
-		// 如果当前系统是属于 docker desktop 也强制标记为在容器中运行，因为无法读取宿主机的文件
-		if strings.Contains(dockerInfo.OperatingSystem, "Docker Desktop") {
-			result.RunIn = types2.DPanelRunInDockerDesktop
-		}
+
 		// 面板信息总是从默认环境中获取
 		dpanelContainerName := facade.GetConfig().GetString("app.name")
-		if info, err := sdk.Client.ContainerInspect(sdk.Ctx, dpanelContainerName); err == nil && function.IsRunInDocker() {
-			info.ExecIDs = make([]string, 0)
-			result.ContainerInfo = info
-			if v, _, ok := function.PluckArrayItemWalk(info.Mounts, func(item container.MountPoint) bool {
-				return item.Destination == "/dpanel"
-			}); ok {
-				result.Mount = types.VolumeItem{
-					Host: v.Source,
-					Dest: v.Destination,
-					Type: string(v.Type),
-				}
-				if v.Type == types3.VolumeTypeVolume {
-					result.Mount.Host = v.Name
-				}
-			}
-			// 只有在容器才会包含 nginx 功能，如果有网络就自动中入，并重启 nginx
-			if _, err := sdk.Client.NetworkInspect(sdk.Ctx, define.DPanelProxyNetworkName, network.InspectOptions{}); err == nil {
-				_ = sdk.Client.NetworkConnect(sdk.Ctx, define.DPanelProxyNetworkName, info.ID, &network.EndpointSettings{
-					Aliases: []string{
-						fmt.Sprintf(define.DPanelNetworkHostName, strings.Trim(info.Name, "/")),
-					},
-				})
-				var nginxErr error
-				var cmd exec.Executor
-				if facade.GetConfig().Get("app.env") == define.PanelAppEnvStandard {
-					err = logic2.Site{}.MakeNginxResolver()
-					if err != nil {
-						slog.Warn("init nginx make resolver", "error", err)
+		if function.IsRunInDocker() {
+			result.RunIn = types2.DPanelRunInContainer
+			if info, err := sdk.Client.ContainerInspect(sdk.Ctx, dpanelContainerName); err == nil {
+				info.ExecIDs = make([]string, 0)
+				result.ContainerInfo = info
+				if v, _, ok := function.PluckArrayItemWalk(info.Mounts, func(item container.MountPoint) bool {
+					return item.Destination == "/dpanel"
+				}); ok {
+					result.Mount = types.VolumeItem{
+						Host: v.Source,
+						Dest: v.Destination,
+						Type: string(v.Type),
 					}
-					_, nginxErr = local.QuickRun("nginx -s reload")
-					if nginxErr != nil {
-						// 尝试启动 nginx
-						if cmd, err = local.New(
-							local.WithCommandName("nginx"),
-							local.WithArgs("-g", "daemon on;"),
-						); err == nil {
-							nginxErr = cmd.Run()
-							if nginxErr != nil {
-								slog.Warn("init nginx make resolver", "error", nginxErr)
+					if v.Type == types3.VolumeTypeVolume {
+						result.Mount.Host = v.Name
+					}
+				}
+				// 只有在容器才会包含 nginx 功能，如果有网络就自动中入，并重启 nginx
+				if _, err := sdk.Client.NetworkInspect(sdk.Ctx, define.DPanelProxyNetworkName, network.InspectOptions{}); err == nil {
+					_ = sdk.Client.NetworkConnect(sdk.Ctx, define.DPanelProxyNetworkName, info.ID, &network.EndpointSettings{
+						Aliases: []string{
+							fmt.Sprintf(define.DPanelNetworkHostName, strings.Trim(info.Name, "/")),
+						},
+					})
+					var nginxErr error
+					var cmd exec.Executor
+					if facade.GetConfig().Get("app.env") == define.PanelAppEnvStandard {
+						err = logic2.Site{}.MakeNginxResolver()
+						if err != nil {
+							slog.Warn("init nginx make resolver", "error", err)
+						}
+						_, nginxErr = local.QuickRun("nginx -s reload")
+						if nginxErr != nil {
+							// 尝试启动 nginx
+							if cmd, err = local.New(
+								local.WithCommandName("nginx"),
+								local.WithArgs("-g", "daemon on;"),
+							); err == nil {
+								nginxErr = cmd.Run()
+								if nginxErr != nil {
+									slog.Warn("init nginx make resolver", "error", nginxErr)
+								}
 							}
 						}
 					}
 				}
+			} else {
+				slog.Warn("docker daemon/event get dpanel container info", "error", err)
+				// 如果在容器中找不到 dpanel 容器则后续不会挂载 dpanel 目录
+				dockerEnv.DockerInfo.InDPanel = false
+				result.ContainerInfo = container.InspectResponse{}
+				result.Mount = types.VolumeItem{}
 			}
 		} else {
+			result.RunIn = types2.DPanelRunInHost
+			// 如果是二进制运行，则挂载数据存储目录
 			// 如果在 windows 默认是远程 docker 那么需要转换一个安全路径
 			// 否则保持原样就可以了
 			result.Mount = types.VolumeItem{
@@ -181,11 +183,8 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 					result.Mount.Host = v
 				}
 			}
-
-			dockerEnv.DockerInfo.InDPanel = false
-			result.ContainerInfo = container.InspectResponse{}
-			slog.Warn("init dpanel info", "name", facade.GetConfig().GetString("app.name"), "error", err)
 		}
+		slog.Debug("docker daemon/event init dpanel info", "info", result)
 		_ = logic.Setting{}.Save(&entity.Setting{
 			GroupName: logic.SettingGroupSetting,
 			Name:      logic.SettingGroupSettingDPanelInfo,

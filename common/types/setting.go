@@ -6,9 +6,8 @@ import (
 )
 
 const (
-	DPanelRunInContainer     = "container" // 在容器中运行
-	DPanelRunInHost          = "host"      // 在宿主机运行
-	DPanelRunInDockerDesktop = "dockerDesktop"
+	DPanelRunInContainer = "container" // 在容器中运行
+	DPanelRunInHost      = "host"      // 在宿主机运行
 )
 
 type DPanelInfo struct {

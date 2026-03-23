@@ -67,7 +67,7 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 	if err != nil {
 		return nil, err
 	}
-
+	slog.Debug("plugin parse yaml result", "yaml", buffer.String())
 	p.composeTask, _, err = compose.NewCompose(compose.WithYamlContent(buffer.String()))
 	if err != nil {
 		return nil, err

@@ -328,7 +328,7 @@ func (self Site) GetDetail(http *gin.Context) {
 		_ = dao.Site.Save(siteRow)
 	}
 
-	if siteRow.ContainerInfo != nil && siteRow.ContainerInfo.Info.Config.Image != "" {
+	if siteRow.ContainerInfo != nil && siteRow.ContainerInfo.Info.Config != nil && siteRow.ContainerInfo.Info.Config.Image != "" {
 		imageNameDetail := function.ImageTag(siteRow.ContainerInfo.Info.Config.Image)
 		siteRow.ContainerInfo.Info.Config.Image = imageNameDetail.Uri()
 	}
@@ -365,7 +365,7 @@ func (self Site) Restore(http *gin.Context) {
 	}
 
 	siteRow, err := dao.Site.Unscoped().Where(dao.Site.SiteName.Eq(params.Name)).Last()
-	if err != nil || siteRow.ContainerInfo == nil || siteRow.ContainerInfo.Info.Name == "" {
+	if err != nil || siteRow.ContainerInfo == nil || siteRow.ContainerInfo.Info.ContainerJSONBase == nil || siteRow.ContainerInfo.Info.Name == "" {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}

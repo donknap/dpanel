@@ -184,12 +184,13 @@ func (self *monitor) listen(c *client) {
 					}
 				}
 				if !ok {
+					slog.Debug("monitor closed by message event chan", "name", c.dockerEnv.Name)
 					break eventLoop
 				}
 				self.processor(c.dockerEnv.Name, message)
 			case err, ok := <-errChan:
 				if !ok {
-					slog.Warn("monitor error", "name", c.dockerEnv.Name, "error", err)
+					slog.Debug("monitor closed by error event chan", "name", c.dockerEnv.Name, "error", err)
 					break eventLoop
 				}
 			}
