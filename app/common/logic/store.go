@@ -47,7 +47,7 @@ func (self Store) SyncByGit(gitUrl string, option SyncByGitOption) error {
 		gitUrl = b
 		branch = a
 	} else {
-		branch = "master"
+		branch = ""
 	}
 
 	// 先创建一个临时目录，下载完成后再同步数据，否则失败时原先的数据会被删除
