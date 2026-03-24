@@ -73,7 +73,11 @@ func WithServerInfo(info *ServerInfo) []Option {
 	option := make([]Option, 0)
 	option = append(option, WithAddress(info.Address, info.Port))
 	if info.AuthType == SshAuthTypePem {
-		option = append(option, WithAuthPem(info.Username, info.PrivateKey, info.Password))
+		pk := info.PrivateKey
+		if v, err := function.RSADecode(info.PrivateKey, nil); err == nil {
+			pk = v
+		}
+		option = append(option, WithAuthPem(info.Username, pk, info.Password))
 	} else if info.AuthType == SshAuthTypeBasic {
 		option = append(option, WithAuthBasic(info.Username, info.Password))
 	} else if info.AuthType == SshAuthTypePemDefault {

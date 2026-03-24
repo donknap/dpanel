@@ -155,9 +155,8 @@ func (self Cron) RunOnce(http *gin.Context) {
 		return
 	}
 
-	for _, id := range cronRow.Setting.JobIds {
-		crontab.Client.RunById(id)
-	}
+	// 计划任务可能会注册多个周期，执行时也只需要调用一次即可
+	crontab.Client.RunById(cronRow.Setting.JobIds[0])
 
 	self.JsonSuccessResponse(http)
 	return

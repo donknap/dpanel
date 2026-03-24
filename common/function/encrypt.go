@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -24,9 +25,17 @@ const (
 	CryptoPrefix = "RSA:"
 )
 
-// RSAEncode 统一加密入口：强制使用 RSA 加密
+// RSAEncode 统一加密入口：强制使用 RSA 加密（支持超长文本自动分段）
 func RSAEncode(str string) (string, error) {
-	rsaPubContent, err := os.ReadFile(facade.Config.GetString("system.rsa.pub"))
+	var err error
+	var rsaPubContent []byte
+	defer func() {
+		if err != nil {
+			slog.Debug("rsa encode", "error", err)
+		}
+	}()
+
+	rsaPubContent, err = os.ReadFile(facade.Config.GetString("system.rsa.pub"))
 	if err != nil {
 		return "", err
 	}
@@ -34,15 +43,32 @@ func RSAEncode(str string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	encrypted, err := rsa.EncryptPKCS1v15(rand.Reader, pubKey, []byte(str))
-	if err != nil {
-		return "", err
+
+	rawBytes := []byte(str)
+	keySize := pubKey.Size()
+	// PKCS1v15 填充固定消耗 11 字节，每次最大加密长度为 keySize - 11
+	maxBlockSize := keySize - 11
+
+	var encryptedBuffer bytes.Buffer
+
+	// 循环分段加密
+	for i := 0; i < len(rawBytes); i += maxBlockSize {
+		end := i + maxBlockSize
+		if end > len(rawBytes) {
+			end = len(rawBytes)
+		}
+
+		chunk, err := rsa.EncryptPKCS1v15(rand.Reader, pubKey, rawBytes[i:end])
+		if err != nil {
+			return "", err
+		}
+		encryptedBuffer.Write(chunk)
 	}
 
-	return CryptoPrefix + hex.EncodeToString(encrypted), nil
+	return CryptoPrefix + hex.EncodeToString(encryptedBuffer.Bytes()), nil
 }
 
-// RSADecode 统一解密入口：根据前缀自动切换 RSA 或 AES
+// RSADecode 统一解密入口：根据前缀自动切换 RSA 或 AES（支持 RSA 分段解密）
 func RSADecode(str string, userKey []byte) (string, error) {
 	if strings.HasPrefix(str, CryptoPrefix) {
 		cipherBytes, err := hex.DecodeString(str[len(CryptoPrefix):])
@@ -57,17 +83,33 @@ func RSADecode(str string, userKey []byte) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		decrypted, err := rsa.DecryptPKCS1v15(rand.Reader, key, cipherBytes)
-		if err != nil {
-			return "", err
+
+		keySize := key.Size()
+		var decryptedBuffer bytes.Buffer
+
+		// 循环分段解密：密文块的长度固定等于密钥的长度 (keySize)
+		for i := 0; i < len(cipherBytes); i += keySize {
+			end := i + keySize
+			if end > len(cipherBytes) {
+				return "", errors.New("invalid rsa cipher length: not a multiple of key size")
+			}
+
+			chunk, err := rsa.DecryptPKCS1v15(rand.Reader, key, cipherBytes[i:end])
+			if err != nil {
+				return "", err
+			}
+			decryptedBuffer.Write(chunk)
 		}
-		return string(decrypted), nil
+
+		return decryptedBuffer.String(), nil
 	}
+
 	// 兼容明文的情况
 	if userKey == nil {
 		return str, nil
 	}
 
+	// 兼容旧版 AES 解密
 	return AseDecode(string(userKey), str)
 }
 
@@ -206,4 +248,17 @@ func Sha256Struct(data interface{}) string {
 		return ""
 	}
 	return Sha256(b)
+}
+
+// MaskSensitiveValue 将敏感值转换为占位符
+func MaskSensitiveValue(value string) string {
+	if value == "" || value == "******" {
+		return value
+	}
+	return "******"
+}
+
+// IsSensitivePlaceholder 判断值是否为敏感占位符
+func IsSensitivePlaceholder(value string) bool {
+	return value == "******"
 }

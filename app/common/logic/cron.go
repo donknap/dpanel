@@ -75,14 +75,19 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 		}
 	}))
 	option = append(option, crontab.WithRunFunc(func(ctx *crontab.RunFuncContext) {
+		slog.Info("cron run", "task", task)
 		var err error
 		var runCtx context.Context
 		if task.Setting.ScriptRunTimeout > 0 {
 			runCtx, _ = context.WithTimeout(context.Background(), time.Second*time.Duration(task.Setting.ScriptRunTimeout))
 		}
+		if task.Setting.EntryShell == "" {
+			task.Setting.EntryShell = "/bin/sh"
+		}
 		storage.Cache.Set(cacheKey, "running", cache.DefaultExpiration)
 		defer func() {
 			if err != nil {
+				slog.Info("cron run finish", "error", err)
 				ctx.Err = err
 			}
 			storage.Cache.Delete(cacheKey)
@@ -118,9 +123,6 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 			if err != nil {
 				ctx.Err = err
 				return
-			}
-			if task.Setting.EntryShell == "" {
-				task.Setting.EntryShell = "/bin/sh"
 			}
 			defer func() {
 				dockerClient.Close()

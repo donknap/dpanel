@@ -73,8 +73,16 @@ func (self Env) GetList(http *gin.Context) {
 				status = v.(types2.DockerStatus)
 			}
 			item.DockerStatus = &status
-			if item.SshServerInfo != nil && item.SshServerInfo.Password != "" {
-				item.SshServerInfo.Password = "******"
+			if item.SshServerInfo != nil {
+				if item.SshServerInfo.Password != "" {
+					item.SshServerInfo.Password = function.MaskSensitiveValue(item.SshServerInfo.Password)
+				}
+				if item.SshServerInfo.PrivateKey != "" {
+					item.SshServerInfo.PrivateKey = function.MaskSensitiveValue(item.SshServerInfo.PrivateKey)
+				}
+			}
+			if item.TlsKey != "" {
+				item.TlsKey = function.MaskSensitiveValue(item.TlsKey)
 			}
 			return item, true
 		}),
@@ -101,8 +109,16 @@ func (self Env) Create(http *gin.Context) {
 	var oldDockerEnv *types2.DockerEnv
 	if v, err := (logic.Env{}).GetEnvByName(params.Name); err == nil {
 		oldDockerEnv = v
-		if params.SshServerInfo != nil && params.SshServerInfo.Password == "******" {
-			params.SshServerInfo.Password = oldDockerEnv.SshServerInfo.Password
+		if params.SshServerInfo != nil {
+			if function.IsSensitivePlaceholder(params.SshServerInfo.Password) {
+				params.SshServerInfo.Password = oldDockerEnv.SshServerInfo.Password
+			}
+			if function.IsSensitivePlaceholder(params.SshServerInfo.PrivateKey) {
+				params.SshServerInfo.PrivateKey = oldDockerEnv.SshServerInfo.PrivateKey
+			}
+		}
+		if function.IsSensitivePlaceholder(params.TlsKey) {
+			params.TlsKey = oldDockerEnv.TlsKey
 		}
 	}
 
@@ -120,8 +136,12 @@ func (self Env) Create(http *gin.Context) {
 			sshClient.Close()
 		}()
 		// ssh 密码加密
-		if v, err := function.RSAEncode(params.SshServerInfo.Password); err == nil {
+		if v, err := function.RSAEncode(params.SshServerInfo.Password); err == nil && params.SshServerInfo.Password != "" {
 			params.SshServerInfo.Password = v
+		}
+		// ssh 证书加密
+		if v, err := function.RSAEncode(params.SshServerInfo.PrivateKey); err == nil && params.SshServerInfo.PrivateKey != "" {
+			params.SshServerInfo.PrivateKey = v
 		}
 	}
 
