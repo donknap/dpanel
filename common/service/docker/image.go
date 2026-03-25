@@ -2,6 +2,7 @@ package docker
 
 import (
 	"archive/tar"
+	"bufio"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -17,25 +18,20 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/types/fs"
-	"github.com/mcuadros/go-version"
 )
 
-func (self Client) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*fs.FileData, path []string, err error) {
-	imageInfo, err := self.Client.ImageInspect(ctx, imageID)
+func (self Client) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*fs.FileData, pathList []string, err error) {
+	_, err = self.Client.ImageInspect(ctx, imageID)
 	if err != nil {
 		return nil, nil, err
 	}
-	dockerVersion, _ := self.Client.ServerVersion(ctx)
-	// 如果当前 docker 版本大于 25 则获取 rootfs 否则直接查找 tar 的文件
-	layers := function.PluckArrayWalk(imageInfo.RootFS.Layers, func(i string) (string, bool) {
-		if _, after, ok := strings.Cut(i, "sha256:"); ok {
-			return fmt.Sprintf("blobs/sha256/%s", after), true
-		}
-		return "", false
-	})
 	out, err := self.Client.ImageSave(ctx, []string{
 		imageID,
 	})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer out.Close()
 
 	tarReader := tar.NewReader(out)
 	for {
@@ -43,30 +39,43 @@ func (self Client) ImageInspectFileList(ctx context.Context, imageID string) (pa
 		if err != nil {
 			break
 		}
-		var tarFileList []*fs.FileData
-		if version.Compare(dockerVersion.Version, "25", ">=") && function.InArray(layers, header.Name) {
-			tarFileList, err = getFileListFromTar(tar.NewReader(tarReader))
-			if err != nil {
-				slog.Debug("docker image inspect file list", "error", err)
-				continue
+		if header.FileInfo().IsDir() {
+			continue
+		}
+
+		name := header.Name
+		isPossibleLayer := strings.HasSuffix(name, ".tar") ||
+			strings.HasSuffix(name, ".tar.gz") ||
+			strings.HasSuffix(name, ".tgz") ||
+			strings.HasPrefix(name, "blobs/") ||
+			strings.Contains(name, "/layer.tar")
+
+		if !isPossibleLayer {
+			continue
+		}
+
+		bufReader := bufio.NewReader(tarReader)
+		var layerReader io.Reader = bufReader
+		var gzReader *gzip.Reader
+
+		magic, err := bufReader.Peek(2)
+		if err == nil && len(magic) == 2 && magic[0] == 0x1f && magic[1] == 0x8b {
+			gzReader, err = gzip.NewReader(bufReader)
+			if err == nil {
+				layerReader = gzReader
 			}
-		} else if strings.HasSuffix(header.Name, ".tar") {
-			tarFileList, err = getFileListFromTar(tar.NewReader(tarReader))
-			if err != nil {
-				slog.Debug("docker image inspect file list", "error", err)
-				continue
-			}
-		} else if strings.HasSuffix(header.Name, ".tar.gz") || strings.HasSuffix(header.Name, "tgz") {
-			gzReader, err := gzip.NewReader(tarReader)
-			if err != nil {
-				return nil, nil, err
-			}
-			tarFileList, err = getFileListFromTar(tar.NewReader(gzReader))
+		}
+
+		layerTar := tar.NewReader(layerReader)
+		tarFileList, err := getFileListFromTar(layerTar)
+
+		if gzReader != nil {
 			_ = gzReader.Close()
-			if err != nil {
-				slog.Debug("docker image inspect file list", "error", err)
-				continue
-			}
+		}
+
+		if err != nil {
+			slog.Debug("docker image inspect file list: skip non-tar layer", "name", name, "error", err)
+			continue
 		}
 		pathInfo = append(pathInfo, tarFileList...)
 	}
@@ -79,17 +88,16 @@ func (self Client) ImageInspectFileList(ctx context.Context, imageID string) (pa
 		}
 		return pathInfo[i].Name < pathInfo[j].Name
 	})
-
-	path = make([]string, 0)
+	pathList = make([]string, 0)
 	pathInfo = function.PluckArrayWalk(pathInfo, func(i *fs.FileData) (*fs.FileData, bool) {
-		if function.InArray(path, i.Name) {
+		if function.InArray(pathList, i.Name) {
 			return nil, false
 		} else {
-			path = append(path, i.Name)
+			pathList = append(pathList, i.Name)
 			return i, true
 		}
 	})
-	return pathInfo, path, nil
+	return pathInfo, pathList, nil
 }
 
 func getFileListFromTar(tarReader *tar.Reader) (files []*fs.FileData, err error) {

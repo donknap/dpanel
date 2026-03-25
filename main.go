@@ -50,8 +50,6 @@ var (
 	Asset embed.FS
 )
 
-const dpanelBanner = `DPanel is a lightweight container management panel; visit https://deepanel.com for more information.`
-
 var DPanelVersion string
 
 func main() {
@@ -100,7 +98,7 @@ func main() {
 	storage.Cache.Set(storage.CacheKeyAsset, Asset, cache.DefaultExpiration)
 
 	if isAppServer() {
-		slog.Warn(dpanelBanner)
+		slog.Warn(define.PanelBanner)
 		slog.Info("config", "env", facade.GetConfig().GetString("app.env"), "version", DPanelVersion, "date", time.Now())
 		slog.Info("config", "storage", storage.Local{}.GetStorageLocalPath())
 

@@ -565,7 +565,7 @@ func (self Image) CheckUpgrade(http *gin.Context) {
 	} else if err != nil {
 		result["error"] = err.Error()
 	}
-
+	slog.Info("image check upgrade", "result", result)
 	storage.Cache.Set(fmt.Sprintf(storage.CacheKeyImageDigest, params.Md5), result, time.Duration(params.CacheTime)*time.Second)
 	self.JsonResponseWithoutError(http, result)
 	return
