@@ -1261,7 +1261,7 @@
   "notification.containerExplorerContentUnsupportedType": "Unsupported file type for online editor.",
   "notification.containerExplorerEditDeleteUnsafe": "File deletion restricted.",
   "notification.containerExplorerEditFileMaxSize": "Files over 1MB must be modified via export/import.",
-  "notification.containerExplorerInvalidFilename": "Invalid filename format",
+  "notification.containerExplorerInvalidFilename": "Invalid filename format or naming conflict with an existing directory",
   "notification.containerExplorerUnzipTargetUnsupportedType": "Requires .zip, .tar, or .tar.gz",
   "notification.containerMountPathDenied": "Permission denied for mount directory creation. Create on host directly.",
   "notification.containerPrune": "Pruned {count} containers. Freed {size}.",

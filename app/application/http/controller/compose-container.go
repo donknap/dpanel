@@ -127,7 +127,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		defer func() {
 			importFileList.Close()
 		}()
-		err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, plugin.ExplorerName, importFileList.Reader())
+		err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, plugin.ExplorerName, "/", importFileList.Reader())
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

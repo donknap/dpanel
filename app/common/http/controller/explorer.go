@@ -120,10 +120,10 @@ func (self Explorer) Export(http *gin.Context) {
 
 func (self Explorer) ImportFileContent(http *gin.Context) {
 	type ParamsValidate struct {
-		Name     string `json:"name" binding:"required"`
-		File     string `json:"file" binding:"required"`
-		Content  string `json:"content"`
-		DestPath string `json:"destPath" binding:"required"`
+		Name    string `json:"name" binding:"required"`
+		File    string `json:"file" binding:"required"`
+		Content string `json:"content"`
+		DstPath string `json:"dstPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -136,7 +136,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 	}
 
 	params.File = function.PathClean(params.File)
-	params.DestPath = function.Path2SystemSafe(params.DestPath)
+	params.DstPath = function.Path2SystemSafe(params.DstPath)
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
@@ -146,7 +146,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		return
 	}
 
-	file, err := afs.OpenFile(path.Join(params.DestPath, params.File), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o644)
+	file, err := afs.OpenFile(path.Join(params.DstPath, params.File), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o644)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -171,13 +171,13 @@ func (self Explorer) Import(http *gin.Context) {
 	type ParamsValidate struct {
 		Name     string         `json:"name" binding:"required"`
 		FileList []fileListItem `json:"fileList" binding:"required"`
-		DestPath string         `json:"destPath" binding:"required"`
+		DstPath  string         `json:"dstPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	params.DestPath = function.Path2SystemSafe(params.DestPath)
+	params.DstPath = function.Path2SystemSafe(params.DstPath)
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
@@ -198,7 +198,7 @@ func (self Explorer) Import(http *gin.Context) {
 				_ = realPath.Close()
 				_ = os.Remove(realPath.Name())
 			}()
-			err = afs.WriteReader(path.Join(params.DestPath, item.Name), realPath)
+			err = afs.WriteReader(path.Join(params.DstPath, item.Name), realPath)
 			if err != nil {
 				return err
 			}
@@ -638,8 +638,8 @@ func (self Explorer) GetUserList(http *gin.Context) {
 
 func (self Explorer) MkDir(http *gin.Context) {
 	type ParamsValidate struct {
-		Name     string `json:"name" binding:"required"`
-		DestPath string `json:"destPath" binding:"required"`
+		Name    string `json:"name" binding:"required"`
+		DstPath string `json:"dstPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -654,8 +654,8 @@ func (self Explorer) MkDir(http *gin.Context) {
 		return
 	}
 
-	params.DestPath = function.Path2SystemSafe(params.DestPath)
-	err = afs.MkdirAll(params.DestPath, os.ModePerm)
+	params.DstPath = function.Path2SystemSafe(params.DstPath)
+	err = afs.MkdirAll(params.DstPath, os.ModePerm)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

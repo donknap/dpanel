@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -128,7 +129,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		File     string `json:"file" binding:"required"`
 		Content  string `json:"content"`
 		Name     string `json:"name" binding:"required"`
-		DestPath string `json:"destPath" binding:"required"`
+		DstPath  string `json:"dstPath" binding:"required"`
 		FileMode int    `json:"fileMode"`
 	}
 	params := ParamsValidate{}
@@ -136,7 +137,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		return
 	}
 	params.File = function.PathClean(params.File)
-	params.DestPath = function.PathClean(params.DestPath)
+	params.DstPath = function.PathClean(params.DstPath) + "/."
 
 	if strings.HasPrefix(params.File, "/") {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerInvalidFilename), 500)
@@ -144,20 +145,26 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 	}
 	fileMode := os.FileMode(params.FileMode)
 	if params.FileMode == 0 {
-		if pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Name, params.File); err == nil {
+		if pathStat, err := docker.Sdk.Client.ContainerStatPath(docker.Sdk.Ctx, params.Name, path.Join(params.DstPath, params.File)); err == nil {
 			fileMode = pathStat.Mode.Perm()
+			if pathStat.Mode.IsDir() {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerInvalidFilename), 500)
+				return
+			}
 		}
 	}
 	if fileMode == 0 {
 		fileMode = os.FileMode(0666)
 	}
-	importFile, err := imports.NewFileImport(params.DestPath, imports.WithImportContent(params.File, []byte(params.Content), fileMode))
+	importFile, err := imports.NewFileImport("/", imports.WithImportContent(params.File, []byte(params.Content), fileMode))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer importFile.Close()
-	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile.Reader())
+	defer func() {
+		defer importFile.Close()
+	}()
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, params.DstPath, importFile.Reader())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -172,7 +179,7 @@ func (self Explorer) Import(http *gin.Context) {
 			Name string `json:"name"`
 			Path string `json:"path"`
 		} `json:"fileList" binding:"required"`
-		DestPath string `json:"destPath" binding:"required"`
+		DstPath string `json:"dstPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -194,13 +201,13 @@ func (self Explorer) Import(http *gin.Context) {
 		realPath := storage.Local{}.GetSaveRealPath(item.Path)
 		options = append(options, imports.WithImportFilePath(realPath, item.Name))
 	}
-	importFile, err := imports.NewFileImport(params.DestPath, options...)
+	importFile, err := imports.NewFileImport(params.DstPath, options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	defer importFile.Close()
-	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile.Reader())
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, "/", importFile.Reader())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -254,7 +261,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 		return
 	}
 	defer importFile.Close()
-	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile.Reader())
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, "/", importFile.Reader())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -588,8 +595,8 @@ func (self Explorer) GetUserList(http *gin.Context) {
 
 func (self Explorer) MkDir(http *gin.Context) {
 	type ParamsValidate struct {
-		Name     string `json:"name" binding:"required"`
-		DestPath string `json:"destPath" binding:"required"`
+		Name    string `json:"name" binding:"required"`
+		DstPath string `json:"dstPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -602,7 +609,7 @@ func (self Explorer) MkDir(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	err = afs.MkdirAll(params.DestPath, os.ModePerm)
+	err = afs.MkdirAll(params.DstPath, os.ModePerm)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -615,7 +622,6 @@ func (self Explorer) Copy(http *gin.Context) {
 		Name       string `json:"name" binding:"required"`
 		SourceFile string `json:"sourceFile" binding:"required"`
 		TargetFile string `json:"targetFile" binding:"required"`
-		IsMove     bool   `json:"isMove"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -626,7 +632,6 @@ func (self Explorer) Copy(http *gin.Context) {
 	}
 	targetFile, _ := storage.Local{}.CreateTempFile("")
 	defer func() {
-		_ = targetFile.Close()
 		_ = os.Remove(targetFile.Name())
 	}()
 	_, err := docker.Sdk.ContainerReadFile(docker.Sdk.Ctx, params.Name, params.SourceFile, targetFile)
@@ -634,26 +639,21 @@ func (self Explorer) Copy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	importFile, err := imports.NewFileImport(filepath.Dir(params.TargetFile), imports.WithImportFile(targetFile, filepath.Base(params.TargetFile)))
+	err = targetFile.Close()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	importFile, err := imports.NewFileImport("/", imports.WithImportFilePath(targetFile.Name(), filepath.Base(params.TargetFile)))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	defer importFile.Close()
-	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, importFile.Reader())
+	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, path.Dir(params.SourceFile), importFile.Reader())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
-	}
-	if params.IsMove {
-		afs, err := logic.Explorer{}.Afs(docker.Sdk, logic.AfsCreateOption{
-			MountPoint: params.Name,
-		})
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		_ = afs.RemoveAll(params.SourceFile)
 	}
 	self.JsonSuccessResponse(http)
 }

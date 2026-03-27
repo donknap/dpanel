@@ -1261,7 +1261,7 @@
   "notification.containerExplorerContentUnsupportedType": "編集非対応",
   "notification.containerExplorerEditDeleteUnsafe": "削除権限なし",
   "notification.containerExplorerEditFileMaxSize": "1MB超はエクスポートが必要",
-  "notification.containerExplorerInvalidFilename": "無効なファイル名",
+  "notification.containerExplorerInvalidFilename": "ファイル名の形式が正しくないか、ディレクトリ名と競合しています",
   "notification.containerExplorerUnzipTargetUnsupportedType": "対応外: .zip .tar .tar.gz",
   "notification.containerMountPathDenied": "フォルダ作成権限なし。ホストで作成してください。",
   "notification.containerPrune": "{count} コンテナ削除 ({size} 解放)",

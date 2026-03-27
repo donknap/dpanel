@@ -64,10 +64,10 @@ func (self Client) ContainerByField(ctx context.Context, field string, name ...s
 	return result, nil
 }
 
-func (self Client) ContainerImport(ctx context.Context, containerName string, reader io.Reader) error {
+func (self Client) ContainerImport(ctx context.Context, containerName string, dstPath string, reader io.Reader) error {
 	err := self.Client.CopyToContainer(ctx,
 		containerName,
-		"/",
+		dstPath,
 		reader,
 		container.CopyToContainerOptions{},
 	)
