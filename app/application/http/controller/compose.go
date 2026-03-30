@@ -73,6 +73,9 @@ func (self Compose) Create(http *gin.Context) {
 		if params.Title != "" {
 			composeRow.Title = params.Title
 		}
+		if params.Type != "" {
+			composeRow.Setting.Type = params.Type
+		}
 	} else {
 		if params.Type == accessor.ComposeTypeStoragePath {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDisableStorageType), 500)
@@ -389,9 +392,8 @@ func (self Compose) GetFromUri(http *gin.Context) {
 
 func (self Compose) GetFromGit(http *gin.Context) {
 	type ParamsValidate struct {
-		Uri   string `json:"uri" binding:"required,url"`
-		Name  string `json:"name" binding:"required"`
-		Title string `json:"title"`
+		Uri  string `json:"uri" binding:"required,url"`
+		Name string `json:"name" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -411,8 +413,7 @@ func (self Compose) GetFromGit(http *gin.Context) {
 	if composeRow == nil {
 		createTime := time.Now().Local().Format(time.DateTime)
 		composeRow = &entity.Compose{
-			Title: params.Title,
-			Name:  params.Name,
+			Name: params.Name,
 			Setting: &accessor.ComposeSettingOption{
 				Type:          accessor.ComposeTypeStoragePath,
 				Environment:   make([]types2.EnvItem, 0),
