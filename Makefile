@@ -99,6 +99,7 @@ DOCKER_TARGET_LITE := 1
 DOCKER_TARGET_PROD := $(if $(call __IS_TRUE,${APP_ENV},prod all),1,0)
 DOCKER_PUSH_ALI := $(if $(call __IS_TRUE,${PUSH},ali all),1,0)
 DOCKER_PUSH_HUB := $(if $(call __IS_TRUE,${PUSH},hub all),1,0)
+_BUILD_OS_LOWER := $(shell echo $(BUILD_OS) | tr '[:upper:]' '[:lower:]')
 
 _RAW_LIST := $(strip \
     $(if $(call __IS_TRUE,$(AMD64)),linux/amd64) \
@@ -108,7 +109,7 @@ _RAW_LIST := $(strip \
 DOCKER_PLATFORM := $(subst $(_SPACE),$(_COMMA),$(or $(_RAW_LIST),linux/amd64))
 
 _IS_BETA := $(if $(filter command line,$(origin APP_VERSION)),0,1)
-_TAG_SFX := $(if $(filter $(BUILD_LIBC),GNU),-debian,)
+_TAG_SFX := $(if $(filter $(BUILD_LIBC),GNU),-debian,)$(if $(filter windows,$(_BUILD_OS_LOWER)),-windows,)
 
 _REPO_NAME := $(PROJECT_NAME)
 ifeq ($(APP_FAMILY),nw)
@@ -180,7 +181,7 @@ define go_build
 	$(eval GO_EXECUTABLE := $(if $(call __IS_TRUE,$(GARBLE)),GOGARBLE="github.com/donknap/dpanel" garble -seed=${GARBLE_SEED},go))
 	@echo ">> Target Filename: $(TARGET_BIN)"
 	@# --- Compilation Logic ---
-	GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=$(shell echo $(1) | tr '[:upper:]' '[:lower:]') GOARCH=$(2) GOARM=$(3) CC=$(4) \
+	GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=$(shell echo $(1) | tr '[:upper:]' '[:lower:]') GOARCH=$(2) GOARM=$(3) CC="$(4)" \
 	$(GO_EXECUTABLE) build -p $(BUILD_CPUS) -trimpath \
 	-ldflags="-s -w -X 'main.DPanelVersion=${APP_VERSION}'" \
 	-tags "${APP_FAMILY},w7_rangine_release,containers_image_openpgp" \

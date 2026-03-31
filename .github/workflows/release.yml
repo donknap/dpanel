@@ -241,6 +241,60 @@ jobs:
           files: runtime/*
           prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
 
+  windows-image-build:
+    needs: prepare
+    strategy:
+      fail-fast: true
+      matrix:
+        family: [ce, pe]
+    runs-on: ubuntu-latest
+    env:
+      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+    steps:
+      - name: Test Env
+        run: |
+          echo "Tag name from GITHUB_REF_NAME: $GITHUB_REF_NAME"
+          echo "Tag name from github.ref_name: ${{ github.ref_name }}"
+          echo "Tag name from github.ref: ${{ github.ref }}"
+          echo "Global Version Param is: '${{ env.VERSION_PARAM }}'"
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          name: dpanel-context-local-builder
+          driver-opts: image=moby/buildkit:master
+          install: true
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to ALiYun
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-hangzhou.aliyuncs.com
+          username: ${{ secrets.ALIYUN_USERNAME }}
+          password: ${{ secrets.ALIYUN_TOKEN }}
+      - name: Build Windows CE Image
+        if: matrix.family == 'ce'
+        run: |
+          make release BUILD_OS=windows APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all
+      - name: Build Windows PE Image
+        if: matrix.family == 'pe'
+        env:
+          GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
+        run: |
+          make release BUILD_OS=windows APP_FAMILY=pe APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }}
+
   xk-build:
     needs: prepare
     runs-on: ubuntu-latest
@@ -277,7 +331,7 @@ jobs:
           prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
 
   push-tags-to-related-repos:
-    needs: [ build, build-pe, macos-build, windows-build, xk-build ]
+    needs: [ build, build-pe, macos-build, windows-build, windows-image-build, xk-build ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout dpanel-gui

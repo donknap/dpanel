@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETA
     --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
     --mount=type=bind,from=toolchain,source=/toolchains,target=/toolchains \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
-    COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY-ce} OS=linux" && \
+    COMMON_ARGS="APP_VERSION=${APP_VERSION} APP_FAMILY=${APP_FAMILY-ce} OS=linux" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
         export CC=$(echo /toolchains/*amd64-musl-*/bin/*-gcc); \
         make build ${COMMON_ARGS} AMD64=1 ARM64=0 ARMV7=0 CC_AMD64=$CC; \
@@ -45,6 +45,8 @@ COPY --from=builder /src/runtime /
 FROM alpine AS base
 
 ARG HTTP_PROXY
+# Keep this no-op replacement for compatibility with existing build scripts.
+# The pattern is intentionally unmatched so the original repository list stays intact.
 RUN sed -i 's/dl-cdn.alpinelinux111.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && apk add --no-cache --update \
     bash musl docker-cli docker-cli-compose docker-cli-buildx tzdata git openssh-client curl && \

@@ -1,0 +1,51 @@
+ARG VERSION=12.3
+ARG BUILDARCH
+ARG TARGETARCH
+
+FROM --platform=${BUILDPLATFORM} dpanel/builder:${BUILDARCH}-zig AS toolchain
+FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
+
+ARG HTTP_PROXY
+
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    apt-get update && apt-get install -y --no-install-recommends make git
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache \
+    export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    go mod download
+
+COPY ./ /src
+
+ARG BUILDARCH
+ARG TARGETARCH
+ARG APP_VERSION
+ARG APP_FAMILY
+
+RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_windows_${TARGETARCH} \
+    --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_windows_${TARGETARCH} \
+    --mount=type=bind,from=toolchain,source=/toolchains,target=/toolchains \
+    export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    export ZIG=/toolchains/${BUILDARCH}-zig/zig && \
+    COMMON_ARGS="APP_VERSION=${APP_VERSION} APP_FAMILY=${APP_FAMILY-ce} BUILD_OS=windows LIBC=gnu" && \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        export CC_AMD64="$ZIG cc -target x86_64-windows-gnu"; \
+        make build ${COMMON_ARGS} AMD64=1 ARM64=0 ARMV7=0; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        export CC_ARM64="$ZIG cc -target aarch64-windows-gnu"; \
+        make build ${COMMON_ARGS} AMD64=0 ARM64=1 ARMV7=0; \
+    fi
+
+FROM scratch AS binary-export
+ARG TARGETARCH
+COPY --from=builder /src/runtime/dpanel-ce-gnu-${TARGETARCH} /dpanel-ce-gnu-${TARGETARCH}.exe
+COPY --from=builder /src/runtime/config.yaml /config.yaml
+
+FROM scratch AS lite
+ARG TARGETARCH
+COPY --from=builder /src/runtime/dpanel-ce-gnu-${TARGETARCH} /app/server/dpanel.exe
+COPY ./config.yaml /app/server/config.yaml
+
+FROM lite AS production

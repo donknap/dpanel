@@ -1,5 +1,5 @@
 ARG PE_LITE_FROM_BASE=dpanel/dpanel:lite-debian
-ARG PE_PROD_FROM_BASE=dpanel/dpanel:debian
+ARG PE_PROD_FROM_BASE=dpanel/dpanel:latest-debian
 
 ARG LIBC=gnu
 ARG VERSION=12.3
@@ -60,7 +60,7 @@ RUN --mount=type=secret,id=GARBLE_SEED \
     export SEED=$(cat /run/secrets/GARBLE_SEED) && \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     go test -v --run TestGenerateDefines ./app/pro/tests/obfuscate_test.go && \
-    COMMON_ARGS="VERSION=${APP_VERSION} FAMILY=${APP_FAMILY-pe} OS=linux LIBC=gnu GARBLE=1 GARBLE_SEED=${SEED}" && \
+    COMMON_ARGS="APP_VERSION=${APP_VERSION} APP_FAMILY=${APP_FAMILY-pe} OS=linux LIBC=gnu GARBLE=1 GARBLE_SEED=${SEED}" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
         export CC=$(echo /toolchains/*amd64-gnu-*/bin/*-gcc); \
         make build ${COMMON_ARGS} AMD64=1 ARM64=0 ARMV7=0 CC_AMD64=$CC; \

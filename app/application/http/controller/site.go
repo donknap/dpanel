@@ -277,7 +277,7 @@ func (self Site) GetDetail(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "Id"))...).First()
+		siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "id"))...).First()
 		// 先使用容器名称查询，查询不到时通过 md5 再次查询
 		//if siteRow == nil {
 		//	siteRow, _ = dao.Site.Where(dao.Site.SiteName.Eq(strings.TrimLeft(containerInfo.Name, "/"))).First()
