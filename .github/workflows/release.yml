@@ -32,13 +32,32 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        family: [ce, nw, sy]
-        libc: [gnu, musl]
-        exclude:
+        include:
+          - family: ce
+            libc: gnu
+            build_os: linux
+            armv7: 1
+            make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=gnu"
+          - family: ce
+            libc: musl
+            build_os: linux
+            armv7: 1
+            make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=musl"
+          - family: ce
+            libc: gnu
+            build_os: windows
+            armv7: 0
+            make_args: "BUILD_OS=windows APP_FAMILY=ce APP_ENV=all PUSH=all"
           - family: nw
-            libc: gnu
+            libc: musl
+            build_os: linux
+            armv7: 0
+            make_args: "APP_FAMILY=nw APP_ENV=lite OS=linux PUSH=all"
           - family: sy
-            libc: gnu
+            libc: musl
+            build_os: linux
+            armv7: 0
+            make_args: ""
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -52,6 +71,9 @@ jobs:
           echo "Global Version Param is: '${{ env.VERSION_PARAM }}'"
 
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
         with:
           submodules: recursive
           token: ${{ secrets.MY_GITHUB_TOKEN }}
@@ -82,9 +104,9 @@ jobs:
       - name: Build CE Version
         if: matrix.family == 'ce'
         env:
-          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=ce-${{ matrix.libc }} --cache-to type=gha,mode=max,scope=ce-${{ matrix.libc }}"
+          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }} --cache-to type=gha,mode=max,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }}"
         run: |
-          make release APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all LIBC=${{ matrix.libc }} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
+          make release ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=${{ matrix.armv7 }} ${{ matrix.make_args }} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
 
       - name: Build NW Version
         if: matrix.family == 'nw'
@@ -117,7 +139,19 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        libc: [gnu, musl]
+        include:
+          - libc: gnu
+            build_os: linux
+            armv7: 1
+            make_args: "APP_FAMILY=pe APP_ENV=all OS=linux PUSH=all LIBC=gnu GARBLE=1"
+          - libc: musl
+            build_os: linux
+            armv7: 1
+            make_args: "APP_FAMILY=pe APP_ENV=all OS=linux PUSH=all LIBC=musl GARBLE=1"
+          - libc: gnu
+            build_os: windows
+            armv7: 0
+            make_args: "BUILD_OS=windows APP_FAMILY=pe APP_ENV=all PUSH=all GARBLE=1"
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -154,9 +188,9 @@ jobs:
         env:
           GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
           GIT_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
-          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=pe-${{ matrix.libc }} --cache-to type=gha,mode=max,scope=pe-${{ matrix.libc }}"
+          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=pe-${{ matrix.build_os }}-${{ matrix.libc }} --cache-to type=gha,mode=max,scope=pe-${{ matrix.build_os }}-${{ matrix.libc }}"
         run: |
-          make release ${{ env.VERSION_PARAM }} APP_FAMILY=pe APP_ENV=all AMD64=1 ARM64=1 ARMV7=1 OS=linux PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }} GIT_TOKEN=${{ secrets.MY_GITHUB_TOKEN }} LIBC=${{ matrix.libc }} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
+          make release ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=${{ matrix.armv7 }} ${{ matrix.make_args }} GARBLE_SEED=${GARBLE_SEED} GIT_TOKEN=${GIT_TOKEN} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
 
       - name: Flatten Artifact Directories
         run: |
@@ -174,8 +208,8 @@ jobs:
     needs: prepare
     strategy:
       matrix:
-        platform: [ 'macos-15-intel', 'macos-latest' ]
-    runs-on: ${{ matrix.platform }}
+        family: [ce, pe]
+    runs-on: macos-15-intel
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
     steps:
@@ -193,13 +227,47 @@ jobs:
           go-version: '1.25'
       - name: Install dependencies
         run: go get .
-      - name: Build
+      - name: Set up Docker
+        uses: docker/setup-docker-action@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          name: dpanel-context-local-builder
+          driver-opts: image=moby/buildkit:master
+          install: true
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to ALiYun
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-hangzhou.aliyuncs.com
+          username: ${{ secrets.ALIYUN_USERNAME }}
+          password: ${{ secrets.ALIYUN_TOKEN }}
+      - name: Build Darwin Binaries
+        env:
+          GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
         run: |
           export CC=$(which clang)
-          if [ "${{ runner.arch }}" = "X64" ]; then
-            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-darwin-amd64 AMD64=1 CC_AMD64=$CC
+          if [ "${{ matrix.family }}" = "pe" ]; then
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-pe-darwin-amd64 APP_FAMILY=pe AMD64=1 ARM64=0 ARMV7=0 GARBLE=1 GARBLE_SEED=${GARBLE_SEED} CC_AMD64="$CC"
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-pe-darwin-arm64 APP_FAMILY=pe AMD64=0 ARM64=1 ARMV7=0 GARBLE=1 GARBLE_SEED=${GARBLE_SEED} CC_ARM64="$CC -arch arm64"
           else
-            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-darwin-arm64 ARM64=1 CC_ARM64=$CC
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-amd64 APP_FAMILY=ce AMD64=1 ARM64=0 ARMV7=0 CC_AMD64="$CC"
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-arm64 APP_FAMILY=ce AMD64=0 ARM64=1 ARMV7=0 CC_ARM64="$CC -arch arm64"
+          fi
+      - name: Build Darwin Image
+        env:
+          GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
+          GIT_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=${{ matrix.family }}-darwin --cache-to type=gha,mode=max,scope=${{ matrix.family }}-darwin"
+        run: |
+          if [ "${{ matrix.family }}" = "pe" ]; then
+            make release BUILD_OS=darwin APP_FAMILY=pe APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all GARBLE=1 GARBLE_SEED=${GARBLE_SEED} GIT_TOKEN=${GIT_TOKEN} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
+          else
+            make release BUILD_OS=darwin APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
           fi
       - name: upload artifact
         uses: softprops/action-gh-release@v2
@@ -241,60 +309,6 @@ jobs:
           files: runtime/*
           prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
 
-  windows-image-build:
-    needs: prepare
-    strategy:
-      fail-fast: true
-      matrix:
-        family: [ce, pe]
-    runs-on: ubuntu-latest
-    env:
-      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
-    steps:
-      - name: Test Env
-        run: |
-          echo "Tag name from GITHUB_REF_NAME: $GITHUB_REF_NAME"
-          echo "Tag name from github.ref_name: ${{ github.ref_name }}"
-          echo "Tag name from github.ref: ${{ github.ref }}"
-          echo "Global Version Param is: '${{ env.VERSION_PARAM }}'"
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          token: ${{ secrets.MY_GITHUB_TOKEN }}
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          name: dpanel-context-local-builder
-          driver-opts: image=moby/buildkit:master
-          install: true
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Login to ALiYun
-        uses: docker/login-action@v3
-        with:
-          registry: registry.cn-hangzhou.aliyuncs.com
-          username: ${{ secrets.ALIYUN_USERNAME }}
-          password: ${{ secrets.ALIYUN_TOKEN }}
-      - name: Build Windows CE Image
-        if: matrix.family == 'ce'
-        run: |
-          make release BUILD_OS=windows APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all
-      - name: Build Windows PE Image
-        if: matrix.family == 'pe'
-        env:
-          GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
-        run: |
-          make release BUILD_OS=windows APP_FAMILY=pe APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all GARBLE=1 GARBLE_SEED=${{ secrets.GARBLE_SEED }}
-
   xk-build:
     needs: prepare
     runs-on: ubuntu-latest
@@ -331,7 +345,7 @@ jobs:
           prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
 
   push-tags-to-related-repos:
-    needs: [ build, build-pe, macos-build, windows-build, windows-image-build, xk-build ]
+    needs: [ build, build-pe, macos-build, windows-build, xk-build ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout dpanel-gui

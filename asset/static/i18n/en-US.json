@@ -1163,6 +1163,7 @@
   "image.formPlatformTypeTip": "Builds for current platform if empty. Multi-platform requires BuildKit.",
   "image.formTitle": "Title",
   "image.listManageExportOptionToHost": "Export to /dpanel/storage/export/image?",
+  "image.listManageExportCompress": "Enable Gzip compression",
   "image.listManageExportTipOption": "Exported images can be re-imported later. Proceed?",
   "image.listManagePruneOption.enableBuildCache": "Clean build cache",
   "image.listManagePruneOption.enableUnuseTag": "Clean unused tags (disables version checks)",

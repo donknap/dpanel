@@ -1,0 +1,16 @@
+ARG TARGETARCH
+
+FROM scratch AS builder
+COPY ./runtime/dpanel-pe-darwin-amd64 /runtime/dpanel-pe-darwin-amd64
+COPY ./runtime/dpanel-pe-darwin-arm64 /runtime/dpanel-pe-darwin-arm64
+COPY ./config.yaml /runtime/config.yaml
+
+FROM scratch AS binary-export
+COPY --from=builder /runtime/ /
+
+FROM scratch AS lite
+ARG TARGETARCH
+COPY --from=builder /runtime/dpanel-pe-darwin-${TARGETARCH} /app/server/dpanel
+COPY --from=builder /runtime/config.yaml /app/server/config.yaml
+
+FROM lite AS production

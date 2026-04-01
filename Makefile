@@ -109,7 +109,7 @@ _RAW_LIST := $(strip \
 DOCKER_PLATFORM := $(subst $(_SPACE),$(_COMMA),$(or $(_RAW_LIST),linux/amd64))
 
 _IS_BETA := $(if $(filter command line,$(origin APP_VERSION)),0,1)
-_TAG_SFX := $(if $(filter $(BUILD_LIBC),GNU),-debian,)$(if $(filter windows,$(_BUILD_OS_LOWER)),-windows,)
+_TAG_SFX := $(if $(filter $(BUILD_LIBC),GNU),-debian,)$(if $(filter windows,$(_BUILD_OS_LOWER)),-windows,)$(if $(filter darwin,$(_BUILD_OS_LOWER)),-darwin,)
 
 _REPO_NAME := $(PROJECT_NAME)
 ifeq ($(APP_FAMILY),nw)
@@ -149,10 +149,24 @@ DOCKER_TAG_PROD := $(strip \
     ,) \
 )
 
-
-DOCKER_FILE := ./docker/Dockerfile$(_TAG_SFX)
-ifeq ($(APP_FAMILY),pe)
-    DOCKER_FILE := ./docker/Dockerfile-pe$(_TAG_SFX)
+ifeq ($(_BUILD_OS_LOWER),windows)
+    DOCKER_FILE := ./docker/Dockerfile-windows
+    ifeq ($(APP_FAMILY),pe)
+        DOCKER_FILE := ./docker/Dockerfile-pe-windows
+    endif
+else ifeq ($(_BUILD_OS_LOWER),darwin)
+    DOCKER_FILE := ./docker/Dockerfile-darwin
+    ifeq ($(APP_FAMILY),pe)
+        DOCKER_FILE := ./docker/Dockerfile-pe-darwin
+    endif
+else
+    DOCKER_FILE := ./docker/Dockerfile
+    ifeq ($(APP_FAMILY),pe)
+        DOCKER_FILE := ./docker/Dockerfile-pe
+    endif
+    ifeq ($(BUILD_LIBC),GNU)
+        DOCKER_FILE := $(DOCKER_FILE)-debian
+    endif
 endif
 
 DOCKER_PE_LITE_FROM_BASE    := $(if $(filter 1,$(_IS_BETA)),dpanel/dpanel:beta-lite$(_TAG_SFX),dpanel/dpanel:lite$(_TAG_SFX))

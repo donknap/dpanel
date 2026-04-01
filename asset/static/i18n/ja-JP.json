@@ -1163,6 +1163,7 @@
   "image.formPlatformTypeTip": "空欄で現在のみ。マルチアーキは要レジストリPush。",
   "image.formTitle": "名前",
   "image.listManageExportOptionToHost": "/dpanel/storage/export/image に保存",
+  "image.listManageExportCompress": "GZ 圧縮を有効にする",
   "image.listManageExportTipOption": "エクスポート後、再インポート可能です。続行しますか？",
   "image.listManagePruneOption.enableBuildCache": "キャッシュ削除",
   "image.listManagePruneOption.enableUnuseTag": "未使用Tag削除 (更新検知不可になります)",

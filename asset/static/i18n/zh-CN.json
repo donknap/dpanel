@@ -1162,6 +1162,7 @@
   "image.formPlatformType": "构建平台",
   "image.formPlatformTypeTip": "为空时仅构建当前架构；构建多平台架构时必须确保仓库支持推送",
   "image.formTitle": "任务名称",
+  "image.listManageExportCompress": "启用 GZ 压缩？",
   "image.listManageExportOptionToHost": "仅导出到面板数据目录中？",
   "image.listManageExportTipOption": "导出镜像文件后可通过面板导入恢复，是否确认？",
   "image.listManagePruneOption.enableBuildCache": "构建缓存",
