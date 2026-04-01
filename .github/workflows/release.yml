@@ -32,32 +32,36 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
+        arch: [amd64, arm64, armv7]
         include:
           - family: ce
             libc: gnu
             build_os: linux
-            armv7: 1
             make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=gnu"
           - family: ce
             libc: musl
             build_os: linux
-            armv7: 1
             make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=musl"
           - family: ce
             libc: gnu
             build_os: windows
-            armv7: 0
             make_args: "BUILD_OS=windows APP_FAMILY=ce APP_ENV=all PUSH=all"
           - family: nw
             libc: musl
             build_os: linux
-            armv7: 0
             make_args: "APP_FAMILY=nw APP_ENV=lite OS=linux PUSH=all"
           - family: sy
             libc: musl
             build_os: linux
-            armv7: 0
             make_args: ""
+        exclude:
+          - family: ce
+            build_os: windows
+            arch: armv7
+          - family: nw
+            arch: armv7
+          - family: sy
+            arch: armv7
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -101,23 +105,44 @@ jobs:
       - name: Build CE Version
         if: matrix.family == 'ce'
         env:
-          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }} --cache-to type=gha,mode=max,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }}"
+          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }}-${{ matrix.arch }} --cache-to type=gha,mode=max,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }}-${{ matrix.arch }}"
         run: |
-          make release ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=${{ matrix.armv7 }} ${{ matrix.make_args }} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
+          case "${{ matrix.arch }}" in
+            amd64)
+              AMD64=1 ARM64=0 ARMV7=0
+              ;;
+            arm64)
+              AMD64=0 ARM64=1 ARMV7=0
+              ;;
+            armv7)
+              AMD64=0 ARM64=0 ARMV7=1
+              ;;
+          esac
+          make release ${{ env.VERSION_PARAM }} AMD64=${AMD64} ARM64=${ARM64} ARMV7=${ARMV7} ${{ matrix.make_args }} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
 
       - name: Build NW Version
         if: matrix.family == 'nw'
         run: |
-          make release APP_FAMILY=nw APP_ENV=lite ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 OS=linux PUSH=all
+          case "${{ matrix.arch }}" in
+            amd64)
+              AMD64=1 ARM64=0
+              ;;
+            arm64)
+              AMD64=0 ARM64=1
+              ;;
+          esac
+          make release APP_FAMILY=nw APP_ENV=lite ${{ env.VERSION_PARAM }} AMD64=${AMD64} ARM64=${ARM64} ARMV7=0 OS=linux PUSH=all
 
       - name: Build SY (Synology) Version
         if: matrix.family == 'sy'
         run: |
-          # Synology Toolchains
-          curl -Lo armv8-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/armv8-synology.txz && tar -Jvxf armv8-synology.txz
-          curl -Lo amd64-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/amd64-synology.txz && tar -Jvxf amd64-synology.txz
-          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 CC_ARM64=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
-          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 CC_AMD64=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            curl -Lo armv8-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/armv8-synology.txz && tar -Jvxf armv8-synology.txz
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 ARMV7=0 AMD64=0 CC_ARM64=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
+          else
+            curl -Lo amd64-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/amd64-synology.txz && tar -Jvxf amd64-synology.txz
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 ARM64=0 ARMV7=0 CC_AMD64=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
+          fi
 
       - name: Flatten Artifact Directories
         run: |
@@ -227,8 +252,52 @@ jobs:
           go-version: '1.25'
       - name: Install dependencies
         run: go get .
-      - name: Set up Docker
-        uses: docker/setup-docker-action@v4
+      - name: Install garble
+        if: matrix.family == 'pe'
+        run: go install mvdan.cc/garble@latest
+      - name: Build Darwin Binaries
+        env:
+          GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
+        run: |
+          export CC=$(which clang)
+          if [ "${{ matrix.family }}" = "pe" ]; then
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-pe-darwin-amd64 APP_FAMILY=pe AMD64=1 ARM64=0 ARMV7=0 GARBLE=1 GARBLE_SEED=${GARBLE_SEED} CC_AMD64="$CC"
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-pe-darwin-arm64 APP_FAMILY=pe AMD64=0 ARM64=1 ARMV7=0 GARBLE=1 GARBLE_SEED=${GARBLE_SEED} CC_ARM64="$CC -arch arm64"
+          else
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-amd64 APP_FAMILY=ce AMD64=1 ARM64=0 ARMV7=0 CC_AMD64="$CC"
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-arm64 APP_FAMILY=ce AMD64=0 ARM64=1 ARMV7=0 CC_ARM64="$CC -arch arm64"
+          fi
+      - name: upload artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: runtime/*darwin*
+          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+
+  darwin-image:
+    needs: [prepare, macos-build]
+    strategy:
+      fail-fast: true
+      matrix:
+        family: [ce, pe]
+    runs-on: ubuntu-latest
+    env:
+      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
+      - name: Download Darwin Binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p runtime
+          gh release download "${{ github.ref_name }}" \
+            --pattern "dpanel-${{ matrix.family }}-darwin-*" \
+            --dir runtime \
+            --clobber
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -246,35 +315,15 @@ jobs:
           registry: registry.cn-hangzhou.aliyuncs.com
           username: ${{ secrets.ALIYUN_USERNAME }}
           password: ${{ secrets.ALIYUN_TOKEN }}
-      - name: Build Darwin Binaries
-        env:
-          GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
-        run: |
-          export CC=$(which clang)
-          if [ "${{ matrix.family }}" = "pe" ]; then
-            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-pe-darwin-amd64 APP_FAMILY=pe AMD64=1 ARM64=0 ARMV7=0 GARBLE=1 GARBLE_SEED=${GARBLE_SEED} CC_AMD64="$CC"
-            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-pe-darwin-arm64 APP_FAMILY=pe AMD64=0 ARM64=1 ARMV7=0 GARBLE=1 GARBLE_SEED=${GARBLE_SEED} CC_ARM64="$CC -arch arm64"
-          else
-            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-amd64 APP_FAMILY=ce AMD64=1 ARM64=0 ARMV7=0 CC_AMD64="$CC"
-            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-arm64 APP_FAMILY=ce AMD64=0 ARM64=1 ARMV7=0 CC_ARM64="$CC -arch arm64"
-          fi
       - name: Build Darwin Image
         env:
-          GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
-          GIT_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
           DOCKER_EXT_ARGS: "--cache-from type=gha,scope=${{ matrix.family }}-darwin --cache-to type=gha,mode=max,scope=${{ matrix.family }}-darwin"
         run: |
           if [ "${{ matrix.family }}" = "pe" ]; then
-            make release BUILD_OS=darwin APP_FAMILY=pe APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all GARBLE=1 GARBLE_SEED=${GARBLE_SEED} GIT_TOKEN=${GIT_TOKEN} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
+            make release BUILD_OS=darwin APP_FAMILY=pe APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
           else
             make release BUILD_OS=darwin APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
           fi
-      - name: upload artifact
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: runtime/*
-          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
 
   xk-build:
     needs: prepare
@@ -312,7 +361,7 @@ jobs:
           prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
 
   push-tags-to-related-repos:
-    needs: [ build, build-pe, macos-build, xk-build ]
+    needs: [ build, build-pe, macos-build, darwin-image, xk-build ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout dpanel-gui
