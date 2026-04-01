@@ -12,6 +12,7 @@ import (
 	http2 "net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -31,6 +32,7 @@ import (
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
+	"github.com/mholt/archives"
 	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/registry-go-sdk"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -195,26 +197,29 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 
 	for _, s := range tarPathList {
 		err := func() error {
+			var imageStreamFile *os.File
 			mimeType, err := docker.Sdk.OciMimeType(docker.Sdk.Ctx, s)
-			if err != nil {
-				return err
-			}
-			if strings.Contains(mimeType, "application/vnd.oci") {
-				// oci 镜像
-				err = docker.Sdk.OciLoadImage(docker.Sdk.Ctx, s)
+			// 因为 windows 调用 oci 库的时候会报路径错误，包含了冒号（：）所以这里如果是 windows 则回退到 docker 逻辑上
+			if runtime.GOOS != "windows" && err == nil && strings.Contains(mimeType, "application/vnd.oci") {
+				imageStreamFile, err = docker.Sdk.OciToDockerTar(docker.Sdk.Ctx, s)
 				if err != nil {
 					return err
 				}
-				return nil
+			} else {
+				imageStreamFile, err = os.Open(s)
+				if err != nil {
+					return err
+				}
 			}
-			imageTar, err := os.Open(s)
-			if err != nil {
-				return err
-			}
+
 			defer func() {
-				_ = os.Remove(imageTar.Name())
+				if imageStreamFile != nil {
+					_ = imageStreamFile.Close()
+					_ = os.Remove(imageStreamFile.Name())
+				}
 			}()
-			response, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageTar, client.ImageLoadWithQuiet(false))
+
+			response, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageStreamFile, client.ImageLoadWithQuiet(false))
 			if err != nil {
 				return err
 			}
@@ -455,8 +460,9 @@ func (self Image) Prune(http *gin.Context) {
 
 func (self Image) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5                []string `json:"md5" binding:"required"`
-		EnableExportToPath bool     `json:"enableExportToPath"` // 开启后只存储到服务路径，不通过浏览器下载
+		Md5                  []string `json:"md5" binding:"required"`
+		EnableExportToPath   bool     `json:"enableExportToPath"` // 开启后只存储到服务路径，不通过浏览器下载
+		EnableExportCompress bool     `json:"enableExportCompress"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -469,6 +475,10 @@ func (self Image) Export(http *gin.Context) {
 		return strings.ReplaceAll(imageDetail.ImageName, "-", "_"), true
 	}), "-"), time.Now().Format(define.DateYmdHis))
 
+	if params.EnableExportCompress {
+		fileName += ".gz"
+	}
+
 	ctx, cancel := context.WithCancel(docker.Sdk.Ctx)
 	defer cancel()
 
@@ -477,6 +487,9 @@ func (self Image) Export(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	defer func() {
+		_ = out.Close()
+	}()
 
 	exportSaveFile, err := storage.Local{}.CreateSaveFile(filepath.Join("export", "image", fileName))
 	if err != nil {
@@ -487,7 +500,22 @@ func (self Image) Export(http *gin.Context) {
 		_ = exportSaveFile.Close()
 	}()
 
-	_, err = io.Copy(exportSaveFile, out)
+	if params.EnableExportCompress {
+		// 由于 zstd 是从 20 版本后才支持这里为了兼容还是保持 gz
+		compression := archives.Gz{}
+		cw, err := compression.OpenWriter(exportSaveFile)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		defer func() {
+			_ = cw.Close()
+		}()
+		_, err = io.Copy(cw, out)
+	} else {
+		_, err = io.Copy(exportSaveFile, out)
+	}
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
