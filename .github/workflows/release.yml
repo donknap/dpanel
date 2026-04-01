@@ -32,41 +32,32 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        target: [ce-linux-gnu, ce-linux-musl, ce-windows, nw-linux, sy-linux]
-        arch: [amd64, arm64, armv7]
         include:
-          - target: ce-linux-gnu
-            family: ce
+          - family: ce
             libc: gnu
             build_os: linux
+            armv7: 1
             make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=gnu"
-          - target: ce-linux-musl
-            family: ce
+          - family: ce
             libc: musl
             build_os: linux
+            armv7: 1
             make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=musl"
-          - target: ce-windows
-            family: ce
+          - family: ce
             libc: gnu
             build_os: windows
+            armv7: 0
             make_args: "BUILD_OS=windows APP_FAMILY=ce APP_ENV=all PUSH=all"
-          - target: nw-linux
-            family: nw
+          - family: nw
             libc: musl
             build_os: linux
+            armv7: 0
             make_args: "APP_FAMILY=nw APP_ENV=lite OS=linux PUSH=all"
-          - target: sy-linux
-            family: sy
+          - family: sy
             libc: musl
             build_os: linux
+            armv7: 0
             make_args: ""
-        exclude:
-          - target: ce-windows
-            arch: armv7
-          - target: nw-linux
-            arch: armv7
-          - target: sy-linux
-            arch: armv7
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -110,44 +101,23 @@ jobs:
       - name: Build CE Version
         if: matrix.family == 'ce'
         env:
-          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }}-${{ matrix.arch }} --cache-to type=gha,mode=max,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }}-${{ matrix.arch }}"
+          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }} --cache-to type=gha,mode=max,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }}"
         run: |
-          case "${{ matrix.arch }}" in
-            amd64)
-              AMD64=1 ARM64=0 ARMV7=0
-              ;;
-            arm64)
-              AMD64=0 ARM64=1 ARMV7=0
-              ;;
-            armv7)
-              AMD64=0 ARM64=0 ARMV7=1
-              ;;
-          esac
-          make release ${{ env.VERSION_PARAM }} AMD64=${AMD64} ARM64=${ARM64} ARMV7=${ARMV7} ${{ matrix.make_args }} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
+          make release ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=${{ matrix.armv7 }} ${{ matrix.make_args }} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
 
       - name: Build NW Version
         if: matrix.family == 'nw'
         run: |
-          case "${{ matrix.arch }}" in
-            amd64)
-              AMD64=1 ARM64=0
-              ;;
-            arm64)
-              AMD64=0 ARM64=1
-              ;;
-          esac
-          make release APP_FAMILY=nw APP_ENV=lite ${{ env.VERSION_PARAM }} AMD64=${AMD64} ARM64=${ARM64} ARMV7=0 OS=linux PUSH=all
+          make release APP_FAMILY=nw APP_ENV=lite ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 OS=linux PUSH=all
 
       - name: Build SY (Synology) Version
         if: matrix.family == 'sy'
         run: |
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            curl -Lo armv8-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/armv8-synology.txz && tar -Jvxf armv8-synology.txz
-            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 ARMV7=0 AMD64=0 CC_ARM64=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
-          else
-            curl -Lo amd64-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/amd64-synology.txz && tar -Jvxf amd64-synology.txz
-            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 ARM64=0 ARMV7=0 CC_AMD64=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
-          fi
+          # Synology Toolchains
+          curl -Lo armv8-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/armv8-synology.txz && tar -Jvxf armv8-synology.txz
+          curl -Lo amd64-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/amd64-synology.txz && tar -Jvxf amd64-synology.txz
+          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 CC_ARM64=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
+          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 CC_AMD64=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
 
       - name: Flatten Artifact Directories
         run: |
