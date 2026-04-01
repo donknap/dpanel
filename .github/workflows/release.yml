@@ -74,9 +74,6 @@ jobs:
         with:
           submodules: recursive
           token: ${{ secrets.MY_GITHUB_TOKEN }}
-        with:
-          submodules: recursive
-          token: ${{ secrets.MY_GITHUB_TOKEN }}
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -221,6 +218,9 @@ jobs:
           echo "Runs name: ${{runner.os}}"
           echo "Global Version Param is: '${{ env.VERSION_PARAM }}'"
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -276,39 +276,6 @@ jobs:
           files: runtime/*
           prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
 
-  windows-build:
-    needs: prepare
-    runs-on: windows-latest
-    env:
-      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
-    steps:
-      - name: Test Env
-        run: |
-          echo "Tag name from GITHUB_REF_NAME: $GITHUB_REF_NAME"
-          echo "Tag name from github.ref_name: ${{  github.ref_name }}"
-          echo "Tag name from github.ref: ${{  github.ref }}"
-          echo "Runs name: ${{runner.os}}"
-          echo "Global Version Param is: '${{ env.VERSION_PARAM }}'"
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-      - name: Install dependencies
-        run: go get .
-      - name: Install Make
-        run: choco install make -y
-      - name: Build
-        shell: bash
-        run: |
-          make build ${{ env.VERSION_PARAM }} BUILD_OS=windows PROJECT_NAME=dpanel.exe AMD64=1 CC_AMD64=gcc
-      - name: upload artifact
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: runtime/*
-          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
-
   xk-build:
     needs: prepare
     runs-on: ubuntu-latest
@@ -345,7 +312,7 @@ jobs:
           prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
 
   push-tags-to-related-repos:
-    needs: [ build, build-pe, macos-build, windows-build, xk-build ]
+    needs: [ build, build-pe, macos-build, xk-build ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout dpanel-gui
