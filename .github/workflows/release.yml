@@ -32,35 +32,40 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
+        target: [ce-linux-gnu, ce-linux-musl, ce-windows, nw-linux, sy-linux]
         arch: [amd64, arm64, armv7]
         include:
-          - family: ce
+          - target: ce-linux-gnu
+            family: ce
             libc: gnu
             build_os: linux
             make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=gnu"
-          - family: ce
+          - target: ce-linux-musl
+            family: ce
             libc: musl
             build_os: linux
             make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=musl"
-          - family: ce
+          - target: ce-windows
+            family: ce
             libc: gnu
             build_os: windows
             make_args: "BUILD_OS=windows APP_FAMILY=ce APP_ENV=all PUSH=all"
-          - family: nw
+          - target: nw-linux
+            family: nw
             libc: musl
             build_os: linux
             make_args: "APP_FAMILY=nw APP_ENV=lite OS=linux PUSH=all"
-          - family: sy
+          - target: sy-linux
+            family: sy
             libc: musl
             build_os: linux
             make_args: ""
         exclude:
-          - family: ce
-            build_os: windows
+          - target: ce-windows
             arch: armv7
-          - family: nw
+          - target: nw-linux
             arch: armv7
-          - family: sy
+          - target: sy-linux
             arch: armv7
     runs-on: ubuntu-latest
     env:
