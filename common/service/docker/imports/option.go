@@ -228,3 +228,31 @@ func WithImportTarGzFile(tarPath string) ImportFileOption {
 		return WithImportTar(reader)(self)
 	}
 }
+
+func WithImportFileInTar(reader *tar.Reader, newFileName string, match func(header *tar.Header) bool) ImportFileOption {
+	return func(self *ImportFile) (err error) {
+		if match == nil {
+			return nil
+		}
+		for {
+			header, err := reader.Next()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return err
+			}
+			if match(header) {
+				header.Name = getTarName(self.targetRootPath, newFileName)
+				if err := self.tarWrite.WriteHeader(header); err != nil {
+					return err
+				}
+				if _, err := io.Copy(self.tarWrite, reader); err != nil {
+					return err
+				}
+				break
+			}
+		}
+		return nil
+	}
+}

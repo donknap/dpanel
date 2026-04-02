@@ -26,8 +26,13 @@ jobs:
             echo "version_param=APP_VERSION=$TAG" >> $GITHUB_OUTPUT
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          prerelease: ${{ steps.set_param.outputs.is_prerelease == 'true' }}
 
-  build:
+  build-ce-base:
     needs: prepare
     strategy:
       fail-fast: true
@@ -43,6 +48,68 @@ jobs:
             build_os: linux
             armv7: 1
             make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=musl"
+    runs-on: ubuntu-latest
+    env:
+      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+    steps:
+      - name: Test Env
+        run: |
+          echo "Tag name from GITHUB_REF_NAME: $GITHUB_REF_NAME"
+          echo "Tag name from github.ref_name: ${{  github.ref_name }}"
+          echo "Tag name from github.ref: ${{  github.ref }}"
+          echo "Runs name: ${{runner.os}}"
+          echo "Global Version Param is: '${{ env.VERSION_PARAM }}'"
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          name: dpanel-context-local-builder
+          driver-opts: image=moby/buildkit:master
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to ALiYun
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-hangzhou.aliyuncs.com
+          username: ${{ secrets.ALIYUN_USERNAME }}
+          password: ${{ secrets.ALIYUN_TOKEN }}
+
+      - name: Build CE Version
+        if: matrix.family == 'ce'
+        env:
+          DOCKER_EXT_ARGS: "--cache-from type=gha,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }} --cache-to type=gha,mode=max,scope=ce-${{ matrix.build_os }}-${{ matrix.libc }}"
+        run: |
+          make release ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=${{ matrix.armv7 }} ${{ matrix.make_args }} DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
+
+      - name: Flatten Artifact Directories
+        run: |
+          find runtime -mindepth 2 -type f -name 'dpanel-*' -exec mv -f {} runtime/ \; || true
+          find runtime -mindepth 1 -type d -empty -delete || true
+
+      - name: Upload Release Assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: find runtime -maxdepth 1 -type f -exec gh release upload "${{ github.ref_name }}" {} --clobber \;
+
+  build-other:
+    needs: prepare
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
           - family: ce
             libc: gnu
             build_os: windows
@@ -85,7 +152,6 @@ jobs:
         with:
           name: dpanel-context-local-builder
           driver-opts: image=moby/buildkit:master
-          install: true
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -124,15 +190,13 @@ jobs:
           find runtime -mindepth 2 -type f -name 'dpanel-*' -exec mv -f {} runtime/ \; || true
           find runtime -mindepth 1 -type d -empty -delete || true
 
-      - name: upload artifact
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: runtime/*
-          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+      - name: Upload Release Assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: find runtime -maxdepth 1 -type f -exec gh release upload "${{ github.ref_name }}" {} --clobber \;
 
   build-pe:
-    needs: [prepare, build]
+    needs: [prepare, build-ce-base]
     strategy:
       fail-fast: true
       matrix:
@@ -168,7 +232,6 @@ jobs:
         with:
           name: dpanel-context-local-builder
           driver-opts: image=moby/buildkit:master
-          install: true
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -194,12 +257,10 @@ jobs:
           find runtime -mindepth 2 -type f -name 'dpanel-*' -exec mv -f {} runtime/ \; || true
           find runtime -mindepth 1 -type d -empty -delete || true
 
-      - name: upload artifact
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: runtime/*
-          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+      - name: Upload Release Assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: find runtime -maxdepth 1 -type f -exec gh release upload "${{ github.ref_name }}" {} --clobber \;
 
   macos-build:
     needs: prepare
@@ -242,12 +303,10 @@ jobs:
             make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-amd64 APP_FAMILY=ce AMD64=1 ARM64=0 ARMV7=0 CC_AMD64="$CC"
             make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-arm64 APP_FAMILY=ce AMD64=0 ARM64=1 ARMV7=0 CC_ARM64="$CC -arch arm64"
           fi
-      - name: upload artifact
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: runtime/*darwin*
-          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+      - name: Upload Release Assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: find runtime -maxdepth 1 -type f -name '*darwin*' -exec gh release upload "${{ github.ref_name }}" {} --clobber \;
 
   darwin-image:
     needs: [prepare, macos-build]
@@ -278,7 +337,6 @@ jobs:
         with:
           name: dpanel-context-local-builder
           driver-opts: image=moby/buildkit:master
-          install: true
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -328,15 +386,13 @@ jobs:
           make -C app/pro/tests/xk_open clean libxksssopen.so
           make clean 
           make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-xk-amd64 APP_FAMILY=xk AMD64=1 CC_AMD64=gcc
-      - name: upload artifact
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: runtime/*
-          prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+      - name: Upload Release Assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: find runtime -maxdepth 1 -type f -exec gh release upload "${{ github.ref_name }}" {} --clobber \;
 
   push-tags-to-related-repos:
-    needs: [ build, build-pe, macos-build, darwin-image, xk-build ]
+    needs: [ build-ce-base, build-other, build-pe, macos-build, darwin-image, xk-build ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout dpanel-gui

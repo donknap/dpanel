@@ -32,20 +32,20 @@ RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_windows_$
     COMMON_ARGS="APP_VERSION=${APP_VERSION} APP_FAMILY=${APP_FAMILY-ce} BUILD_OS=windows LIBC=gnu" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
         export CC_AMD64="$ZIG cc -target x86_64-windows-gnu"; \
-        make build ${COMMON_ARGS} AMD64=1 ARM64=0 ARMV7=0; \
+        make build ${COMMON_ARGS} PROJECT_NAME=dpanel-ce-windows-amd64.exe AMD64=1 ARM64=0 ARMV7=0; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         export CC_ARM64="$ZIG cc -target aarch64-windows-gnu"; \
-        make build ${COMMON_ARGS} AMD64=0 ARM64=1 ARMV7=0; \
+        make build ${COMMON_ARGS} PROJECT_NAME=dpanel-ce-windows-arm64.exe AMD64=0 ARM64=1 ARMV7=0; \
     fi
 
 FROM scratch AS binary-export
 ARG TARGETARCH
-COPY --from=builder /src/runtime/dpanel-ce-gnu-${TARGETARCH} /dpanel-ce-gnu-${TARGETARCH}.exe
+COPY --from=builder /src/runtime/dpanel-ce-windows-${TARGETARCH}.exe /dpanel-ce-windows-${TARGETARCH}.exe
 COPY --from=builder /src/runtime/config.yaml /config.yaml
 
 FROM scratch AS lite
 ARG TARGETARCH
-COPY --from=builder /src/runtime/dpanel-ce-gnu-${TARGETARCH} /app/server/dpanel.exe
+COPY --from=builder /src/runtime/dpanel-ce-windows-${TARGETARCH}.exe /app/server/dpanel.exe
 COPY ./config.yaml /app/server/config.yaml
 
 FROM lite AS production
