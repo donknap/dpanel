@@ -461,7 +461,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		}
 
 		if !function.IsEmptyArray(item.VolumeList) {
-			func() {
+			err = func() error {
 				var proxyContainerName string
 
 				// 仅当有挂载文件的时候才新建文件管理助手
@@ -472,8 +472,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					defer ctxCancel()
 					proxyContainerName, err = plugin.NewHostExplorer(ctx, docker.Sdk)
 					if err != nil {
-						self.JsonResponseWithError(http, err, 500)
-						return
+						return err
 					}
 				}
 
@@ -481,30 +480,45 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					targetImportContainerName := newContainerName
 					targetImportPath := "/"
 
-					// 因为从 docker 导出目录的时候，不会存储一级目录，而是从二级目录开始。
-					// 例如 docker cp caddy:/etc/caddy/ . 只会保存 caddy 目录，那么这里恢复的时候，也需要脱去一层目录
-					if volume.Mode.IsRegular() {
-						targetImportPath = path.Join("/", "mnt", "host", path.Dir(volume.Source))
-						targetImportContainerName = proxyContainerName
-					} else {
-						targetImportPath = path.Dir(volume.Destination)
-						targetImportContainerName = newContainerName
-					}
-
 					reader, _ := b.Reader.ReadBlobs(volume.SavePath)
 					gzReader, _ := gzip.NewReader(reader)
 					tarReader := tar.NewReader(gzReader)
-					if importFiles, err := imports.NewFileImport(targetImportPath, imports.WithImportTar(tarReader)); err == nil {
-						err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, targetImportContainerName, "/", importFiles.Reader())
+
+					// 因为从 docker 导出目录的时候，不会存储一级目录，而是从二级目录开始。
+					// 例如 docker cp caddy:/etc/caddy/ . 只会保存 caddy 目录，那么这里恢复的时候，也需要脱去一层目录
+					importOption := make([]imports.ImportFileOption, 0)
+					if volume.Mode.IsRegular() {
+						targetImportPath = path.Join("/", "mnt", "host", path.Dir(volume.Source))
+						targetImportContainerName = proxyContainerName
+						importOption = append(importOption, imports.WithImportFileInTar(tarReader, path.Base(volume.Source), func(header *tar.Header) bool {
+							return strings.HasSuffix(volume.Destination, header.Name)
+						}))
+						_, err = docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, proxyContainerName, "mkdir -p "+targetImportPath)
+						if err != nil {
+							return err
+						}
+					} else {
+						targetImportPath = path.Dir(volume.Destination)
+						targetImportContainerName = newContainerName
+						importOption = append(importOption, imports.WithImportTar(tarReader))
+					}
+
+					if importFiles, err := imports.NewFileImport("/", importOption...); err == nil {
+						err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, targetImportContainerName, targetImportPath, importFiles.Reader())
 						importFiles.Close()
 						if err != nil {
-							self.JsonResponseWithError(http, err, 500)
-							return
+							return err
 						}
 					}
 					_ = gzReader.Close()
 				}
+				return nil
 			}()
+
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 
 		if runContainer {
