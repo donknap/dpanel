@@ -461,7 +461,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		}
 
 		if !function.IsEmptyArray(item.VolumeList) {
-			func() {
+			err = func() error {
 				var proxyContainerName string
 
 				// 仅当有挂载文件的时候才新建文件管理助手
@@ -472,8 +472,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					defer ctxCancel()
 					proxyContainerName, err = plugin.NewHostExplorer(ctx, docker.Sdk)
 					if err != nil {
-						self.JsonResponseWithError(http, err, 500)
-						return
+						return err
 					}
 				}
 
@@ -494,6 +493,10 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 						importOption = append(importOption, imports.WithImportFileInTar(tarReader, path.Base(volume.Source), func(header *tar.Header) bool {
 							return strings.HasSuffix(volume.Destination, header.Name)
 						}))
+						_, err = docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, proxyContainerName, "mkdir -p "+targetImportPath)
+						if err != nil {
+							return err
+						}
 					} else {
 						targetImportPath = path.Dir(volume.Destination)
 						targetImportContainerName = newContainerName
@@ -504,13 +507,18 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 						err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, targetImportContainerName, targetImportPath, importFiles.Reader())
 						importFiles.Close()
 						if err != nil {
-							self.JsonResponseWithError(http, err, 500)
-							return
+							return err
 						}
 					}
 					_ = gzReader.Close()
 				}
+				return nil
 			}()
+
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 
 		if runContainer {
