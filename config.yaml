@@ -22,7 +22,7 @@ log:
   file:
     driver: file
     path: ${STORAGE_LOCAL_PATH}/logs/dpanel.log
-    level: warn
+    level: ${DP_LOG_FILE_LEVEL-info}
   console:
     driver: console
     level: ${DP_LOG_CONSOLE_LEVEL-info}
