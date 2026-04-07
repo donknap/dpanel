@@ -162,7 +162,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 		return
 	}
 	defer func() {
-		defer importFile.Close()
+		importFile.Close()
 	}()
 	err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, params.Name, params.DstPath, importFile.Reader())
 	if err != nil {

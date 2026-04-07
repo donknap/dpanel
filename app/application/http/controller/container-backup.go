@@ -493,7 +493,9 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 						importOption = append(importOption, imports.WithImportFileInTar(tarReader, path.Base(volume.Source), func(header *tar.Header) bool {
 							return strings.HasSuffix(volume.Destination, header.Name)
 						}))
-						_, err = docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, proxyContainerName, "mkdir -p "+targetImportPath)
+						if p := function.PathClean(targetImportPath); p != "" {
+							_, err = docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, proxyContainerName, "mkdir -p "+p)
+						}
 						if err != nil {
 							return err
 						}
