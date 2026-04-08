@@ -72,7 +72,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		if _, err := docker.Sdk.Client.Ping(docker.Sdk.Ctx); err != nil {
 			if v, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithSockProxy()); err == nil {
 				docker.Sdk = v
-				slog.Debug("docker daemon/event update docker.Sdk")
+				slog.Debug("docker daemon/event update docker.Sdk", "address", v.Client.DaemonHost())
 			}
 		}
 		// 当前的状态有变化，强制前端重新刷新一下状态

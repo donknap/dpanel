@@ -44,7 +44,7 @@ func NewClientWithDockerEnv(dockerEnv *types.DockerEnv, opts ...Option) (*Client
 
 func NewEmptyClient(dockerEnv *types.DockerEnv) *Client {
 	v, err := NewClient(
-		WithAddress(define.DockerDefaultEmptyClientHost),
+		WithAddress(dockerclient.DefaultDockerHost),
 		WithName(dockerEnv.Name),
 		WithDockerEnv(dockerEnv),
 	)
