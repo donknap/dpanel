@@ -49,7 +49,7 @@ COPY --from=builder /src/runtime/config.yaml /config.yaml
 
 FROM scratch AS lite
 ARG TARGETARCH
-COPY --from=builder /src/runtime/dpanel-pe-windows-${TARGETARCH}.exe /app/server/dpanel.exe
+COPY --from=builder /src/runtime/dpanel-pe-windows-${TARGETARCH}.exe /app/server/dpanel
 COPY ./config.yaml /app/server/config.yaml
 
 FROM lite AS production
