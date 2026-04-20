@@ -9,7 +9,7 @@ ARG HTTP_PROXY
 
 RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     apt-get update && apt-get install -y --no-install-recommends make git && \
-    go install mvdan.cc/garble@latest
+    go install mvdan.cc/garble@v0.15.0
 
 WORKDIR /src
 

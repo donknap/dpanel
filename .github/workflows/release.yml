@@ -290,7 +290,7 @@ jobs:
         run: go get .
       - name: Install garble
         if: matrix.family == 'pe'
-        run: go install mvdan.cc/garble@latest
+        run: go install mvdan.cc/garble@v0.15.0
       - name: Build Darwin Binaries
         env:
           GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
