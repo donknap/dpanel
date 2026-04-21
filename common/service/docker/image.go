@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/types/fs"
@@ -150,6 +151,20 @@ func (self Client) ImageLoadFsFile(ctx context.Context, file ioFs.File) error {
 	_, err = io.Copy(io.Discard, reader.Body)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (self Client) ImageRemoveAll(ctx context.Context, imageName string) error {
+	imageInfo, err := self.Client.ImageInspect(ctx, imageName)
+	if err != nil {
+		return err
+	}
+	for _, tag := range imageInfo.RepoTags {
+		_, err = self.Client.ImageRemove(ctx, tag, image.RemoveOptions{})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

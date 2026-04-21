@@ -3,14 +3,12 @@ package plugin
 import (
 	"bytes"
 	"embed"
-	"fmt"
 	"html/template"
 	"io/fs"
 	"log/slog"
 	"os"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -233,6 +231,10 @@ func (self *Plugin) Close() error {
 			}
 			return false
 		})
+
+		if err = self.dockerSdk.ImageRemoveAll(self.dockerSdk.Ctx, containerInfo.Config.Image); err != nil {
+			slog.Debug("plugin delete explorer image", "id", containerInfo.Config.Image)
+		}
 	}
 	return nil
 }
@@ -248,13 +250,7 @@ func (self *Plugin) Exists() bool {
 }
 
 func importImage(sdk *docker.Client, imageName string, imageFile fs.File) error {
-	serverStartTime := time.Now()
-	if v, ok := storage.Cache.Get(storage.CacheKeyCommonServerStartTime); ok {
-		serverStartTime = v.(time.Time)
-	}
-	tag := fmt.Sprintf("%s-%s:latest", imageName, serverStartTime.Format(define.DateShowVersion))
-
-	if imageInfo, err := sdk.Client.ImageInspect(sdk.Ctx, imageName); err != nil || !function.InArray(imageInfo.RepoTags, tag) {
+	if _, err := sdk.Client.ImageInspect(sdk.Ctx, imageName); err != nil {
 		if _, err = docker.Sdk.Client.ImageRemove(sdk.Ctx, imageName, image.RemoveOptions{
 			Force:         true,
 			PruneChildren: true,
@@ -265,7 +261,6 @@ func importImage(sdk *docker.Client, imageName string, imageFile fs.File) error 
 		if err != nil {
 			return err
 		}
-		_ = sdk.Client.ImageTag(sdk.Ctx, imageName, tag)
 	}
 	return nil
 }

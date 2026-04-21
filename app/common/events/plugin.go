@@ -1,12 +1,14 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/types/define"
@@ -26,13 +28,26 @@ func (self Plugin) DestroyExplorer(e event.DockerDaemonPayload) {
 				All:     true,
 				Filters: filter,
 			}); err == nil {
+				var removeErr error
 				for _, containerInfo := range list {
-					slog.Debug("plugin destroy explorer", "name", containerInfo.Names)
-					_ = dockerSdk.Client.ContainerStop(dockerSdk.Ctx, containerInfo.ID, container.StopOptions{})
-					_ = dockerSdk.Client.ContainerRemove(dockerSdk.Ctx, containerInfo.ID, container.RemoveOptions{
+					err = dockerSdk.Client.ContainerStop(dockerSdk.Ctx, containerInfo.ID, container.StopOptions{})
+					if err != nil {
+						errors.Join(removeErr, err)
+					}
+					err = dockerSdk.Client.ContainerRemove(dockerSdk.Ctx, containerInfo.ID, container.RemoveOptions{
 						Force: true,
 					})
+					if err != nil {
+						errors.Join(removeErr, err)
+					}
+					err = dockerSdk.ImageRemoveAll(dockerSdk.Ctx, containerInfo.Image)
+					if err != nil {
+						errors.Join(removeErr, err)
+					}
 				}
+				slog.Debug("plugin destroy explorer", "name", function.PluckArrayWalk(list, func(item container.Summary) ([]string, bool) {
+					return item.Names, true
+				}), "error", removeErr)
 			}
 			return
 		}
