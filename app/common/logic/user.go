@@ -102,6 +102,7 @@ func (self User) GetUserOauthToken(user *entity.Setting, autoLogin bool) (string
 		AutoLogin:        autoLogin,
 	}
 	userInfo.RegisteredClaims.IssuedAt = jwt.NewNumericDate(time.Now())
+	// TODO: autoLogin 后续补充独立的过期策略，避免长期 token 无明确 exp。
 	var rsaKeyContent []byte
 	if v, ok := storage.Cache.Get(storage.CacheKeyRsaKey); ok {
 		rsaKeyContent = v.([]byte)

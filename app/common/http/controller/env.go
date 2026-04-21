@@ -155,7 +155,11 @@ func (self Env) Create(http *gin.Context) {
 			params.ComposePath = fmt.Sprintf("compose-%s", params.Name)
 		}
 	}
-	_ = os.MkdirAll(filepath.Join(storage.Local{}.GetStorageLocalPath(), params.ComposePath), 0755)
+	composePath := function.PathSafeJoin(storage.Local{}.GetStorageLocalPath(), params.ComposePath)
+	if relComposePath, err := filepath.Rel(storage.Local{}.GetStorageLocalPath(), composePath); err == nil {
+		params.ComposePath = relComposePath
+	}
+	_ = os.MkdirAll(composePath, 0755)
 
 	dockerEnv := &types2.DockerEnv{
 		Name:              params.Name,

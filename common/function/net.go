@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -41,6 +42,39 @@ func IpIsLocalhost(address string) bool {
 		return ip.IsLoopback()
 	}
 	return false
+}
+
+func CheckSSRFURL(raw string) error {
+	uri, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if uri.Scheme != "http" && uri.Scheme != "https" {
+		return errors.New("unsupported url scheme")
+	}
+	host := uri.Hostname()
+	if host == "" {
+		return errors.New("invalid url host")
+	}
+	if strings.EqualFold(host, "localhost") {
+		return errors.New("localhost is not allowed")
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return err
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() {
+			return errors.New("loopback address is not allowed")
+		}
+		if ip.IsUnspecified() {
+			return errors.New("unspecified address is not allowed")
+		}
+		if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return errors.New("link-local address is not allowed")
+		}
+	}
+	return nil
 }
 
 func SystemResolver(defaultDnsIps ...string) []string {

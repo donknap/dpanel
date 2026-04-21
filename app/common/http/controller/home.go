@@ -175,6 +175,12 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	clientReady := false
+	defer func() {
+		if !clientReady {
+			_ = client.Close()
+		}
+	}()
 	go func() {
 		select {
 		case <-client.CtxContext.Done():
@@ -214,6 +220,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 		return
 	}
 
+	clientReady = true
 	go client.ReadMessage()
 	go func() {
 		out := make([]byte, 2028)
@@ -287,6 +294,12 @@ func (self Home) WsHostConsole(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	clientReady := false
+	defer func() {
+		if !clientReady {
+			_ = client.Close()
+		}
+	}()
 
 	err = func() error {
 		dockerEnv, err := logic.Env{}.GetEnvByName(params.Name)
@@ -315,6 +328,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 		return
 	}
 
+	clientReady = true
 	go func() {
 		out := make([]byte, 2028)
 		for {

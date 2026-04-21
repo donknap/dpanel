@@ -16,8 +16,7 @@ import (
 )
 
 var (
-	collect         = NewCollection()
-	sendMessageLock = sync.RWMutex{}
+	collect = NewCollection()
 )
 
 func NewClient(ctx *gin.Context, options ...Option) (*Client, error) {
@@ -74,6 +73,7 @@ type Client struct {
 	Conn               *websocket.Conn // 当前 ws 连接
 	CtxCancelFunc      context.CancelFunc
 	CtxContext         context.Context
+	writeLock          sync.Mutex
 	recvMessageHandler map[string]RecvMessageHandlerFn
 }
 
@@ -118,8 +118,8 @@ func (self *Client) ReadMessage() {
 }
 
 func (self *Client) SendMessage(message *RespMessage) error {
-	sendMessageLock.Lock()
-	defer sendMessageLock.Unlock()
+	self.writeLock.Lock()
+	defer self.writeLock.Unlock()
 	err := self.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
 	if err != nil {
 		return err

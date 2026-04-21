@@ -61,7 +61,9 @@ func (self Explorer) Export(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -140,7 +142,9 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -181,7 +185,9 @@ func (self Explorer) Import(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -226,7 +232,9 @@ func (self Explorer) Unzip(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -326,7 +334,9 @@ func (self Explorer) Delete(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	sshClient, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	sshClient, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -361,7 +371,9 @@ func (self Explorer) GetPathList(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	sshClient, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	sshClient, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -370,7 +382,7 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		params.Path = "/"
 		if sshClient != nil {
 			if defaultPath, err := remote.QuickRun(sshClient, "pwd"); err == nil {
-				params.Path = string(defaultPath)
+				params.Path = strings.TrimSpace(string(defaultPath))
 			}
 		} else {
 			if v, err := os.UserHomeDir(); err == nil {
@@ -458,7 +470,9 @@ func (self Explorer) GetContent(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -515,7 +529,9 @@ func (self Explorer) Chmod(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -550,7 +566,9 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -591,7 +609,9 @@ func (self Explorer) GetUserList(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -648,7 +668,9 @@ func (self Explorer) MkDir(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -683,7 +705,9 @@ func (self Explorer) Copy(http *gin.Context) {
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, params.Name)
+	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
+		MountPoint: params.Name,
+	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

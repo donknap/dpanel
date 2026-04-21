@@ -97,6 +97,32 @@ func PathClean(p string) string {
 	return cleaned
 }
 
+// PathSafeJoin 以 root 作为根目录拼接后续路径，并强制结果落在 root 下。
+func PathSafeJoin(root string, paths ...string) string {
+	if root == "" {
+		return ""
+	}
+	cleanRoot := filepath.Clean(root)
+	parts := make([]string, 0, len(paths)+1)
+	parts = append(parts, cleanRoot)
+	for _, p := range paths {
+		if p == "" {
+			continue
+		}
+		cleanPart := Path2SystemSafe(p)
+		cleanPart = strings.TrimLeft(filepath.ToSlash(cleanPart), "/")
+		cleanPart = strings.TrimPrefix(cleanPart, cleanRoot)
+		cleanPart = strings.TrimLeft(cleanPart, "/")
+		cleanPart = strings.TrimPrefix(cleanPart, filepath.ToSlash(cleanRoot))
+		cleanPart = strings.TrimLeft(cleanPart, "/")
+		if cleanPart == "" || cleanPart == "." {
+			continue
+		}
+		parts = append(parts, filepath.FromSlash(cleanPart))
+	}
+	return filepath.Join(parts...)
+}
+
 func PathSize(p string) (int64, error) {
 	var size int64
 

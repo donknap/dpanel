@@ -7,10 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/fs/dockerfs"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -70,14 +68,6 @@ func (self Explorer) Afs(dockerSdk *docker.Client, option AfsCreateOption) (*afe
 		}
 	default:
 		targetContainerName = mountTarget
-		dpanelInfo := logic.Setting{}.GetDPanelInfo()
-		if dpanelInfo.Mount.Host != "" {
-			pluginOption = plugin.CreateOption{
-				Volumes: []types.VolumeItem{
-					dpanelInfo.Mount,
-				},
-			}
-		}
 	}
 
 	explorer, err := plugin.NewPlugin(dockerSdk, plugin.ExplorerName, pluginOption)

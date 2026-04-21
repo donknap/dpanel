@@ -98,6 +98,9 @@ func (self Store) SyncByGit(gitUrl string, option SyncByGitOption) error {
 // SyncByZip 同步远程 zip
 // root 只同步 root 目录下的内容
 func (self Store) SyncByZip(path, zipUrl string, root string) error {
+	if err := function.CheckSSRFURL(zipUrl); err != nil {
+		return err
+	}
 	zipTempFile, _ := storage.Local{}.CreateTempFile("")
 	defer func() {
 		_ = zipTempFile.Close()
@@ -157,6 +160,9 @@ func (self Store) SyncByZip(path, zipUrl string, root string) error {
 }
 
 func (self Store) SyncByUrl(targetPath, url string) error {
+	if err := function.CheckSSRFURL(url); err != nil {
+		return err
+	}
 	_ = os.MkdirAll(filepath.Dir(targetPath), os.ModePerm)
 	file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	defer func() {

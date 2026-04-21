@@ -12,7 +12,6 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/event"
-	"github.com/gorilla/websocket"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
@@ -110,7 +109,7 @@ func (self *Collection) sendMessage(message *RespMessage) {
 		if message.Fd != "" && c.Fd != message.Fd {
 			return true
 		}
-		err := c.Conn.WriteMessage(websocket.TextMessage, message.ToJson())
+		err := c.SendMessage(message)
 		if err != nil {
 			slog.Warn("ws broadcast error", "fd", c.Fd, "error", err.Error())
 			self.Leave(c)
