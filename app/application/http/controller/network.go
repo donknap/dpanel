@@ -245,15 +245,20 @@ func (self Network) Connect(http *gin.Context) {
 		return
 	}
 
-	alise := make([]string, 0)
-	for _, item := range params.ContainerAlise {
-		alise = append(alise, strings.TrimPrefix(item, "/"))
+	var err error
+	if params.Name == network.NetworkBridge {
+		err = docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, params.Name, params.ContainerName, &network.EndpointSettings{})
+	} else {
+		alise := make([]string, 0)
+		for _, item := range params.ContainerAlise {
+			alise = append(alise, strings.TrimPrefix(item, "/"))
+		}
+		err = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, types.NetworkItem{
+			Name:  params.Name,
+			Alise: alise,
+			IpV4:  params.IpV4,
+		}, params.ContainerName)
 	}
-	err := docker.Sdk.NetworkConnect(docker.Sdk.Ctx, types.NetworkItem{
-		Name:  params.Name,
-		Alise: alise,
-		IpV4:  params.IpV4,
-	}, params.ContainerName)
 
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
