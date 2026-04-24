@@ -381,7 +381,7 @@ func (self Home) Info(http *gin.Context) {
 		}
 	}
 
-	dockerEnv := docker.Sdk.DockerEnv
+	dockerEnv := *docker.Sdk.DockerEnv
 	dockerEnv.SshServerInfo = nil
 	dockerEnv.TlsCert = ""
 	dockerEnv.TlsCa = ""
@@ -405,7 +405,7 @@ func (self Home) Info(http *gin.Context) {
 			"containerInfo": containerInfo,
 			"runIn":         dpanelInfo.RunIn,
 		},
-		"dockerEnv": docker.Sdk.DockerEnv,
+		"dockerEnv": dockerEnv,
 		"plugin":    plugin.Wrapper{}.GetPluginList(),
 		"rsa": gin.H{
 			"public": public,
