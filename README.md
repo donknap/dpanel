@@ -60,7 +60,7 @@ lite 版去掉了域名转发相关，需要自行转发域名绑定容器，不
 ```
 docker run -d --name dpanel --restart=always \
  -p 8807:8080 -e APP_NAME=dpanel \
- -v /var/run/docker.sock:/var/run/docker.sock 
+ -v /var/run/docker.sock:/var/run/docker.sock \
  -v /home/dpanel:/dpanel dpanel/dpanel:lite
 ```
 
