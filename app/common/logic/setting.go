@@ -2,6 +2,7 @@ package logic
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -90,6 +91,16 @@ func (self Setting) GetValueById(id int32) (*entity.Setting, error) {
 func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 	result := types2.DPanelInfo{}
 	self.GetByKey(SettingGroupSetting, SettingGroupSettingDPanelInfo, &result)
+	if result.Proxy == "" {
+		if v := os.Getenv("HTTP_PROXY"); v != "" {
+			result.Proxy = v
+		} else {
+			result.Proxy = os.Getenv("HTTPS_PROXY")
+		}
+	}
+	if result.NoProxy == "" {
+		result.NoProxy = os.Getenv("NO_PROXY")
+	}
 	return result
 }
 

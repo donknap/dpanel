@@ -1,0 +1,20 @@
+services:
+  dpanel-plugin-installer:
+    image: dpanel/installer:latest
+    container_name: dpanel-plugin-installer
+    restart: "no"
+    labels:
+      - "com.dpanel.container.title=DPanel-升级助手"
+      - "com.dpanel.container.auto_remove=true"
+      - "com.dpanel.container.hash={{.hash}}"
+      - "com.dpanel.container.name=dpanel-plugin-installer"
+#{{- if .command }}
+    command:
+#{{- range .command }}
+      - {{ . | printf "%q" }}
+#{{- end }}
+#{{- end }}
+    x-dpanel-service:
+      image_registry:
+        - docker.io
+        - registry.cn-hangzhou.aliyuncs.com

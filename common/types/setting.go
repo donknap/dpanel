@@ -14,5 +14,6 @@ type DPanelInfo struct {
 	ContainerInfo container.InspectResponse `json:"containerInfo"`
 	RunIn         string                    `json:"runIn"`
 	Proxy         string                    `json:"proxy"`
+	NoProxy       string                    `json:"noProxy"`
 	Mount         types.VolumeItem          `json:"mount"` // 通过容器创建时是挂载目录，二进制运行时是直接路径
 }

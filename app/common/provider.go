@@ -3,6 +3,7 @@ package common
 import (
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/donknap/dpanel/app/common/events"
 	"github.com/donknap/dpanel/app/common/http/controller"
@@ -124,6 +125,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 
 		cors.POST("/common/panel/usage", controller.Panel{}.Usage)
 		cors.POST("/common/panel/backup", controller.Panel{}.Backup)
+		cors.POST("/common/panel/proxy", controller.Panel{}.Proxy)
 		cors.POST("/common/panel/backup-list", controller.Panel{}.BackupList)
 		cors.POST("/common/panel/backup-delete", controller.Panel{}.BackupDelete)
 		cors.POST("/common/panel/backup-download", controller.Panel{}.BackupDownload)
@@ -161,6 +163,14 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			}
 			_ = dao.Cron.Save(task)
 		}
+	}
+
+	// 配置代理
+	if v := (logic.Setting{}).GetDPanelInfo(); v.Proxy != "" {
+		_ = os.Setenv("HTTP_PROXY", v.Proxy)
+		_ = os.Setenv("HTTPS_PROXY", v.Proxy)
+		_ = os.Setenv("NO_PROXY", v.NoProxy)
+		slog.Info("dpanel set proxy", "url", v.Proxy)
 	}
 
 	// 启动全局的监控

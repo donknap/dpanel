@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -202,6 +204,64 @@ func (self Panel) Proxy(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+
+	if params.Proxy != "" {
+		proxyUrl, err := url.ParseRequestURI(params.Proxy)
+		if err != nil || proxyUrl.Scheme == "" || proxyUrl.Host == "" {
+			self.JsonResponseWithError(http, errors.New("invalid proxy url"), 500)
+			return
+		}
+		address := proxyUrl.Host
+		if proxyUrl.Port() == "" {
+			switch proxyUrl.Scheme {
+			case "http":
+				address = net.JoinHostPort(proxyUrl.Hostname(), "80")
+			case "https":
+				address = net.JoinHostPort(proxyUrl.Hostname(), "443")
+			case "socks5":
+				address = net.JoinHostPort(proxyUrl.Hostname(), "1080")
+			default:
+				self.JsonResponseWithError(http, errors.New("unsupported proxy scheme"), 500)
+				return
+			}
+		}
+		conn, err := net.DialTimeout("tcp", address, 3*time.Second)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_ = conn.Close()
+	}
+
+	dpanelInfo := logic.Setting{}.GetDPanelInfo()
+	dpanelInfo.Proxy = params.Proxy
+	dpanelInfo.NoProxy = params.NoProxy
+	err := logic.Setting{}.Save(&entity.Setting{
+		GroupName: logic.SettingGroupSetting,
+		Name:      logic.SettingGroupSettingDPanelInfo,
+		Value: &accessor.SettingValueOption{
+			DPanelInfo: &dpanelInfo,
+		},
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.Proxy != "" {
+		_ = os.Setenv("HTTP_PROXY", params.Proxy)
+		_ = os.Setenv("HTTPS_PROXY", params.Proxy)
+	} else {
+		_ = os.Unsetenv("HTTP_PROXY")
+		_ = os.Unsetenv("HTTPS_PROXY")
+	}
+
+	if params.NoProxy != "" {
+		_ = os.Setenv("NO_PROXY", params.NoProxy)
+	} else {
+		_ = os.Unsetenv("NO_PROXY")
+	}
+
+	self.JsonSuccessResponse(http)
 }
 
 func (self Panel) BackupList(http *gin.Context) {

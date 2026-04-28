@@ -404,6 +404,8 @@ func (self Home) Info(http *gin.Context) {
 			"env":           facade.GetConfig().GetString("app.env"),
 			"containerInfo": containerInfo,
 			"runIn":         dpanelInfo.RunIn,
+			"proxy":         dpanelInfo.Proxy,
+			"noProxy":       dpanelInfo.NoProxy,
 		},
 		"dockerEnv": dockerEnv,
 		"plugin":    plugin.Wrapper{}.GetPluginList(),

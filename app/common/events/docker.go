@@ -3,7 +3,6 @@ package events
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -96,12 +95,6 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 	}()
 
 	result := logic.Setting{}.GetDPanelInfo()
-	if result.Proxy != "" {
-		_ = os.Setenv("HTTP_PROXY", result.Proxy)
-		_ = os.Setenv("HTTPS_PROXY", result.Proxy)
-		slog.Info("init dpanel proxy", "url", result.Proxy)
-	}
-
 	if dockerInfo, err := sdk.Client.Info(sdk.Ctx); err == nil {
 		dockerEnv.DockerInfo = &types.DockerInfo{
 			ID:              dockerInfo.ID,

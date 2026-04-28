@@ -71,6 +71,7 @@ func (self Store) SyncByGit(gitUrl string, option SyncByGitOption) error {
 	cmd, err := local.New(
 		local.WithCommandName("git"),
 		local.WithArgs(args...),
+		local.WithEnv(os.Environ()),
 	)
 	if err != nil {
 		return err
