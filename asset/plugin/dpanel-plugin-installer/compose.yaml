@@ -15,6 +15,7 @@ services:
 #{{- end }}
 #{{- end }}
     x-dpanel-service:
-      image_registry:
-        - docker.io
+      image_proxy:
         - registry.cn-hangzhou.aliyuncs.com
+        - docker.io
+      image_auto_remove: true

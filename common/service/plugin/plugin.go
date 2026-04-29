@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"embed"
 	"html/template"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -19,6 +20,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/we7coreteam/registry-go-sdk"
 )
 
 const ExplorerName = "dpanel-plugin-explorer"
@@ -101,6 +103,39 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 				return nil, err
 			}
 		}
+	}
+
+	if serviceExt.ImageProxy != nil {
+		imageNameDetail := function.ImageTag(service.Image)
+
+		for _, proxy := range serviceExt.ImageProxy {
+			reg := registry.New(
+				registry.WithAddress(proxy),
+			)
+			if ok, _, manifestErr := reg.Client().ManifestExist(imageNameDetail.BaseName, imageNameDetail.Version); manifestErr == nil && ok {
+				imageNameDetail.Registry = proxy
+				break
+			}
+		}
+
+		reader, err := dockerSdk.Client.ImagePull(dockerSdk.Ctx, imageNameDetail.Uri(), image.PullOptions{})
+		if err != nil {
+			slog.Debug("plugin pull image", "image", imageNameDetail.Uri(), "error", err)
+			return nil, err
+		}
+		defer func() {
+			_ = reader.Close()
+		}()
+		_, err = io.Copy(os.Stdout, reader)
+		if err != nil {
+			return nil, err
+		}
+
+		err = dockerSdk.Client.ImageTag(dockerSdk.Ctx, imageNameDetail.Uri(), service.Image)
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	return p, nil
@@ -212,6 +247,11 @@ func (self *Plugin) Close() error {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
+	_, serviceExt, err := self.composeTask.GetService(self.Name)
+	if err != nil {
+		return err
+	}
+
 	if containerInfo, err := self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, self.containerName); err == nil {
 		if containerInfo.State.Running {
 			if err = self.dockerSdk.Client.ContainerStop(self.dockerSdk.Ctx, containerInfo.ID, container.StopOptions{}); err != nil {
@@ -232,8 +272,10 @@ func (self *Plugin) Close() error {
 			return false
 		})
 
-		if err = self.dockerSdk.ImageRemoveAll(self.dockerSdk.Ctx, containerInfo.Config.Image); err != nil {
-			slog.Debug("plugin delete explorer image", "id", containerInfo.Config.Image)
+		if serviceExt.ImageAutoRemove {
+			if err = self.dockerSdk.ImageRemoveAll(self.dockerSdk.Ctx, containerInfo.Config.Image); err != nil {
+				slog.Debug("plugin delete explorer image", "id", containerInfo.Config.Image)
+			}
 		}
 	}
 	return nil

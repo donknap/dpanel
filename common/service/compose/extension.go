@@ -16,8 +16,9 @@ type PortsItem struct {
 }
 
 type ExtService struct {
-	ImageTar      map[string]string `yaml:"image_tar,omitempty" json:"image_tar"`
-	ImageRegistry []string          `yaml:"image_registry" json:"image_registry"` // 用于自动选择镜像源
-	External      ExternalItem      `yaml:"external,omitempty" json:"external"`   // 关联外部容器资源
-	Ports         PortsItem         `yaml:"ports,omitempty" json:"ports"`
+	ImageTar        map[string]string `yaml:"image_tar,omitempty" json:"image_tar"`
+	ImageProxy      []string          `yaml:"image_proxy" json:"image_proxy"` // 用于自动选择镜像源
+	ImageAutoRemove bool              `yaml:"image_auto_remove" json:"image_auto_remove"`
+	External        ExternalItem      `yaml:"external,omitempty" json:"external"` // 关联外部容器资源
+	Ports           PortsItem         `yaml:"ports,omitempty" json:"ports"`
 }
