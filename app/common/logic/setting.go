@@ -95,10 +95,8 @@ func (self Setting) GetValueById(id int32) (*entity.Setting, error) {
 func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 	result := types2.DPanelInfo{}
 	self.GetByKey(SettingGroupSetting, SettingGroupSettingDPanelInfo, &result)
-	if result.Name == "" {
-		result.Name = strings.TrimSpace(facade.GetConfig().GetString("app.name"))
-	}
-	if result.Name == "" && !function.IsRunInDocker() {
+	existingName := result.Name
+	if !function.IsRunInDocker() {
 		if executablePath, err := os.Executable(); err == nil {
 			executableName := strings.TrimSpace(filepath.Base(executablePath))
 			if executableName != "" && executableName != "." && executableName != string(filepath.Separator) {
@@ -106,20 +104,15 @@ func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 			}
 		}
 	}
-	rawVersion := result.Version
-	if rawVersion == "" {
-		rawVersion = os.Getenv("APP_VERSION")
+	if result.Name == "" {
+		result.Name = existingName
 	}
-	if rawVersion == "" {
-		rawVersion = facade.GetConfig().GetString("app.version")
+	if result.Name == "" {
+		result.Name = strings.TrimSpace(facade.GetConfig().GetString("app.name"))
 	}
-	result.Version = rawVersion
-	if result.Family == "" {
-		result.Family = os.Getenv("APP_FAMILY")
-	}
-	if result.Env == "" {
-		result.Env = os.Getenv("APP_ENV")
-	}
+	result.Version = facade.GetConfig().GetString("app.version")
+	result.Family = facade.GetConfig().GetString("app.family")
+	result.Env = facade.GetConfig().GetString("app.env")
 	if result.Dns == "" {
 		result.Dns = os.Getenv("DP_DNS")
 	}
@@ -133,8 +126,8 @@ func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 	if result.NoProxy == "" {
 		result.NoProxy = os.Getenv("NO_PROXY")
 	}
-	if len(rawVersion) == len(define.DateShowVersion) && strings.Count(rawVersion, ".") == 1 {
-		if t, err := time.ParseInLocation(define.DateShowVersion, rawVersion, time.UTC); err == nil {
+	if len(result.Version) == len(define.DateShowVersion) && strings.Count(result.Version, ".") == 1 {
+		if t, err := time.ParseInLocation(define.DateShowVersion, result.Version, time.UTC); err == nil {
 			result.IsDev = true
 			result.Version = t.Local().Format(define.DateShowVersion)
 		}

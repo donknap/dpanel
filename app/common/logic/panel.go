@@ -18,7 +18,7 @@ const panelUpdateCommandTemplate = `
 docker run --rm \
 -v /var/run/docker.sock:/var/run/docker.sock \
 {{ .installerImage }} \
-upgrade -y \
+upgrade -y -d \
 --name {{ .name }}{{ if .version }} \
 --version {{ .version }}{{ end }}{{ if .edition }} \
 --edition {{ .edition }}{{ end }}{{ if .enableDev }} \
@@ -28,7 +28,7 @@ upgrade -y \
 --backup{{ end }}
 {{- else -}}
 curl -sSL https://dpanel.cc/quick.sh | bash -s -- \
-upgrade -y \
+upgrade -y -d \
 --name {{ .name }} \
 {{ if .version }} \
 --version {{ .version }}{{ end }}{{ if .edition }} \
