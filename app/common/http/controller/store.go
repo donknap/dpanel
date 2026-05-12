@@ -104,7 +104,10 @@ func (self Store) Delete(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
-		err := os.RemoveAll(filepath.Join(storage.Local{}.GetStorePath(), storeRow.Name))
+		err := function.SafeDeleteAll(
+			storage.Local{}.GetStorePath(),
+			storeRow.Name,
+		)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -184,7 +187,7 @@ func (self Store) Sync(http *gin.Context) {
 	}
 	var err error
 
-	storeRootPath := filepath.Join(storage.Local{}.GetStorePath(), params.Name)
+	storeRootPath := function.SafePathJoin(storage.Local{}.GetStorePath(), params.Name)
 	if _, err = os.Stat(storeRootPath); err != nil && params.Type == define.StoreTypeOnePanelLocal {
 		_ = os.MkdirAll(filepath.Join(storeRootPath, "apps"), os.ModePerm)
 	}
@@ -268,7 +271,7 @@ func (self Store) Deploy(http *gin.Context) {
 		return
 	}
 
-	composeYamlRealPath := filepath.Join(storage.Local{}.GetStorePath(), params.VersionInfo.ComposeFile)
+	composeYamlRealPath := function.SafePathJoin(storage.Local{}.GetStorePath(), params.VersionInfo.ComposeFile)
 
 	// 创建私有网络
 	if v, ok := map[string]string{
@@ -362,15 +365,15 @@ func (self Store) Deploy(http *gin.Context) {
 			Store:       fmt.Sprintf("%s:%s@%s@%s", storeRow.Setting.Type, storeRow.Title, storeRow.Setting.Url, params.AppName),
 			Environment: params.VersionInfo.Environment,
 			Uri: []string{
-				filepath.Join(params.TaskName, filepath.Base(params.VersionInfo.ComposeFile)),
+				filepath.Join(function.SafeFileName(params.TaskName), filepath.Base(params.VersionInfo.ComposeFile)),
 			},
 			DockerEnvName: docker.Sdk.Name,
 		},
 	}
 
-	targetPath := filepath.Join(storage.Local{}.GetComposePath(""), params.TaskName)
+	targetPath := storage.Local{}.GetComposeProjectPath("", params.TaskName)
 	if docker.Sdk.DockerEnv.EnableComposePath {
-		targetPath = filepath.Join(storage.Local{}.GetComposePath(docker.Sdk.Name), params.TaskName)
+		targetPath = storage.Local{}.GetComposeProjectPath(docker.Sdk.Name, params.TaskName)
 	}
 
 	err = dao.Compose.Create(composeNew)

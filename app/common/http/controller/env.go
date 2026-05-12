@@ -40,17 +40,17 @@ func (self Env) GetList(http *gin.Context) {
 	if setting, err := (logic.Setting{}).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDocker); err == nil {
 		for _, item := range setting.Value.Docker {
 			if params.EnableCertContent && item.EnableTLS {
-				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetCertPath(), item.TlsCa)); err == nil {
+				if content, err := os.ReadFile(function.SafePathJoin(storage.Local{}.GetCertPath(), item.TlsCa)); err == nil {
 					item.TlsCa = string(content)
 				} else {
 					item.TlsCa = ""
 				}
-				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetCertPath(), item.TlsCert)); err == nil {
+				if content, err := os.ReadFile(function.SafePathJoin(storage.Local{}.GetCertPath(), item.TlsCert)); err == nil {
 					item.TlsCert = string(content)
 				} else {
 					item.TlsCert = ""
 				}
-				if content, err := os.ReadFile(filepath.Join(storage.Local{}.GetCertPath(), item.TlsKey)); err == nil {
+				if content, err := os.ReadFile(function.SafePathJoin(storage.Local{}.GetCertPath(), item.TlsKey)); err == nil {
 					item.TlsKey = string(content)
 				} else {
 					item.TlsKey = ""
@@ -155,7 +155,7 @@ func (self Env) Create(http *gin.Context) {
 			params.ComposePath = fmt.Sprintf("compose-%s", params.Name)
 		}
 	}
-	composePath := function.PathSafeJoin(storage.Local{}.GetStorageLocalPath(), params.ComposePath)
+	composePath := function.SafePathJoin(storage.Local{}.GetStorageLocalPath(), params.ComposePath)
 	if relComposePath, err := filepath.Rel(storage.Local{}.GetStorageLocalPath(), composePath); err == nil {
 		params.ComposePath = relComposePath
 	}
@@ -201,7 +201,7 @@ func (self Env) Create(http *gin.Context) {
 			if s.content == "" || !strings.Contains(s.content, "-----BEGIN") {
 				continue
 			}
-			path := filepath.Join(storage.Local{}.GetCertPath(), dockerEnv.CertRoot(), s.name)
+			path := function.SafePathJoin(storage.Local{}.GetCertPath(), dockerEnv.CertRoot(), s.name)
 			err := os.MkdirAll(filepath.Dir(path), os.ModePerm)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)

@@ -2,10 +2,13 @@ package logic
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"html/template"
 	"path/filepath"
+	"regexp"
 
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 )
@@ -13,32 +16,15 @@ import (
 type Panel struct {
 }
 
+var installerArgKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]*$`)
+
+// 容器内触发升级时必须以 detached 模式运行 installer，避免当前进程/容器退出后升级中断。
 const panelUpdateCommandTemplate = `
 {{- if eq .type "container" -}}
-docker run --rm \
--v /var/run/docker.sock:/var/run/docker.sock \
-{{ .installerImage }} \
-upgrade -y -d \
---name {{ .name }}{{ if .version }} \
---version {{ .version }}{{ end }}{{ if .edition }} \
---edition {{ .edition }}{{ end }}{{ if .enableDev }} \
---dev{{ end }}{{ if .dns }} \
---dns {{ .dns }}{{ end }}{{ if .proxy }} \
---proxy {{ .proxy }}{{ end }}{{ if .enableBackup }} \
---backup{{ end }}
+docker run -d --rm -v /var/run/docker.sock:/var/run/docker.sock {{ .installerDownloadSource }} upgrade -y --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
 {{- else -}}
-curl -sSL https://dpanel.cc/quick.sh | bash -s -- \
-upgrade -y -d \
---name {{ .name }} \
-{{ if .version }} \
---version {{ .version }}{{ end }}{{ if .edition }} \
---edition {{ .edition }}{{ end }}{{ if .enableDev }} \
---dev{{ end }}{{ if .dns }} \
---dns {{ .dns }}{{ end }}{{ if .proxy }} \
---proxy {{ .proxy }}{{ end }}{{ if .enableBackup }} \
---backup{{ end }}
-{{- end }}
-`
+curl -sSL https://dpanel.cc/quick.sh | bash -s -- upgrade -y -d --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
+{{- end }}`
 
 func (self Panel) GetPanelPath() []*types.ValueItem {
 	savePath := []*types.ValueItem{
@@ -78,7 +64,21 @@ func (self Panel) SaveRootPath() string {
 }
 
 func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
-	commandTemplate, err := template.New("panel-update-command").Parse(panelUpdateCommandTemplate)
+	if raw, exists := params["params"]; exists && raw != nil {
+		args, ok := raw.(map[string]any)
+		if !ok {
+			return "", errors.New("invalid update params")
+		}
+		for key := range args {
+			if !installerArgKeyPattern.MatchString(key) {
+				return "", fmt.Errorf("invalid update param key: %s", key)
+			}
+		}
+	}
+
+	commandTemplate, err := template.New("panel-update-command").Funcs(template.FuncMap{
+		"shellSafe": function.SafeShell,
+	}).Parse(panelUpdateCommandTemplate)
 	if err != nil {
 		return "", err
 	}

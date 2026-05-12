@@ -77,6 +77,38 @@ func CheckSSRFURL(raw string) error {
 	return nil
 }
 
+func ValidateDomainName(domain string) error {
+	domain = strings.TrimSpace(domain)
+	if domain == "" {
+		return errors.New("domain is empty")
+	}
+	if net.ParseIP(domain) != nil {
+		return errors.New("domain cannot be ip")
+	}
+	if strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") {
+		return errors.New("domain cannot start or end with dot")
+	}
+	parts := strings.Split(domain, ".")
+	if len(parts) < 2 {
+		return errors.New("domain must include at least one dot")
+	}
+	for _, label := range parts {
+		if label == "" || len(label) > 63 {
+			return errors.New("domain label length is invalid")
+		}
+		if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+			return errors.New("domain label cannot start or end with hyphen")
+		}
+		for _, ch := range label {
+			if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' {
+				continue
+			}
+			return errors.New("domain contains invalid character")
+		}
+	}
+	return nil
+}
+
 func SystemResolver(defaultDnsIps ...string) []string {
 	resolvers := make([]string, 0, 3)
 	file, err := os.Open("/etc/resolv.conf")

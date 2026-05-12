@@ -28,8 +28,8 @@ func PathConvertWinPath2Unix(p string) (string, bool) {
 	return path.Clean(convertedSource), true
 }
 
-// Path2SystemSafe 传入类 linux 风格的路径，返回一个当前系统支持的安全路径
-func Path2SystemSafe(p string) string {
+// SystemPathFromSlash 传入类 linux 风格路径，返回当前系统可用路径。
+func SystemPathFromSlash(p string) string {
 	if p == "" {
 		return "."
 	}
@@ -95,32 +95,6 @@ func PathClean(p string) string {
 	}
 
 	return cleaned
-}
-
-// PathSafeJoin 以 root 作为根目录拼接后续路径，并强制结果落在 root 下。
-func PathSafeJoin(root string, paths ...string) string {
-	if root == "" {
-		return ""
-	}
-	cleanRoot := filepath.Clean(root)
-	parts := make([]string, 0, len(paths)+1)
-	parts = append(parts, cleanRoot)
-	for _, p := range paths {
-		if p == "" {
-			continue
-		}
-		cleanPart := Path2SystemSafe(p)
-		cleanPart = strings.TrimLeft(filepath.ToSlash(cleanPart), "/")
-		cleanPart = strings.TrimPrefix(cleanPart, cleanRoot)
-		cleanPart = strings.TrimLeft(cleanPart, "/")
-		cleanPart = strings.TrimPrefix(cleanPart, filepath.ToSlash(cleanRoot))
-		cleanPart = strings.TrimLeft(cleanPart, "/")
-		if cleanPart == "" || cleanPart == "." {
-			continue
-		}
-		parts = append(parts, filepath.FromSlash(cleanPart))
-	}
-	return filepath.Join(parts...)
 }
 
 func PathSize(p string) (int64, error) {

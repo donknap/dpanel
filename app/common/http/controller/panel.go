@@ -27,6 +27,7 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
+	"github.com/mcuadros/go-version"
 	"github.com/mholt/archives"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/we7coreteam/registry-go-sdk"
@@ -270,15 +271,11 @@ func (self Panel) Proxy(http *gin.Context) {
 
 func (self Panel) Update(http *gin.Context) {
 	type ParamsValidate struct {
-		Name           string `json:"name"`
-		Type           string `json:"type"`
-		InstallerImage string `json:"installerImage"`
-		Version        string `json:"version"`
-		Edition        string `json:"edition"`
-		EnableDev      bool   `json:"enableDev"`
-		Dns            string `json:"dns"`
-		Proxy          string `json:"proxy"`
-		EnableBackup   bool   `json:"enableBackup"`
+		Name                    string         `json:"name"`
+		Type                    string         `json:"type"`
+		InstallerDownloadSource string         `json:"installerDownloadSource"`
+		DryRun                  bool           `json:"dryRun"`
+		Params                  map[string]any `json:"params"`
 	}
 
 	params := ParamsValidate{}
@@ -298,7 +295,7 @@ func (self Panel) Update(http *gin.Context) {
 	}
 
 	if params.Type == "container" {
-		params.InstallerImage = "dpanel/installer:latest"
+		params.InstallerDownloadSource = "dpanel/installer:latest"
 		for _, address := range []string{"registry.cn-hangzhou.aliyuncs.com", "docker.io"} {
 			reg := registry.New(
 				registry.WithAddress(address),
@@ -307,7 +304,7 @@ func (self Panel) Update(http *gin.Context) {
 				slog.Debug("panel upgrade select installer registry", "address", address, "error", err)
 				continue
 			}
-			params.InstallerImage = address + "/dpanel/installer:latest"
+			params.InstallerDownloadSource = address + "/dpanel/installer:latest"
 			break
 		}
 
@@ -316,6 +313,12 @@ func (self Panel) Update(http *gin.Context) {
 	cmd, err := logic.Panel{}.MakeUpdateCommand(function.StructToMap(params))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.DryRun {
+		self.JsonResponseWithoutError(http, gin.H{
+			"command": cmd,
+		})
 		return
 	}
 
@@ -408,12 +411,15 @@ func (self Panel) BackupDelete(http *gin.Context) {
 		return
 	}
 	for _, s := range params.Name {
-		backupFilePath := filepath.Join(logic.Panel{}.SaveRootPath(), function.PathClean(s))
+		backupFilePath := function.SafePathJoin(logic.Panel{}.SaveRootPath(), s)
 		if _, err := os.Stat(backupFilePath); errors.Is(err, os.ErrNotExist) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		err := os.Remove(backupFilePath)
+		err := function.SafeDelete(
+			logic.Panel{}.SaveRootPath(),
+			s,
+		)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -432,7 +438,7 @@ func (self Panel) BackupDownload(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	backupFilePath := filepath.Join(logic.Panel{}.SaveRootPath(), function.PathClean(params.Name))
+	backupFilePath := filepath.Join(logic.Panel{}.SaveRootPath(), function.SafeFileName(params.Name))
 	if _, err := os.Stat(backupFilePath); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -456,7 +462,7 @@ func (self Panel) BackupRestore(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	backupTar := filepath.Join(logic.Panel{}.SaveRootPath(), function.PathClean(params.Name))
+	backupTar := filepath.Join(logic.Panel{}.SaveRootPath(), function.SafeFileName(params.Name))
 	if _, err := os.Stat(backupTar); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -530,5 +536,33 @@ func (self Panel) BackupImport(http *gin.Context) {
 	info.Backup.ID = 0
 	_ = dao.Backup.Save(info.Backup)
 	self.JsonSuccessResponse(http)
+	return
+}
+
+func (self Panel) CheckNewVersion(http *gin.Context) {
+	currentVersion := facade.GetConfig().GetString("app.version")
+	newVersion := ""
+	reference := "latest"
+	if strings.Index(currentVersion, ".") == 8 {
+		reference = "beta"
+	}
+	option := make([]registry.Option, 0)
+	option = append(option, registry.WithAddress(registry.RegistryDefaultHost, "registry.cn-hangzhou.aliyuncs.com"))
+	reg := registry.New(option...)
+	if manifest, _, err := reg.Client().PullManifest("dpanel/dpanel", reference); err == nil {
+		for _, descriptor := range manifest.References() {
+			if ver, ok := descriptor.Annotations[define.PanelLabelVersion]; ok {
+				if version.Compare(ver, currentVersion, ">") {
+					newVersion = ver
+				}
+				break
+			}
+		}
+	}
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"version":    currentVersion,
+		"newVersion": newVersion,
+	})
 	return
 }

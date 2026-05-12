@@ -585,11 +585,12 @@ func (self ContainerBackup) Delete(http *gin.Context) {
 	}
 	backupInfo, _ := dao.Backup.Where(dao.Backup.ID.In(params.Id...)).Find()
 	for _, item := range backupInfo {
-		_ = os.Remove(filepath.Join(storage.Local{}.GetBackupPath(), item.Setting.BackupTar))
+		_ = function.SafeDelete(storage.Local{}.GetBackupPath(), item.Setting.BackupTar)
 		// 删除临时文件
-		if tempFileList, err := filepath.Glob(filepath.Join(storage.Local{}.GetBackupPath(), filepath.Dir(item.Setting.BackupTar), "*.temp")); err == nil {
+		tempGlobDir := function.SafePathJoin(storage.Local{}.GetBackupPath(), filepath.Dir(item.Setting.BackupTar))
+		if tempFileList, err := filepath.Glob(filepath.Join(tempGlobDir, "*.temp")); err == nil {
 			for _, file := range tempFileList {
-				_ = os.Remove(file)
+				_ = function.SafeDelete(storage.Local{}.GetBackupPath(), file)
 			}
 		}
 	}

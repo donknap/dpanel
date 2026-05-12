@@ -47,6 +47,10 @@ func (self SiteDomain) Create(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	if err := function.ValidateDomainName(params.ServerName); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	var err error
 	var siteDomainRow *entity.SiteDomain
 
@@ -69,6 +73,10 @@ func (self SiteDomain) Create(http *gin.Context) {
 	}
 
 	for _, alias := range params.ServerNameAlias {
+		if err := function.ValidateDomainName(alias); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 		if item, err := dao.SiteDomain.
 			Where(gen.Cond(datatypes.JSONQuery("setting").
 				Likes("%"+alias+"%", "serverNameAlias"))...).
@@ -226,12 +234,12 @@ func (self SiteDomain) GetDetail(http *gin.Context) {
 	}
 
 	vhostFileName := domainRow.Setting.VHostFilename()
-	vhost, err := os.ReadFile(filepath.Join(storage.Local{}.GetNginxSettingPath(), vhostFileName))
+	vhost, err := os.ReadFile(storage.Local{}.GetNginxSettingFilePath(vhostFileName))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if extraVhost, err := os.ReadFile(filepath.Join(storage.Local{}.GetNginxExtraSettingPath(), vhostFileName)); err == nil {
+	if extraVhost, err := os.ReadFile(storage.Local{}.GetNginxExtraSettingFilePath(vhostFileName)); err == nil {
 		domainRow.Setting.ExtraNginx = template.HTML(extraVhost)
 	}
 	self.JsonResponseWithoutError(http, gin.H{
@@ -251,7 +259,7 @@ func (self SiteDomain) Delete(http *gin.Context) {
 	}
 	list, _ := dao.SiteDomain.Where(dao.SiteDomain.ID.In(params.Id...)).Find()
 	for _, item := range list {
-		err := os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), item.Setting.VHostFilename()))
+		err := os.Remove(storage.Local{}.GetNginxSettingFilePath(item.Setting.VHostFilename()))
 		if err != nil {
 			slog.Debug("container delete domain", "error", err)
 		}
@@ -322,12 +330,15 @@ func (self SiteDomain) NginxRestart(http *gin.Context) {
 
 func (self SiteDomain) NginxLog(http *gin.Context) {
 	type ParamsValidate struct {
-		Log       []string `json:"log"`
-		LineTotal int      `json:"lineTotal"`
+		LineTotal int `json:"lineTotal"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
+	}
+	logPathList := []string{
+		"/var/log/nginx/access.log",
+		"/var/log/nginx/error.log",
 	}
 
 	wsBuffer := ws.NewProgressPip(ws.MessageTypeNginxLog)
@@ -338,7 +349,7 @@ func (self SiteDomain) NginxLog(http *gin.Context) {
 
 	var wg sync.WaitGroup
 
-	for _, s := range params.Log {
+	for _, s := range logPathList {
 		wg.Add(1)
 
 		go func(filename string) {
@@ -346,7 +357,7 @@ func (self SiteDomain) NginxLog(http *gin.Context) {
 
 			file, err := os.Open(filename)
 			if err != nil {
-				wsBuffer.BroadcastMessage(function.ConsoleWriteError(fmt.Sprintf("打开文件失败 %s: %v", filename, err)))
+				wsBuffer.BroadcastMessage(function.ConsoleWriteError(fmt.Sprintf("Open file failed %s: %v", filename, err)))
 				return
 			}
 
@@ -411,7 +422,7 @@ func (self SiteDomain) UpdateVhost(http *gin.Context) {
 		return
 	}
 
-	nginxConfPath := filepath.Join(storage.Local{}.GetNginxSettingPath(), siteDomainRow.Setting.VHostFilename())
+	nginxConfPath := storage.Local{}.GetNginxSettingFilePath(siteDomainRow.Setting.VHostFilename())
 	err = os.WriteFile(nginxConfPath, []byte(params.Vhost), 0666)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/acme"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/google/uuid"
@@ -26,7 +27,7 @@ func (self Local) GetSaveRootPath() string {
 }
 
 func (self Local) GetSaveRealPath(name string) string {
-	return filepath.Join(self.GetStorageLocalPath(), "storage", name)
+	return function.SafePathJoin(self.GetSaveRootPath(), name)
 }
 
 func (self Local) GetCertPath() string {
@@ -77,8 +78,20 @@ func (self Local) GetNginxSettingPath() string {
 	return fmt.Sprintf("%s/nginx/proxy_host/", self.GetStorageLocalPath())
 }
 
+func (self Local) GetNginxSettingFilePath(fileName string) string {
+	return function.SafePathJoin(self.GetNginxSettingPath(), fileName)
+}
+
 func (self Local) GetNginxExtraSettingPath() string {
 	return fmt.Sprintf("%s/nginx/extra_host/", self.GetStorageLocalPath())
+}
+
+func (self Local) GetNginxExtraSettingFilePath(fileName string) string {
+	return function.SafePathJoin(self.GetNginxExtraSettingPath(), fileName)
+}
+
+func (self Local) GetComposeProjectPath(dockerEnvName string, projectName string) string {
+	return function.SafePathJoin(self.GetComposePath(dockerEnvName), projectName)
 }
 
 func (self Local) GetStorageLocalPath() string {
