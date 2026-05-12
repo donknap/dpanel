@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -113,6 +114,35 @@ func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 	result.Version = facade.GetConfig().GetString("app.version")
 	result.Family = facade.GetConfig().GetString("app.family")
 	result.Env = facade.GetConfig().GetString("app.env")
+	result.BaseURL = facade.GetConfig().GetString("system.baseurl")
+	result.ServerHost = facade.GetConfig().GetString("server.http.host")
+	result.ServerPort = facade.GetConfig().GetInt("server.http.port")
+	result.LogConsoleLevel = facade.GetConfig().GetString("log.console.level")
+	result.LogFileLevel = facade.GetConfig().GetString("log.file.level")
+	result.StorageLocalPath = facade.GetConfig().GetString("system.storage.local.path")
+
+	if result.ServerHost == "" {
+		result.ServerHost = os.Getenv("APP_SERVER_HOST")
+	}
+	if result.ServerPort <= 0 {
+		if v := os.Getenv("APP_SERVER_PORT"); v != "" {
+			if port, err := strconv.Atoi(v); err == nil {
+				result.ServerPort = port
+			}
+		}
+	}
+	if result.BaseURL == "" {
+		result.BaseURL = os.Getenv("DP_SYSTEM_BASEURL")
+	}
+	if result.LogConsoleLevel == "" {
+		result.LogConsoleLevel = os.Getenv("DP_LOG_CONSOLE_LEVEL")
+	}
+	if result.LogFileLevel == "" {
+		result.LogFileLevel = os.Getenv("DP_LOG_FILE_LEVEL")
+	}
+	if result.StorageLocalPath == "" {
+		result.StorageLocalPath = os.Getenv("STORAGE_LOCAL_PATH")
+	}
 	if result.Dns == "" {
 		result.Dns = os.Getenv("DP_DNS")
 	}
@@ -126,12 +156,14 @@ func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 	if result.NoProxy == "" {
 		result.NoProxy = os.Getenv("NO_PROXY")
 	}
+
 	if len(result.Version) == len(define.DateShowVersion) && strings.Count(result.Version, ".") == 1 {
 		if t, err := time.ParseInLocation(define.DateShowVersion, result.Version, time.UTC); err == nil {
 			result.IsDev = true
 			result.Version = t.Local().Format(define.DateShowVersion)
 		}
 	}
+
 	result.IsCe = result.Family != "pe"
 	result.IsLite = result.Env == "lite"
 	return result

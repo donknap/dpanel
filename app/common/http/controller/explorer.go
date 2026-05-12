@@ -72,7 +72,7 @@ func (self Explorer) Export(http *gin.Context) {
 	zipWriter := zip.NewWriter(tempFile)
 
 	for _, p := range params.FileList {
-		p = function.Path2SystemSafe(p)
+		p = function.SystemPathFromSlash(p)
 		err = func() error {
 			file, err := afs.Open(p)
 			if err != nil {
@@ -138,7 +138,7 @@ func (self Explorer) ImportFileContent(http *gin.Context) {
 	}
 
 	params.File = function.PathClean(params.File)
-	params.DstPath = function.Path2SystemSafe(params.DstPath)
+	params.DstPath = function.SystemPathFromSlash(params.DstPath)
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
@@ -181,7 +181,7 @@ func (self Explorer) Import(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	params.DstPath = function.Path2SystemSafe(params.DstPath)
+	params.DstPath = function.SystemPathFromSlash(params.DstPath)
 
 	ctx, ctxCancel := context.WithCancel(http)
 	defer ctxCancel()
@@ -195,7 +195,7 @@ func (self Explorer) Import(http *gin.Context) {
 
 	for _, item := range params.FileList {
 		err = func() error {
-			item.Path = function.Path2SystemSafe(item.Path)
+			item.Path = function.SystemPathFromSlash(item.Path)
 			realPath, err := os.Open(storage.Local{}.GetSaveRealPath(item.Path))
 			if err != nil {
 				return err
@@ -241,7 +241,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 	}
 	options := make([]imports.ImportFileOption, 0)
 	for _, p := range params.File {
-		p = function.Path2SystemSafe(p)
+		p = function.SystemPathFromSlash(p)
 		file, err := afs.OpenFile(p, os.O_RDONLY, 0o644)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -279,7 +279,7 @@ func (self Explorer) Unzip(http *gin.Context) {
 			return
 		}
 	}
-	params.Path = function.Path2SystemSafe(params.Path)
+	params.Path = function.SystemPathFromSlash(params.Path)
 	importFile, err := imports.NewFileImport(params.Path, options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -321,7 +321,7 @@ func (self Explorer) Delete(http *gin.Context) {
 
 	safePath := make([]string, 0)
 	for _, p := range params.FileList {
-		p = function.Path2SystemSafe(p)
+		p = function.SystemPathFromSlash(p)
 		if p == "/" ||
 			p == "./" ||
 			p == "." ||
@@ -477,7 +477,7 @@ func (self Explorer) GetContent(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	params.File = function.Path2SystemSafe(params.File)
+	params.File = function.SystemPathFromSlash(params.File)
 	file, err := afs.OpenFile(params.File, os.O_RDONLY, 0o644)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -538,7 +538,7 @@ func (self Explorer) Chmod(http *gin.Context) {
 	}
 	mode, err := strconv.ParseUint(params.Mod, 8, 32)
 	for _, p := range params.FileList {
-		p = function.Path2SystemSafe(p)
+		p = function.SystemPathFromSlash(p)
 		err = afs.Chmod(p, os.FileMode(mode))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -573,7 +573,7 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	params.Path = function.Path2SystemSafe(params.Path)
+	params.Path = function.SystemPathFromSlash(params.Path)
 	var fileInfo os.FileInfo
 	file, err := afs.OpenFile(params.Path, os.O_RDONLY, 0o644)
 	if err != nil {
@@ -676,7 +676,7 @@ func (self Explorer) MkDir(http *gin.Context) {
 		return
 	}
 
-	params.DstPath = function.Path2SystemSafe(params.DstPath)
+	params.DstPath = function.SystemPathFromSlash(params.DstPath)
 	err = afs.MkdirAll(params.DstPath, os.ModePerm)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -697,8 +697,8 @@ func (self Explorer) Copy(http *gin.Context) {
 		return
 	}
 
-	params.SourceFile = function.Path2SystemSafe(params.SourceFile)
-	params.TargetFile = function.Path2SystemSafe(params.TargetFile)
+	params.SourceFile = function.SystemPathFromSlash(params.SourceFile)
+	params.TargetFile = function.SystemPathFromSlash(params.TargetFile)
 	if !path.IsAbs(params.TargetFile) {
 		params.TargetFile = path.Join(path.Dir(params.SourceFile), params.TargetFile)
 	}

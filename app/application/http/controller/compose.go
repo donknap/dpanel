@@ -109,8 +109,9 @@ func (self Compose) Create(http *gin.Context) {
 		if function.InArray([]string{
 			accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl,
 		}, params.Type) {
+			safeComposeName := function.SafeFileName(params.Name)
 			composeRow.Setting.Uri = []string{
-				filepath.Join(params.Name, define.ComposeProjectDeployComposeFileName),
+				filepath.Join(safeComposeName, define.ComposeProjectDeployComposeFileName),
 			}
 		}
 	}
@@ -426,7 +427,7 @@ func (self Compose) GetFromGit(http *gin.Context) {
 		}
 	}
 	var err error
-	targetPath := filepath.Join(storage.Local{}.GetComposePath(dockerEnvName), params.Name)
+	targetPath := storage.Local{}.GetComposeProjectPath(dockerEnvName, params.Name)
 
 	if strings.Contains(params.Uri, ".git") {
 		err = logic2.Store{}.SyncByGit(params.Uri, logic2.SyncByGitOption{
@@ -458,12 +459,13 @@ func (self Compose) GetFromGit(http *gin.Context) {
 		return
 	}
 
+	safeComposeName := function.SafeFileName(params.Name)
 	for _, suffix := range logic.ComposeFileNameSuffix {
 		relYamlFilePath := filepath.Join(targetPath, suffix)
 		if _, err = os.Stat(relYamlFilePath); err == nil {
-			composeRow.Setting.Uri = append(composeRow.Setting.Uri, path.Join(params.Name, suffix))
+			composeRow.Setting.Uri = append(composeRow.Setting.Uri, path.Join(safeComposeName, suffix))
 			if _, err = os.Stat(filepath.Join(targetPath, define.ComposeProjectDeployOverrideFileName)); err == nil {
-				composeRow.Setting.Uri = append(composeRow.Setting.Uri, path.Join(params.Name, define.ComposeProjectDeployOverrideFileName))
+				composeRow.Setting.Uri = append(composeRow.Setting.Uri, path.Join(safeComposeName, define.ComposeProjectDeployOverrideFileName))
 			}
 			break
 		}

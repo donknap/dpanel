@@ -5,7 +5,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -417,7 +416,7 @@ func (self Container) Delete(http *gin.Context) {
 	// 删除域名、配置、证书
 	domainList, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.Eq(containerInfo.Name)).Find()
 	for _, domain := range domainList {
-		err = os.Remove(filepath.Join(storage.Local{}.GetNginxSettingPath(), domain.Setting.VHostFilename()))
+		err = os.Remove(storage.Local{}.GetNginxSettingFilePath(domain.Setting.VHostFilename()))
 		if err != nil {
 			slog.Warn("container delete domain", "error", err)
 		}
@@ -457,7 +456,7 @@ func (self Container) Delete(http *gin.Context) {
 			if item.Type == mount.TypeVolume {
 				err = docker.Sdk.Client.VolumeRemove(docker.Sdk.Ctx, item.Name, false)
 				if err != nil {
-					slog.Warn("remove container volume", err.Error())
+					slog.Warn("remove container volume", "error", err.Error())
 				}
 			}
 		}

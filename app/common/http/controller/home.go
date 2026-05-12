@@ -37,8 +37,6 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/mcuadros/go-version"
-	"github.com/we7coreteam/registry-go-sdk"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	ssh2 "golang.org/x/crypto/ssh"
@@ -387,56 +385,19 @@ func (self Home) Info(http *gin.Context) {
 	dockerEnv.TlsCa = ""
 	dockerEnv.TlsKey = ""
 
+	dpanelInfoResult := function.StructToMap(dpanelInfo)
+	dpanelInfoResult["containerInfo"] = containerInfo
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":          info,
 		"clientVersion": docker.Sdk.Client.ClientVersion(),
 		"sdkVersion":    api.DefaultVersion,
-		"dpanel": map[string]interface{}{
-			"version":       dpanelInfo.Version,
-			"family":        dpanelInfo.Family,
-			"env":           dpanelInfo.Env,
-			"dns":           dpanelInfo.Dns,
-			"isDev":         dpanelInfo.IsDev,
-			"isCe":          dpanelInfo.IsCe,
-			"isLite":        dpanelInfo.IsLite,
-			"containerInfo": containerInfo,
-			"runIn":         dpanelInfo.RunIn,
-			"proxy":         dpanelInfo.Proxy,
-			"noProxy":       dpanelInfo.NoProxy,
-		},
-		"dockerEnv": dockerEnv,
-		"plugin":    plugin.Wrapper{}.GetPluginList(),
+		"dpanel":        dpanelInfoResult,
+		"dockerEnv":     dockerEnv,
+		"plugin":        plugin.Wrapper{}.GetPluginList(),
 		"rsa": gin.H{
 			"public": public,
 		},
-	})
-	return
-}
-
-func (self Home) CheckNewVersion(http *gin.Context) {
-	currentVersion := facade.GetConfig().GetString("app.version")
-	newVersion := ""
-	reference := "latest"
-	if strings.Index(currentVersion, ".") == 8 {
-		reference = "beta"
-	}
-	option := make([]registry.Option, 0)
-	option = append(option, registry.WithAddress("registry.cn-hangzhou.aliyuncs.com", registry.RegistryDefaultHost))
-	reg := registry.New(option...)
-	if manifest, _, err := reg.Client().PullManifest("dpanel/dpanel", reference); err == nil {
-		for _, descriptor := range manifest.References() {
-			if ver, ok := descriptor.Annotations[define.PanelLabelVersion]; ok {
-				if version.Compare(ver, currentVersion, ">") {
-					newVersion = ver
-				}
-				break
-			}
-		}
-	}
-
-	self.JsonResponseWithoutError(http, gin.H{
-		"version":    currentVersion,
-		"newVersion": newVersion,
 	})
 	return
 }
@@ -701,14 +662,6 @@ func (self Home) GetStatList(http *gin.Context) {
 			progress.BroadcastMessage(list)
 		}
 	}
-}
-
-func (self Home) UpgradeScript(http *gin.Context) {
-	dpanelInfo := logic.Setting{}.GetDPanelInfo()
-	self.JsonResponseWithoutError(http, gin.H{
-		"info": dpanelInfo.ContainerInfo,
-	})
-	return
 }
 
 func (self Home) Prune(http *gin.Context) {

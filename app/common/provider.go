@@ -72,9 +72,8 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/setting/notification", controller.Home{}.Notification)
 
 		cors.POST("/common/home/info", controller.Home{}.Info)
-		cors.POST("/common/home/check-new-version", controller.Home{}.CheckNewVersion)
+
 		cors.POST("/common/home/usage", controller.Home{}.Usage)
-		cors.POST("/common/home/upgrade-script", controller.Home{}.UpgradeScript)
 		cors.POST("/common/home/get-stat-list", controller.Home{}.GetStatList)
 		cors.POST("/common/home/prune", controller.Home{}.Prune)
 
@@ -132,6 +131,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/panel/backup-download", controller.Panel{}.BackupDownload)
 		cors.POST("/common/panel/backup-restore", controller.Panel{}.BackupRestore)
 		cors.POST("/common/panel/backup-import", controller.Panel{}.BackupImport)
+		cors.POST("/common/panel/check-new-version", controller.Panel{}.CheckNewVersion)
 	})
 
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
