@@ -24,6 +24,7 @@ services:
         amd64: asset/plugin/dpanel-plugin-explorer/image-amd64.tar
         arm64: asset/plugin/dpanel-plugin-explorer/image-arm64.tar
         arm: asset/plugin/dpanel-plugin-explorer/image-arm.tar
+      image_auto_remove: true
       external:
 #{{- if .external.volumes }}
         volumes:

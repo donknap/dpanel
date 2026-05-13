@@ -29,6 +29,7 @@ func (self Plugin) DestroyExplorer(e event.DockerDaemonPayload) {
 				Filters: filter,
 			}); err == nil {
 				var removeErr error
+				// TODO: 如果后续需要更完整的排障信息，再把这里的错误聚合补完整。
 				for _, containerInfo := range list {
 					err = dockerSdk.Client.ContainerStop(dockerSdk.Ctx, containerInfo.ID, container.StopOptions{})
 					if err != nil {

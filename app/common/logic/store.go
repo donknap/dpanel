@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	exec2 "os/exec"
+	path2 "path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -99,7 +100,7 @@ func (self Store) SyncByGit(gitUrl string, option SyncByGitOption) error {
 // SyncByZip 同步远程 zip
 // root 只同步 root 目录下的内容
 func (self Store) SyncByZip(path, zipUrl string, root string) error {
-	if err := function.CheckSSRFURL(zipUrl); err != nil {
+	if err := function.CheckSSRFURL(zipUrl, function.SSRFAllowPrivate); err != nil {
 		return err
 	}
 	zipTempFile, _ := storage.Local{}.CreateTempFile("")
@@ -136,36 +137,58 @@ func (self Store) SyncByZip(path, zipUrl string, root string) error {
 		if strings.HasPrefix(file.Name, "__MACOSX") {
 			continue
 		}
-		targetFilePath := filepath.Join(path, file.Name)
+
+		archiveFilePath := strings.TrimPrefix(path2.Clean("/"+file.Name), "/")
+		if archiveFilePath == "" || archiveFilePath == "." {
+			continue
+		}
 		if root != "" {
-			if before, after, exists := strings.Cut(file.Name, root); exists {
-				if before != "" {
-					targetFilePath = filepath.Join(path, root, after)
-				}
-			} else {
+			rootPath := strings.TrimPrefix(path2.Clean("/"+root), "/")
+			if archiveFilePath != rootPath && !strings.HasPrefix(archiveFilePath, rootPath+"/") {
 				continue
 			}
 		}
-		err = os.MkdirAll(filepath.Dir(targetFilePath), os.ModePerm)
+		targetFilePath := function.SafePathJoin(path, archiveFilePath)
+		err = func() error {
+			err = os.MkdirAll(filepath.Dir(targetFilePath), os.ModePerm)
+			if err != nil {
+				return err
+			}
+			targetFile, err := os.OpenFile(targetFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = targetFile.Close()
+			}()
+
+			sourceFile, err := file.Open()
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = sourceFile.Close()
+			}()
+
+			_, err = io.Copy(targetFile, sourceFile)
+			return err
+		}()
 		if err != nil {
 			return err
 		}
-		targetFile, err := os.OpenFile(targetFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
-		if err != nil {
-			return err
-		}
-		sourceFile, _ := file.Open()
-		_, _ = io.Copy(targetFile, sourceFile)
 	}
 	return nil
 }
 
 func (self Store) SyncByUrl(targetPath, url string) error {
-	if err := function.CheckSSRFURL(url); err != nil {
+	if err := function.CheckSSRFURL(url, function.SSRFAllowPrivate); err != nil {
 		return err
 	}
 	_ = os.MkdirAll(filepath.Dir(targetPath), os.ModePerm)
 	file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		_ = file.Close()
 	}()

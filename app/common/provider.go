@@ -167,6 +167,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 	}
 
 	// 配置代理
+	// TODO: 当前启动恢复依赖 Proxy 主开关，后续再补仅持久化 NO_PROXY 的恢复逻辑。
 	if v := (logic.Setting{}).GetDPanelInfo(); v.Proxy != "" {
 		_ = os.Setenv("HTTP_PROXY", v.Proxy)
 		_ = os.Setenv("HTTPS_PROXY", v.Proxy)

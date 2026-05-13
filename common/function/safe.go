@@ -2,8 +2,10 @@ package function
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -18,24 +20,25 @@ func SafePathJoin(root string, parts ...string) string {
 		return ""
 	}
 	cleanRoot := filepath.Clean(root)
-	all := make([]string, 0, len(parts)+1)
-	all = append(all, cleanRoot)
-	for _, p := range parts {
-		if p == "" {
-			continue
-		}
-		cleanPart := SystemPathFromSlash(p)
-		cleanPart = strings.TrimLeft(filepath.ToSlash(cleanPart), "/")
-		cleanPart = strings.TrimPrefix(cleanPart, cleanRoot)
-		cleanPart = strings.TrimLeft(cleanPart, "/")
-		cleanPart = strings.TrimPrefix(cleanPart, filepath.ToSlash(cleanRoot))
-		cleanPart = strings.TrimLeft(cleanPart, "/")
-		if cleanPart == "" || cleanPart == "." {
-			continue
-		}
-		all = append(all, filepath.FromSlash(cleanPart))
+	targetPath := filepath.Join(append([]string{cleanRoot}, parts...)...)
+	rootAbs, err := filepath.Abs(cleanRoot)
+	if err != nil {
+		return cleanRoot
 	}
-	return filepath.Join(all...)
+	targetAbs, err := filepath.Abs(targetPath)
+	if err != nil {
+		return cleanRoot
+	}
+	rootSlash := filepath.ToSlash(rootAbs)
+	targetSlash := filepath.ToSlash(targetAbs)
+	if targetSlash == rootSlash || strings.HasPrefix(targetSlash, rootSlash+"/") {
+		return targetPath
+	}
+	targetClean := filepath.Clean(targetPath)
+	targetVolume := filepath.VolumeName(targetClean)
+	targetSlash = filepath.ToSlash(strings.TrimPrefix(targetClean, targetVolume))
+	targetSlash = strings.TrimLeft(targetSlash, "/")
+	return filepath.Join(cleanRoot, filepath.FromSlash(targetSlash))
 }
 
 // SafeFileName 返回净化后的文件名（不包含目录）。
@@ -61,6 +64,11 @@ func SafeShell(value any) string {
 			return "true"
 		}
 		return "false"
+	case float64:
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return ""
+		}
+		return strconv.FormatFloat(v, 'f', -1, 64)
 	case json.Number:
 		return v.String()
 	default:
@@ -70,16 +78,32 @@ func SafeShell(value any) string {
 
 // SafeDelete 在 root 根目录内删除 target。
 func SafeDelete(root, target string) error {
-	safePath := SafePathJoin(root, target)
 	rootAbs, err := filepath.Abs(filepath.Clean(root))
 	if err != nil {
 		return os.ErrPermission
 	}
+	if filepath.IsAbs(target) {
+		targetAbs, err := filepath.Abs(filepath.Clean(target))
+		if err != nil {
+			return os.ErrPermission
+		}
+		targetSlash := filepath.ToSlash(targetAbs)
+		rootSlash := filepath.ToSlash(rootAbs)
+		if targetSlash == rootSlash {
+			return os.ErrPermission
+		}
+		if strings.HasPrefix(targetSlash, rootSlash+"/") {
+			if relPath, err := filepath.Rel(rootAbs, targetAbs); err == nil {
+				target = relPath
+			}
+		}
+	}
+	safePath := SafePathJoin(root, target)
 	targetAbs, err := filepath.Abs(filepath.Clean(safePath))
 	if err != nil {
 		return os.ErrPermission
 	}
-	if targetAbs != rootAbs && !strings.HasPrefix(targetAbs, rootAbs+string(filepath.Separator)) {
+	if targetAbs == rootAbs || !strings.HasPrefix(filepath.ToSlash(targetAbs), filepath.ToSlash(rootAbs)+"/") {
 		return os.ErrPermission
 	}
 	return os.Remove(targetAbs)
@@ -87,16 +111,32 @@ func SafeDelete(root, target string) error {
 
 // SafeDeleteAll 在 root 根目录内删除 target 目录树。
 func SafeDeleteAll(root, target string) error {
-	safePath := SafePathJoin(root, target)
 	rootAbs, err := filepath.Abs(filepath.Clean(root))
 	if err != nil {
 		return os.ErrPermission
 	}
+	if filepath.IsAbs(target) {
+		targetAbs, err := filepath.Abs(filepath.Clean(target))
+		if err != nil {
+			return os.ErrPermission
+		}
+		targetSlash := filepath.ToSlash(targetAbs)
+		rootSlash := filepath.ToSlash(rootAbs)
+		if targetSlash == rootSlash {
+			return os.ErrPermission
+		}
+		if strings.HasPrefix(targetSlash, rootSlash+"/") {
+			if relPath, err := filepath.Rel(rootAbs, targetAbs); err == nil {
+				target = relPath
+			}
+		}
+	}
+	safePath := SafePathJoin(root, target)
 	targetAbs, err := filepath.Abs(filepath.Clean(safePath))
 	if err != nil {
 		return os.ErrPermission
 	}
-	if targetAbs != rootAbs && !strings.HasPrefix(targetAbs, rootAbs+string(filepath.Separator)) {
+	if targetAbs == rootAbs || !strings.HasPrefix(filepath.ToSlash(targetAbs), filepath.ToSlash(rootAbs)+"/") {
 		return os.ErrPermission
 	}
 	return os.RemoveAll(targetAbs)

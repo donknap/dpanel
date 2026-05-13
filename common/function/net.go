@@ -9,6 +9,13 @@ import (
 	"strings"
 )
 
+const (
+	SSRFAllowLoopback = 1 << iota
+	SSRFAllowUnspecified
+	SSRFAllowLinkLocal
+	SSRFAllowPrivate
+)
+
 func IpInSubnet(ipAddress, subnetAddress string) (bool, error) {
 	ip := net.ParseIP(ipAddress)
 	if ip == nil {
@@ -44,7 +51,7 @@ func IpIsLocalhost(address string) bool {
 	return false
 }
 
-func CheckSSRFURL(raw string) error {
+func CheckSSRFURL(raw string, flags ...int) error {
 	uri, err := url.Parse(raw)
 	if err != nil {
 		return err
@@ -56,7 +63,11 @@ func CheckSSRFURL(raw string) error {
 	if host == "" {
 		return errors.New("invalid url host")
 	}
-	if strings.EqualFold(host, "localhost") {
+	flagValue := 0
+	for _, flag := range flags {
+		flagValue |= flag
+	}
+	if strings.EqualFold(host, "localhost") && flagValue&SSRFAllowLoopback == 0 {
 		return errors.New("localhost is not allowed")
 	}
 	ips, err := net.LookupIP(host)
@@ -64,14 +75,17 @@ func CheckSSRFURL(raw string) error {
 		return err
 	}
 	for _, ip := range ips {
-		if ip.IsLoopback() {
+		if ip.IsLoopback() && flagValue&SSRFAllowLoopback == 0 {
 			return errors.New("loopback address is not allowed")
 		}
-		if ip.IsUnspecified() {
+		if ip.IsUnspecified() && flagValue&SSRFAllowUnspecified == 0 {
 			return errors.New("unspecified address is not allowed")
 		}
-		if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		if (ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()) && flagValue&SSRFAllowLinkLocal == 0 {
 			return errors.New("link-local address is not allowed")
+		}
+		if ip.IsPrivate() && flagValue&SSRFAllowPrivate == 0 {
+			return errors.New("private address is not allowed")
 		}
 	}
 	return nil

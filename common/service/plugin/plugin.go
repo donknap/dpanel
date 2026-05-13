@@ -293,7 +293,7 @@ func (self *Plugin) Exists() bool {
 
 func importImage(sdk *docker.Client, imageName string, imageFile fs.File) error {
 	if _, err := sdk.Client.ImageInspect(sdk.Ctx, imageName); err != nil {
-		if _, err = docker.Sdk.Client.ImageRemove(sdk.Ctx, imageName, image.RemoveOptions{
+		if _, err = sdk.Client.ImageRemove(sdk.Ctx, imageName, image.RemoveOptions{
 			Force:         true,
 			PruneChildren: true,
 		}); err != nil {
