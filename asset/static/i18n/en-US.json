@@ -20,7 +20,7 @@
   "components.appCompose.createEnvTitle": "Environment Variables",
   "components.appCompose.createFormName": "ID",
   "components.appCompose.createFormNameEmpty": "Identify Compose tasks",
-  "components.appCompose.createFormNameRule": "Project name can only contain letters, numbers, underscores, or hyphens.",
+  "components.appCompose.createFormNameRule": "Project name must start with a lowercase letter or number and contain only lowercase letters, numbers, underscores, or hyphens.",
   "components.appCompose.createFormTitle": "Title",
   "components.appCompose.createFormType": "Yaml Source",
   "components.appCompose.createFormTypeOption.outPath": "External Task",

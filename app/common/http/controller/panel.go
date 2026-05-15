@@ -272,7 +272,6 @@ func (self Panel) Proxy(http *gin.Context) {
 func (self Panel) Update(http *gin.Context) {
 	type ParamsValidate struct {
 		Name                    string         `json:"name"`
-		Type                    string         `json:"type"`
 		InstallerDownloadSource string         `json:"installerDownloadSource"`
 		DryRun                  bool           `json:"dryRun"`
 		Params                  map[string]any `json:"params"`
@@ -285,16 +284,12 @@ func (self Panel) Update(http *gin.Context) {
 
 	dpanelInfo := logic.Setting{}.GetDPanelInfo()
 	params.Name = dpanelInfo.Name
-	params.Type = "container"
-	if !function.IsRunInDocker() {
-		params.Type = "binary"
-	}
 	if params.Name == "" {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonNotFoundDPanel), 500)
 		return
 	}
 
-	if params.Type == "container" {
+	if function.IsRunInDocker() {
 		params.InstallerDownloadSource = "dpanel/installer:latest"
 		for _, address := range []string{"registry.cn-hangzhou.aliyuncs.com", "docker.io"} {
 			reg := registry.New(
@@ -309,7 +304,6 @@ func (self Panel) Update(http *gin.Context) {
 		}
 
 	}
-
 	cmd, err := logic.Panel{}.MakeUpdateCommand(function.StructToMap(params))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -325,9 +319,6 @@ func (self Panel) Update(http *gin.Context) {
 	commandExecutor, err := local.New(
 		local.WithCommandName("/bin/sh"),
 		local.WithArgs("-c", cmd),
-		local.WithEnv(append(os.Environ(),
-			"SETTING_LOG_PATH="+filepath.Join(storage.Local{}.GetStorageLocalPath(), "logs", fmt.Sprintf("upgrade-%s.log", time.Now().Format(define.DateYmdHis))),
-		)),
 	)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -342,7 +333,7 @@ func (self Panel) Update(http *gin.Context) {
 	}
 	defer func() {
 		_ = commandOutput.Close()
-		slog.Debug("panel upgrade output closed", "name", params.Name, "type", params.Type)
+		slog.Debug("panel upgrade output closed", "name", params.Name, "type", dpanelInfo.RunIn)
 	}()
 	scanner := bufio.NewScanner(commandOutput)
 	for scanner.Scan() {
@@ -350,10 +341,10 @@ func (self Panel) Update(http *gin.Context) {
 		if line == "" {
 			continue
 		}
-		slog.Debug("panel upgrade output", "name", params.Name, "type", params.Type, "line", line)
+		slog.Debug("panel upgrade output", "name", params.Name, "type", dpanelInfo.RunIn, "line", line)
 	}
 	if err := scanner.Err(); err != nil {
-		slog.Debug("panel upgrade output error", "name", params.Name, "type", params.Type, "error", err)
+		slog.Debug("panel upgrade output error", "name", params.Name, "type", dpanelInfo.RunIn, "error", err)
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}

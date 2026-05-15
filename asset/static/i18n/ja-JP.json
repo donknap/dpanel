@@ -20,7 +20,7 @@
   "components.appCompose.createEnvTitle": "環境変数",
   "components.appCompose.createFormName": "ID",
   "components.appCompose.createFormNameEmpty": "Composeタスク識別子",
-  "components.appCompose.createFormNameRule": "プロジェクト名は英数字、アンダースコア、ハイフンのみ使用可能",
+  "components.appCompose.createFormNameRule": "プロジェクト名は小文字英字または数字で始まり、小文字英字、数字、アンダースコア、ハイフンのみ使用可能です",
   "components.appCompose.createFormTitle": "名前",
   "components.appCompose.createFormType": "Yamlソース",
   "components.appCompose.createFormTypeOption.outPath": "外部タスク",

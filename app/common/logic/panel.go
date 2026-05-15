@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"html/template"
 	"path/filepath"
 	"regexp"
+	"text/template"
+	"time"
 
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
+	types2 "github.com/donknap/dpanel/common/types"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 type Panel struct {
@@ -21,9 +24,9 @@ var installerArgKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]*$`)
 // 容器内触发升级时必须以 detached 模式运行 installer，避免当前进程/容器退出后升级中断。
 const panelUpdateCommandTemplate = `
 {{- if eq .type "container" -}}
-docker run -d --rm -v /var/run/docker.sock:/var/run/docker.sock {{ .installerDownloadSource }} upgrade -y --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
+docker run -d --rm --pull always -v /var/run/docker.sock:/var/run/docker.sock -v {{ shellSafe .mountHost }}:/dpanel {{ .installerDownloadSource }} upgrade -y --log-path {{ shellSafe .installerLogPath }} --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
 {{- else -}}
-curl -sSL https://dpanel.cc/quick.sh | bash -s -- upgrade -y -d --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
+curl -sSL https://dpanel.cc/quick.sh | bash -s -- upgrade -y -d --log-path {{ shellSafe .installerLogPath }} --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
 {{- end }}`
 
 func (self Panel) GetPanelPath() []*types.ValueItem {
@@ -75,6 +78,24 @@ func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
 			}
 		}
 	}
+	dpanelInfo := (Setting{}).GetDPanelInfo()
+	storagePath := dpanelInfo.Mount.Host
+	if storagePath == "" {
+		return "", errors.New("dpanel storage path not found")
+	}
+
+	templateParams := make(map[string]any, len(params)+3)
+	for key, value := range params {
+		templateParams[key] = value
+	}
+
+	logFileName := fmt.Sprintf("upgrade-%s.log", time.Now().Format(define.DateYmdHis))
+	templateParams["installerLogPath"] = filepath.Join(storagePath, "logs", logFileName)
+	templateParams["type"] = dpanelInfo.RunIn
+	if dpanelInfo.RunIn == types2.DPanelRunInContainer {
+		templateParams["mountHost"] = storagePath
+		templateParams["installerLogPath"] = filepath.Join("/dpanel", "logs", logFileName)
+	}
 
 	commandTemplate, err := template.New("panel-update-command").Funcs(template.FuncMap{
 		"shellSafe": function.SafeShell,
@@ -84,7 +105,7 @@ func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
 	}
 
 	commandBuffer := new(bytes.Buffer)
-	err = commandTemplate.Execute(commandBuffer, params)
+	err = commandTemplate.Execute(commandBuffer, templateParams)
 	if err != nil {
 		return "", err
 	}

@@ -20,7 +20,7 @@
   "components.appCompose.createEnvTitle": "环境变量",
   "components.appCompose.createFormName": "标识",
   "components.appCompose.createFormNameEmpty": "标识 Compose 创建的容器组",
-  "components.appCompose.createFormNameRule": "项目名称只能包含字母、数字、下划线或短横线",
+  "components.appCompose.createFormNameRule": "项目名称只能包含小写字母、数字、下划线或短横线，且必须以小写字母或数字开头",
   "components.appCompose.createFormTitle": "名称",
   "components.appCompose.createFormType": "Yaml 来源",
   "components.appCompose.createFormTypeOption.outPath": "外部任务",
