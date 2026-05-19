@@ -25,6 +25,12 @@ func SplitCommandArray(cmd string) []string {
 	if err != nil {
 		slog.Debug("function split command array", "error", err)
 	}
+	result = PluckArrayWalk(result, func(item string) (string, bool) {
+		if item == "\n" || item == "\r\n" {
+			return "", false
+		}
+		return item, true
+	})
 	return result
 }
 

@@ -2,18 +2,21 @@ package controller
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/application/logic/task"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
@@ -27,6 +30,148 @@ import (
 
 type Site struct {
 	controller.Abstract
+}
+
+func (self Site) CreateByCommand(http *gin.Context) {
+	type ParamsValidate struct {
+		SiteTitle      string `json:"siteTitle"`
+		SiteName       string `json:"siteName" binding:"required"`
+		Command        string `json:"command" binding:"required"`
+		EnableOptimize bool   `json:"enableOptimize"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); err == nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.SiteName), 500)
+		return
+	}
+
+	command := function.SplitCommandArray(params.Command)
+	if len(command) < 2 || command[0] != "docker" || command[1] != "run" {
+		self.JsonResponseWithError(http, fmt.Errorf("command must start with docker run"), 500)
+		return
+	}
+	command = command[2:]
+	for i, item := range command {
+		if item == "--name" {
+			if i+1 >= len(command) || command[i+1] != params.SiteName {
+				self.JsonResponseWithError(http, fmt.Errorf("command --name must equal siteName"), 500)
+				return
+			}
+		}
+		if strings.HasPrefix(item, "--name=") && item != "--name="+params.SiteName {
+			self.JsonResponseWithError(http, fmt.Errorf("command --name must equal siteName"), 500)
+			return
+		}
+	}
+
+	rules := []logic.DockerRunDefaultArg{
+		{
+			Aliases: []string{"^-d$", "^--detach$"},
+			Default: []string{"-d"},
+		},
+		{
+			Aliases: []string{"^--name$", "^--name=.*$"},
+			Default: []string{"--name", params.SiteName},
+		},
+	}
+	if params.EnableOptimize {
+		rules = append(rules,
+			logic.DockerRunDefaultArg{
+				Aliases: []string{"^--restart$", "^--restart=.*$"},
+				Default: []string{"--restart", "on-failure:5"},
+			},
+			logic.DockerRunDefaultArg{
+				Aliases: []string{"^--init$"},
+				Default: []string{"--init"},
+			},
+			logic.DockerRunDefaultArg{
+				Aliases: []string{"^--stop-timeout$", "^--stop-timeout=.*$"},
+				Default: []string{"--stop-timeout", "30"},
+			},
+			logic.DockerRunDefaultArg{
+				Aliases: []string{"^--log-driver$", "^--log-driver=.*$"},
+				Default: []string{"--log-driver", "local"},
+			},
+			logic.DockerRunDefaultArg{
+				Aliases: []string{"^max-size="},
+				Default: []string{"--log-opt", "max-size=10m"},
+			},
+			logic.DockerRunDefaultArg{
+				Aliases: []string{"^max-file="},
+				Default: []string{"--log-opt", "max-file=3"},
+			},
+		)
+	}
+	runCommand := logic.Site{}.NormalizeDockerRunCommand(append([]string{"run"}, command...), rules)
+
+	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeContainerCommandCreate, params.SiteName))
+	defer progress.Close()
+
+	cmd, err := docker.Sdk.Run(runCommand...)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	_, _ = progress.Write([]byte("$ " + cmd.String() + "\n"))
+
+	out, err := cmd.RunInPip()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		_ = out.Close()
+	}()
+
+	_, err = io.Copy(progress, out)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	siteRow := &entity.Site{
+		SiteName:  params.SiteName,
+		SiteTitle: params.SiteTitle,
+		Env: &accessor.SiteEnvOption{
+			DockerEnvName: docker.Sdk.Name,
+			Name:          params.SiteName,
+			ContainerName: params.SiteName,
+			Command:       params.Command,
+		},
+		Status: define.DockerImageBuildStatusSuccess,
+		ContainerInfo: &accessor.SiteContainerInfoOption{
+			Id:   detail.ID,
+			Info: detail,
+		},
+		Message: "",
+	}
+
+	err = dao.Site.Create(siteRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	facade.GetEvent().Publish(event.ContainerCreateEvent, event.ContainerPayload{
+		InspectInfo: &detail,
+		Ctx:         http,
+	})
+
+	self.JsonResponseWithoutError(http, gin.H{
+		"siteId":      siteRow.ID,
+		"containerId": detail.ID,
+	})
+	return
 }
 
 func (self Site) CreateByImage(http *gin.Context) {

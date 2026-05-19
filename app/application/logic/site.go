@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/docker/go-units"
@@ -32,6 +33,36 @@ var (
 )
 
 type Site struct {
+}
+
+type DockerRunDefaultArg struct {
+	Aliases []string
+	Default []string
+}
+
+func (self Site) NormalizeDockerRunCommand(command []string, rules []DockerRunDefaultArg) []string {
+	defaultArgs := make([]string, 0)
+	for _, rule := range rules {
+		matched := false
+		for _, item := range command[1:] {
+			for _, alias := range rule.Aliases {
+				if ok, _ := regexp.MatchString(alias, item); ok {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				break
+			}
+		}
+		if !matched {
+			defaultArgs = append(defaultArgs, rule.Default...)
+		}
+	}
+	if len(defaultArgs) == 0 {
+		return command
+	}
+	return append([]string{command[0]}, append(defaultArgs, command[1:]...)...)
 }
 
 func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnvOption, err error) {

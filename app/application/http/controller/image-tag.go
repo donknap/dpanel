@@ -30,6 +30,7 @@ func (self Image) TagSync(http *gin.Context) {
 		return
 	}
 	imageNameDetail := function.ImageTag(params.Tag)
+	originRegistry := imageNameDetail.Registry
 	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Registry)
 
 	var out io.ReadCloser
@@ -43,8 +44,8 @@ func (self Image) TagSync(http *gin.Context) {
 	for _, s := range registryConfig.Address {
 		if params.Type == "pull" {
 			imageNameDetail.Registry = s
-			// 使用代理地址时先尝试发起 http 请求是否可以访问。以便于可以减少直接 pull 的等待时间
-			if !function.IpIsLocalhost(s) {
+			// 只探测面板显式配置的地址；回落到原始 registry 时直接交给 daemon 处理。
+			if s != originRegistry && !function.IpIsLocalhost(s) {
 				reg := registry.New(
 					registry.WithAddress(s),
 					registry.WithCredentials(registryConfig.Credential()),
