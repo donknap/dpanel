@@ -29,8 +29,8 @@ func (self Image) TagSync(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+
 	imageNameDetail := function.ImageTag(params.Tag)
-	originRegistry := imageNameDetail.Registry
 	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Registry)
 
 	var out io.ReadCloser
@@ -41,41 +41,30 @@ func (self Image) TagSync(http *gin.Context) {
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, params.Tag))
 	defer wsBuffer.Close()
 
-	for _, s := range registryConfig.Address {
-		if params.Type == "pull" {
-			imageNameDetail.Registry = s
-			// 只探测面板显式配置的地址；回落到原始 registry 时直接交给 daemon 处理。
-			if s != originRegistry && !function.IpIsLocalhost(s) {
-				reg := registry.New(
-					registry.WithAddress(s),
-					registry.WithCredentials(registryConfig.Credential()),
-				)
-				if err = reg.Client().Ping(); err != nil {
-					slog.Debug("image remote select registry url", "error", err)
-					continue
-				}
+	if params.Type == "pull" {
+		// 如果用户配置过加速地址，并且有可用的，那么就直接使用，否则回退到默认的拉取动作上（可能会命中 daemon 配置的加速或是代理）
+		if len(registryConfig.Address) > 1 {
+			if selectAddress, _, ok := registry.New(registry.WithAddress(registryConfig.Address...), registry.WithRepository(imageNameDetail.BaseName, imageNameDetail.Version)).Check(); ok {
+				imageNameDetail.Registry = selectAddress.Url
 			}
-			pullOption := image.PullOptions{
-				RegistryAuth: registryConfig.AuthString(),
-			}
-			if params.Platform != "" {
-				pullOption.Platform = params.Platform
-			}
-			out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption)
-			if err != nil {
-				slog.Debug("image remote pull", "error", err)
-			}
-		} else {
-			// 推荐送镜像时保持原样
-			// 自建仓库不需要添加 library
-			// 即使推送 hub 镜像，library 命名空间属于官方空间，也不应该添加
-			out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, params.Tag, image.PushOptions{
-				RegistryAuth: registryConfig.AuthString(),
-			})
 		}
-		if err == nil {
-			break
+		pullOption := image.PullOptions{
+			RegistryAuth: registryConfig.AuthString(),
 		}
+		if params.Platform != "" {
+			pullOption.Platform = params.Platform
+		}
+		out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption)
+		if err != nil {
+			slog.Debug("image remote pull", "error", err)
+		}
+	} else {
+		// 推荐送镜像时保持原样
+		// 自建仓库不需要添加 library
+		// 即使推送 hub 镜像，library 命名空间属于官方空间，也不应该添加
+		out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, params.Tag, image.PushOptions{
+			RegistryAuth: registryConfig.AuthString(),
+		})
 	}
 
 	if err != nil {

@@ -37,7 +37,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/we7coreteam/registry-go-sdk v0.0.0-20260518085434-dfe28df3d4a8
+	github.com/we7coreteam/registry-go-sdk v0.0.0-20260519091545-8085d2151cb9
 	github.com/we7coreteam/w7-rangine-go/v2 v2.0.8
 	go.uber.org/zap v1.27.1
 	go.uber.org/zap/exp v0.3.0
