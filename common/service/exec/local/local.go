@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -129,8 +130,9 @@ func (self *Local) RunWithResult() ([]byte, error) {
 func (self *Local) RunInPip() (io.ReadCloser, error) {
 	self.debug()
 	pr, pw := io.Pipe()
+	stderrBuf := &bytes.Buffer{}
 	self.cmd.Stdout = pw
-	self.cmd.Stderr = pw
+	self.cmd.Stderr = io.MultiWriter(pw, stderrBuf)
 
 	if err := self.cmd.Start(); err != nil {
 		return nil, err
@@ -139,8 +141,9 @@ func (self *Local) RunInPip() (io.ReadCloser, error) {
 	go func() {
 		err := self.cmd.Wait()
 		if err != nil {
-			slog.Debug("run command wait", "err", err)
-			pw.CloseWithError(err)
+			fullErr := fmt.Errorf("%s: %s", err.Error(), stderrBuf.String())
+			slog.Debug("run command wait", "err", fullErr)
+			pw.CloseWithError(fullErr)
 		} else {
 			pw.Close()
 		}

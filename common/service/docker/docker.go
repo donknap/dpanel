@@ -60,6 +60,7 @@ func NewClient(opts ...Option) (*Client, error) {
 		Option: []dockerclient.Opt{
 			dockerclient.FromEnv,
 			dockerclient.WithAPIVersionNegotiation(),
+			dockerclient.WithUserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:151.0) Gecko/20100101 Firefox/151.0"),
 		},
 		Client: &dockerclient.Client{},
 	}

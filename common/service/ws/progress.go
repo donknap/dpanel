@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
@@ -15,11 +14,7 @@ import (
 type ProgressWrite func(p []byte) ([]byte, error)
 
 func PushEvent(messageType string, data interface{}) {
-	BroadcastMessage <- &RespMessage{
-		Type:   messageType,
-		Data:   data,
-		RespAt: time.Now(),
-	}
+	BroadcastMessage <- NewRespMessage("", messageType, data)
 }
 
 func NewProgressPip(messageType string) *ProgressPip {
@@ -93,11 +88,7 @@ func (self *ProgressPip) Write(p []byte) (n int, err error) {
 }
 
 func (self *ProgressPip) BroadcastMessage(data interface{}) {
-	BroadcastMessage <- &RespMessage{
-		Type:   self.messageType,
-		Data:   data,
-		RespAt: time.Now(),
-	}
+	BroadcastMessage <- NewRespMessage("", self.messageType, data)
 }
 
 func (self *ProgressPip) Close() {

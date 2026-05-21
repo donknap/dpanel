@@ -3,6 +3,8 @@ package ws
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -39,19 +41,40 @@ type RespMessage struct {
 	RespAt time.Time   `json:"respAt,omitempty"`
 }
 
-func (self RespMessage) ToJson() []byte {
-	// 防止传递的值是指针，发广播时数据发生变生产生 panic
-	// 先复制成副本再操作
-	if self.Data != nil {
-		switch v := self.Data.(type) {
-		case json.RawMessage, string, int, int64, float64, bool:
-			break
-		default:
-			if b, err := json.Marshal(v); err == nil {
-				self.Data = json.RawMessage(b)
-			}
+func NewRespMessage(fd, messageType string, data interface{}) (message *RespMessage) {
+	message = &RespMessage{
+		Fd:     fd,
+		Type:   messageType,
+		Data:   data,
+		RespAt: time.Now(),
+	}
+	if message.Data == nil {
+		return message
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Warn("ws snapshot message panic", "type", message.Type, "error", fmt.Sprint(r))
+			message.Data = fmt.Sprintf("snapshot ws message failed: %v", r)
+		}
+	}()
+
+	switch v := message.Data.(type) {
+	case json.RawMessage:
+		message.Data = append(json.RawMessage(nil), v...)
+	case string, int, int64, float64, bool:
+	default:
+		if b, err := json.Marshal(v); err == nil {
+			message.Data = json.RawMessage(b)
+		} else {
+			slog.Warn("ws snapshot message", "type", message.Type, "error", err.Error())
+			message.Data = err.Error()
 		}
 	}
+	return message
+}
+
+func (self RespMessage) ToJson() []byte {
 	jsonStr, _ := json.Marshal(self)
 	return jsonStr
 }

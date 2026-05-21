@@ -99,10 +99,7 @@ func (self *Client) ReadMessage() {
 				RecvAt:  time.Now().Unix(),
 			}
 			if recv.IsPing() {
-				BroadcastMessage <- &RespMessage{
-					Type: MessageTypeEvent,
-					Data: "pong",
-				}
+				BroadcastMessage <- NewRespMessage("", MessageTypeEvent, "pong")
 				continue
 			}
 			content := recvMessageContent{}
@@ -118,6 +115,9 @@ func (self *Client) ReadMessage() {
 }
 
 func (self *Client) SendMessage(message *RespMessage) error {
+	if message.Data == nil {
+		return nil
+	}
 	self.writeLock.Lock()
 	defer self.writeLock.Unlock()
 	err := self.Conn.WriteMessage(websocket.TextMessage, message.ToJson())

@@ -125,11 +125,7 @@ func (self *Collection) Broadcast() {
 			self.sendMessage(message)
 
 		case message := <-notice.QueueNoticePushMessage:
-			data := &RespMessage{
-				Type: "notice",
-				Data: message,
-			}
-			self.sendMessage(data)
+			self.sendMessage(NewRespMessage("", "notice", message))
 		}
 	}
 }
