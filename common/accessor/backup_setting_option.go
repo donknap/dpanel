@@ -8,4 +8,5 @@ type BackupSettingOption struct {
 	Size             int64    `json:"size"`
 	Error            string   `json:"error,omitempty"`
 	Status           int      `json:"status,omitempty"`
+	Description      string   `json:"description"`
 }

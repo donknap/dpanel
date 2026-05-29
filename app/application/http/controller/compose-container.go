@@ -317,7 +317,11 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeleteFileMustDeleteTask), 500)
 			return
 		}
-		err := os.RemoveAll(filepath.Dir(composeRow.Setting.GetUriFilePath()))
+		targetPath := storage.Local{}.GetComposeProjectPath(composeRow.Setting.DockerEnvName, composeRow.Name)
+		if !function.IsEmptyArray(composeRow.Setting.Uri) {
+			targetPath = filepath.Dir(composeRow.Setting.GetUriFilePath())
+		}
+		err := os.RemoveAll(targetPath)
 		if err != nil {
 			slog.Info("compose", "destroy", err)
 		}

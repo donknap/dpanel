@@ -47,6 +47,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		EnableBackupImageContainer bool     `json:"enableBackupImageContainer"`
 		EnableBackupVolume         bool     `json:"enableBackupVolume"`
 		BackupVolumeList           []string `json:"backupVolumeList"`
+		Description                string   `json:"description"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -71,6 +72,7 @@ func (self ContainerBackup) Create(http *gin.Context) {
 			BackupTar:        filepath.ToSlash(backupRelTar),
 			VolumePathList:   make([]string, 0),
 			Status:           define.DockerImageBuildStatusProcess,
+			Description:      params.Description,
 		},
 	}
 	_ = dao.Backup.Save(backupRow)
@@ -659,6 +661,7 @@ func (self ContainerBackup) GetDetail(http *gin.Context) {
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"detail": containerInfoList,
+		"info":   backupRow,
 	})
 	return
 }

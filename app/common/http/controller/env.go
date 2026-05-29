@@ -36,6 +36,8 @@ func (self Env) GetList(http *gin.Context) {
 		return
 	}
 
+	var current types2.DockerEnv
+
 	result := make([]*types2.DockerEnv, 0)
 	if setting, err := (logic.Setting{}).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDocker); err == nil {
 		for _, item := range setting.Value.Docker {
@@ -56,6 +58,9 @@ func (self Env) GetList(http *gin.Context) {
 					item.TlsKey = ""
 				}
 			}
+			if docker.Sdk.Name == item.Name {
+				current = *item
+			}
 			result = append(result, item)
 		}
 	}
@@ -63,7 +68,8 @@ func (self Env) GetList(http *gin.Context) {
 		return result[i].Name < result[j].Name
 	})
 	self.JsonResponseWithoutError(http, gin.H{
-		"currentName": docker.Sdk.Name,
+		"currentName":  current.Name,
+		"currentTitle": current.Title,
 		"list": function.PluckArrayWalk(result, func(item *types2.DockerEnv) (*types2.DockerEnv, bool) {
 			status := types2.DockerStatus{
 				Available: false,

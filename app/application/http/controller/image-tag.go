@@ -65,12 +65,14 @@ func (self Image) TagSync(http *gin.Context) {
 				}
 			}
 
-			// 如果循环结束后还有错误那么就回退到原始的仓库里，把错误落到原始的镜像上
-			imageNameDetail.Registry = originRegistryUrl
-			if out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption); err == nil {
-				slog.Debug("image remote use proxy", "type", params.Type, "uri", imageNameDetail.Uri())
-			} else {
-				slog.Debug("image remote", "type", params.Type, "error", err)
+			if err != nil {
+				// 如果循环结束后还有错误那么就回退到原始的仓库里，把错误落到原始的镜像上
+				imageNameDetail.Registry = originRegistryUrl
+				if out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption); err == nil {
+					slog.Debug("image remote use proxy", "type", params.Type, "uri", imageNameDetail.Uri())
+				} else {
+					slog.Debug("image remote", "type", params.Type, "error", err)
+				}
 			}
 		} else {
 			out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption)
