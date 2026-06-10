@@ -130,6 +130,10 @@ func (self *reader) Extract(fileName string, targetPath string) error {
 	if err != nil {
 		return err
 	}
+	targetAbs, err := filepath.Abs(filepath.Clean(targetPath))
+	if err != nil {
+		return err
+	}
 
 	ctx := context.Background()
 	format, stream, err := archives.Identify(ctx, fileName, out)
@@ -141,14 +145,27 @@ func (self *reader) Extract(fileName string, targetPath string) error {
 		return err
 	}
 	handler := func(ctx context.Context, f archives.FileInfo) error {
-		outPath := filepath.Join(targetPath, f.NameInArchive)
-		if f.IsDir() {
-			return os.MkdirAll(outPath, f.Mode())
+		if f.NameInArchive == "" || f.NameInArchive == "." {
+			return errors.New("invalid archive path")
 		}
-		if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
+		outPath := function.SafePathJoin(targetAbs, f.NameInArchive)
+		outAbs, err := filepath.Abs(filepath.Clean(outPath))
+		if err != nil {
 			return err
 		}
-		out, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if outAbs == targetAbs {
+			return errors.New("invalid archive path")
+		}
+		if !f.IsDir() && !f.Mode().IsRegular() {
+			return nil
+		}
+		if f.IsDir() {
+			return os.MkdirAll(outAbs, f.Mode())
+		}
+		if err := os.MkdirAll(filepath.Dir(outAbs), 0755); err != nil {
+			return err
+		}
+		out, err := os.OpenFile(outAbs, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 		if err != nil {
 			return err
 		}

@@ -517,7 +517,17 @@ func (self Panel) BackupImport(http *gin.Context) {
 		return
 	}
 	_ = b.Close()
-	backupTarFile := filepath.Join(storage.Local{}.GetStorageLocalPath(), "backup", info.Backup.Setting.BackupTar)
+	if info.Backup == nil || info.Backup.Setting == nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerBackupImportFileFailed), 500)
+		return
+	}
+	backupFileName := function.SafeFileName(info.Backup.Setting.BackupTar)
+	if !strings.HasSuffix(backupFileName, ".snapshot") {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerBackupImportFileFailed), 500)
+		return
+	}
+	backupRelTar := filepath.ToSlash(filepath.Join("dpanel", backupFileName))
+	backupTarFile := function.SafePathJoin(storage.Local{}.GetBackupPath(), backupRelTar)
 	_ = os.MkdirAll(filepath.Dir(backupTarFile), os.ModePerm)
 	err = os.Rename(realTarFilePath, backupTarFile)
 	if err != nil {
@@ -525,6 +535,7 @@ func (self Panel) BackupImport(http *gin.Context) {
 		return
 	}
 	info.Backup.ID = 0
+	info.Backup.Setting.BackupTar = backupRelTar
 	_ = dao.Backup.Save(info.Backup)
 	self.JsonSuccessResponse(http)
 	return

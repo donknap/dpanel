@@ -88,6 +88,7 @@ func (self *Remote) Run() error {
 		}
 	}
 	pipeReader, pipeWriter := io.Pipe()
+	waitDone := make(chan struct{})
 
 	go func() {
 		select {
@@ -97,16 +98,19 @@ func (self *Remote) Run() error {
 				_ = session.Close()
 				_ = session.Signal(ssh2.SIGINT)
 			}
+		case <-waitDone:
 		}
 	}()
 
 	session.Stderr = pipeWriter
 	err = session.Start(self.String())
 	if err != nil {
+		close(waitDone)
 		return err
 	}
 
 	go func() {
+		defer close(waitDone)
 		err := session.Wait()
 		_ = pipeWriter.CloseWithError(err)
 	}()
@@ -116,7 +120,7 @@ func (self *Remote) Run() error {
 		return errors.Join(err, errors.New(string(result)))
 	}
 
-	if result != nil {
+	if len(result) > 0 {
 		return errors.New(string(result))
 	}
 
@@ -132,6 +136,9 @@ func (self *Remote) RunWithResult() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		_ = reader.Close()
+	}()
 	result, err := io.ReadAll(reader)
 	if err != nil {
 		// 如果发生错误，并且 result 有值，result 为真正的错误信息， err 为执行状态，一般为  Process exited with status xxx
@@ -156,6 +163,7 @@ func (self *Remote) RunInPip() (io.ReadCloser, error) {
 		}
 	}
 	pipeReader, pipeWriter := io.Pipe()
+	waitDone := make(chan struct{})
 
 	go func() {
 		select {
@@ -165,11 +173,13 @@ func (self *Remote) RunInPip() (io.ReadCloser, error) {
 				_ = session.Close()
 				_ = session.Signal(ssh2.SIGINT)
 			}
+		case <-waitDone:
 		}
 	}()
 
 	r := &readCloser{
 		buffer:  pipeReader,
+		closer:  pipeReader,
 		session: session,
 	}
 
@@ -178,12 +188,14 @@ func (self *Remote) RunInPip() (io.ReadCloser, error) {
 
 	err = session.Start(self.String())
 	if err != nil {
+		close(waitDone)
 		_ = pipeWriter.CloseWithError(err)
 		_ = session.Close()
 		return nil, err
 	}
 
 	go func() {
+		defer close(waitDone)
 		err := session.Wait()
 		_ = pipeWriter.CloseWithError(err)
 	}()

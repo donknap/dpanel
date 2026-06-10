@@ -742,23 +742,29 @@ func (self Explorer) Copy(http *gin.Context) {
 		}
 		var errs []error
 		waitGroup := sync.WaitGroup{}
+		errLock := sync.Mutex{}
 		for _, info := range list {
-			go func() {
-				waitGroup.Add(1)
+			waitGroup.Add(1)
+			go func(info os.FileInfo) {
 				defer func() {
 					waitGroup.Done()
 				}()
+				appendErr := func(err error) {
+					errLock.Lock()
+					defer errLock.Unlock()
+					errs = append(errs, err)
+				}
 				newFileName := path.Base(info.Name())
 				if info.IsDir() {
-					err = afs.Mkdir(path.Join(targetFileRoot, newFileName), info.Mode())
+					err := afs.Mkdir(path.Join(targetFileRoot, newFileName), info.Mode())
 					if err != nil {
-						errs = append(errs, err)
+						appendErr(err)
 						return
 					}
 				} else {
 					tf, err := afs.OpenFile(path.Join(targetFileRoot, newFileName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, info.Mode())
 					if err != nil {
-						errs = append(errs, err)
+						appendErr(err)
 						return
 					}
 					defer func() {
@@ -766,7 +772,7 @@ func (self Explorer) Copy(http *gin.Context) {
 					}()
 					sf, err := afs.Open(path.Join(params.SourceFile, info.Name()))
 					if err != nil {
-						errs = append(errs, err)
+						appendErr(err)
 						return
 					}
 					defer func() {
@@ -774,11 +780,11 @@ func (self Explorer) Copy(http *gin.Context) {
 					}()
 					_, err = io.Copy(tf, sf)
 					if err != nil {
-						errs = append(errs, err)
+						appendErr(err)
 						return
 					}
 				}
-			}()
+			}(info)
 		}
 		waitGroup.Wait()
 		if errs != nil {
