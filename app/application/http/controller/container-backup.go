@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -254,6 +255,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 	type ParamsValidate struct {
 		Id          int32 `json:"id" binding:"required"`
 		EnableForce bool  `json:"enableForce"`
+		NoStart     bool  `json:"noStart"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -318,7 +320,11 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					return
 				}
 			} else {
-				out, err := docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, containerInfo.Config.Image, image.PullOptions{})
+				imageNameDetail := function.ImageTag(containerInfo.Config.Image)
+				registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Registry)
+				out, err := docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, containerInfo.Config.Image, image.PullOptions{
+					RegistryAuth: registryConfig.AuthString(),
+				})
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return
@@ -525,7 +531,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			}
 		}
 
-		if runContainer {
+		if runContainer && !params.NoStart {
 			err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, newContainerName, container.StartOptions{})
 			if err != nil {
 				for _, inspect := range networkCreate {

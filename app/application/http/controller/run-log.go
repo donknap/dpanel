@@ -20,7 +20,7 @@ type RunLog struct {
 func (self RunLog) Run(http *gin.Context) {
 	type ParamsValidate struct {
 		Id        string `json:"id" binding:"required"`
-		LineTotal int    `json:"lineTotal" binding:"required,number,oneof=50 100 200 500 1000 5000 -1"`
+		LineTotal int    `json:"lineTotal" binding:"required,number,oneof=20 50 100 200 500 1000 5000 -1"`
 		Download  bool   `json:"download"`
 		ShowTime  bool   `json:"showTime"`
 	}

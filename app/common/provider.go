@@ -72,6 +72,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/setting/notification", controller.Home{}.Notification)
 
 		cors.POST("/common/home/info", controller.Home{}.Info)
+		cors.POST("/common/home/consolelink", controller.Home{}.ConsoleLink)
 
 		cors.POST("/common/home/usage", controller.Home{}.Usage)
 		cors.POST("/common/home/get-stat-list", controller.Home{}.GetStatList)

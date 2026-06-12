@@ -79,6 +79,8 @@ func (self Builder) Execute() (exec.Executor, error) {
 		local.WithArgs("-c", scriptBuffer.String()),
 		local.WithEnv(env),
 		local.WithCtx(self.ctx),
+		local.WithIndependentProcessGroup(),
+		local.WithKillProcessGroupOnCancel(),
 	)
 }
 

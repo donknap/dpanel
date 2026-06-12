@@ -35,6 +35,7 @@ var (
 	SettingGroupSettingTag                  = "tag"
 	SettingGroupSettingLogin                = "login"
 	SettingGroupSettingNotification         = "notification"
+	SettingGroupSettingConsoleInstance      = "consoleInstance"
 )
 
 // 用户相关数据
@@ -248,6 +249,11 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 			if setting.Value.Login != nil {
 				exists = true
 				*v = *setting.Value.Login
+			}
+		case *accessor.ConsoleInstance:
+			if setting.Value.ConsoleInstance != nil {
+				exists = true
+				*v = *setting.Value.ConsoleInstance
 			}
 		case *entity.Setting:
 			*v = *setting

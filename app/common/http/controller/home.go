@@ -22,6 +22,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	applicationLogic "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -358,6 +359,43 @@ func (self Home) WsHostConsole(http *gin.Context) {
 	go client.ReadMessage()
 }
 
+func (self Home) ConsoleLink(http *gin.Context) {
+	params := accessor.ConsoleInstance{}
+	if http.Request.ContentLength != 0 && !self.Validate(http, &params) {
+		return
+	}
+
+	if params.Host == nil && params.Container == nil {
+		logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingConsoleInstance, &params)
+	} else {
+		if params.Host == nil {
+			params.Host = make([]string, 0)
+		}
+		if params.Container == nil {
+			params.Container = make([]string, 0)
+		}
+		err := logic.Setting{}.Save(&entity.Setting{
+			GroupName: logic.SettingGroupSetting,
+			Name:      logic.SettingGroupSettingConsoleInstance,
+			Value: &accessor.SettingValueOption{
+				ConsoleInstance: &params,
+			},
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	if params.Host == nil {
+		params.Host = make([]string, 0)
+	}
+	if params.Container == nil {
+		params.Container = make([]string, 0)
+	}
+	self.JsonResponseWithoutError(http, params)
+}
+
 func (self Home) Info(http *gin.Context) {
 	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
 	if err == nil && info.ID != "" {
@@ -504,7 +542,9 @@ func (self Home) Usage(http *gin.Context) {
 	if containerList, err = docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
 		All: true,
 	}); err == nil {
+		containerLogic := applicationLogic.Container{}
 		for _, item := range containerList {
+			unhealthy := false
 			if item.State == "exited" {
 				containerRunningTotal.Stop += 1
 			}
@@ -513,14 +553,30 @@ func (self Home) Usage(http *gin.Context) {
 			}
 			if strings.Contains(item.Status, "unhealthy") {
 				containerRunningTotal.Unhealthy += 1
+				unhealthy = true
 			}
 			if strings.Contains(item.Status, "Restarting") {
+				containerRunningTotal.Unhealthy += 1
+				unhealthy = true
+			}
+			var containerInfo container.InspectResponse
+			var inspectInfo *container.InspectResponse
+			containerInspectOK := false
+			if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID); err == nil {
+				containerInfo = info
+				inspectInfo = &containerInfo
+				containerInspectOK = true
+			}
+			if !unhealthy && containerLogic.RuntimeStatus(applicationLogic.ContainerRuntimeItem{
+				Summary: item,
+				Inspect: inspectInfo,
+			}).Unhealthy {
 				containerRunningTotal.Unhealthy += 1
 			}
 			usePort := make([]*portItem, 0)
 			if function.IsEmptyArray(item.Ports) {
-				if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID); err == nil && info.HostConfig != nil && !function.IsEmptyMap(info.HostConfig.PortBindings) {
-					for port, bindings := range info.HostConfig.PortBindings {
+				if containerInspectOK && containerInfo.HostConfig != nil && !function.IsEmptyMap(containerInfo.HostConfig.PortBindings) {
+					for port, bindings := range containerInfo.HostConfig.PortBindings {
 						for _, binding := range bindings {
 							hostPort, _ := strconv.Atoi(binding.HostPort)
 							if binding.HostIP == "" {

@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"runtime"
@@ -20,6 +21,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/exec/local"
+	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	types2 "github.com/donknap/dpanel/common/types"
@@ -190,6 +192,12 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 }
 
 func (self Docker) Message(e event.DockerMessagePayload) {
+	if client, ok := notice.Monitor.Clients()[e.DockerEnvName]; ok {
+		client.ContainerRuntimeCollect(context.Background(), e.Message)
+	} else if docker.Sdk != nil && docker.Sdk.Name == e.DockerEnvName {
+		docker.Sdk.ContainerRuntimeCollect(context.Background(), e.Message)
+	}
+
 	mu.Lock()
 	eventCache = append(eventCache, &e)
 

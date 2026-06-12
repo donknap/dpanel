@@ -28,9 +28,15 @@ type SettingValueOption struct {
 	Notification                *Notification                `json:"notification,omitempty"`
 	Tag                         []Tag                        `json:"tag,omitempty"`
 	Login                       *Login                       `json:"login,omitempty"`
+	ConsoleInstance             *ConsoleInstance             `json:"consoleInstance,omitempty"`
 }
 
 type ContainerCheckIgnoreUpgrade []string
+
+type ConsoleInstance struct {
+	Host      []string `json:"host"`
+	Container []string `json:"container"`
+}
 
 type DiskUsage struct {
 	DockerEnvName string           `json:"dockerEnvName"`
@@ -57,6 +63,7 @@ type ThemeUserConfig struct {
 	SiteTitle     string                 `json:"siteTitle"`
 	SiteLogo      string                 `json:"siteLogo,omitempty"`
 	LoginLogo     string                 `json:"loginLogo,omitempty"`
+	LoginBgImage  ThemeUserConfigBgImage `json:"loginBgImage,omitempty"`
 }
 
 type ThemeUserConfigBgImage struct {

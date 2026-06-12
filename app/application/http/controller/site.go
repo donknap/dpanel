@@ -127,9 +127,14 @@ func (self Site) CreateByCommand(http *gin.Context) {
 		_ = out.Close()
 	}()
 
+	go func() {
+		<-progress.Done()
+		_ = out.Close()
+	}()
+
 	_, err = io.Copy(progress, out)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonCancelOperator, "error", err.Error()), 500)
 		return
 	}
 

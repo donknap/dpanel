@@ -8,3 +8,10 @@ func WithIndependentProcessGroup() Option {
 		return nil
 	}
 }
+
+func WithKillProcessGroupOnCancel() Option {
+	return func(self *Local) error {
+		// windows 不支持
+		return nil
+	}
+}

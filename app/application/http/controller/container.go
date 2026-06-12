@@ -148,12 +148,27 @@ func (self Container) GetList(http *gin.Context) {
 	var containerName []string
 	for index, item := range list {
 		containerName = append(containerName, item.Names...)
+		containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID)
+		var inspectInfo *container.InspectResponse
+		if err == nil {
+			inspectInfo = &containerInfo
+		}
+		status := logic.Container{}.RuntimeStatus(logic.ContainerRuntimeItem{
+			Summary: item,
+			Inspect: inspectInfo,
+		})
+		if status.State != "" {
+			list[index].State = status.State
+		}
+		if status.Message != "" {
+			list[index].Status = status.Message
+		}
 		// 如果是直接绑定到宿主机网络或是 Macvlan，端口号不会显示到容器详情中
 		// 需要通过获取镜像详情数据获取一下
 		if item.HostConfig.NetworkMode == network.NetworkHost {
-			if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID); err == nil && info.Config != nil && !function.IsEmptyMap(info.Config.ExposedPorts) {
+			if err == nil && containerInfo.Config != nil && !function.IsEmptyMap(containerInfo.Config.ExposedPorts) {
 				ports := make([]container.Port, 0)
-				for port, _ := range info.Config.ExposedPorts {
+				for port, _ := range containerInfo.Config.ExposedPorts {
 					ports = append(ports, container.Port{
 						IP:          "0.0.0.0",
 						PublicPort:  uint16(port.Int()),
