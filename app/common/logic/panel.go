@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"text/template"
@@ -60,6 +62,38 @@ func (self Panel) GetPanelPath() []*types.ValueItem {
 	}
 
 	return savePath
+}
+
+func (self Panel) ValidateProxy(proxy string) error {
+	proxyUrl, err := url.ParseRequestURI(proxy)
+	if err != nil || proxyUrl.Scheme == "" || proxyUrl.Host == "" || proxyUrl.Hostname() == "" {
+		return errors.New("invalid proxy url")
+	}
+	switch proxyUrl.Scheme {
+	case "http", "https", "socks5":
+	default:
+		return errors.New("unsupported proxy scheme")
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxyUrl),
+		},
+		Timeout: 8 * time.Second,
+	}
+	resp, err := client.Get("https://registry-1.docker.io/v2/")
+	if err != nil {
+		return errors.New("proxy external access check failed: " + err.Error())
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusUnauthorized {
+		return nil
+	}
+	if resp.StatusCode == http.StatusProxyAuthRequired {
+		return errors.New("proxy authentication failed")
+	}
+	return fmt.Errorf("proxy external access check failed: %d", resp.StatusCode)
 }
 
 func (self Panel) SaveRootPath() string {

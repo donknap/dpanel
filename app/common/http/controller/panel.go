@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
-	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -211,31 +209,10 @@ func (self Panel) Proxy(http *gin.Context) {
 	}
 
 	if params.Proxy != "" {
-		proxyUrl, err := url.ParseRequestURI(params.Proxy)
-		if err != nil || proxyUrl.Scheme == "" || proxyUrl.Host == "" {
-			self.JsonResponseWithError(http, errors.New("invalid proxy url"), 500)
-			return
-		}
-		address := proxyUrl.Host
-		if proxyUrl.Port() == "" {
-			switch proxyUrl.Scheme {
-			case "http":
-				address = net.JoinHostPort(proxyUrl.Hostname(), "80")
-			case "https":
-				address = net.JoinHostPort(proxyUrl.Hostname(), "443")
-			case "socks5":
-				address = net.JoinHostPort(proxyUrl.Hostname(), "1080")
-			default:
-				self.JsonResponseWithError(http, errors.New("unsupported proxy scheme"), 500)
-				return
-			}
-		}
-		conn, err := net.DialTimeout("tcp", address, 3*time.Second)
-		if err != nil {
+		if err := (logic.Panel{}).ValidateProxy(params.Proxy); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		_ = conn.Close()
 	}
 
 	dpanelInfo := logic.Setting{}.GetDPanelInfo()
