@@ -51,25 +51,23 @@ func (self Image) TagSync(http *gin.Context) {
 		// 如果用户配置过加速地址，并且有可用的，那么就直接使用，否则回退到默认的拉取动作上（可能会命中 daemon 配置的加速或是代理）
 		if len(registryConfig.Address) > 1 {
 			originRegistryUrl := imageNameDetail.Registry
+			availableRegister := registry.New(registry.WithAddress(registryConfig.Address...), registry.WithRepository(imageNameDetail.BaseName, imageNameDetail.Version)).GetAvailableServers()
 			for {
-				availableRegister, ok := <-registry.New(registry.WithAddress(registryConfig.Address...), registry.WithRepository(imageNameDetail.BaseName, imageNameDetail.Version)).GetAvailableServers()
+				item, ok := <-availableRegister
 				if !ok {
+					// 如果循环结束后还有错误那么就回退到原始的仓库里，把错误落到原始的镜像上
+					imageNameDetail.Registry = originRegistryUrl
+					if out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption); err == nil {
+						slog.Debug("image remote use proxy", "type", params.Type, "uri", imageNameDetail.Uri())
+					} else {
+						slog.Debug("image remote", "type", params.Type, "error", err)
+					}
 					break
 				}
-				imageNameDetail.Registry = availableRegister.Url
+				imageNameDetail.Registry = item.Url
 				if out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption); err == nil {
 					slog.Debug("image remote use proxy", "type", params.Type, "uri", imageNameDetail.Uri())
 					break
-				} else {
-					slog.Debug("image remote", "type", params.Type, "error", err)
-				}
-			}
-
-			if err != nil {
-				// 如果循环结束后还有错误那么就回退到原始的仓库里，把错误落到原始的镜像上
-				imageNameDetail.Registry = originRegistryUrl
-				if out, err = docker.Sdk.Client.ImagePull(wsBuffer.Context(), imageNameDetail.Uri(), pullOption); err == nil {
-					slog.Debug("image remote use proxy", "type", params.Type, "uri", imageNameDetail.Uri())
 				} else {
 					slog.Debug("image remote", "type", params.Type, "error", err)
 				}

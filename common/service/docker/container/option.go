@@ -438,10 +438,13 @@ func WithDevice(item ...types.DeviceItem) Option {
 
 func WithGpus(item *types.GpusItem) Option {
 	return func(self *Builder) error {
-		if item == nil || !item.Enable {
+		if item == nil {
 			return nil
 		}
 		self.hostConfig.DeviceRequests = make([]container.DeviceRequest, 0)
+		if !item.Enable {
+			return nil
+		}
 
 		if function.IsEmptyArray(item.Device) {
 			item.Device = []string{
