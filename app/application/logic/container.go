@@ -2,6 +2,7 @@ package logic
 
 import (
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -42,12 +43,20 @@ func (self Container) runtimeRestarting(inspectInfo container.InspectResponse) b
 	if inspectInfo.Config == nil || inspectInfo.Config.Healthcheck != nil {
 		return false
 	}
-	if inspectInfo.RestartCount >= 3 {
-		return true
-	}
 	runtime, ok := docker.Sdk.ContainerRuntime(docker.Sdk.Ctx, inspectInfo.ID)
 	if !ok {
 		return false
 	}
-	return runtime.ActionCount("start", "restart") >= 3
+
+	since := time.Now().Add(-time.Minute)
+	actionCount := 0
+	for _, item := range runtime.History {
+		if item.Time.Before(since) {
+			continue
+		}
+		if item.Action == "start" || item.Action == "restart" {
+			actionCount += 1
+		}
+	}
+	return actionCount >= 3
 }

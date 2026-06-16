@@ -101,6 +101,7 @@ func main() {
 		slog.Warn(define.PanelBanner)
 		slog.Info("config", "env", facade.GetConfig().GetString("app.env"), "version", DPanelVersion, "date", time.Now())
 		slog.Info("config", "storage", storage.Local{}.GetStorageLocalPath())
+		slog.Debug("system", "env", os.Environ())
 
 		err = initDb()
 		if err != nil {

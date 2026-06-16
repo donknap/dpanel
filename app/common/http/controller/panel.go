@@ -267,6 +267,17 @@ func (self Panel) Update(http *gin.Context) {
 	}
 
 	if function.IsRunInDocker() {
+		// 如果容器运行但是无法获取面板容器信息则直接报错
+		if dpanelInfo.ContainerInfo.ContainerJSONBase == nil {
+			if params.DryRun {
+				self.JsonResponseWithoutError(http, gin.H{
+					"command": "curl -sSL https://dpanel.cc/quick.sh | bash",
+				})
+				return
+			}
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonNotFoundDPanel), 500)
+			return
+		}
 		params.InstallerDownloadSource = "dpanel/installer:latest"
 		for _, address := range []string{"registry.cn-hangzhou.aliyuncs.com", "docker.io"} {
 			reg := registry.New(
