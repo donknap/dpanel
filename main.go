@@ -19,6 +19,7 @@ import (
 	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/app/ctrl"
+	"github.com/donknap/dpanel/app/socket"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -161,6 +162,7 @@ func main() {
 		new(family.Provider).Register(httpServer)
 		new(common.Provider).Register(httpServer)
 		new(application.Provider).Register(httpServer)
+		new(socket.Provider).Register(httpServer.Engine)
 	}
 
 	new(ctrl.Provider).Command(facade.GetConsole())

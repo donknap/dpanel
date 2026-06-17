@@ -14,6 +14,8 @@ var (
 	CacheKeyCommonServerStartTime  = "server:startTime"
 	CacheKeyXkStorageInfo          = "xk:storageInfo"
 	CacheKeyLoginFailed            = "login:failed:%s"
+	CacheKeyOauthState             = "oauth:state:%s"
+	CacheKeyOauthCode              = "oauth:code:%s"
 	CacheKeySetting                = "setting:%s"
 	CacheKeySettingLocale          = fmt.Sprintf(CacheKeySetting, "locale")
 	CacheKeyImageDigest            = "image:digest:%s"

@@ -1,12 +1,11 @@
 package controller
 
 import (
-	"time"
+	"log/slog"
 
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/app/common/logic/oauth"
 	"github.com/donknap/dpanel/common/accessor"
-	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/family"
@@ -196,18 +195,7 @@ func (self User) CreateFounder(http *gin.Context) {
 		return
 	}
 
-	registerAt := time.Now()
-	err := dao.Setting.Create(&entity.Setting{
-		GroupName: logic.SettingGroupUser,
-		Name:      logic.SettingGroupUserFounder,
-		Value: &accessor.SettingValueOption{
-			Password:   logic.User{}.GetMd5Password(params.Password, params.Username),
-			Username:   params.Username,
-			UserStatus: logic.SettingGroupUserStatusEnable,
-			RegisterAt: &registerAt,
-		},
-	})
-	if err != nil {
+	if _, err := (logic.User{}).CreateFounderUser(params.Username, params.Password); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -216,5 +204,71 @@ func (self User) CreateFounder(http *gin.Context) {
 }
 
 func (self User) OauthCallback(http *gin.Context) {
+	type ParamsValidate struct {
+		Provider    string `json:"provider"`
+		Code        string `json:"code" binding:"required"`
+		State       string `json:"state"`
+		RedirectURI string `json:"redirect_uri"`
+		RedirectUri string `json:"redirectUri"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if params.RedirectURI == "" {
+		params.RedirectURI = params.RedirectUri
+	}
+	if params.Provider == "" {
+		params.Provider = oauth.ProviderFnnas
+	}
+	slog.Debug("oauth callback",
+		"provider", params.Provider,
+		"codeEmpty", params.Code == "",
+		"stateEmpty", params.State == "",
+		"redirectURIEmpty", params.RedirectURI == "",
+	)
 
+	accessToken, err := oauth.Exchange(params.Provider, oauth.ExchangeOption{
+		Code:        params.Code,
+		State:       params.State,
+		RedirectURI: params.RedirectURI,
+	})
+	if err != nil {
+		slog.Debug("oauth callback failed", "provider", params.Provider, "error", err.Error())
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"accessToken": accessToken,
+	})
+	return
+}
+
+func (self User) OauthProviders(http *gin.Context) {
+	result := make([]oauth.Item, 0)
+	for _, provider := range []oauth.Provider{
+		oauth.Fnnas{},
+	} {
+		if item, ok := provider.Item(); ok {
+			result = append(result, item)
+		}
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": result,
+	})
+	slog.Debug("oauth providers", "count", len(result), "path", http.Request.URL.Path, "host", http.Request.Host)
+	return
+}
+
+func (self User) OauthAuthorize(http *gin.Context) {
+	provider := http.Query("provider")
+	callbackURL, err := oauth.Authorize(provider, http.Request)
+	if err != nil {
+		slog.Debug("oauth authorize failed", "provider", provider, "error", err.Error())
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	slog.Debug("oauth authorize redirect", "provider", provider, "callbackURLGenerated", callbackURL != "")
+	http.Redirect(302, callbackURL)
+	return
 }

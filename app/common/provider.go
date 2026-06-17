@@ -54,10 +54,11 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/common/user/login", controller.User{}.Login)
 		}
 
-		if !function.InArrayArray(feature, types.FeatureFamilyPe, types.FeatureFamilyXk) {
+		if !function.InArrayArray(feature, types.FeatureFamilyXk) {
 			cors.POST("/common/user/oauth/callback", controller.User{}.OauthCallback)
 		}
-
+		cors.POST("/common/user/oauth/providers", controller.User{}.OauthProviders)
+		cors.GET("/common/user/oauth/authorize", controller.User{}.OauthAuthorize)
 		cors.POST("/common/user/create-founder", controller.User{}.CreateFounder)
 		cors.POST("/common/user/login-info", controller.User{}.LoginInfo)
 		cors.POST("/common/user/get-user-info", controller.User{}.GetUserInfo)

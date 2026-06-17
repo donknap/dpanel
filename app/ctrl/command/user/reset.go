@@ -2,9 +2,7 @@ package user
 
 import (
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/entity"
 	"github.com/google/uuid"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
@@ -32,16 +30,6 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	founder, _ := dao.Setting.
 		Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
 		Where(dao.Setting.Name.Eq(logic.SettingGroupUserFounder)).First()
-	if founder == nil {
-		founder = &entity.Setting{
-			GroupName: logic.SettingGroupUser,
-			Name:      logic.SettingGroupUserFounder,
-			Value: &accessor.SettingValueOption{
-				Username: "",
-				Password: "",
-			},
-		}
-	}
 	username, err := cmd.Flags().GetString("username")
 	if err != nil {
 		color.Errorln("Error: ", err.Error())
@@ -59,6 +47,18 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 
 	if username != "" && password == "" {
 		color.Errorln("When resetting the username, the password must also be reset.")
+		return
+	}
+
+	if founder == nil {
+		_, err = logic.User{}.CreateFounderUser(username, password)
+		if err != nil {
+			color.Errorln("Error: ", err.Error())
+			return
+		}
+		color.Println("用户名 (Username): ", username)
+		color.Println("密  码 (Password): ", password)
+		color.Successln("Success")
 		return
 	}
 

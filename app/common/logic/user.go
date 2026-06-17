@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
+	"gorm.io/gorm"
 )
 
 var (
@@ -91,6 +93,49 @@ func (self User) Lock(username string, failed bool) {
 func (self User) GetUserByUsername(username string) (*entity.Setting, error) {
 	return dao.Setting.Where(dao.Setting.GroupName.Eq(SettingGroupUser)).
 		Where(gen.Cond(datatypes.JSONQuery("value").Equals(username, "username"))...).First()
+}
+
+func (self User) GetFounderUser() (*entity.Setting, error) {
+	founder, err := dao.Setting.Where(dao.Setting.GroupName.Eq(SettingGroupUser)).
+		Where(dao.Setting.Name.Eq(SettingGroupUserFounder)).
+		First()
+	if err != nil {
+		return nil, err
+	}
+	if founder.Value == nil || founder.Value.UserStatus == SettingGroupUserStatusDisable {
+		return nil, errors.New("dpanel founder user is disabled")
+	}
+	return founder, nil
+}
+
+func (self User) CreateFounderUser(username string, password string) (*entity.Setting, error) {
+	if founder, err := dao.Setting.Where(dao.Setting.GroupName.Eq(SettingGroupUser)).
+		Where(dao.Setting.Name.Eq(SettingGroupUserFounder)).
+		First(); err == nil && founder != nil {
+		return nil, function.ErrorMessage(define.ErrorMessageUserFounderExists)
+	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	passwordValue := ""
+	if password != "" {
+		passwordValue = self.GetMd5Password(password, username)
+	}
+	registerAt := time.Now()
+	founder := &entity.Setting{
+		GroupName: SettingGroupUser,
+		Name:      SettingGroupUserFounder,
+		Value: &accessor.SettingValueOption{
+			Username:   username,
+			Password:   passwordValue,
+			UserStatus: SettingGroupUserStatusEnable,
+			RegisterAt: &registerAt,
+		},
+	}
+	if err := dao.Setting.Create(founder); err != nil {
+		return nil, err
+	}
+	return founder, nil
 }
 
 func (self User) GetUserOauthToken(user *entity.Setting, autoLogin bool) (string, error) {
