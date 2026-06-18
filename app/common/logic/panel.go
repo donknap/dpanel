@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"text/template"
@@ -101,8 +102,10 @@ func (self Panel) SaveRootPath() string {
 }
 
 func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
+	args := map[string]any{}
 	if raw, exists := params["params"]; exists && raw != nil {
-		args, ok := raw.(map[string]any)
+		var ok bool
+		args, ok = raw.(map[string]any)
 		if !ok {
 			return "", errors.New("invalid update params")
 		}
@@ -111,11 +114,23 @@ func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
 				return "", fmt.Errorf("invalid update param key: %s", key)
 			}
 		}
+	} else {
+		params["params"] = args
 	}
 	dpanelInfo := (Setting{}).GetDPanelInfo()
 	storagePath := dpanelInfo.Mount.Host
 	if storagePath == "" {
 		return "", errors.New("dpanel storage path not found")
+	}
+
+	if dpanelInfo.RunIn != types2.DPanelRunInContainer {
+		if _, exists := args["data-path"]; !exists {
+			executablePath, err := os.Executable()
+			if err != nil {
+				return "", err
+			}
+			args["data-path"] = filepath.Dir(executablePath)
+		}
 	}
 
 	templateParams := make(map[string]any, len(params)+3)

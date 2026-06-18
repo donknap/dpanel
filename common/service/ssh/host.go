@@ -3,13 +3,11 @@ package ssh
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
 
 	"github.com/donknap/dpanel/common/service/exec/local"
-	"github.com/donknap/dpanel/common/service/storage"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
@@ -18,12 +16,8 @@ var keyErr *knownhosts.KeyError
 
 func NewDefaultKnownHostCallback() *DefaultKnownHostsCallback {
 	path := ""
-	// fix: 飞牛系统获取不到 $HOME 环境变量，如果获取不到就放到系统目录下
 	if v, err := os.UserHomeDir(); err == nil {
 		path = filepath.Join(v, ".ssh", "known_hosts")
-	} else {
-		slog.Debug("ssh get known host path", "error", err)
-		path = filepath.Join(storage.Local{}.GetStorageLocalPath(), "known_hosts")
 	}
 	return &DefaultKnownHostsCallback{
 		path: path,

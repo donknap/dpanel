@@ -141,7 +141,8 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 
 		wsCors.GET("/common/notice", controller.Home{}.WsNotice)
 		wsCors.GET("/common/console/container/:id", controller.Home{}.WsContainerConsole)
-		wsCors.GET("/common/console/host/:name", controller.Home{}.WsHostConsole)
+		wsCors.GET("/common/console/ssh/:name", controller.Home{}.WsSshConsole)
+		wsCors.GET("/common/console/shell", controller.Home{}.WsShellConsole)
 	})
 
 	_ = facade.GetEvent().Subscribe(event.DockerDaemonEvent, events.Docker{}.Daemon)

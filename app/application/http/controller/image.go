@@ -202,7 +202,13 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 			// 因为 windows 调用 oci 库的时候会报路径错误，包含了冒号（：）所以这里如果是 windows 则回退到 docker 逻辑上
 			if runtime.GOOS != "windows" && err == nil && strings.Contains(mimeType, "application/vnd.oci") {
 				imageStreamFile, err = docker.Sdk.OciToDockerTar(docker.Sdk.Ctx, s)
-				if err != nil {
+				if errors.Is(err, docker.ErrOciArchiveNotSplittable) {
+					slog.Debug("oci image import fallback docker load", "reason", err.Error())
+					imageStreamFile, err = os.Open(s)
+					if err != nil {
+						return err
+					}
+				} else if err != nil {
 					return err
 				}
 			} else {

@@ -87,6 +87,7 @@ func main() {
 	} else {
 		facade.GetConfig().Set("app.version", DPanelVersion)
 	}
+	initHomeDir()
 
 	// 注册数据库
 	db, err := facade.GetDbFactory().Channel("default")
@@ -175,6 +176,17 @@ func isAppServer() bool {
 
 func isDebug() bool {
 	return facade.GetConfig().GetString("app.env") == "debug"
+}
+
+func initHomeDir() {
+	if _, err := os.UserHomeDir(); err != nil {
+		homeDir := storage.Local{}.GetStorageLocalPath()
+		if setErr := os.Setenv("HOME", homeDir); setErr != nil {
+			slog.Warn("main set home dir", "path", homeDir, "error", setErr)
+			return
+		}
+		slog.Debug("main set home dir", "path", homeDir, "error", err)
+	}
 }
 
 func initDb() error {

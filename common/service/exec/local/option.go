@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -46,12 +47,74 @@ func WithCommandName(commandName string) Option {
 	}
 }
 
+func WithDefaultShell() Option {
+	return func(self *Local) error {
+		if runtime.GOOS == "windows" {
+			for _, commandName := range []string{
+				os.Getenv("ComSpec"),
+				"powershell.exe",
+				"powershell",
+				"cmd.exe",
+				"cmd",
+			} {
+				if commandName == "" {
+					continue
+				}
+				if shellPath, err := exec.LookPath(commandName); err == nil {
+					return WithCommandName(shellPath)(self)
+				}
+			}
+			return WithCommandName("powershell")(self)
+		}
+
+		for _, commandName := range []string{
+			os.Getenv("SHELL"),
+			"/bin/sh",
+			"/bin/bash",
+			"sh",
+			"bash",
+		} {
+			if commandName == "" {
+				continue
+			}
+			if shellPath, err := exec.LookPath(commandName); err == nil {
+				return WithCommandName(shellPath)(self)
+			}
+		}
+		return WithCommandName("/bin/sh")(self)
+	}
+}
+
 func WithDir(dir string) Option {
 	return func(self *Local) error {
 		if dir == "" {
 			return nil
 		}
 		self.cmd.Dir = dir
+		return nil
+	}
+}
+
+func WithDefaultShellDir() Option {
+	return func(self *Local) error {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil
+		}
+		return WithDir(homeDir)(self)
+	}
+}
+
+func WithInteractiveTerminalEnv() Option {
+	return func(self *Local) error {
+		env := make([]string, 0, len(os.Environ())+2)
+		for _, item := range os.Environ() {
+			if strings.HasPrefix(item, "TERM=") || strings.HasPrefix(item, "COLORTERM=") {
+				continue
+			}
+			env = append(env, item)
+		}
+		self.cmd.Env = append(env, "TERM=xterm-256color", "COLORTERM=truecolor")
 		return nil
 	}
 }

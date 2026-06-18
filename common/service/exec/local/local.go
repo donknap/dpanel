@@ -84,9 +84,10 @@ func QuickCheckRunning(targetCmd string) (bool, error) {
 }
 
 type Local struct {
-	cmd       *exec2.Cmd
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+	cmd          *exec2.Cmd
+	ctx          context.Context
+	ctxCancel    context.CancelFunc
+	terminalFile *os.File
 }
 
 func (self *Local) AppendEnv(env []string) {
@@ -155,24 +156,59 @@ func (self *Local) RunInPip() (io.ReadCloser, error) {
 	}, nil
 }
 
-func (self *Local) RunInTerminal(size *pty.Winsize) (io.ReadCloser, error) {
+func (self *Local) RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser, error) {
 	var out *os.File
 	var err error
 
 	if runtime.GOOS == "windows" {
-		// 不支持 Pty，利用管道模拟读取
-		return self.RunInPip()
+		self.debug()
+		stdoutReader, stdoutWriter := io.Pipe()
+		stdinReader, stdinWriter := io.Pipe()
+		stderrBuf := &bytes.Buffer{}
+		self.cmd.Stdin = stdinReader
+		self.cmd.Stdout = stdoutWriter
+		self.cmd.Stderr = io.MultiWriter(stdoutWriter, stderrBuf)
+		if err := self.cmd.Start(); err != nil {
+			_ = stdoutWriter.CloseWithError(err)
+			_ = stdinReader.CloseWithError(err)
+			_ = stdinWriter.CloseWithError(err)
+			return nil, nil, err
+		}
+		go func() {
+			err := self.cmd.Wait()
+			if err != nil {
+				fullErr := fmt.Errorf("%s: %s", err.Error(), stderrBuf.String())
+				slog.Debug("run command wait", "err", fullErr)
+				_ = stdoutWriter.CloseWithError(fullErr)
+			} else {
+				_ = stdoutWriter.Close()
+			}
+			_ = stdinReader.Close()
+		}()
+		return stdoutReader, readCloser{
+			cmd:   self,
+			Conn:  stdoutReader,
+			stdin: stdinWriter,
+		}, nil
 	}
 
 	self.debug()
 	out, err = pty.StartWithSize(self.cmd, size)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return TerminalResult{
+	self.terminalFile = out
+	return out, TerminalResult{
 		Conn: out,
 		cmd:  self.cmd,
 	}, err
+}
+
+func (self *Local) ResizeTerminal(size *pty.Winsize) error {
+	if self.terminalFile == nil || size == nil {
+		return nil
+	}
+	return pty.Setsize(self.terminalFile, size)
 }
 
 func (self *Local) Kill() error {

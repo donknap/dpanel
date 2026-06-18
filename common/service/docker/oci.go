@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -12,6 +13,7 @@ import (
 	imagecopy "github.com/containers/image/v5/copy"
 	dockerarchive "github.com/containers/image/v5/docker/archive"
 	"github.com/containers/image/v5/docker/reference" // [核心]: 用于严格解析和校验镜像名称
+	cimgmanifest "github.com/containers/image/v5/manifest"
 	"github.com/containers/image/v5/oci/archive"
 	"github.com/containers/image/v5/signature"
 	"github.com/containers/image/v5/types"
@@ -19,13 +21,20 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/mholt/archives"
+	"github.com/opencontainers/go-digest"
 
 	imgspecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+// ErrOciArchiveNotSplittable 表示 OCI 包不能转换，应回退到 docker load。
+var ErrOciArchiveNotSplittable = errors.New("oci archive cannot be split")
+
 // OciToDockerTar 将多平台 oci 提取成标准的 docker tar 包
 func (self Client) OciToDockerTar(ctx context.Context, tarPath string) (*os.File, error) {
 	currentOS, currentArch := function.CurrentSystemPlatform()
+	if ok, reason := canSplitOciArchive(ctx, tarPath, currentOS, currentArch); !ok {
+		return nil, fmt.Errorf("%w: %s", ErrOciArchiveNotSplittable, reason)
+	}
 
 	targetRef, imageName := self.extractOciMetadata(ctx, tarPath, currentOS, currentArch)
 	if imageName == "" {
@@ -151,6 +160,101 @@ func (self Client) OciInfo(ctx context.Context, tarPath string) (*imgspecv1.Inde
 	}
 
 	return &layoutIndex, nil
+}
+
+func canSplitOciArchive(ctx context.Context, tarPath string, currentOS string, currentArch string) (bool, string) {
+	file, err := os.Open(tarPath)
+	if err != nil {
+		return false, err.Error()
+	}
+	defer file.Close()
+
+	archiveFS, err := archives.FileSystem(ctx, tarPath, file)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	indexBytes, err := fs.ReadFile(archiveFS, "index.json")
+	if err != nil {
+		return false, err.Error()
+	}
+	var layoutIndex imgspecv1.Index
+	if err := json.Unmarshal(indexBytes, &layoutIndex); err != nil {
+		return false, err.Error()
+	}
+
+	return canSplitOciIndex(archiveFS, &layoutIndex, currentOS, currentArch)
+}
+
+func canSplitOciIndex(archiveFS fs.FS, index *imgspecv1.Index, currentOS string, currentArch string) (bool, string) {
+	var lastReason string
+	for _, desc := range index.Manifests {
+		if desc.Platform != nil && (desc.Platform.OS != currentOS || desc.Platform.Architecture != currentArch) {
+			continue
+		}
+
+		switch desc.MediaType {
+		case imgspecv1.MediaTypeImageIndex, cimgmanifest.DockerV2ListMediaType:
+			indexBytes, err := readOciBlob(archiveFS, desc.Digest)
+			if err != nil {
+				return false, err.Error()
+			}
+			childIndex := imgspecv1.Index{}
+			if err := json.Unmarshal(indexBytes, &childIndex); err != nil {
+				return false, err.Error()
+			}
+			ok, reason := canSplitOciIndex(archiveFS, &childIndex, currentOS, currentArch)
+			if ok {
+				return true, ""
+			}
+			lastReason = reason
+		case imgspecv1.MediaTypeImageManifest:
+			if desc.Platform == nil {
+				lastReason = "single OCI manifest has no platform to split"
+				continue
+			}
+			manifestBytes, err := readOciBlob(archiveFS, desc.Digest)
+			if err != nil {
+				return false, err.Error()
+			}
+			manifest := imgspecv1.Manifest{}
+			if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+				return false, err.Error()
+			}
+			if ok, reason := isStandardOciManifest(&manifest); !ok {
+				return false, reason
+			}
+			return true, ""
+		default:
+			lastReason = fmt.Sprintf("unsupported OCI descriptor media type %q", desc.MediaType)
+		}
+	}
+	if lastReason == "" {
+		lastReason = "current platform OCI manifest not found"
+	}
+	return false, lastReason
+}
+
+func isStandardOciManifest(manifest *imgspecv1.Manifest) (bool, string) {
+	if manifest.MediaType != imgspecv1.MediaTypeImageManifest {
+		return false, fmt.Sprintf("unsupported OCI manifest media type %q", manifest.MediaType)
+	}
+
+	for _, layer := range manifest.Layers {
+		switch layer.MediaType {
+		case imgspecv1.MediaTypeImageLayer,
+			imgspecv1.MediaTypeImageLayerGzip,
+			imgspecv1.MediaTypeImageLayerNonDistributable,
+			imgspecv1.MediaTypeImageLayerNonDistributableGzip:
+		default:
+			return false, fmt.Sprintf("unsupported OCI layer media type %q", layer.MediaType)
+		}
+	}
+	return true, ""
+}
+
+func readOciBlob(archiveFS fs.FS, blobDigest digest.Digest) ([]byte, error) {
+	return fs.ReadFile(archiveFS, "blobs/sha256/"+blobDigest.Encoded())
 }
 
 // extractOciMetadata 辅助提取逻辑 (保持不变)

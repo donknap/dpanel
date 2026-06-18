@@ -16,6 +16,7 @@ import (
 const (
 	ExplorerMountTypeDocker = "docker"
 	ExplorerMountTypeLocal  = "local"
+	ExplorerMountSSH        = "ssh"
 	ExplorerMountHost       = "host"
 	ExplorerMountDPanel     = "dpanel"
 )
@@ -25,7 +26,7 @@ type Explorer struct {
 
 type AfsCreateOption struct {
 	Init       bool   // 仅用于与 app/explorer 保持一致的调用风格
-	MountPoint string // docker:xxx local:host local:dpanel
+	MountPoint string // docker:xxx local:ssh local:host local:dpanel
 }
 
 func (self Explorer) Afs(ctx context.Context, option AfsCreateOption) (*serviceSsh.Client, *afero.Afero, error) {
@@ -45,13 +46,12 @@ func (self Explorer) Afs(ctx context.Context, option AfsCreateOption) (*serviceS
 			return nil, &afero.Afero{
 				Fs: afero.NewBasePathFs(afero.NewOsFs(), rootPath),
 			}, nil
-		case ExplorerMountHost:
-			if !function.IsRunInDocker() {
-				return nil, &afero.Afero{
-					Fs: afero.NewBasePathFs(afero.NewOsFs(), "/"),
-				}, nil
-			}
+		case ExplorerMountSSH:
 			return self.newSshAfs(ctx, define.DockerDefaultClientName)
+		case ExplorerMountHost:
+			return nil, &afero.Afero{
+				Fs: afero.NewBasePathFs(afero.NewOsFs(), "/"),
+			}, nil
 		default:
 			return nil, nil, errors.New("invalid local mount point")
 		}

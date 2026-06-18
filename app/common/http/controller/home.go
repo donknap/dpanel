@@ -16,8 +16,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/creack/pty"
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -30,6 +32,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/ssh"
@@ -127,8 +130,12 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	params.Cmd = strings.TrimSpace(params.Cmd)
 	if params.Cmd == "" {
 		params.Cmd = "/bin/sh"
+	}
+	if params.Cmd == "bin/sh" || params.Cmd == "bin/bash" {
+		params.Cmd = "/" + params.Cmd
 	}
 	containerName := params.Id
 	if _, pluginName, exists := strings.Cut(params.Id, ":"); exists {
@@ -240,7 +247,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	}()
 }
 
-func (self Home) WsHostConsole(http *gin.Context) {
+func (self Home) WsSshConsole(http *gin.Context) {
 	if !websocket.IsWebSocketUpgrade(http.Request) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonUseWsConnect), 500)
 		return
@@ -249,7 +256,6 @@ func (self Home) WsHostConsole(http *gin.Context) {
 		Name   string `json:"name" uri:"name" binding:"required"`
 		Width  int    `json:"width"`
 		Height int    `json:"height"`
-		Cmd    string `json:"cmd"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -258,16 +264,13 @@ func (self Home) WsHostConsole(http *gin.Context) {
 	if params.Name == "" {
 		params.Name = define.DockerDefaultClientName
 	}
-	if params.Cmd == "" {
-		params.Cmd = "/bin/sh"
-	}
 	var err error
 	var sshClient *ssh.Client
 	var read io.Reader
 	var write io.WriteCloser
 	var session *ssh2.Session
 
-	messageType := fmt.Sprintf(ws.MessageTypeConsoleHost, params.Name)
+	messageType := fmt.Sprintf(ws.MessageTypeConsoleSsh, params.Name)
 	client, err := ws.NewClient(http,
 		ws.WithMessageRecvHandler(messageType, func(recvMessage *ws.RecvMessage) {
 			var cmd command
@@ -305,7 +308,7 @@ func (self Home) WsHostConsole(http *gin.Context) {
 		if err != nil {
 			return err
 		}
-		if !dockerEnv.EnableSSH {
+		if !dockerEnv.EnableSSH || dockerEnv.SshServerInfo == nil {
 			return function.ErrorMessage(define.ErrorMessageHomeWsHostConsoleSshNotSetting)
 		}
 		sshClient, err = ssh.NewClient(ssh.WithServerInfo(dockerEnv.SshServerInfo)...)
@@ -353,6 +356,132 @@ func (self Home) WsHostConsole(http *gin.Context) {
 				sshClient.Close()
 			}
 			return
+		}
+	}()
+
+	go client.ReadMessage()
+}
+
+func (self Home) WsShellConsole(http *gin.Context) {
+	if !websocket.IsWebSocketUpgrade(http.Request) {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonUseWsConnect), 500)
+		return
+	}
+	type ParamsValidate struct {
+		Width  int `json:"width"`
+		Height int `json:"height"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	var err error
+	var read io.Reader
+	var write io.WriteCloser
+	var closeTerminalOnce sync.Once
+	var resizeTerminal func(size *pty.Winsize) error
+
+	client, err := ws.NewClient(http,
+		ws.WithMessageRecvHandler(ws.MessageTypeConsoleShell, func(recvMessage *ws.RecvMessage) {
+			var cmd command
+			err = json.Unmarshal(recvMessage.Message, &cmd)
+			if err != nil {
+				slog.Warn("console", "json unmarshal", err.Error())
+			}
+			if cmd.Content.Command != "" {
+				_, err = write.Write([]byte(cmd.Content.Command))
+				if err != nil {
+					slog.Warn("console shell write", "error", err.Error())
+				}
+			}
+			if resizeTerminal != nil && cmd.Size.Width > 0 && cmd.Size.Height > 0 {
+				err = resizeTerminal(&pty.Winsize{
+					Rows: uint16(cmd.Size.Height),
+					Cols: uint16(cmd.Size.Width),
+				})
+				if err != nil {
+					slog.Warn("console shell resize", "size", cmd.Size, "error", err)
+				}
+			}
+		}),
+	)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	clientReady := false
+	defer func() {
+		if !clientReady {
+			_ = client.Close()
+		}
+	}()
+
+	localCmd, err := local.New(
+		local.WithDefaultShell(),
+		local.WithDefaultShellDir(),
+		local.WithInteractiveTerminalEnv(),
+		local.WithCtx(client.CtxContext),
+		// pty.StartWithSize already sets Setsid and Setctty; adding Setpgid can make fork/exec fail with EPERM.
+		local.WithKillProcessGroupOnCancel(),
+	)
+	if err != nil {
+		_ = client.SendMessage(&ws.RespMessage{
+			Type: ws.MessageTypeConsoleShell,
+			Data: err.Error(),
+		})
+		return
+	}
+	read, write, err = localCmd.RunInTerminal(&pty.Winsize{
+		Rows: uint16(params.Height),
+		Cols: uint16(params.Width),
+	})
+	if err != nil {
+		_ = client.SendMessage(&ws.RespMessage{
+			Type: ws.MessageTypeConsoleShell,
+			Data: err.Error(),
+		})
+		return
+	}
+	if resizer, ok := localCmd.(interface {
+		ResizeTerminal(size *pty.Winsize) error
+	}); ok {
+		resizeTerminal = resizer.ResizeTerminal
+	}
+
+	closeTerminal := func() {
+		closeTerminalOnce.Do(func() {
+			if write != nil {
+				_ = write.Close()
+			}
+		})
+	}
+
+	clientReady = true
+	go func() {
+		select {
+		case <-client.CtxContext.Done():
+			closeTerminal()
+			return
+		}
+	}()
+
+	go func() {
+		defer closeTerminal()
+		out := make([]byte, 2028)
+		for {
+			n, err := read.Read(out)
+			if err != nil {
+				return
+			}
+			err = client.SendMessage(&ws.RespMessage{
+				Type: ws.MessageTypeConsoleShell,
+				Data: string(out[:n]),
+			})
+			if err != nil {
+				slog.Warn("websocket shell write", "error", err.Error())
+				return
+			}
 		}
 	}()
 

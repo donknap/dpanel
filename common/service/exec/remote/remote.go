@@ -203,16 +203,16 @@ func (self *Remote) RunInPip() (io.ReadCloser, error) {
 	return r, nil
 }
 
-func (self *Remote) RunInTerminal(size *pty.Winsize) (io.ReadCloser, error) {
+func (self *Remote) RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser, error) {
 	session, reader, write, err := self.client.NewPtySession(24, 80)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	go func() {
 		_, err = write.Write([]byte(self.String() + "\n"))
 	}()
-	return &readCloser{
-		buffer:  reader,
+	return reader, &readCloser{
+		writer:  write,
 		session: session,
 	}, nil
 }
