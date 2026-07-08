@@ -58,21 +58,27 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
         proxy_http_version 1.1;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
         {{end}}
 
         add_header X-Served-By $host;
 
         proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host   $host;
         proxy_set_header X-Forwarded-Scheme $scheme;
         proxy_set_header X-Forwarded-Proto  $scheme;
         proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
         proxy_set_header X-Real-IP          $remote_addr;
 
+        client_max_body_size 0;
+        proxy_buffering off;
+
         {{if eq .serverAddress "host.dpanel.local"}}
-        proxy_pass $forward_scheme://host.dpanel.local:{{.port}}$request_uri;
+        proxy_pass $forward_scheme://host.dpanel.local:{{.port}};
         {{else}}
         set $upstream_endpoint {{.serverAddress}}:{{.port}};
-        proxy_pass $forward_scheme://$upstream_endpoint$request_uri;
+        proxy_pass $forward_scheme://$upstream_endpoint;
         {{end}}
     }
     {{end}}
