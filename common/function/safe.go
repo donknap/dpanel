@@ -51,6 +51,20 @@ func SafeFileName(name string) string {
 	return base
 }
 
+func IsSafeName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == '_' || r == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 // SafeShell 将参数转换为可安全放入 shell 命令参数位置的值。
 // 安全优先：仅兼容明确允许的基础类型，不支持的类型返回空字符串并在模板中跳过。
 func SafeShell(value any) string {

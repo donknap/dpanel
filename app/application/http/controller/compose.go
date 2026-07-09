@@ -33,6 +33,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
+	"gorm.io/gen/field"
 )
 
 type Compose struct {
@@ -225,8 +226,7 @@ func (self Compose) Create(http *gin.Context) {
 
 func (self Compose) GetList(http *gin.Context) {
 	type ParamsValidate struct {
-		Name  string `json:"name"`
-		Title string `json:"title"`
+		Name string `json:"name"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -247,14 +247,16 @@ func (self Compose) GetList(http *gin.Context) {
 
 	composeList := make([]*entity.Compose, 0)
 	query := dao.Compose.Order(dao.Compose.Name.Asc())
+	keyword := ""
 	if params.Name != "" {
-		query = query.Where(dao.Compose.Name.Like("%" + params.Name + "%"))
-	}
-	if params.Title != "" {
-		query = query.Where(dao.Compose.Title.Like("%" + params.Title + "%"))
+		keyword = "%" + params.Name + "%"
+		query = query.Where(field.Or(
+			dao.Compose.Name.Like(keyword),
+			dao.Compose.Title.Like(keyword),
+		))
 	}
 
-	query.Where(gen.Cond(
+	query = query.Where(gen.Cond(
 		datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
 	)...)
 	composeList, _ = query.Find()
@@ -275,6 +277,9 @@ func (self Compose) GetList(http *gin.Context) {
 		}); ok {
 			composeList[i].Setting.Status = runItem.Status
 			composeList[i].Setting.UpdatedAt = runItem.UpdatedAt.Local().Format(time.DateTime)
+			continue
+		}
+		if keyword != "" && !strings.Contains(runItem.Name, params.Name) {
 			continue
 		}
 		outPathTask := &entity.Compose{

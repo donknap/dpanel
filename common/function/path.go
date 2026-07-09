@@ -54,7 +54,9 @@ func SystemPathFromSlash(p string) string {
 
 func PathClean(p string) string {
 	var sb strings.Builder
+	// 仅压缩非法字符替换产生的 '-'，纯合法路径中的原始 '-' 需要原样保留。
 	lastWasDash := false
+	lastDashFromReplacement := false
 
 	// 1. 白名单过滤：仅允许安全字符通过，非法字符（如空格、&、|、" 等）替换为 '-'
 	for _, r := range p {
@@ -62,17 +64,22 @@ func PathClean(p string) string {
 			r == '/' || r == '\\' || r == ':' || r == '.' || r == '_' || r == '@' {
 			sb.WriteRune(r)
 			lastWasDash = false
+			lastDashFromReplacement = false
 		} else if r == '-' {
-			if !lastWasDash {
-				sb.WriteRune(r)
-				lastWasDash = true
+			if lastDashFromReplacement {
+				lastDashFromReplacement = false
+				continue
 			}
+			sb.WriteRune(r)
+			lastWasDash = true
+			lastDashFromReplacement = false
 		} else {
 			// 将不在白名单中的危险/非法字符统一替换为 '-'
 			if !lastWasDash {
 				sb.WriteRune('-')
 				lastWasDash = true
 			}
+			lastDashFromReplacement = true
 		}
 	}
 

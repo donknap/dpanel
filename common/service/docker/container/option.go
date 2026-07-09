@@ -23,30 +23,23 @@ type Option func(builder *Builder) error
 
 func WithContainerInfo(containerInfo container.InspectResponse) Option {
 	return func(self *Builder) error {
-		self.containerConfig = containerInfo.Config
-		self.hostConfig = containerInfo.HostConfig
-		// compatible cgroup v2 不支持配置 MemorySwappiness，podman 在 crun 下会严格报错
-		self.hostConfig.MemorySwappiness = nil
+		if containerInfo.Config != nil {
+			containerConfig := *containerInfo.Config
+			self.containerConfig = &containerConfig
+		}
+		if containerInfo.HostConfig != nil {
+			hostConfig := *containerInfo.HostConfig
+			// compatible cgroup v2 不支持配置 MemorySwappiness，podman 在 crun 下会严格报错
+			hostConfig.MemorySwappiness = nil
+			self.hostConfig = &hostConfig
+		}
 		return nil
 	}
 }
 
 func WithContainerName(name string) Option {
 	return func(self *Builder) error {
-		self.containerConfig.Hostname = name
 		self.containerName = name
-		// 恢复一些默认值
-		self.hostConfig.NetworkMode = network.NetworkDefault
-		self.hostConfig.PidMode = ""
-		self.hostConfig.ExtraHosts = []string{
-			"host.dpanel.local:host-gateway",
-		}
-
-		//  防止退出
-		self.containerConfig.AttachStdin = true
-		self.containerConfig.AttachStdout = true
-		self.containerConfig.AttachStderr = true
-		self.containerConfig.OpenStdin = true
 		return nil
 	}
 }
@@ -223,11 +216,6 @@ func WithLink(item ...types.LinkItem) Option {
 // WithNetwork 不在构建时加入网络，会导致 bridge 网络无法加入
 func WithNetwork(item ...types.NetworkItem) Option {
 	return func(self *Builder) error {
-		if self.networkingConfig == nil {
-			self.networkingConfig = &network.NetworkingConfig{
-				EndpointsConfig: make(map[string]*network.EndpointSettings),
-			}
-		}
 		for _, networkRow := range item {
 			if networkRow.Alise == nil {
 				networkRow.Alise = make([]string, 0)
@@ -246,8 +234,33 @@ func WithNetwork(item ...types.NetworkItem) Option {
 			if networkRow.IpV6 != "" {
 				endpointSetting.IPAMConfig.IPv6Address = networkRow.IpV6
 			}
-			self.networkingConfig.EndpointsConfig[networkRow.Name] = endpointSetting
+			if err := WithNetworkEndpoint(networkRow.Name, endpointSetting)(self); err != nil {
+				return err
+			}
 		}
+		return nil
+	}
+}
+
+func WithNetworkEndpoint(name string, endpoint *network.EndpointSettings) Option {
+	return func(self *Builder) error {
+		if name == "" || endpoint == nil {
+			return nil
+		}
+		if self.networkingConfig == nil {
+			self.networkingConfig = &network.NetworkingConfig{}
+		}
+		if self.networkingConfig.EndpointsConfig == nil {
+			self.networkingConfig.EndpointsConfig = make(map[string]*network.EndpointSettings)
+		}
+		self.networkingConfig.EndpointsConfig[name] = endpoint
+		return nil
+	}
+}
+
+func WithNetworkMode(mode container.NetworkMode) Option {
+	return func(self *Builder) error {
+		self.hostConfig.NetworkMode = mode
 		return nil
 	}
 }
@@ -352,6 +365,16 @@ func WithPid(s string) Option {
 	}
 }
 
+func WithStdioKeepAlive(enable bool) Option {
+	return func(self *Builder) error {
+		self.containerConfig.AttachStdin = enable
+		self.containerConfig.AttachStdout = enable
+		self.containerConfig.AttachStderr = enable
+		self.containerConfig.OpenStdin = enable
+		return nil
+	}
+}
+
 func WithHostNetwork() Option {
 	return func(self *Builder) error {
 		self.hostConfig.NetworkMode = network.NetworkHost
@@ -402,6 +425,19 @@ func WithLabel(item ...types.ValueItem) Option {
 		for _, row := range item {
 			self.containerConfig.Labels[row.Name] = row.Value
 		}
+		return nil
+	}
+}
+
+func WithLabels(item ...types.ValueItem) Option {
+	return func(self *Builder) error {
+		if len(item) == 0 {
+			self.containerConfig.Labels = nil
+			return nil
+		}
+		self.containerConfig.Labels = function.PluckArrayMapWalk(item, func(row types.ValueItem) (string, string, bool) {
+			return row.Name, row.Value, row.Name != ""
+		})
 		return nil
 	}
 }

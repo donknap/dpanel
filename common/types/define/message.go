@@ -49,6 +49,7 @@ const (
 	ErrorMessageSystemEnvApiTooOld                          = ".systemEnvApiTooOld"
 	ErrorMessageSystemEnvDockerApiFailed                    = ".systemEnvDockerApiFailed"
 	ErrorMessageSystemEnvCurrentCanNotDelete                = ".systemEnvCurrentCanNotDelete"
+	ErrorMessageSystemEnvNameInvalid                        = ".systemEnvNameInvalid"
 	ErrorMessageSystemStoreNotFoundGit                      = ".systemStoreNotFoundGit"
 	ErrorMessageSystemStoreDownloadFailed                   = ".systemStoreDownloadFailed"
 	ErrorMessageSettingBasicEmailInvalid                    = ".settingBasicEmailInvalid"

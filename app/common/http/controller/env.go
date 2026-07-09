@@ -104,8 +104,8 @@ func (self Env) Create(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	if !self.Validate(http, &params) {
+	if !function.IsSafeName(params.Name) {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvNameInvalid), 500)
 		return
 	}
 	if params.EnableTLS && (params.TlsCa == "" || params.TlsCert == "" || params.TlsKey == "") {

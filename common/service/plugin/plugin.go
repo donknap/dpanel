@@ -13,6 +13,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -184,6 +185,14 @@ recreate:
 	options := []builder.Option{
 		builder.WithImage(service.Image, false),
 		builder.WithContainerName(self.containerName),
+		builder.WithHostname(self.containerName),
+		builder.WithNetworkMode(network.NetworkDefault),
+		builder.WithPid(""),
+		builder.WithExtraHosts(types.ValueItem{
+			Name:  "host.dpanel.local",
+			Value: "host-gateway",
+		}),
+		builder.WithStdioKeepAlive(true),
 		builder.WithLabel(function.PluckMapWalkArray(service.Labels, func(key string, value string) (types.ValueItem, bool) {
 			return types.ValueItem{
 				Name:  key,

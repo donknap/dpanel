@@ -115,5 +115,11 @@ func (self Attach) Download(http *gin.Context) {
 		return
 	}
 	http.FileAttachment(task.FilePath, filepath.Base(task.FilePath))
+	if task.DeleteAfterDownload {
+		storage.Cache.Delete(cacheKey)
+		if err := function.SafeDelete(storage.Local{}.GetSaveRootPath(), task.FilePath); err != nil {
+			slog.Warn("delete attach download file after download failed", "path", task.FilePath, "error", err)
+		}
+	}
 	return
 }

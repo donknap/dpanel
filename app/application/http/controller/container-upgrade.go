@@ -10,18 +10,18 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	builder "github.com/donknap/dpanel/common/service/docker/container"
+	dockerTypes "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
@@ -52,11 +52,12 @@ func (self Container) Upgrade(http *gin.Context) {
 	bakTime := time.Now().Format(define.DateYmdHis)
 
 	// 更新容器时可以更改镜像 tag
+	imageName := containerInfo.Config.Image
 	if params.ImageTag != "" {
-		containerInfo.Config.Image = params.ImageTag
+		imageName = params.ImageTag
 	}
 
-	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, containerInfo.Config.Image)
+	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, imageName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -72,21 +73,44 @@ func (self Container) Upgrade(http *gin.Context) {
 		//})
 		//return
 	}
-	if params.EnableResetImageConfig {
-		containerInfo.Config.Env = imageInfo.Config.Env
-		containerInfo.Config.Labels = imageInfo.Config.Labels
-		containerInfo.Config.WorkingDir = imageInfo.Config.WorkingDir
-		containerInfo.Config.Cmd = imageInfo.Config.Cmd
-		containerInfo.Config.Entrypoint = imageInfo.Config.Entrypoint
-	}
 
 	// 成功的创建一个新的容器后再对旧的进停止或是删除操作
 	_ = notice.Message{}.Info(".containerCreate", containerInfo.Name)
 	newContainerName := fmt.Sprintf("%s-copy-%s", containerInfo.Name, bakTime)
 
-	out, err := docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, containerInfo.Config, containerInfo.HostConfig, &network.NetworkingConfig{
-		EndpointsConfig: containerInfo.NetworkSettings.Networks,
-	}, &v1.Platform{}, newContainerName)
+	options := []builder.Option{
+		builder.WithContainerInfo(containerInfo),
+		builder.WithContainerName(newContainerName),
+		builder.WithImage(imageName, false),
+	}
+	if containerInfo.NetworkSettings != nil {
+		for name, endpoint := range containerInfo.NetworkSettings.Networks {
+			options = append(options, builder.WithNetworkEndpoint(name, endpoint))
+		}
+	}
+	if params.EnableResetImageConfig {
+		options = append(options,
+			builder.WithEnv(function.PluckArrayWalk(imageInfo.Config.Env, func(item string) (dockerTypes.EnvItem, bool) {
+				return dockerTypes.NewEnvItemFromString(item), true
+			})...),
+			builder.WithLabels(function.PluckMapWalkArray(imageInfo.Config.Labels, func(name string, value string) (dockerTypes.ValueItem, bool) {
+				return dockerTypes.ValueItem{
+					Name:  name,
+					Value: value,
+				}, true
+			})...),
+			builder.WithWorkDir(imageInfo.Config.WorkingDir),
+			builder.WithCommand(imageInfo.Config.Cmd),
+			builder.WithEntrypoint(imageInfo.Config.Entrypoint),
+		)
+	}
+	containerBuilder, err := builder.New(options...)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	out, err := containerBuilder.Execute()
 	if err != nil {
 		errRemove := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, newContainerName, container.RemoveOptions{})
 		self.JsonResponseWithError(http, errors.Join(err, errRemove), 500)

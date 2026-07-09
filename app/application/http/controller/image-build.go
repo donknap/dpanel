@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -276,15 +275,17 @@ func (self ImageBuild) Prune(http *gin.Context) {
 
 func (self ImageBuild) Buildx(http *gin.Context) {
 	type ParamsValidate struct {
-		ProxyUrl     string `json:"proxyUrl"`
-		EnableCreate bool   `json:"enableCreate"`
-		EnablePrune  bool   `json:"enablePrune"`
+		Config       *string `json:"config"`
+		EnableCreate bool    `json:"enableCreate"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if _, err := url.Parse(params.ProxyUrl); err != nil {
+
+	imageLogic := logic.Image{}
+	createConfigOption, err := imageLogic.BuildxConfig(docker.Sdk.Name)
+	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -297,26 +298,30 @@ func (self ImageBuild) Buildx(http *gin.Context) {
 	if result, err := local.QuickRun("docker context inspect", contextName); err == nil && strings.Contains(string(result), description) {
 		recreateContext = false
 	}
-	if !params.EnableCreate && recreateContext {
-		// 如果 hash 不对，是表示当前的构建环境不能用了，所以返回空
-		self.JsonResponseWithoutError(http, gin.H{
-			"name":   builderName,
-			"detail": "",
-		})
-		return
-	}
-
-	if params.EnableCreate {
-		if recreateContext {
-			if _, err := docker.Sdk.RunResult("context",
-				"rm", contextName, "--force",
-			); err != nil {
+	if params.EnableCreate || recreateContext {
+		if params.Config != nil {
+			createConfigOption.ConfigContent = params.Config
+			if err := imageLogic.BuildxCreateConfig(createConfigOption); err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-			cmd, err := docker.Sdk.Run("context", "create", contextName,
-				"--description", description,
-			)
+		} else if _, err := os.Stat(createConfigOption.ConfigPath); os.IsNotExist(err) {
+			createConfigOption.DriverHttpProxy = os.Getenv("HTTP_PROXY")
+			if err := imageLogic.BuildxCreateConfig(createConfigOption); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		} else if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+
+		if recreateContext {
+			if _, err := docker.Sdk.RunResult("context", "rm", contextName, "--force"); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			cmd, err := docker.Sdk.Run("context", "create", contextName, "--description", description)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
@@ -326,24 +331,18 @@ func (self ImageBuild) Buildx(http *gin.Context) {
 				return
 			}
 		}
-		if params.ProxyUrl == "" {
-			params.ProxyUrl = os.Getenv("HTTP_PROXY")
-		}
-		if _, err := docker.Sdk.RunResult("buildx",
-			"rm", contextName+"-builder",
-			"--force",
-		); err != nil {
-			// 即使出错也不提示只记录日志
+		if _, err := docker.Sdk.RunResult("buildx", "rm", contextName+"-builder", "--force"); err != nil {
 			slog.Debug("image build rm buildx", "error", err)
 		}
-		_, err := docker.Sdk.RunResult("buildx", "create",
+		createArgs := []string{
+			"buildx", "create",
 			"--name", builderName,
 			"--driver", "docker-container",
 			"--driver-opt", "network=host",
-			"--driver-opt", "env.http_proxy="+params.ProxyUrl,
-			"--driver-opt", "env.https_proxy="+params.ProxyUrl,
-			"--bootstrap", fmt.Sprintf(define.DockerContextName, docker.Sdk.Name))
-		if err != nil {
+			"--buildkitd-config", createConfigOption.ConfigPath,
+		}
+		createArgs = append(createArgs, "--bootstrap", contextName)
+		if _, err = docker.Sdk.RunResult(createArgs...); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
@@ -352,10 +351,20 @@ func (self ImageBuild) Buildx(http *gin.Context) {
 	var detail string
 	if v, err := docker.Sdk.RunResult("buildx", "inspect", fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)); err == nil {
 		detail = string(v)
+	} else {
+		slog.Info("buildx get inspect", "error", err)
 	}
+	var config string
+	if v, err := os.ReadFile(createConfigOption.ConfigPath); err == nil {
+		config = string(v)
+	} else if !os.IsNotExist(err) {
+		slog.Info("buildx get config", "error", err)
+	}
+
 	self.JsonResponseWithoutError(http, gin.H{
 		"name":   builderName,
 		"detail": detail,
+		"config": config,
 	})
 	return
 }

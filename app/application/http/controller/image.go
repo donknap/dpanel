@@ -534,7 +534,7 @@ func (self Image) Export(http *gin.Context) {
 		return
 	}
 
-	downloadUrl, err := logic2.Attach{}.PreDownload(exportSaveFile.Name(), cache.DefaultExpiration)
+	downloadUrl, err := logic2.Attach{}.PreDownload(exportSaveFile.Name(), cache.DefaultExpiration, true)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

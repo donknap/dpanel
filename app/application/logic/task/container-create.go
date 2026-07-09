@@ -59,6 +59,14 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 
 	options = append(options, []builder.Option{
 		builder.WithContainerName(task.SiteName),
+		builder.WithHostname(task.SiteName),
+		builder.WithNetworkMode(network.NetworkDefault),
+		builder.WithPid(""),
+		builder.WithExtraHosts(types.ValueItem{
+			Name:  "host.dpanel.local",
+			Value: "host-gateway",
+		}),
+		builder.WithStdioKeepAlive(true),
 		builder.WithHostname(task.BuildParams.Hostname),
 		builder.WithImage(task.BuildParams.ImageName, false),
 		builder.WithEnv(task.BuildParams.Environment...),
