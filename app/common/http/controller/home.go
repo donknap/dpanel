@@ -121,10 +121,10 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	}
 	type ParamsValidate struct {
 		Id      string `json:"id" uri:"id" binding:"required"`
-		Width   uint   `json:"width"`
-		Height  uint   `json:"height"`
-		Cmd     string `json:"cmd"`
-		WorkDir string `json:"workDir"`
+		Width   uint   `json:"width" form:"width"`
+		Height  uint   `json:"height" form:"height"`
+		Cmd     string `json:"cmd" form:"cmd"`
+		WorkDir string `json:"workDir" form:"workDir"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {

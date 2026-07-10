@@ -273,6 +273,33 @@ func (self ImageBuild) Prune(http *gin.Context) {
 	return
 }
 
+func (self ImageBuild) BuildxPrune(http *gin.Context) {
+	type ParamsValidate struct {
+		EnablePrune  bool `json:"enablePrune"`
+		EnableRemove bool `json:"enableRemove"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	builderName := fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)
+	if params.EnablePrune {
+		if _, err := docker.Sdk.RunResult("buildx", "prune", "--builder", builderName, "--all", "--force"); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+	if params.EnableRemove {
+		if _, err := docker.Sdk.RunResult("buildx", "rm", builderName, "--force"); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+	}
+
+	self.JsonSuccessResponse(http)
+}
+
 func (self ImageBuild) Buildx(http *gin.Context) {
 	type ParamsValidate struct {
 		Config       *string `json:"config"`

@@ -87,6 +87,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/image-build/delete", controller.ImageBuild{}.Delete)
 			cors.POST("/app/image-build/prune", controller.ImageBuild{}.Prune)
 			cors.POST("/app/image-build/buildx", controller.ImageBuild{}.Buildx)
+			cors.POST("/app/image-build/buildx-prune", controller.ImageBuild{}.BuildxPrune)
 
 			// 文件相关
 			cors.POST("/app/explorer/export", controller.Explorer{}.Export)
