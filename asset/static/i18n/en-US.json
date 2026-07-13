@@ -555,6 +555,7 @@
   "components.console.toolbarBatchCommandTitle": "Batch Scripts",
   "components.console.toolbarEntryCmdEmpty": "Switch Shell",
   "components.console.toolbarOpenInNewWindowTip": "Open in New Window",
+  "components.console.toolbarUserEmpty": "User (optional)",
   "components.containerPort.cardDomainTitle": "Domain Bindings",
   "components.containerPort.cardPortTitle": "Port Bindings",
   "components.containerPort.domain": "Domain",

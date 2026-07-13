@@ -3,7 +3,6 @@ package controller
 import (
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -20,7 +19,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
-	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
@@ -270,128 +268,5 @@ func (self ImageBuild) Prune(http *gin.Context) {
 	}
 	_ = notice.Message{}.Info(".imageBuildPrune", "size", units.HumanSize(float64(res.SpaceReclaimed)))
 	self.JsonSuccessResponse(http)
-	return
-}
-
-func (self ImageBuild) BuildxPrune(http *gin.Context) {
-	type ParamsValidate struct {
-		EnablePrune  bool `json:"enablePrune"`
-		EnableRemove bool `json:"enableRemove"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-
-	builderName := fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)
-	if params.EnablePrune {
-		if _, err := docker.Sdk.RunResult("buildx", "prune", "--builder", builderName, "--all", "--force"); err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-	if params.EnableRemove {
-		if _, err := docker.Sdk.RunResult("buildx", "rm", builderName, "--force"); err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-
-	self.JsonSuccessResponse(http)
-}
-
-func (self ImageBuild) Buildx(http *gin.Context) {
-	type ParamsValidate struct {
-		Config       *string `json:"config"`
-		EnableCreate bool    `json:"enableCreate"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-
-	imageLogic := logic.Image{}
-	createConfigOption, err := imageLogic.BuildxConfig(docker.Sdk.Name)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	builderName := fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)
-	contextName := fmt.Sprintf(define.DockerContextName, docker.Sdk.Name)
-	description := fmt.Sprintf("Created by DPanel DO NOT DELETE!!! %s", function.Sha256Struct(docker.Sdk.DockerEnv))
-
-	recreateContext := true
-	if result, err := local.QuickRun("docker context inspect", contextName); err == nil && strings.Contains(string(result), description) {
-		recreateContext = false
-	}
-	if params.EnableCreate || recreateContext {
-		if params.Config != nil {
-			createConfigOption.ConfigContent = params.Config
-			if err := imageLogic.BuildxCreateConfig(createConfigOption); err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		} else if _, err := os.Stat(createConfigOption.ConfigPath); os.IsNotExist(err) {
-			createConfigOption.DriverHttpProxy = os.Getenv("HTTP_PROXY")
-			if err := imageLogic.BuildxCreateConfig(createConfigOption); err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		} else if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-
-		if recreateContext {
-			if _, err := docker.Sdk.RunResult("context", "rm", contextName, "--force"); err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			cmd, err := docker.Sdk.Run("context", "create", contextName, "--description", description)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			if _, err = cmd.RunWithResult(); err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
-		if _, err := docker.Sdk.RunResult("buildx", "rm", contextName+"-builder", "--force"); err != nil {
-			slog.Debug("image build rm buildx", "error", err)
-		}
-		createArgs := []string{
-			"buildx", "create",
-			"--name", builderName,
-			"--driver", "docker-container",
-			"--driver-opt", "network=host",
-			"--buildkitd-config", createConfigOption.ConfigPath,
-		}
-		createArgs = append(createArgs, "--bootstrap", contextName)
-		if _, err = docker.Sdk.RunResult(createArgs...); err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-
-	var detail string
-	if v, err := docker.Sdk.RunResult("buildx", "inspect", fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)); err == nil {
-		detail = string(v)
-	} else {
-		slog.Info("buildx get inspect", "error", err)
-	}
-	var config string
-	if v, err := os.ReadFile(createConfigOption.ConfigPath); err == nil {
-		config = string(v)
-	} else if !os.IsNotExist(err) {
-		slog.Info("buildx get config", "error", err)
-	}
-
-	self.JsonResponseWithoutError(http, gin.H{
-		"name":   builderName,
-		"detail": detail,
-		"config": config,
-	})
 	return
 }

@@ -124,6 +124,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 		Width   uint   `json:"width" form:"width"`
 		Height  uint   `json:"height" form:"height"`
 		Cmd     string `json:"cmd" form:"cmd"`
+		User    string `json:"user" form:"user"`
 		WorkDir string `json:"workDir" form:"workDir"`
 	}
 	params := ParamsValidate{}
@@ -207,6 +208,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 		Cmd: []string{
 			params.Cmd,
 		},
+		User: params.User,
 		ConsoleSize: &[2]uint{
 			params.Height, params.Width,
 		},

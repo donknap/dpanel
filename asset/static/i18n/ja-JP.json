@@ -555,6 +555,7 @@
   "components.console.toolbarBatchCommandTitle": "一括実行",
   "components.console.toolbarEntryCmdEmpty": "シェル切替",
   "components.console.toolbarOpenInNewWindowTip": "新規ウィンドウ",
+  "components.console.toolbarUserEmpty": "ユーザー（任意）",
   "components.containerPort.cardDomainTitle": "ドメイン設定",
   "components.containerPort.cardPortTitle": "ポート設定",
   "components.containerPort.domain": "ドメイン",

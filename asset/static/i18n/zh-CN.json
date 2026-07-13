@@ -555,6 +555,7 @@
   "components.console.toolbarBatchCommandTitle": "批量执行脚本",
   "components.console.toolbarEntryCmdEmpty": "切换 Shell 环境",
   "components.console.toolbarOpenInNewWindowTip": "新窗口打开",
+  "components.console.toolbarUserEmpty": "指定进入用户（可选）",
   "components.containerPort.cardDomainTitle": "绑定域名",
   "components.containerPort.cardPortTitle": "绑定端口",
   "components.containerPort.domain": "域名",

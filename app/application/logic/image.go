@@ -51,12 +51,6 @@ const buildxConfigTmpl = `
   networkMode = {{ quote .WorkerNetworkMode }}
 
 {{- end }}
-{{- if .DriverHttpProxy }}
-[proxy]
-  httpProxy = {{ quote .DriverHttpProxy }}
-  httpsProxy = {{ quote .DriverHttpProxy }}
-
-{{- end }}
 {{- range .Registry }}
 [registry.{{ quote .ServerAddress }}]
 {{- if .Mirrors }}
@@ -74,7 +68,6 @@ type BuildxConfig struct {
 	ConfigContent     *string
 	WorkerNetworkMode string
 	Registry          []BuildxConfigRegistry
-	DriverHttpProxy   string
 }
 
 type BuildxConfigRegistry struct {
