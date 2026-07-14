@@ -153,8 +153,9 @@ func (self ImageBuildx) Create(http *gin.Context) {
 
 func (self ImageBuildx) Prune(http *gin.Context) {
 	type ParamsValidate struct {
-		EnablePrune  bool `json:"enablePrune"`
-		EnableRemove bool `json:"enableRemove"`
+		EnablePrune       bool  `json:"enablePrune"`
+		EnableRemove      bool  `json:"enableRemove"`
+		EnableForceRemove *bool `json:"enableForceRemove"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -170,12 +171,37 @@ func (self ImageBuildx) Prune(http *gin.Context) {
 		}
 	}
 	if params.EnableRemove {
-		if _, err := docker.Sdk.RunResult("buildx", "rm", builderName, "--force"); err != nil {
-			slog.Debug("image buildx delete builder", "error", err)
+		// 旧版请求没有 enableForceRemove 字段，默认保持原有的强制删除行为。
+		forceRemove := params.EnableForceRemove == nil || *params.EnableForceRemove
+		removeBuilderArgs := []string{"buildx", "rm", builderName}
+		if _, inspectErr := docker.Sdk.RunResult("buildx", "inspect", builderName); inspectErr == nil {
+			_, removeErr := docker.Sdk.RunResult(removeBuilderArgs...)
+			if removeErr != nil && forceRemove {
+				removeBuilderArgs = append(removeBuilderArgs, "--force")
+				_, removeErr = docker.Sdk.RunResult(removeBuilderArgs...)
+			}
+			if removeErr != nil {
+				self.JsonResponseWithError(http, removeErr, 500)
+				return
+			}
+			if _, inspectErr := docker.Sdk.RunResult("buildx", "inspect", builderName); inspectErr == nil {
+				self.JsonResponseWithError(http, fmt.Errorf("buildx builder %s still exists after removal", builderName), 500)
+				return
+			}
 		}
 		if _, err := local.QuickRun("docker context inspect", contextName); err == nil {
-			if _, err := docker.Sdk.RunResult("context", "rm", contextName, "--force"); err != nil {
-				self.JsonResponseWithError(http, err, 500)
+			removeContextArgs := []string{"context", "rm", contextName}
+			_, removeErr := docker.Sdk.RunResult(removeContextArgs...)
+			if removeErr != nil && forceRemove {
+				removeContextArgs = append(removeContextArgs, "--force")
+				_, removeErr = docker.Sdk.RunResult(removeContextArgs...)
+			}
+			if removeErr != nil {
+				self.JsonResponseWithError(http, removeErr, 500)
+				return
+			}
+			if _, inspectErr := local.QuickRun("docker context inspect", contextName); inspectErr == nil {
+				self.JsonResponseWithError(http, fmt.Errorf("docker context %s still exists after removal", contextName), 500)
 				return
 			}
 		}

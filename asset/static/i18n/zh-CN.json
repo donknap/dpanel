@@ -718,6 +718,7 @@
   "components.image.buildxCleanEnvironment": "同时删除构建环境",
   "components.image.buildxConfig": "BuildKit 配置",
   "components.image.buildxDetail": "Buildx 详情",
+  "components.image.buildxForceRemoveEnvironment": "强制删除构建环境",
   "components.image.buildxMirrorUrl": "镜像加速地址",
   "components.image.buildxMirrorUrlTip": "每行一个镜像加速地址，用于快速更新 BuildKit 配置",
   "components.image.buildxProxyUrl": "代理地址",

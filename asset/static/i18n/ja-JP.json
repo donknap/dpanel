@@ -718,6 +718,7 @@
   "components.image.buildxCleanEnvironment": "ビルド環境も削除する",
   "components.image.buildxConfig": "BuildKit設定",
   "components.image.buildxDetail": "Buildx詳細",
+  "components.image.buildxForceRemoveEnvironment": "ビルド環境を強制削除",
   "components.image.buildxMirrorUrl": "ミラーURL",
   "components.image.buildxMirrorUrlTip": "1行に1つ。BuildKit設定をすばやく更新します。",
   "components.image.buildxProxyUrl": "プロキシURL",

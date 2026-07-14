@@ -135,7 +135,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	if params.Cmd == "" {
 		params.Cmd = "/bin/sh"
 	}
-	if params.Cmd == "bin/sh" || params.Cmd == "bin/bash" {
+	if params.Cmd == "bin/sh" || params.Cmd == "bin/bash" || params.Cmd == "bin/ash" {
 		params.Cmd = "/" + params.Cmd
 	}
 	containerName := params.Id

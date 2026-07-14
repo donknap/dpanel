@@ -718,6 +718,7 @@
   "components.image.buildxCleanEnvironment": "Also Remove Build Environment",
   "components.image.buildxConfig": "BuildKit Config",
   "components.image.buildxDetail": "Buildx Detail",
+  "components.image.buildxForceRemoveEnvironment": "Force Remove Build Environment",
   "components.image.buildxMirrorUrl": "Registry Mirrors",
   "components.image.buildxMirrorUrlTip": "One mirror URL per line. Used to update the BuildKit config.",
   "components.image.buildxProxyUrl": "Proxy URL",
