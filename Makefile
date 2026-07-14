@@ -247,16 +247,18 @@ build-js: debug
 release: debug
 	@echo ">> Using Dockerfile: $(DOCKER_FILE)"
 	@echo ">> Platforms: $(DOCKER_PLATFORM)"
+	@# AliYun ACR currently rejects BuildKit provenance attestation manifests
+	@# (application/vnd.oci.empty.v1+json); remove this flag when supported.
 
 	@echo ">> Building [Lite] edition..."
-	docker buildx build --target lite $(DOCKER_TAG_LITE) $(DOCKER_BUILD_ARGS) --push
+	docker buildx build --target lite $(DOCKER_TAG_LITE) $(DOCKER_BUILD_ARGS) --provenance=false --push
 
 	@echo ">> Extracting Binaries to Host $(PROJECT_GO_TARGET)..."
 	docker buildx build --target binary-export --output type=local,dest=$(PROJECT_GO_TARGET) $(DOCKER_BUILD_ARGS)
 
 	@if [ -n "$(strip $(DOCKER_TAG_PROD))" ]; then \
 		echo ">> Building [Production] edition..."; \
-		docker buildx build --target production $(DOCKER_TAG_PROD) $(DOCKER_BUILD_ARGS) --push; \
+		docker buildx build --target production $(DOCKER_TAG_PROD) $(DOCKER_BUILD_ARGS) --provenance=false --push; \
 	fi
 
 test:
