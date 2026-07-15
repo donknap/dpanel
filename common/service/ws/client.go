@@ -56,6 +56,7 @@ func NewClient(ctx *gin.Context, options ...Option) (*Client, error) {
 	for _, option := range options {
 		err = option(client)
 		if err != nil {
+			_ = client.Close()
 			return nil, err
 		}
 	}
@@ -74,6 +75,8 @@ type Client struct {
 	CtxCancelFunc      context.CancelFunc
 	CtxContext         context.Context
 	writeLock          sync.Mutex
+	closeOnce          sync.Once
+	closeErr           error
 	recvMessageHandler map[string]RecvMessageHandlerFn
 }
 
@@ -128,15 +131,12 @@ func (self *Client) SendMessage(message *RespMessage) error {
 }
 
 func (self *Client) Close() error {
-	collect.Leave(self)
-	err := self.Conn.CloseHandler()(websocket.ClosePolicyViolation, "close repeat login")
-	if err != nil {
-		return err
-	}
-	err = self.Conn.Close()
-	if err != nil {
-		return err
-	}
-	self.CtxCancelFunc()
-	return nil
+	self.closeOnce.Do(func() {
+		self.CtxCancelFunc()
+		collect.Leave(self)
+		if self.Conn != nil {
+			self.closeErr = self.Conn.Close()
+		}
+	})
+	return self.closeErr
 }

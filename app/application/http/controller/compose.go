@@ -377,7 +377,7 @@ func (self Compose) GetFromUri(http *gin.Context) {
 	}
 	var err error
 	content := make([]byte, 0)
-	response, err := http2.Get(params.Uri)
+	response, err := function.SafeHTTPGet(http.Request.Context(), params.Uri, 30*time.Second, 5<<20)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -385,6 +385,10 @@ func (self Compose) GetFromUri(http *gin.Context) {
 	defer func() {
 		_ = response.Body.Close()
 	}()
+	if response.StatusCode != http2.StatusOK {
+		self.JsonResponseWithError(http, fmt.Errorf("remote compose returned %s", response.Status), 500)
+		return
+	}
 	content, err = io.ReadAll(response.Body)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -439,7 +443,7 @@ func (self Compose) GetFromGit(http *gin.Context) {
 			TargetPath: targetPath,
 		})
 	} else {
-		response, err := http2.Get(params.Uri)
+		response, err := function.SafeHTTPGet(http.Request.Context(), params.Uri, 30*time.Second, 5<<20)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -447,11 +451,18 @@ func (self Compose) GetFromGit(http *gin.Context) {
 		defer func() {
 			_ = response.Body.Close()
 		}()
+		if response.StatusCode != http2.StatusOK {
+			self.JsonResponseWithError(http, fmt.Errorf("remote compose returned %s", response.Status), 500)
+			return
+		}
 		file, err := os.OpenFile(filepath.Join(targetPath, define.ComposeProjectDeployComposeFileName), os.O_RDWR|os.O_TRUNC, 0666)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		defer func() {
+			_ = file.Close()
+		}()
 		_, err = io.Copy(file, response.Body)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)

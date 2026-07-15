@@ -104,7 +104,7 @@ func (self Cron) GetList(http *gin.Context) {
 		datatypes.JSONQuery("setting").Equals(docker.Sdk.Name, "dockerEnvName"),
 	)...)
 	if params.Title != "" {
-		query.Where(dao.Cron.Title.Like("%" + params.Title + "%"))
+		query = query.Where(dao.Cron.Title.Like("%" + params.Title + "%"))
 	}
 	list, _ := query.Find()
 	self.JsonResponseWithoutError(http, gin.H{
@@ -150,7 +150,7 @@ func (self Cron) RunOnce(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	if cronRow.Setting.JobIds == nil {
+	if len(cronRow.Setting.JobIds) == 0 {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerCronTaskEmpty), 500)
 		return
 	}

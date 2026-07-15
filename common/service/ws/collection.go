@@ -47,7 +47,6 @@ func (self *Collection) Leave(c *Client) {
 	if _, loaded := self.clients.LoadAndDelete(c.Fd); !loaded {
 		return
 	}
-	_ = c.Conn.Close()
 
 	self.progressPip.Range(func(key, value any) bool {
 		if v, ok := value.(*ProgressPip); ok && !v.IsKeepAlive {

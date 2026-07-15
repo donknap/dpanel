@@ -58,6 +58,9 @@ func (self client) AddJob(exp string, job *Job) (cron.EntryID, error) {
 		return 0, err
 	}
 	id, err := self.Cron.AddJob(exp, job)
+	if err != nil {
+		return 0, err
+	}
 	slog.Debug("cron add job", "name", job.Name, "next run time", self.GetNextRunTime(id))
 	return id, nil
 }

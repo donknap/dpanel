@@ -58,39 +58,43 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 	option := make([]crontab.Option, 0)
 	option = append(option, crontab.WithName(fmt.Sprintf("%s:%s:%s", task.Setting.TriggerType, task.Setting.EventType, task.Title)))
 	option = append(option, crontab.WithRunFunc(func(ctx *crontab.RunFuncContext) {
-		if v, ok := storage.Cache.Get(cacheKey); ok {
-			if task.Setting.EnableRunBlock && v == "running" {
-				ctx.Err = crontab.SkipRun
-				_ = dao.CronLog.Create(&entity.CronLog{
-					CronID: task.ID,
-					Value: &accessor.CronLogValueOption{
-						Error:   "",
-						RunTime: ctx.StartTime,
-						UseTime: 0,
-						Message: crontab.SkipRun.Error(),
-					},
-				})
-			}
+		if !task.Setting.EnableRunBlock {
 			return
 		}
+		if err := storage.Cache.Add(cacheKey, "running", cache.NoExpiration); err == nil {
+			return
+		}
+		ctx.Err = crontab.SkipRun
+		_ = dao.CronLog.Create(&entity.CronLog{
+			CronID: task.ID,
+			Value: &accessor.CronLogValueOption{
+				Error:   "",
+				RunTime: ctx.StartTime,
+				UseTime: 0,
+				Message: crontab.SkipRun.Error(),
+			},
+		})
 	}))
 	option = append(option, crontab.WithRunFunc(func(ctx *crontab.RunFuncContext) {
 		slog.Info("cron run", "task", task)
 		var err error
 		var runCtx context.Context
+		var runCancel context.CancelFunc
 		if task.Setting.ScriptRunTimeout > 0 {
-			runCtx, _ = context.WithTimeout(context.Background(), time.Second*time.Duration(task.Setting.ScriptRunTimeout))
+			runCtx, runCancel = context.WithTimeout(context.Background(), time.Second*time.Duration(task.Setting.ScriptRunTimeout))
+			defer runCancel()
 		}
 		if task.Setting.EntryShell == "" {
 			task.Setting.EntryShell = "/bin/sh"
 		}
-		storage.Cache.Set(cacheKey, "running", cache.DefaultExpiration)
 		defer func() {
 			if err != nil {
 				slog.Info("cron run finish", "error", err)
 				ctx.Err = err
 			}
-			storage.Cache.Delete(cacheKey)
+			if task.Setting.EnableRunBlock {
+				storage.Cache.Delete(cacheKey)
+			}
 		}()
 
 		containerName := task.Setting.ContainerName
@@ -190,11 +194,15 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 		if runCtx != nil {
 			//options = append(options, local.WithIndependentProcessGroup())
 		}
-		cmd, _ := local.New(options...)
+		cmd, err := local.New(options...)
+		if err != nil {
+			ctx.Err = err
+			return
+		}
 		if runCtx != nil {
 			go func() {
-				select {
-				case <-runCtx.Done():
+				<-runCtx.Done()
+				if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
 					slog.Info("cron run timeout", "timeout", task.Setting.ScriptRunTimeout, "task", task)
 					_ = cmd.Close()
 				}

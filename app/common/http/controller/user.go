@@ -34,20 +34,6 @@ func (self User) Login(http *gin.Context) {
 		return
 	}
 
-	if !function.InArray((family.Provider{}).Feature(), types.FeatureFamilyCe) {
-		twoFa := accessor.TwoFa{}
-		exists := logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa, &twoFa)
-		if exists && twoFa.Enable {
-			if params.Code == "" {
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserTwoFaEmpty), 500)
-				return
-			}
-			if !totp.Validate(params.Code, twoFa.Secret) {
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserTwoFaNotCorrect), 500)
-				return
-			}
-		}
-	}
 	var code string
 	var err error
 
@@ -82,6 +68,20 @@ func (self User) Login(http *gin.Context) {
 
 	password := logic.User{}.GetMd5Password(params.Password, params.Username)
 	if params.Username == currentUser.Value.Username && currentUser.Value.Password == password {
+		if !function.InArray((family.Provider{}).Feature(), types.FeatureFamilyCe) {
+			twoFa := accessor.TwoFa{}
+			exists := logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa, &twoFa)
+			if exists && twoFa.Enable {
+				if params.Code == "" {
+					self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserTwoFaEmpty), 500)
+					return
+				}
+				if !totp.Validate(params.Code, twoFa.Secret) {
+					self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserTwoFaNotCorrect), 500)
+					return
+				}
+			}
+		}
 		code, err = logic.User{}.GetUserOauthToken(currentUser, params.AutoLogin)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)

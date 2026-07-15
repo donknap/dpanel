@@ -2,6 +2,7 @@ package logic
 
 import (
 	"archive/zip"
+	"context"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -100,16 +101,16 @@ func (self Store) SyncByGit(gitUrl string, option SyncByGitOption) error {
 // SyncByZip 同步远程 zip
 // root 只同步 root 目录下的内容
 func (self Store) SyncByZip(path, zipUrl string, root string) error {
-	if err := function.CheckSSRFURL(zipUrl, function.SSRFAllowPrivate); err != nil {
+	zipTempFile, err := storage.Local{}.CreateTempFile("")
+	if err != nil {
 		return err
 	}
-	zipTempFile, _ := storage.Local{}.CreateTempFile("")
 	defer func() {
 		_ = zipTempFile.Close()
 		_ = os.RemoveAll(zipTempFile.Name())
 	}()
 
-	response, err := http.Get(zipUrl)
+	response, err := function.SafeHTTPGet(context.Background(), zipUrl, 30*time.Minute, 20<<30)
 	if err != nil {
 		return err
 	}
@@ -181,9 +182,6 @@ func (self Store) SyncByZip(path, zipUrl string, root string) error {
 }
 
 func (self Store) SyncByUrl(targetPath, url string) error {
-	if err := function.CheckSSRFURL(url, function.SSRFAllowPrivate); err != nil {
-		return err
-	}
 	_ = os.MkdirAll(filepath.Dir(targetPath), os.ModePerm)
 	file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
@@ -193,7 +191,7 @@ func (self Store) SyncByUrl(targetPath, url string) error {
 		_ = file.Close()
 	}()
 
-	response, err := http.Get(url)
+	response, err := function.SafeHTTPGet(context.Background(), url, 30*time.Minute, 20<<30)
 	if err != nil {
 		return err
 	}

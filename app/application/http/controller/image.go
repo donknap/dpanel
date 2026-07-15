@@ -161,16 +161,25 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 	}
 
 	tarPathList := make([]string, 0)
+	remoteTempPathList := make([]string, 0)
+	defer func() {
+		for _, tempPath := range remoteTempPathList {
+			_ = os.Remove(tempPath)
+		}
+	}()
 	if !function.IsEmptyArray(params.RemoteUrl) {
 		for _, s := range params.RemoteUrl {
 			err := func() error {
-				response, err := http2.Get(s)
+				response, err := function.SafeHTTPGet(http.Request.Context(), s, 30*time.Minute, 20<<30)
 				if err != nil {
 					return err
 				}
 				defer func() {
 					_ = response.Body.Close()
 				}()
+				if response.StatusCode != http2.StatusOK {
+					return fmt.Errorf("remote image returned %s", response.Status)
+				}
 				tempFile, err := storage.Local{}.CreateTempFile("")
 				if err != nil {
 					return err
@@ -178,8 +187,11 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 				defer func() {
 					_ = tempFile.Close()
 				}()
-				_, _ = io.Copy(tempFile, response.Body)
+				if _, err = io.Copy(tempFile, response.Body); err != nil {
+					return err
+				}
 				tarPathList = append(tarPathList, tempFile.Name())
+				remoteTempPathList = append(remoteTempPathList, tempFile.Name())
 				return nil
 			}()
 			if err != nil {

@@ -2,11 +2,15 @@ package function
 
 import (
 	"bufio"
+	"context"
 	"errors"
+	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 const (
@@ -89,6 +93,46 @@ func CheckSSRFURL(raw string, flags ...int) error {
 		}
 	}
 	return nil
+}
+
+// SafeHTTPGet 获取远程 HTTP 数据，并统一限制内网地址、重定向、超时和响应体大小。
+func SafeHTTPGet(ctx context.Context, rawURL string, timeout time.Duration, maxBodySize int64) (*http.Response, error) {
+	if ctx == nil {
+		return nil, errors.New("http context is nil")
+	}
+	if timeout <= 0 {
+		return nil, errors.New("http timeout must be greater than zero")
+	}
+	if maxBodySize <= 0 {
+		return nil, errors.New("http max body size must be greater than zero")
+	}
+	if err := CheckSSRFURL(rawURL); err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{
+		Timeout: timeout,
+		CheckRedirect: func(request *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return errors.New("stopped after 10 redirects")
+			}
+			return CheckSSRFURL(request.URL.String())
+		},
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	if response.ContentLength > maxBodySize {
+		_ = response.Body.Close()
+		return nil, fmt.Errorf("http response body exceeds %d bytes", maxBodySize)
+	}
+	response.Body = http.MaxBytesReader(nil, response.Body, maxBodySize)
+	return response, nil
 }
 
 func ValidateDomainName(domain string) error {
