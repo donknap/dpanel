@@ -221,13 +221,9 @@ func (self Container) GetDetail(http *gin.Context) {
 	if docker.Sdk.DockerEnv.Default && dpanelInfo.ContainerInfo.ContainerJSONBase != nil && dpanelInfo.ContainerInfo.Name == detail.Name {
 		detail.Config.Labels[define.DPanelLabelContainerDPanelSelf] = "true"
 	}
-	ignore := accessor.ContainerCheckIgnoreUpgrade{}
-	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore, &ignore)
-
 	domain, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(detail.Name)).Find()
 	self.JsonResponseWithoutError(http, gin.H{
 		"info":   detail,
-		"ignore": ignore,
 		"domain": domain,
 	})
 	return

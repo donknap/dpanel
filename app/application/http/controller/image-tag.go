@@ -51,7 +51,12 @@ func (self Image) TagSync(http *gin.Context) {
 		// 如果用户配置过加速地址，并且有可用的，那么就直接使用，否则回退到默认的拉取动作上（可能会命中 daemon 配置的加速或是代理）
 		if len(registryConfig.Address) > 1 {
 			originRegistryUrl := imageNameDetail.Registry
-			availableRegister := registry.New(registry.WithAddress(registryConfig.Address...), registry.WithRepository(imageNameDetail.BaseName, imageNameDetail.Version)).GetAvailableServers()
+			registryOptions := make([]registry.Option, 0, len(registryConfig.Address)+1)
+			for _, address := range registryConfig.Address {
+				registryOptions = append(registryOptions, registry.WithServer(address, "", ""))
+			}
+			registryOptions = append(registryOptions, registry.WithRepository(imageNameDetail.BaseName, imageNameDetail.Version))
+			availableRegister := registry.New(registryOptions...).GetAvailableServers()
 			for {
 				item, ok := <-availableRegister
 				if !ok {

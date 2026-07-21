@@ -281,7 +281,7 @@ func (self Panel) Update(http *gin.Context) {
 		params.InstallerDownloadSource = "dpanel/installer:latest"
 		for _, address := range []string{"registry.cn-hangzhou.aliyuncs.com", "docker.io"} {
 			reg := registry.New(
-				registry.WithAddress(address),
+				registry.WithServer(address, "", ""),
 			)
 			if err := reg.Client().Ping(); err != nil {
 				slog.Debug("panel upgrade select installer registry", "address", address, "error", err)
@@ -536,9 +536,10 @@ func (self Panel) CheckNewVersion(http *gin.Context) {
 	if strings.Index(currentVersion, ".") == 8 {
 		reference = "beta"
 	}
-	option := make([]registry.Option, 0)
-	option = append(option, registry.WithAddress(registry.RegistryDefaultHost, "registry.cn-hangzhou.aliyuncs.com"))
-	reg := registry.New(option...)
+	reg := registry.New(
+		registry.WithServer(registry.RegistryDefaultHost, "", ""),
+		registry.WithServer("registry.cn-hangzhou.aliyuncs.com", "", ""),
+	)
 	if manifest, _, err := reg.Client().PullManifest("dpanel/dpanel", reference); err == nil {
 		for _, descriptor := range manifest.References() {
 			if ver, ok := descriptor.Annotations[define.PanelLabelVersion]; ok {

@@ -22,9 +22,18 @@ import (
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/gin-gonic/gin"
 )
 
 var Sdk *Client
+
+func NewClientWithUser(http *gin.Context) (*Client, error) {
+	// TODO 后续根据当前用户权限及所选 Docker 环境，从共享连接 Map 获取或创建 Client。
+	if Sdk == nil || Sdk.Client == nil || Sdk.DockerEnv == nil {
+		return nil, errors.New("docker client is not initialized")
+	}
+	return Sdk, nil
+}
 
 func NewClientWithDockerEnv(dockerEnv *types.DockerEnv, opts ...Option) (*Client, error) {
 	options := make([]Option, 0)

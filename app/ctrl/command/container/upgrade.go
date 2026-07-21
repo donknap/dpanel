@@ -65,10 +65,9 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 		utils.Result{}.Error(err)
 		return
 	}
-	result, err := proxyClient.AppImageCheckUpgrade(&app.ImageCheckUpgradeOption{
-		Tag:       containerInfo.Info.Config.Image,
-		Md5:       containerInfo.Info.Image,
-		CacheTime: 0,
+	result, err := proxyClient.AppContainerCheckUpgrade(&app.ContainerCheckUpgradeOption{
+		ContainerID: containerInfo.Info.ID,
+		Force:       true,
 	})
 	if err != nil {
 		utils.Result{}.Error(err)

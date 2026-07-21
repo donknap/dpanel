@@ -19,6 +19,7 @@ const (
 	MessageTypeConsoleSsh             = "/console/ssh/%s"
 	MessageTypeConsoleShell           = "/console/shell"
 	MessageTypeContainerLog           = "container:log:%s"
+	MessageTypeContainerUpgrade       = "container:upgrade:%s"
 	MessageTypeContainerCommandCreate = "container:command:create:%s"
 	MessageTypeContainerAllStat       = "container:stat"
 	MessageTypeContainerStat          = "container:stat:%s"

@@ -18,7 +18,7 @@ var (
 	CacheKeyOauthCode              = "oauth:code:%s"
 	CacheKeySetting                = "setting:%s"
 	CacheKeySettingLocale          = fmt.Sprintf(CacheKeySetting, "locale")
-	CacheKeyImageDigest            = "image:digest:%s"
+	CacheKeyContainerUpgrade       = "container:upgrade:%s:%s"
 	CacheKeyImageRootFs            = "image:rootfs:%s"
 	CacheKeyDockerStatus           = "docker:status:%s"
 	CacheKeyDockerEvents           = "docker:events"

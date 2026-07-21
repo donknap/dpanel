@@ -111,7 +111,7 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 
 		for _, proxy := range serviceExt.ImageProxy {
 			reg := registry.New(
-				registry.WithAddress(proxy),
+				registry.WithServer(proxy, "", ""),
 			)
 			if ok, _, manifestErr := reg.Client().ManifestExist(imageNameDetail.BaseName, imageNameDetail.Version); manifestErr == nil && ok {
 				imageNameDetail.Registry = proxy

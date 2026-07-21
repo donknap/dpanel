@@ -20,7 +20,16 @@ func (self *Client) AppContainerGetDetail(containerName string) (result app.Cont
 }
 
 func (self *Client) AppContainerUpgrade(params *app.ContainerUpgradeOption) (result app.ContainerUpgradeResult, err error) {
-	data, err := self.Post(function.RouterApiUri("/app/container/upgrade"), params)
+	data, err := self.Post(function.RouterApiUri("/app/container-upgrade/upgrade"), params)
+	if err != nil {
+		return result, err
+	}
+	err = json.NewDecoder(data).Decode(&result)
+	return result, err
+}
+
+func (self *Client) AppContainerCheckUpgrade(params *app.ContainerCheckUpgradeOption) (result app.ContainerCheckUpgradeResult, err error) {
+	data, err := self.Post(function.RouterApiUri("/app/container-upgrade/check"), params)
 	if err != nil {
 		return result, err
 	}

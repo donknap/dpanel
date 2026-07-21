@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -18,16 +20,22 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
 	dockerTypes "github.com/donknap/dpanel/common/service/docker/types"
-	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
 )
 
-func (self Container) Upgrade(http *gin.Context) {
+type ContainerUpgrade struct {
+	controller.Abstract
+}
+
+func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5                    string `json:"md5" binding:"required"`
 		ImageTag               string `json:"imageTag"`
@@ -48,6 +56,29 @@ func (self Container) Upgrade(http *gin.Context) {
 		return
 	}
 	startContainer := containerInfo.State.Running
+	progressSteps := []string{define.ContainerUpgradeStepCreate}
+	if startContainer {
+		progressSteps = append(progressSteps, define.ContainerUpgradeStepStop)
+	}
+	progressSteps = append(progressSteps, define.ContainerUpgradeStepReplace)
+	if startContainer {
+		progressSteps = append(progressSteps, define.ContainerUpgradeStepStart)
+	}
+	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeContainerUpgrade, containerInfo.ID))
+	defer progress.Close()
+	progressCurrent := 0
+	progress.BroadcastMessage(logic.ContainerUpgradeProgress{
+		Steps:   progressSteps,
+		Current: progressCurrent,
+		Total:   len(progressSteps),
+	})
+
+	progressCurrent++
+	progress.BroadcastMessage(logic.ContainerUpgradeProgress{
+		Steps:   progressSteps,
+		Current: progressCurrent,
+		Total:   len(progressSteps),
+	})
 
 	bakTime := time.Now().Format(define.DateYmdHis)
 
@@ -75,7 +106,6 @@ func (self Container) Upgrade(http *gin.Context) {
 	}
 
 	// 成功的创建一个新的容器后再对旧的进停止或是删除操作
-	_ = notice.Message{}.Info(".containerCreate", containerInfo.Name)
 	newContainerName := fmt.Sprintf("%s-copy-%s", containerInfo.Name, bakTime)
 
 	options := []builder.Option{
@@ -118,6 +148,12 @@ func (self Container) Upgrade(http *gin.Context) {
 	}
 
 	if containerInfo.State.Running {
+		progressCurrent++
+		progress.BroadcastMessage(logic.ContainerUpgradeProgress{
+			Steps:   progressSteps,
+			Current: progressCurrent,
+			Total:   len(progressSteps),
+		})
 		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.Name, container.StopOptions{})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -136,11 +172,15 @@ func (self Container) Upgrade(http *gin.Context) {
 
 	bakContainerName := fmt.Sprintf("%s-bak-%s", containerInfo.Name, bakTime)
 	bakImageName := fmt.Sprintf("%s-bak-%s", containerInfo.Config.Image, bakTime)
+	progressCurrent++
+	progress.BroadcastMessage(logic.ContainerUpgradeProgress{
+		Steps:   progressSteps,
+		Current: progressCurrent,
+		Total:   len(progressSteps),
+	})
 
 	// 未备份旧容器，需要先删除，否则名称会冲突
 	if params.EnableBak {
-		_ = notice.Message{}.Info(".containerBackup", "name", containerInfo.Name)
-
 		if !containerInfo.HostConfig.AutoRemove {
 			// 备份旧容器
 			err = docker.Sdk.Client.ContainerRename(
@@ -167,8 +207,6 @@ func (self Container) Upgrade(http *gin.Context) {
 			}
 		}
 	} else {
-		_ = notice.Message{}.Info(".containerRemove", containerInfo.Name)
-
 		if !containerInfo.HostConfig.AutoRemove {
 			err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.Name, container.RemoveOptions{})
 			if err != nil {
@@ -208,6 +246,12 @@ func (self Container) Upgrade(http *gin.Context) {
 
 	// 旧容器如果是停止状态，重建后保持不启动
 	if startContainer {
+		progressCurrent++
+		progress.BroadcastMessage(logic.ContainerUpgradeProgress{
+			Steps:   progressSteps,
+			Current: progressCurrent,
+			Total:   len(progressSteps),
+		})
 		err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, containerInfo.Name, container.StartOptions{})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -227,7 +271,7 @@ func (self Container) Upgrade(http *gin.Context) {
 	return
 }
 
-func (self Container) Ignore(http *gin.Context) {
+func (self ContainerUpgrade) Ignore(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5     string `json:"md5" binding:"required"`
 		ImageId string `json:"imageId"`
@@ -267,4 +311,148 @@ func (self Container) Ignore(http *gin.Context) {
 
 	self.JsonSuccessResponse(http)
 	return
+}
+
+func (self ContainerUpgrade) Check(http *gin.Context) {
+	type ParamsValidate struct {
+		ContainerID string `json:"containerId" binding:"required"`
+		Force       bool   `json:"force"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	params.ContainerID = strings.TrimSpace(params.ContainerID)
+	if params.ContainerID == "" {
+		self.JsonResponseWithError(http, errors.New("containerId is required"), 500)
+		return
+	}
+
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	containerInfo, err := dockerSdk.Client.ContainerInspect(dockerSdk.Ctx, params.ContainerID)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	ignore := accessor.ContainerCheckIgnoreUpgrade{}
+	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore, &ignore)
+	ignoreStatus := ""
+	if function.InArray(ignore, fmt.Sprintf("%s@*", containerInfo.Name)) {
+		ignoreStatus = define.ContainerUpgradeStatusIgnoreAlways
+	} else if function.InArray(ignore, fmt.Sprintf("%s@%s", containerInfo.Name, containerInfo.Image)) {
+		ignoreStatus = define.ContainerUpgradeStatusIgnoreCurrent
+	}
+	if ignoreStatus != "" {
+		self.JsonResponseWithoutError(http, gin.H{
+			"upgrade":     false,
+			"digest":      "",
+			"digestLocal": make([]string, 0),
+			"error":       "",
+			"status":      ignoreStatus,
+		})
+		return
+	}
+
+	result, err := (logic.ContainerUpgrade{}).Check(dockerSdk, &containerInfo, params.Force)
+	errorMessage := ""
+	if err != nil {
+		errorMessage = err.Error()
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"upgrade":     result.Status == define.ContainerUpgradeStatusUpgrade,
+		"digest":      result.RemoteDigest,
+		"digestLocal": result.LocalDigest,
+		"error":       errorMessage,
+		"status":      result.Status,
+	})
+}
+
+func (self ContainerUpgrade) GetList(http *gin.Context) {
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	ignore := accessor.ContainerCheckIgnoreUpgrade{}
+	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore, &ignore)
+	if ignore == nil {
+		ignore = make(accessor.ContainerCheckIgnoreUpgrade, 0)
+	}
+
+	containerList, err := dockerSdk.Client.ContainerList(dockerSdk.Ctx, container.ListOptions{All: true})
+	if http.Request.Context().Err() != nil {
+		return
+	}
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	list := make([]gin.H, 0, len(containerList))
+	for _, item := range containerList {
+		if hidden, ok := item.Labels[define.DPanelLabelContainerHidden]; ok && (hidden == "true" || hidden == "1") {
+			continue
+		}
+
+		containerName := ""
+		if len(item.Names) > 0 {
+			containerName = item.Names[0]
+		}
+		checkedAt := ""
+		errorMessage := ""
+		status := define.ContainerUpgradeStatusUnchecked
+		cacheKey := fmt.Sprintf(storage.CacheKeyContainerUpgrade, dockerSdk.Name, item.ID)
+		value, exists := storage.Cache.Get(cacheKey)
+		if exists {
+			cached, ok := value.(logic.ContainerUpgradeResult)
+			if !ok {
+				storage.Cache.Delete(cacheKey)
+			} else {
+				checkedAt = cached.CheckedAt
+				// 容器镜像如果已经更新，这里的名称会变成 sha256 的形式，但是返回的值必须是镜像的原始名称
+				item.Image = cached.ImageName
+				switch cached.Status {
+				case define.ContainerUpgradeStatusFailed,
+					define.ContainerUpgradeStatusLatest,
+					define.ContainerUpgradeStatusUnavailable,
+					define.ContainerUpgradeStatusUpgrade:
+					status = cached.Status
+					if cached.Error != nil {
+						errorMessage = cached.Error.Error()
+					}
+				default:
+					storage.Cache.Delete(cacheKey)
+				}
+			}
+		}
+		if function.InArray(ignore, fmt.Sprintf("%s@*", containerName)) {
+			status = define.ContainerUpgradeStatusIgnoreAlways
+			errorMessage = ""
+		} else if function.InArray(ignore, fmt.Sprintf("%s@%s", containerName, item.ImageID)) {
+			status = define.ContainerUpgradeStatusIgnoreCurrent
+			errorMessage = ""
+		}
+		list = append(list, gin.H{
+			"checkedAt":     checkedAt,
+			"containerId":   item.ID,
+			"containerName": containerName,
+			"error":         errorMessage,
+			"imageId":       item.ImageID,
+			"imageName":     item.Image,
+			"status":        status,
+		})
+	}
+
+	sort.Slice(list, func(i, j int) bool {
+		if list[i]["containerName"] == list[j]["containerName"] {
+			return list[i]["containerId"].(string) < list[j]["containerId"].(string)
+		}
+		return list[i]["containerName"].(string) < list[j]["containerName"].(string)
+	})
+	self.JsonResponseWithoutError(http, gin.H{
+		"list": list,
+	})
 }

@@ -11,6 +11,23 @@ const (
 )
 
 const (
+	ContainerUpgradeStatusFailed        = "failed"
+	ContainerUpgradeStatusIgnoreAlways  = "ignoreAlways"
+	ContainerUpgradeStatusIgnoreCurrent = "ignoreCurrent"
+	ContainerUpgradeStatusLatest        = "latest"
+	ContainerUpgradeStatusUnavailable   = "unavailable"
+	ContainerUpgradeStatusUnchecked     = "unchecked"
+	ContainerUpgradeStatusUpgrade       = "upgrade"
+)
+
+const (
+	ContainerUpgradeStepCreate  = "create"
+	ContainerUpgradeStepStop    = "stop"
+	ContainerUpgradeStepReplace = "replace"
+	ContainerUpgradeStepStart   = "start"
+)
+
+const (
 	DockerRemoteTypeSSH  = "ssh"
 	DockerRemoteTypeSock = "sock"
 	DockerRemoteTypeTcp  = "tcp"

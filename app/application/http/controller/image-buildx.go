@@ -22,8 +22,7 @@ type ImageBuildx struct {
 }
 
 func (self ImageBuildx) GetDetail(http *gin.Context) {
-	imageLogic := logic.Image{}
-	createConfigOption, err := imageLogic.BuildxConfig(docker.Sdk.Name)
+	buildxConfig, err := (logic.ImageBuildx{}).ResolveConfig(docker.Sdk.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -37,12 +36,12 @@ func (self ImageBuildx) GetDetail(http *gin.Context) {
 		slog.Info("buildx get inspect", "error", err)
 	}
 	var config string
-	if v, err := os.ReadFile(createConfigOption.ConfigPath); err == nil {
+	if v, err := os.ReadFile(buildxConfig.ConfigPath); err == nil {
 		config = string(v)
 	} else if !os.IsNotExist(err) {
 		slog.Info("buildx get config", "error", err)
 	}
-	proxyPath := filepath.Join(filepath.Dir(createConfigOption.ConfigPath), "proxy")
+	proxyPath := filepath.Join(filepath.Dir(buildxConfig.ConfigPath), "proxy")
 	var proxy string
 	proxyBytes, err := os.ReadFile(proxyPath)
 	if err == nil {
@@ -72,20 +71,19 @@ func (self ImageBuildx) Create(http *gin.Context) {
 		return
 	}
 
-	imageLogic := logic.Image{}
-	createConfigOption, err := imageLogic.BuildxConfig(docker.Sdk.Name)
+	buildxConfig, err := (logic.ImageBuildx{}).ResolveConfig(docker.Sdk.Name)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	if params.Config != nil {
-		createConfigOption.ConfigContent = params.Config
-		if err := imageLogic.BuildxCreateConfig(createConfigOption); err != nil {
+		buildxConfig.ConfigContent = params.Config
+		if err := (logic.ImageBuildx{}).WriteConfig(buildxConfig); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-	} else if _, err := os.Stat(createConfigOption.ConfigPath); os.IsNotExist(err) {
-		if err := imageLogic.BuildxCreateConfig(createConfigOption); err != nil {
+	} else if _, err := os.Stat(buildxConfig.ConfigPath); os.IsNotExist(err) {
+		if err := (logic.ImageBuildx{}).WriteConfig(buildxConfig); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
@@ -93,7 +91,7 @@ func (self ImageBuildx) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	proxyPath := filepath.Join(filepath.Dir(createConfigOption.ConfigPath), "proxy")
+	proxyPath := filepath.Join(filepath.Dir(buildxConfig.ConfigPath), "proxy")
 	if err := os.WriteFile(proxyPath, []byte(params.Proxy), 0600); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -130,7 +128,7 @@ func (self ImageBuildx) Create(http *gin.Context) {
 		"--name", builderName,
 		"--driver", "docker-container",
 		"--driver-opt", "network=host",
-		"--buildkitd-config", createConfigOption.ConfigPath,
+		"--buildkitd-config", buildxConfig.ConfigPath,
 	}
 	proxy := params.Proxy
 	if proxy != "" {

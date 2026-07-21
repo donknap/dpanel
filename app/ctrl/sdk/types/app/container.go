@@ -2,12 +2,10 @@ package app
 
 import (
 	"github.com/docker/docker/api/types/container"
-	"github.com/donknap/dpanel/common/accessor"
 )
 
 type ContainerDetailResult struct {
-	Info   container.InspectResponse            `json:"info"`
-	Ignore accessor.ContainerCheckIgnoreUpgrade `json:"ignore"`
+	Info container.InspectResponse `json:"info"`
 }
 
 type ContainerUpgradeOption struct {
@@ -18,6 +16,19 @@ type ContainerUpgradeOption struct {
 
 type ContainerUpgradeResult struct {
 	ContainerId string `json:"containerId"`
+}
+
+type ContainerCheckUpgradeOption struct {
+	ContainerID string `json:"containerId"`
+	Force       bool   `json:"force"`
+}
+
+type ContainerCheckUpgradeResult struct {
+	Upgrade     bool     `json:"upgrade"`
+	Digest      string   `json:"digest"`
+	DigestLocal []string `json:"digestLocal"`
+	Error       string   `json:"error"`
+	Status      string   `json:"status"`
 }
 
 type ContainerBackupOption struct {

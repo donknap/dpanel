@@ -22,7 +22,6 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
-	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -34,7 +33,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mholt/archives"
 	"github.com/patrickmn/go-cache"
-	"github.com/we7coreteam/registry-go-sdk"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
@@ -555,64 +553,5 @@ func (self Image) Export(http *gin.Context) {
 		"saveUrl":     exportSaveFile.Name(),
 		"downloadUrl": downloadUrl,
 	})
-	return
-}
-
-func (self Image) CheckUpgrade(http *gin.Context) {
-	type ParamsValidate struct {
-		Tag       string `json:"tag" binding:"required"`
-		Md5       string `json:"md5" binding:"required"`
-		CacheTime int    `json:"cacheTime"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.Md5)
-	// 如果本地 digest 为空，则不检测
-	if err != nil || function.IsEmptyArray(imageInfo.RepoDigests) {
-		self.JsonResponseWithoutError(http, gin.H{
-			"upgrade":     false,
-			"digest":      "",
-			"digestLocal": imageInfo.RepoDigests,
-			"error":       err,
-		})
-		return
-	}
-
-	if params.CacheTime > 0 {
-		if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyImageDigest, params.Md5)); ok {
-			self.JsonResponseWithoutError(http, v)
-			return
-		}
-	}
-
-	result := gin.H{
-		"upgrade":     false,
-		"digest":      "",
-		"digestLocal": imageInfo.RepoDigests,
-		"error":       "",
-	}
-
-	imageNameDetail := function.ImageTag(params.Tag)
-	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Registry)
-
-	option := make([]registry.Option, 0)
-	option = append(option, registry.WithCredentials(registryConfig.Credential()))
-	option = append(option, registry.WithAddress(registryConfig.Address...))
-	reg := registry.New(option...)
-	if ok, desc, err := reg.Client().ManifestExist(imageNameDetail.BaseName, imageNameDetail.Version); err == nil && ok {
-		result["digest"] = desc.Digest.String()
-		if !function.InArrayWalk(imageInfo.RepoDigests, func(i string) bool {
-			return strings.HasSuffix(i, desc.Digest.String())
-		}) {
-			result["upgrade"] = true
-		}
-	} else if err != nil {
-		result["error"] = err.Error()
-	}
-	slog.Info("image check upgrade", "result", result)
-	storage.Cache.Set(fmt.Sprintf(storage.CacheKeyImageDigest, params.Md5), result, time.Duration(params.CacheTime)*time.Second)
-	self.JsonResponseWithoutError(http, result)
 	return
 }
