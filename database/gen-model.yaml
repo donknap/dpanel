@@ -9,6 +9,14 @@ relation:
       container_info:
         type: SiteContainerInfoOption
         serializer: json
+  - table: ims_site_upgrade
+    column:
+      setting:
+        serializer: json
+        type: SiteUpgradeSettingOption
+      logs:
+        serializer: json
+        type: SiteUpgradeLogsOption
   - table: ims_image
     column:
       tag:

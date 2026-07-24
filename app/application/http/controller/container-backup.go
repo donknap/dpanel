@@ -41,6 +41,12 @@ type ContainerBackup struct {
 	controller.Abstract
 }
 
+type containerBackupProgress struct {
+	Steps   []string `json:"steps"`
+	Current int      `json:"current"`
+	Total   int      `json:"total"`
+}
+
 func (self ContainerBackup) Create(http *gin.Context) {
 	type ParamsValidate struct {
 		Id                         string   `json:"id" binding:"required"`
@@ -285,6 +291,23 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	progressSteps := []string{
+		define.ContainerBackupStepImage,
+		define.ContainerBackupStepContainer,
+		define.ContainerBackupStepVolume,
+	}
+	if !params.NoStart {
+		progressSteps = append(progressSteps, define.ContainerBackupStepStart)
+	}
+	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeContainerBackup, params.Id))
+	defer progress.Close()
+	progressCurrent := 0
+	progress.BroadcastMessage(containerBackupProgress{
+		Steps:   progressSteps,
+		Current: progressCurrent,
+		Total:   len(progressSteps),
+	})
+
 	for _, item := range manifest {
 		config, err := b.Reader.ReadBlobsContent(item.Config)
 		if err != nil {
@@ -298,6 +321,12 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			self.JsonResponseWithError(http, errors.Join(errors.New("failed to parse container configuration"), err), 500)
 			return
 		}
+		progressCurrent++
+		progress.BroadcastMessage(containerBackupProgress{
+			Steps:   progressSteps,
+			Current: progressCurrent,
+			Total:   len(progressSteps),
+		})
 		if _, err = docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, containerInfo.Config.Image); err != nil {
 			if item.Image != "" {
 				imageOut, err := b.Reader.ReadBlobs(item.Image)
@@ -342,6 +371,12 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		var networkCreate []network.Inspect
 
 		newContainerName := containerInfo.Name
+		progressCurrent++
+		progress.BroadcastMessage(containerBackupProgress{
+			Steps:   progressSteps,
+			Current: progressCurrent,
+			Total:   len(progressSteps),
+		})
 		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, newContainerName); err != nil {
 			if !function.IsEmptyArray(item.Network) {
 				for _, s := range item.Network {
@@ -451,6 +486,12 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		}
 
 		// 兼容旧的数据
+		progressCurrent++
+		progress.BroadcastMessage(containerBackupProgress{
+			Steps:   progressSteps,
+			Current: progressCurrent,
+			Total:   len(progressSteps),
+		})
 		if !function.IsEmptyArray(item.Volume) && function.IsEmptyArray(item.VolumeList) {
 			item.VolumeList = function.PluckArrayWalk(item.Volume, func(volume string) (backup.ManifestVolumeInfo, bool) {
 				mount, _, ok := function.PluckArrayItemWalk(containerInfo.Mounts, func(item container.MountPoint) bool {
@@ -531,6 +572,14 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			}
 		}
 
+		if !params.NoStart {
+			progressCurrent++
+			progress.BroadcastMessage(containerBackupProgress{
+				Steps:   progressSteps,
+				Current: progressCurrent,
+				Total:   len(progressSteps),
+			})
+		}
 		if runContainer && !params.NoStart {
 			err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, newContainerName, container.StartOptions{})
 			if err != nil {

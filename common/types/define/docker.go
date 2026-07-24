@@ -28,6 +28,13 @@ const (
 )
 
 const (
+	ContainerBackupStepImage     = "image"
+	ContainerBackupStepContainer = "container"
+	ContainerBackupStepVolume    = "volume"
+	ContainerBackupStepStart     = "start"
+)
+
+const (
 	DockerRemoteTypeSSH  = "ssh"
 	DockerRemoteTypeSock = "sock"
 	DockerRemoteTypeTcp  = "tcp"
