@@ -471,12 +471,12 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 				}
 			}
 
-			compactContainerInfo, err := docker.Sdk.ContainerInspectCompact(containerInfo)
+			compatContainerInfo, err := docker.Sdk.ContainerInspectCompat(containerInfo)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-			_, err = docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, compactContainerInfo.Config, compactContainerInfo.HostConfig, networkingConfig, &v1.Platform{}, newContainerName)
+			_, err = docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, compatContainerInfo.Config, compatContainerInfo.HostConfig, networkingConfig, &v1.Platform{}, newContainerName)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return

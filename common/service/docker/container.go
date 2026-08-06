@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/common/function"
@@ -83,19 +84,54 @@ func (self Client) ContainerCopyInspect(ctx context.Context, containerName strin
 	if err != nil {
 		return info, err
 	}
-	return self.ContainerInspectCompact(info)
+	return self.ContainerInspectCompat(info)
 }
 
-func (self Client) ContainerInspectCompact(info container.InspectResponse) (container.InspectResponse, error) {
-	if versions.LessThanOrEqualTo(self.Client.ClientVersion(), "1.44") {
-		macAddress := ""
-		for name, settings := range info.NetworkSettings.Networks {
-			if settings.MacAddress != "" {
-				macAddress = settings.MacAddress
-				info.NetworkSettings.Networks[name].MacAddress = ""
+func (self Client) ContainerInspectCompat(info container.InspectResponse) (container.InspectResponse, error) {
+	if info.Config != nil {
+		containerConfig := *info.Config
+		if info.Config.Labels != nil {
+			containerConfig.Labels = make(map[string]string, len(info.Config.Labels))
+			for name, value := range info.Config.Labels {
+				containerConfig.Labels[name] = value
 			}
 		}
-		if macAddress != "" {
+		info.Config = &containerConfig
+	}
+	if info.HostConfig != nil {
+		hostConfig := *info.HostConfig
+		hostConfig.ExtraHosts = append([]string(nil), info.HostConfig.ExtraHosts...)
+		hostConfig.VolumesFrom = append([]string(nil), info.HostConfig.VolumesFrom...)
+		// compatible cgroup v2 不支持配置 MemorySwappiness，podman 在 crun 下会严格报错
+		hostConfig.MemorySwappiness = nil
+		info.HostConfig = &hostConfig
+	}
+	if info.NetworkSettings != nil {
+		networkSettings := *info.NetworkSettings
+		if info.NetworkSettings.Networks != nil {
+			networkSettings.Networks = make(map[string]*network.EndpointSettings, len(info.NetworkSettings.Networks))
+			for name, settings := range info.NetworkSettings.Networks {
+				if settings == nil {
+					networkSettings.Networks[name] = nil
+					continue
+				}
+				endpointSettings := *settings
+				networkSettings.Networks[name] = &endpointSettings
+			}
+		}
+		info.NetworkSettings = &networkSettings
+	}
+	if versions.LessThanOrEqualTo(self.Client.ClientVersion(), "1.44") {
+		macAddress := ""
+		if info.NetworkSettings != nil {
+			for name, settings := range info.NetworkSettings.Networks {
+				if settings != nil && settings.MacAddress != "" {
+					macAddress = settings.MacAddress
+					info.NetworkSettings.Networks[name].MacAddress = ""
+				}
+			}
+		}
+		if macAddress != "" && info.Config != nil {
 			// 底版本的 docker 需要兼容这一项
 			info.Config.MacAddress = macAddress
 		}

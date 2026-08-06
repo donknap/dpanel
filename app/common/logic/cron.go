@@ -22,8 +22,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/patrickmn/go-cache"
-	"github.com/robfig/cron/v3"
 )
 
 var (
@@ -31,7 +29,10 @@ var (
 )
 
 const (
-	taskFileName = "dpanel-task-%d.%s"
+	taskFileName       = "dpanel-task-%d.%s"
+	CronJobName        = "cron:%d"
+	CronEventJobName   = "cron:%s:%d"
+	CronEventJobSearch = "cron:%s:*"
 )
 
 type JobContext struct {
@@ -52,29 +53,19 @@ func (self JobContext) Err() error {
 type Cron struct {
 }
 
-func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
-	cacheKey := fmt.Sprintf(storage.CacheKeyCronTaskStatus, task.ID)
+func (Cron) GetJobName(task *entity.Cron) string {
+	if task.Setting != nil && task.Setting.TriggerType == accessor.CronTriggerTypeEvent {
+		return fmt.Sprintf(CronEventJobName, task.Setting.EventType, task.ID)
+	}
+	return fmt.Sprintf(CronJobName, task.ID)
+}
 
+func (self Cron) AddCronJob(task *entity.Cron) error {
 	option := make([]crontab.Option, 0)
-	option = append(option, crontab.WithName(fmt.Sprintf("%s:%s:%s", task.Setting.TriggerType, task.Setting.EventType, task.Title)))
-	option = append(option, crontab.WithRunFunc(func(ctx *crontab.RunFuncContext) {
-		if !task.Setting.EnableRunBlock {
-			return
-		}
-		if err := storage.Cache.Add(cacheKey, "running", cache.NoExpiration); err == nil {
-			return
-		}
-		ctx.Err = crontab.SkipRun
-		_ = dao.CronLog.Create(&entity.CronLog{
-			CronID: task.ID,
-			Value: &accessor.CronLogValueOption{
-				Error:   "",
-				RunTime: ctx.StartTime,
-				UseTime: 0,
-				Message: crontab.SkipRun.Error(),
-			},
-		})
-	}))
+	option = append(option, crontab.WithName(self.GetJobName(task)))
+	if task.Setting.EnableRunBlock {
+		option = append(option, crontab.WithSkipIfStillRunning())
+	}
 	option = append(option, crontab.WithRunFunc(func(ctx *crontab.RunFuncContext) {
 		slog.Info("cron run", "task", task)
 		var err error
@@ -91,9 +82,6 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 			if err != nil {
 				slog.Info("cron run finish", "error", err)
 				ctx.Err = err
-			}
-			if task.Setting.EnableRunBlock {
-				storage.Cache.Delete(cacheKey)
 			}
 		}()
 
@@ -251,18 +239,9 @@ func (self Cron) AddCronJob(task *entity.Cron) (ids []cron.EntryID, err error) {
 		return
 	}))
 	cronJob := crontab.New(option...)
-
-	ids = make([]cron.EntryID, 0)
-	for _, exp := range task.Setting.Expression {
-		if id, err1 := crontab.Client.AddJob(exp.ToString(), cronJob); err1 == nil {
-			ids = append(ids, id)
-		} else {
-			err = errors.Join(err1)
-			crontab.Client.RemoveJob(ids...)
-		}
-	}
-
-	return ids, err
+	return crontab.Client.AddJob(cronJob, function.PluckArrayWalk(task.Setting.Expression, func(item accessor.CronSettingExpression) (string, bool) {
+		return item.ToString(), true
+	})...)
 }
 
 type scriptTemplateParams struct {

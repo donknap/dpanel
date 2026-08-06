@@ -3,14 +3,14 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"log/slog"
+	"time"
+
 	"slices"
 	"sort"
 	"strings"
-	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -19,7 +19,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
-	dockerTypes "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -35,6 +34,12 @@ type ContainerUpgrade struct {
 	controller.Abstract
 }
 
+type containerUpgradeProgress struct {
+	Steps   []string `json:"steps"`
+	Current int      `json:"current"`
+	Total   int      `json:"total"`
+}
+
 func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5                    string `json:"md5" binding:"required"`
@@ -46,7 +51,12 @@ func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	containerInfo, err := docker.Sdk.ContainerCopyInspect(docker.Sdk.Ctx, params.Md5)
+	dockerClient, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	containerInfo, err := dockerClient.ContainerCopyInspect(dockerClient.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -55,7 +65,17 @@ func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerUpgradeDPanel), 500)
 		return
 	}
-	startContainer := containerInfo.State.Running
+	upgradeMutex := storage.NewMutex(fmt.Sprintf(
+		storage.CacheKeyContainerUpgradeRunning,
+		dockerClient.Name,
+		strings.TrimPrefix(strings.TrimSpace(containerInfo.Name), "/"),
+	))
+	if !upgradeMutex.TryLock() {
+		self.JsonResponseWithError(http, errors.New("container upgrade is running"), 500)
+		return
+	}
+	defer upgradeMutex.Unlock()
+	startContainer := containerInfo.State != nil && containerInfo.State.Running
 	progressSteps := []string{define.ContainerUpgradeStepCreate}
 	if startContainer {
 		progressSteps = append(progressSteps, define.ContainerUpgradeStepStop)
@@ -67,206 +87,127 @@ func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeContainerUpgrade, containerInfo.ID))
 	defer progress.Close()
 	progressCurrent := 0
-	progress.BroadcastMessage(logic.ContainerUpgradeProgress{
-		Steps:   progressSteps,
-		Current: progressCurrent,
-		Total:   len(progressSteps),
-	})
-
-	progressCurrent++
-	progress.BroadcastMessage(logic.ContainerUpgradeProgress{
-		Steps:   progressSteps,
-		Current: progressCurrent,
-		Total:   len(progressSteps),
-	})
-
-	bakTime := time.Now().Format(define.DateYmdHis)
-
-	// 更新容器时可以更改镜像 tag
-	imageName := containerInfo.Config.Image
-	if params.ImageTag != "" {
-		imageName = params.ImageTag
+	notifyProgress := func() {
+		progress.BroadcastMessage(containerUpgradeProgress{
+			Steps:   progressSteps,
+			Current: progressCurrent,
+			Total:   len(progressSteps),
+		})
 	}
+	notifyProgress()
 
-	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, imageName)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	if containerInfo.Config == nil || containerInfo.HostConfig == nil {
+		self.JsonResponseWithError(http, errors.New("container inspect info is incomplete"), 500)
 		return
 	}
-	// 如果旧的容器使用的镜像和重新拉取的镜像一致则不升级
-	// 多平台下的其它平台镜像推送后，也会导致 digest 不一致
-	// 不一定就是本平台镜像有更新
-	// 这里还是选择更新对齐 digest
-	oldContainerImageId := containerInfo.Image
-	if containerInfo.Image == imageInfo.ID {
-		//self.JsonResponseWithoutError(http, gin.H{
-		//	"containerId": containerInfo.ID,
-		//})
-		//return
+	imageName := params.ImageTag
+	if imageName == "" {
+		imageName = containerInfo.Config.Image
 	}
-
-	// 成功的创建一个新的容器后再对旧的进停止或是删除操作
-	newContainerName := fmt.Sprintf("%s-copy-%s", containerInfo.Name, bakTime)
-
 	options := []builder.Option{
+		builder.WithContainerName(containerInfo.Name),
+		builder.WithContainerRollback(containerInfo, params.EnableBak),
 		builder.WithContainerInfo(containerInfo),
-		builder.WithContainerName(newContainerName),
-		builder.WithImage(imageName, false),
+		builder.WithImage(imageName),
+		builder.WithImageRuntimeConfig(params.EnableResetImageConfig),
 	}
 	if containerInfo.NetworkSettings != nil {
 		for name, endpoint := range containerInfo.NetworkSettings.Networks {
 			options = append(options, builder.WithNetworkEndpoint(name, endpoint))
 		}
 	}
-	if params.EnableResetImageConfig {
-		options = append(options,
-			builder.WithEnv(function.PluckArrayWalk(imageInfo.Config.Env, func(item string) (dockerTypes.EnvItem, bool) {
-				return dockerTypes.NewEnvItemFromString(item), true
-			})...),
-			builder.WithLabels(function.PluckMapWalkArray(imageInfo.Config.Labels, func(name string, value string) (dockerTypes.ValueItem, bool) {
-				return dockerTypes.ValueItem{
-					Name:  name,
-					Value: value,
-				}, true
-			})...),
-			builder.WithWorkDir(imageInfo.Config.WorkingDir),
-			builder.WithCommand(imageInfo.Config.Cmd),
-			builder.WithEntrypoint(imageInfo.Config.Entrypoint),
-		)
-	}
-	containerBuilder, err := builder.New(options...)
+	containerBuilder, err := builder.New(dockerClient, options...)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	progressCurrent++
+	notifyProgress()
 
-	out, err := containerBuilder.Execute()
-	if err != nil {
-		errRemove := docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, newContainerName, container.RemoveOptions{})
-		self.JsonResponseWithError(http, errors.Join(err, errRemove), 500)
-		return
-	}
-
-	if containerInfo.State.Running {
+	if startContainer {
 		progressCurrent++
-		progress.BroadcastMessage(logic.ContainerUpgradeProgress{
-			Steps:   progressSteps,
-			Current: progressCurrent,
-			Total:   len(progressSteps),
-		})
-		err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, containerInfo.Name, container.StopOptions{})
-		if err != nil {
+		notifyProgress()
+		if err = dockerClient.Client.ContainerStop(dockerClient.Ctx, containerInfo.ID, container.StopOptions{}); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 		if containerInfo.HostConfig.AutoRemove {
-			// 如果是旧容器配置了自动删除，则等待容器自动被销毁
 			for {
-				time.Sleep(time.Second * 1)
-				if _, err = docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerInfo.Name); err != nil {
+				_, inspectErr := dockerClient.Client.ContainerInspect(dockerClient.Ctx, containerInfo.ID)
+				if errdefs.IsNotFound(inspectErr) {
 					break
+				}
+				if inspectErr != nil {
+					self.JsonResponseWithError(http, inspectErr, 500)
+					return
+				}
+				select {
+				case <-dockerClient.Ctx.Done():
+					self.JsonResponseWithError(http, dockerClient.Ctx.Err(), 500)
+					return
+				case <-time.After(time.Second):
 				}
 			}
 		}
 	}
 
-	bakContainerName := fmt.Sprintf("%s-bak-%s", containerInfo.Name, bakTime)
-	bakImageName := fmt.Sprintf("%s-bak-%s", containerInfo.Config.Image, bakTime)
 	progressCurrent++
-	progress.BroadcastMessage(logic.ContainerUpgradeProgress{
-		Steps:   progressSteps,
-		Current: progressCurrent,
-		Total:   len(progressSteps),
-	})
-
-	// 未备份旧容器，需要先删除，否则名称会冲突
-	if params.EnableBak {
-		if !containerInfo.HostConfig.AutoRemove {
-			// 备份旧容器
-			err = docker.Sdk.Client.ContainerRename(
-				docker.Sdk.Ctx,
-				containerInfo.Name,
-				bakContainerName,
-			)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
-
-		if oldContainerImageId != imageInfo.ID {
-			// 备份旧镜像
-			err = docker.Sdk.Client.ImageTag(
-				docker.Sdk.Ctx,
-				containerInfo.Image,
-				bakImageName,
-			)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
-	} else {
-		if !containerInfo.HostConfig.AutoRemove {
-			err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerInfo.Name, container.RemoveOptions{})
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
-		_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, containerInfo.Image, image.RemoveOptions{})
-		if err != nil {
-			slog.Debug("container upgrade delete image", "error", err.Error())
-		}
-	}
-
-	err = docker.Sdk.Client.ContainerRename(
-		docker.Sdk.Ctx,
-		newContainerName,
-		containerInfo.Name,
-	)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	notifyProgress()
+	containerID, executeErr := containerBuilder.Execute()
+	if containerID == "" {
+		self.JsonResponseWithError(http, errors.Join(executeErr, errors.New("final container id is empty")), 500)
 		return
 	}
-
-	newContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, out.ID)
+	newContainerInfo, err := dockerClient.Client.ContainerInspect(dockerClient.Ctx, containerID)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		self.JsonResponseWithError(http, errors.Join(executeErr, err), 500)
 		return
 	}
-	// 容器升级后，将表中的数据更新为新的容器数据
-	if siteRow, _ := dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.Md5, "Id"))...).First(); siteRow != nil {
-		siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
-			Id:   out.ID,
-			Info: newContainerInfo,
-		}
-		_ = dao.Site.Save(siteRow)
+	if newContainerInfo.ID != containerInfo.ID {
+		// 容器 ID 已经变化时，即使后续启动或数据保存失败，也必须同步依赖旧 ID 的权限。
+		defer func() {
+			facade.GetEvent().Publish(event.ContainerEditEvent, event.ContainerPayload{
+				InspectInfo:    &newContainerInfo,
+				OldInspectInfo: &containerInfo,
+				Ctx:            http,
+			})
+		}()
 	}
-
-	// 旧容器如果是停止状态，重建后保持不启动
+	siteRow, _ := dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "Id"))...).First()
+	if siteRow != nil {
+		siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{Id: newContainerInfo.ID, Info: newContainerInfo}
+		if err = dao.Site.Save(siteRow); err != nil {
+			self.JsonResponseWithError(http, errors.Join(executeErr, err), 500)
+			return
+		}
+	}
+	if executeErr != nil {
+		self.JsonResponseWithError(http, executeErr, 500)
+		return
+	}
 	if startContainer {
 		progressCurrent++
-		progress.BroadcastMessage(logic.ContainerUpgradeProgress{
-			Steps:   progressSteps,
-			Current: progressCurrent,
-			Total:   len(progressSteps),
-		})
-		err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, containerInfo.Name, container.StartOptions{})
+		notifyProgress()
+		if err = dockerClient.Client.ContainerStart(dockerClient.Ctx, containerID, container.StartOptions{}); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		newContainerInfo, err = dockerClient.Client.ContainerInspect(dockerClient.Ctx, containerID)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		if siteRow != nil {
+			siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{Id: newContainerInfo.ID, Info: newContainerInfo}
+			if err = dao.Site.Save(siteRow); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
 	}
 
-	facade.GetEvent().Publish(event.ContainerEditEvent, event.ContainerPayload{
-		InspectInfo:    &newContainerInfo,
-		OldInspectInfo: &containerInfo,
-		Ctx:            http,
-	})
-
 	self.JsonResponseWithoutError(http, gin.H{
-		"containerId": out.ID,
+		"containerId": newContainerInfo.ID,
 	})
 	return
 }
@@ -357,16 +298,12 @@ func (self ContainerUpgrade) Check(http *gin.Context) {
 		return
 	}
 
-	result, err := (logic.ContainerUpgrade{}).Check(dockerSdk, &containerInfo, params.Force)
-	errorMessage := ""
-	if err != nil {
-		errorMessage = err.Error()
-	}
+	result := (logic.Container{}).CheckUpgrade(dockerSdk, containerInfo, params.Force)
 	self.JsonResponseWithoutError(http, gin.H{
 		"upgrade":     result.Status == define.ContainerUpgradeStatusUpgrade,
-		"digest":      result.RemoteDigest,
-		"digestLocal": result.LocalDigest,
-		"error":       errorMessage,
+		"digest":      result.Result.RemoteDigest,
+		"digestLocal": result.Result.LocalDigests,
+		"error":       result.Error,
 		"status":      result.Status,
 	})
 }
@@ -405,28 +342,12 @@ func (self ContainerUpgrade) GetList(http *gin.Context) {
 		errorMessage := ""
 		status := define.ContainerUpgradeStatusUnchecked
 		cacheKey := fmt.Sprintf(storage.CacheKeyContainerUpgrade, dockerSdk.Name, item.ID)
-		value, exists := storage.Cache.Get(cacheKey)
-		if exists {
-			cached, ok := value.(logic.ContainerUpgradeResult)
-			if !ok {
-				storage.Cache.Delete(cacheKey)
-			} else {
-				checkedAt = cached.CheckedAt
-				// 容器镜像如果已经更新，这里的名称会变成 sha256 的形式，但是返回的值必须是镜像的原始名称
-				item.Image = cached.ImageName
-				switch cached.Status {
-				case define.ContainerUpgradeStatusFailed,
-					define.ContainerUpgradeStatusLatest,
-					define.ContainerUpgradeStatusUnavailable,
-					define.ContainerUpgradeStatusUpgrade:
-					status = cached.Status
-					if cached.Error != nil {
-						errorMessage = cached.Error.Error()
-					}
-				default:
-					storage.Cache.Delete(cacheKey)
-				}
-			}
+		if result, ok := storage.LoadCache[logic.ContainerUpgradeCheckResult](cacheKey); ok {
+			checkedAt = result.CheckedAt
+			// 容器镜像如果已经更新，这里的名称会变成 sha256 的形式，但是返回的值必须是镜像的原始名称
+			item.Image = result.Result.ImageName
+			errorMessage = result.Error
+			status = result.Status
 		}
 		if function.InArray(ignore, fmt.Sprintf("%s@*", containerName)) {
 			status = define.ContainerUpgradeStatusIgnoreAlways

@@ -8,6 +8,7 @@ import (
 	"github.com/donknap/dpanel/app/common/events"
 	"github.com/donknap/dpanel/app/common/http/controller"
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	common "github.com/donknap/dpanel/common/middleware"
@@ -18,7 +19,6 @@ import (
 	"github.com/donknap/dpanel/common/types"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
-	"github.com/robfig/cron/v3"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	httpserver "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
@@ -150,22 +150,20 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 
 	_ = facade.Event.Subscribe(event.PluginDestroyExplorer, events.Plugin{}.DestroyExplorer)
 	// 启动时，初始化计划任务
-	crontab.Client.Cron.Start()
+	crontab.Client.Start()
 
 	if cronList, err := dao.Cron.Order(dao.Cron.ID.Desc()).Find(); err == nil {
 		for _, task := range cronList {
-			if task.Setting.Disable {
+			if task.Setting == nil {
+				slog.Warn("init crontab task error", "taskID", task.ID, "error", "task setting is empty")
 				continue
 			}
-			if jobIds, err := (logic.Cron{}).AddCronJob(task); err == nil && jobIds != nil && len(jobIds) > 0 {
-				task.Setting.JobIds = jobIds
-			} else {
-				task.Setting.JobIds = make([]cron.EntryID, 0)
-				if err != nil {
-					slog.Warn("init crontab task error", "error", err.Error())
-				}
+			if task.Setting.Disable && task.Setting.TriggerType != accessor.CronTriggerTypeManual {
+				continue
 			}
-			_ = dao.Cron.Save(task)
+			if err := (logic.Cron{}).AddCronJob(task); err != nil {
+				slog.Warn("init crontab task error", "taskID", task.ID, "name", (logic.Cron{}).GetJobName(task), "error", err)
+			}
 		}
 	}
 

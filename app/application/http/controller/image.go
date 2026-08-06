@@ -140,7 +140,7 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 			if err == io.EOF {
 				break
 			}
-			msg := types.BuildMessage{}
+			msg := types.ImageProgress{}
 			if err = json.Unmarshal(line, &msg); err == nil {
 				if msg.Stream != "" && strings.Contains(msg.Stream, "Loaded image:") {
 					if _, after, exists := strings.Cut(msg.Stream, "Loaded image: "); exists {

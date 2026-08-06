@@ -11,7 +11,6 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
-	"github.com/robfig/cron/v3"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/datatypes"
@@ -41,7 +40,6 @@ func (self Cron) Create(http *gin.Context) {
 			},
 		}
 	}
-
 	err := crontab.Client.CheckExpression(function.PluckArrayWalk(params.Expression, func(item accessor.CronSettingExpression) (string, bool) {
 		return item.ToString(), true
 	})...)
@@ -50,42 +48,43 @@ func (self Cron) Create(http *gin.Context) {
 		return
 	}
 
-	var taskRow *entity.Cron
+	cronLogic := logic.Cron{}
+	taskRow := &entity.Cron{}
 	if params.Id > 0 {
 		taskRow, _ = dao.Cron.Where(dao.Cron.ID.Eq(params.Id)).First()
 		if taskRow == nil {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
-		crontab.Client.RemoveJob(taskRow.Setting.JobIds...)
-		taskRow.Setting = &params.CronSettingOption
-		taskRow.Title = params.Title
-		taskRow.Setting.JobIds = make([]cron.EntryID, 0)
-		taskRow.Setting.DockerEnvName = docker.Sdk.Name
+		crontab.Client.RemoveJob(cronLogic.GetJobName(taskRow))
+		if taskRow.Setting != nil {
+			params.JobIds = taskRow.Setting.JobIds
+		}
 	} else {
 		if _, err := dao.Cron.Where(dao.Cron.Title.Like(params.Title)).First(); err == nil {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Title), 500)
 			return
 		}
-		taskRow = &entity.Cron{
-			Title:   params.Title,
-			Setting: &params.CronSettingOption,
-		}
-		taskRow.Setting.JobIds = make([]cron.EntryID, 0)
-		taskRow.Setting.DockerEnvName = docker.Sdk.Name
-		_ = dao.Cron.Create(taskRow)
-	}
-	// 仅当任务非手动触发的时候，才有暂停和恢复功能
-	if taskRow.Setting.TriggerType == accessor.CronTriggerTypeManual || !params.Disable {
-		if jobIds, err := (logic.Cron{}).AddCronJob(taskRow); err == nil {
-			taskRow.Setting.JobIds = jobIds
-		}
 	}
 
-	err = dao.Cron.Save(taskRow)
+	taskRow.Title = params.Title
+	taskRow.Setting = &params.CronSettingOption
+	taskRow.Setting.DockerEnvName = docker.Sdk.Name
+	if params.Id > 0 {
+		err = dao.Cron.Save(taskRow)
+	} else {
+		err = dao.Cron.Create(taskRow)
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+	// 仅当任务非手动触发的时候，才有暂停和恢复功能
+	if taskRow.Setting.TriggerType == accessor.CronTriggerTypeManual || !params.Disable {
+		if err = cronLogic.AddCronJob(taskRow); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 
 	self.JsonSuccessResponse(http)
@@ -110,7 +109,7 @@ func (self Cron) GetList(http *gin.Context) {
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": function.PluckArrayWalk(list, func(item *entity.Cron) (*entity.Cron, bool) {
 			if item.Setting.TriggerType == accessor.CronTriggerTypeCron {
-				item.Setting.NextRunTime = crontab.Client.GetNextRunTime(item.Setting.JobIds...)
+				item.Setting.NextRunTime = crontab.Client.GetNextRunTime((logic.Cron{}).GetJobName(item))
 			}
 			return item, true
 		}),
@@ -128,7 +127,7 @@ func (self Cron) Delete(http *gin.Context) {
 	}
 	if list, err := dao.Cron.Where(dao.Cron.ID.In(params.Id...)).Find(); err == nil {
 		for _, item := range list {
-			crontab.Client.RemoveJob(item.Setting.JobIds...)
+			crontab.Client.RemoveJob((logic.Cron{}).GetJobName(item))
 			_, _ = dao.Cron.Delete(item)
 			_, _ = dao.CronLog.Where(dao.CronLog.CronID.Eq(item.ID)).Delete()
 		}
@@ -150,13 +149,14 @@ func (self Cron) RunOnce(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	if len(cronRow.Setting.JobIds) == 0 {
+	job, ok := crontab.Client.GetJob((logic.Cron{}).GetJobName(cronRow))
+	if !ok {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerCronTaskEmpty), 500)
 		return
 	}
 
 	// 计划任务可能会注册多个周期，执行时也只需要调用一次即可
-	crontab.Client.RunById(cronRow.Setting.JobIds[0])
+	job.Run()
 
 	self.JsonSuccessResponse(http)
 	return

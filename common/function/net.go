@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"strings"
@@ -19,6 +20,63 @@ const (
 	SSRFAllowLinkLocal
 	SSRFAllowPrivate
 )
+
+var ssrfBlockedPrefixes = []netip.Prefix{
+	netip.MustParsePrefix("0.0.0.0/8"),
+	netip.MustParsePrefix("100.64.0.0/10"),
+}
+
+type safeHTTPAddressesKey struct{}
+
+type safeHTTPRoundTripper struct {
+	direct *http.Transport
+	proxy  *http.Transport
+}
+
+func (self safeHTTPRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	proxyURL, err := http.ProxyFromEnvironment(request)
+	if err != nil {
+		return nil, err
+	}
+	if proxyURL != nil {
+		// 面板代理由管理员显式配置，代理链路保留 URL 和重定向安全校验，目标解析交由可信代理完成。
+		return self.proxy.RoundTrip(request)
+	}
+	return self.direct.RoundTrip(request)
+}
+
+var safeHTTPTransport = func() http.RoundTripper {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		return dialSafeHTTPAddresses(ctx, network, address, (&net.Dialer{}).DialContext)
+	}
+	proxyTransport := http.DefaultTransport.(*http.Transport).Clone()
+	return safeHTTPRoundTripper{
+		direct: transport,
+		proxy:  proxyTransport,
+	}
+}()
+
+func dialSafeHTTPAddresses(ctx context.Context, network, address string, dialContext func(context.Context, string, string) (net.Conn, error)) (net.Conn, error) {
+	addresses, ok := ctx.Value(safeHTTPAddressesKey{}).([]net.IP)
+	if !ok || len(addresses) == 0 {
+		return nil, errors.New("validated http address is unavailable")
+	}
+	_, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	var dialErrors []error
+	for _, ip := range addresses {
+		connection, err := dialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+		if err == nil {
+			return connection, nil
+		}
+		dialErrors = append(dialErrors, err)
+	}
+	return nil, errors.Join(dialErrors...)
+}
 
 func IpInSubnet(ipAddress, subnetAddress string) (bool, error) {
 	ip := net.ParseIP(ipAddress)
@@ -39,60 +97,57 @@ func IpInSubnet(ipAddress, subnetAddress string) (bool, error) {
 	return true, nil
 }
 
-func IpIsLocalhost(address string) bool {
-	host := address
-	if h, _, err := net.SplitHostPort(address); err == nil {
-		host = h
-	}
-	host = strings.Trim(host, "[]")
-	if strings.ToLower(host) == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(host)
-	if ip != nil {
-		return ip.IsLoopback()
-	}
-	return false
-}
-
-func CheckSSRFURL(raw string, flags ...int) error {
-	uri, err := url.Parse(raw)
+func SafeHTTPAddresses(rawURL string, flags ...int) ([]net.IP, error) {
+	uri, err := url.Parse(rawURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if uri.Scheme != "http" && uri.Scheme != "https" {
-		return errors.New("unsupported url scheme")
+		return nil, errors.New("unsupported url scheme")
 	}
 	host := uri.Hostname()
 	if host == "" {
-		return errors.New("invalid url host")
+		return nil, errors.New("invalid url host")
 	}
 	flagValue := 0
 	for _, flag := range flags {
 		flagValue |= flag
 	}
 	if strings.EqualFold(host, "localhost") && flagValue&SSRFAllowLoopback == 0 {
-		return errors.New("localhost is not allowed")
+		return nil, errors.New("localhost is not allowed")
 	}
-	ips, err := net.LookupIP(host)
+	ips, err := net.DefaultResolver.LookupIP(context.Background(), "ip", host)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if len(ips) == 0 {
+		return nil, errors.New("url host has no ip address")
 	}
 	for _, ip := range ips {
 		if ip.IsLoopback() && flagValue&SSRFAllowLoopback == 0 {
-			return errors.New("loopback address is not allowed")
+			return nil, errors.New("loopback address is not allowed")
 		}
 		if ip.IsUnspecified() && flagValue&SSRFAllowUnspecified == 0 {
-			return errors.New("unspecified address is not allowed")
+			return nil, errors.New("unspecified address is not allowed")
 		}
 		if (ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()) && flagValue&SSRFAllowLinkLocal == 0 {
-			return errors.New("link-local address is not allowed")
+			return nil, errors.New("link-local address is not allowed")
 		}
 		if ip.IsPrivate() && flagValue&SSRFAllowPrivate == 0 {
-			return errors.New("private address is not allowed")
+			return nil, errors.New("private address is not allowed")
+		}
+		address, ok := netip.AddrFromSlice(ip)
+		if !ok {
+			return nil, errors.New("invalid resolved ip address")
+		}
+		address = address.Unmap()
+		for _, prefix := range ssrfBlockedPrefixes {
+			if prefix.Contains(address) {
+				return nil, errors.New("special-purpose address is not allowed")
+			}
 		}
 	}
-	return nil
+	return ips, nil
 }
 
 // SafeHTTPGet 获取远程 HTTP 数据，并统一限制内网地址、重定向、超时和响应体大小。
@@ -106,20 +161,27 @@ func SafeHTTPGet(ctx context.Context, rawURL string, timeout time.Duration, maxB
 	if maxBodySize <= 0 {
 		return nil, errors.New("http max body size must be greater than zero")
 	}
-	if err := CheckSSRFURL(rawURL); err != nil {
+	addresses, err := SafeHTTPAddresses(rawURL)
+	if err != nil {
 		return nil, err
 	}
 
 	client := &http.Client{
-		Timeout: timeout,
+		Transport: safeHTTPTransport,
+		Timeout:   timeout,
 		CheckRedirect: func(request *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return errors.New("stopped after 10 redirects")
 			}
-			return CheckSSRFURL(request.URL.String())
+			redirectAddresses, err := SafeHTTPAddresses(request.URL.String())
+			if err != nil {
+				return err
+			}
+			*request = *request.WithContext(context.WithValue(request.Context(), safeHTTPAddressesKey{}, redirectAddresses))
+			return nil
 		},
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	request, err := http.NewRequestWithContext(context.WithValue(ctx, safeHTTPAddressesKey{}, addresses), http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, err
 	}

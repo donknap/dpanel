@@ -3,19 +3,15 @@ package container
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
@@ -23,14 +19,16 @@ type Option func(builder *Builder) error
 
 func WithContainerInfo(containerInfo container.InspectResponse) Option {
 	return func(self *Builder) error {
+		containerInfo, err := self.dockerSdk.ContainerInspectCompat(containerInfo)
+		if err != nil {
+			return err
+		}
 		if containerInfo.Config != nil {
 			containerConfig := *containerInfo.Config
 			self.containerConfig = &containerConfig
 		}
 		if containerInfo.HostConfig != nil {
 			hostConfig := *containerInfo.HostConfig
-			// compatible cgroup v2 不支持配置 MemorySwappiness，podman 在 crun 下会严格报错
-			hostConfig.MemorySwappiness = nil
 			self.hostConfig = &hostConfig
 		}
 		return nil
@@ -72,23 +70,40 @@ func WithEnv(item ...types.EnvItem) Option {
 	}
 }
 
-func WithImage(imageName string, tryPullImage bool) Option {
+func WithImage(imageName string) Option {
 	return func(self *Builder) error {
 		if imageName == "" {
 			return errors.New("image name is empty")
 		}
-		// 只尝试从 docker.io 拉取
-		if tryPullImage {
-			reader, err := docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, imageName, image.PullOptions{})
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(os.Stdout, reader)
-			if err != nil {
-				return err
-			}
-		}
 		self.containerConfig.Image = imageName
+		return nil
+	}
+}
+
+// WithContainerRollback 将旧容器纳入替换事务；新容器创建失败时恢复旧容器，创建成功后按需保留备份。
+func WithContainerRollback(containerInfo container.InspectResponse, enableBak bool) Option {
+	return func(self *Builder) error {
+		self.rollback = &containerRollback{
+			containerInfo: containerInfo,
+			enableBak:     enableBak,
+		}
+		return nil
+	}
+}
+
+func WithImageRuntimeConfig(enable bool) Option {
+	return func(self *Builder) error {
+		if !enable {
+			return nil
+		}
+		self.containerConfig.Env = nil
+		self.containerConfig.Cmd = nil
+		self.containerConfig.Entrypoint = nil
+		self.containerConfig.WorkingDir = ""
+		self.containerConfig.User = ""
+		self.containerConfig.Healthcheck = nil
+		self.containerConfig.StopSignal = ""
+		self.containerConfig.Shell = nil
 		return nil
 	}
 }
@@ -199,11 +214,11 @@ func WithLink(item ...types.LinkItem) Option {
 				continue
 			}
 			// 关联网络时，重新退出加入
-			err := docker.Sdk.Client.NetworkDisconnect(docker.Sdk.Ctx, self.containerName, linkItem.Name, true)
+			err := self.dockerSdk.Client.NetworkDisconnect(self.dockerSdk.Ctx, self.containerName, linkItem.Name, true)
 			if err != nil {
 				return err
 			}
-			return docker.Sdk.Client.NetworkConnect(docker.Sdk.Ctx, self.containerName, linkItem.Name, &network.EndpointSettings{
+			return self.dockerSdk.Client.NetworkConnect(self.dockerSdk.Ctx, self.containerName, linkItem.Name, &network.EndpointSettings{
 				Aliases: []string{
 					linkItem.Alise,
 				},

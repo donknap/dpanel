@@ -3,6 +3,7 @@ package task
 import (
 	"log/slog"
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
@@ -36,29 +37,30 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 			return "", err
 		}
 	}
-	options := make([]builder.Option, 0)
-
-	oldContainerName := task.SiteName
-	if task.ContainerId != "" {
-		oldContainerName = task.ContainerId
+	options := []builder.Option{
+		builder.WithContainerName(task.SiteName),
 	}
-	if oldContainerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, oldContainerName); err == nil {
-		_ = notice.Message{}.Info(".containerRemove", oldContainerName[0:11])
-		if oldContainerInfo.State.Running {
-			err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, oldContainerInfo.ID, container.StopOptions{})
-			if err != nil {
-				return "", err
+
+	if task.ContainerId != "" {
+		if inspectInfo, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, task.ContainerId); inspectErr == nil {
+			_ = notice.Message{}.Info(".containerRemove", task.ContainerId[0:11])
+			// 此处提前停止用于单独记录耗时操作的执行进度；rollback 中的停止是事务正常流程，不能替代这里。
+			// 后续配置校验失败时旧容器仍保留为停止状态，由用户修正配置后重试，不在此处自动重启。
+			if inspectInfo.State.Running {
+				if err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, inspectInfo.ID, container.StopOptions{}); err != nil {
+					return "", err
+				}
 			}
+			options = append(options,
+				builder.WithContainerRollback(inspectInfo, false),
+				builder.WithContainerInfo(inspectInfo),
+			)
+		} else if !errdefs.IsNotFound(inspectErr) {
+			return "", inspectErr
 		}
-		err = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, oldContainerInfo.ID, container.RemoveOptions{})
-		if err != nil {
-			return "", err
-		}
-		options = append(options, builder.WithContainerInfo(oldContainerInfo))
 	}
 
 	options = append(options, []builder.Option{
-		builder.WithContainerName(task.SiteName),
 		builder.WithHostname(task.SiteName),
 		builder.WithNetworkMode(network.NetworkDefault),
 		builder.WithPid(""),
@@ -68,7 +70,7 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 		}),
 		builder.WithStdioKeepAlive(true),
 		builder.WithHostname(task.BuildParams.Hostname),
-		builder.WithImage(task.BuildParams.ImageName, false),
+		builder.WithImage(task.BuildParams.ImageName),
 		builder.WithEnv(task.BuildParams.Environment...),
 		builder.WithVolumesFrom(task.BuildParams.Links...),
 		builder.WithPort(task.BuildParams.Ports...),
@@ -115,15 +117,14 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 		options = append(options, builder.WithNetwork(task.BuildParams.Network...))
 	}
 
-	b, err := builder.New(options...)
+	b, err := builder.New(docker.Sdk, options...)
 	if err != nil {
 		return "", err
 	}
-
 	_ = notice.Message{}.Info(".containerCreate", task.SiteName)
-	response, err := b.Execute()
+	containerID, err := b.Execute()
 	if err != nil {
-		return "", err
+		return containerID, err
 	}
 
 	// 当前如果新建了容器自身网络，创建完后加入
@@ -140,7 +141,7 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 		}
 		err = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, o, task.SiteName)
 		if err != nil {
-			return "", err
+			return containerID, err
 		}
 	}
 
@@ -159,7 +160,7 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 				},
 			}, value.Name)
 			if err != nil {
-				return "", err
+				return containerID, err
 			}
 		}
 	}
@@ -179,22 +180,22 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 			}
 			err = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, value, task.SiteName)
 			if err != nil {
-				return "", err
+				return containerID, err
 			}
 		}
 	}
 
 	if !task.BuildParams.NoStart {
-		err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, response.ID, container.StartOptions{})
+		err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, containerID, container.StartOptions{})
 		if err != nil {
-			return response.ID, err
+			return containerID, err
 		}
 		if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
-			_, err := docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, response.ID, task.BuildParams.Hook.ContainerCreate)
+			_, err := docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, containerID, task.BuildParams.Hook.ContainerCreate)
 			if err != nil {
 				slog.Debug("container create run hook", "hook", "container create", "error", err.Error())
 			}
 		}
 	}
-	return response.ID, err
+	return containerID, err
 }

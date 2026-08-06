@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -194,6 +195,12 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if !self.Validate(http, &buildParams) {
 		return
 	}
+	if params.ContainerId == "" {
+		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); err == nil {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.SiteName), 500)
+			return
+		}
+	}
 
 	checkIpInSubnet := make([][2]string, 0)
 	if buildParams.IpV4 != nil {
@@ -221,31 +228,26 @@ func (self Site) CreateByImage(http *gin.Context) {
 		}
 	}
 
+	var err error
 	var siteRow *entity.Site
-
-	// 重新部署，先删掉之前的容器数据
-	// 删除数据时应该查找对应的Id 和 名称都相同的，避免多环境下名称一致导致删除错误
-	// 删除容器时，先把记录设置为软删除，部署失败后在回收站中可以查看
+	var oldContainerInfo *container.InspectResponse
 	if params.ContainerId != "" {
-		_, _ = dao.Site.
+		siteRow, err = dao.Site.
 			Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.ContainerId, "Id"))...).
-			Delete()
-		deleteQuery := dao.Site.Unscoped().Order(dao.Site.ID.Desc()).Where(gen.Cond(
-			datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
-		)...).Where(dao.Site.SiteName.Eq(params.SiteName)).Where(dao.Site.DeletedAt.IsNotNull())
-		deleteIds := make([]int32, 0)
-		if err := deleteQuery.Limit(5).Pluck(dao.Site.ID, &deleteIds); err == nil {
-			_, _ = deleteQuery.Where(dao.Site.ID.NotIn(deleteIds...)).Delete()
+			Where(gen.Cond(datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"))...).
+			First()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			siteRow, err = dao.Site.
+				Where(gen.Cond(datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"))...).
+				Where(dao.Site.SiteName.Eq(params.SiteName)).
+				First()
 		}
-	}
-
-	// 创建前先查找一下当前环境下是否有容器
-	// 如果有，则查询数据中是否有记录，有就表示是更新，否则是创建
-	if containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); err == nil {
-		siteRow, _ = dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "Id"))...).First()
-		if siteRow != nil && params.ContainerId == "" {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.SiteName), 500)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			self.JsonResponseWithError(http, err, 500)
 			return
+		}
+		if inspectInfo, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId); inspectErr == nil {
+			oldContainerInfo = &inspectInfo
 		}
 	}
 
@@ -267,38 +269,74 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 	buildParams.DockerEnvName = docker.Sdk.Name
 
-	siteRow = &entity.Site{
-		SiteName:      params.SiteName,
-		SiteTitle:     params.SiteTitle,
-		Env:           &buildParams,
-		Status:        define.DockerImageBuildStatusStop,
-		ContainerInfo: &accessor.SiteContainerInfoOption{},
-	}
-	// 获取一下当前是否有容器，出错后，还可以获取到最后一次成功的配置
-	if detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); err == nil {
-		siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
-			Id:   detail.ID,
-			Info: detail,
+	createSiteRow := siteRow == nil
+	if createSiteRow {
+		siteRow = &entity.Site{
+			SiteName:      params.SiteName,
+			SiteTitle:     params.SiteTitle,
+			Env:           &buildParams,
+			Status:        define.DockerImageBuildStatusStop,
+			ContainerInfo: &accessor.SiteContainerInfoOption{},
+		}
+		// 获取一下当前是否有容器，出错后，还可以获取到最后一次成功的配置
+		if detail, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); inspectErr == nil {
+			siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
+				Id:   detail.ID,
+				Info: detail,
+			}
+		}
+
+		err = dao.Site.Create(siteRow)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
 		}
 	}
-
-	err = dao.Site.Create(siteRow)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	runTaskRow := &task.CreateContainerOption{
-		SiteName:    siteRow.SiteName,
+		SiteName:    params.SiteName,
 		SiteId:      siteRow.ID,
 		BuildParams: &buildParams,
 		ContainerId: params.ContainerId,
 	}
 	containerId, err := task.Docker{}.ContainerCreate(runTaskRow)
 	if err != nil {
-		if containerId != "" {
-			// 如果容器在启动时发生错误，需要先删除掉
-			_, err1 := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerId)
-			if err1 == nil {
+		if !createSiteRow {
+			// 重建时只要新容器已经创建，即使后续网络连接或启动失败也保留它，供用户修正配置后再次提交。
+			finalContainer := containerId
+			if finalContainer == "" {
+				finalContainer = params.SiteName
+			}
+			detail, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, finalContainer)
+			updateValue := &entity.Site{
+				Status:  define.DockerImageBuildStatusError,
+				Message: err.Error(),
+			}
+			if containerId != "" {
+				finalInfo := container.InspectResponse{}
+				finalInfo.ID = containerId
+				updateValue.ContainerInfo = &accessor.SiteContainerInfoOption{Id: containerId, Info: finalInfo}
+			}
+			if inspectErr == nil {
+				containerId = detail.ID
+				updateValue.ContainerInfo = &accessor.SiteContainerInfoOption{Id: detail.ID, Info: detail}
+			}
+			if _, updateErr := dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(updateValue); updateErr != nil {
+				self.JsonResponseWithError(http, errors.Join(err, updateErr), 500)
+				return
+			}
+			if inspectErr == nil && oldContainerInfo != nil && oldContainerInfo.ID != detail.ID {
+				facade.GetEvent().Publish(event.ContainerEditEvent, event.ContainerPayload{
+					InspectInfo:    &detail,
+					OldInspectInfo: oldContainerInfo,
+					Ctx:            http,
+				})
+			}
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		// 如果是新建容器失败时需要清理掉创建的容器，否则用户再次提交会提示容器已经存在
+		if params.ContainerId == "" && containerId != "" {
+			if _, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerId); inspectErr == nil {
 				_ = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerId, container.RemoveOptions{})
 			}
 		}
@@ -313,23 +351,52 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerId)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		finalInfo := container.InspectResponse{}
+		finalInfo.ID = containerId
+		_, updateErr := dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(&entity.Site{
+			ContainerInfo: &accessor.SiteContainerInfoOption{Id: containerId, Info: finalInfo},
+			Status:        define.DockerImageBuildStatusError,
+			Message:       err.Error(),
+		})
+		self.JsonResponseWithError(http, errors.Join(err, updateErr), 500)
 		return
 	}
 
-	_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(&entity.Site{
+	_, err = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Select(
+		dao.Site.SiteName,
+		dao.Site.SiteTitle,
+		dao.Site.Env,
+		dao.Site.ContainerInfo,
+		dao.Site.Status,
+		dao.Site.Message,
+	).Updates(&entity.Site{
+		SiteName:  params.SiteName,
+		SiteTitle: params.SiteTitle,
+		Env:       &buildParams,
 		ContainerInfo: &accessor.SiteContainerInfoOption{
-			Id:   containerId,
+			Id:   detail.ID,
 			Info: detail,
 		},
 		Status:  define.DockerImageBuildStatusSuccess,
 		Message: "",
 	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 
-	facade.GetEvent().Publish(event.ContainerCreateEvent, event.ContainerPayload{
-		InspectInfo: &detail,
-		Ctx:         http,
-	})
+	if oldContainerInfo != nil {
+		facade.GetEvent().Publish(event.ContainerEditEvent, event.ContainerPayload{
+			InspectInfo:    &detail,
+			OldInspectInfo: oldContainerInfo,
+			Ctx:            http,
+		})
+	} else {
+		facade.GetEvent().Publish(event.ContainerCreateEvent, event.ContainerPayload{
+			InspectInfo: &detail,
+			Ctx:         http,
+		})
+	}
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"siteId":      siteRow.ID,

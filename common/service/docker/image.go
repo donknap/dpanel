@@ -19,7 +19,52 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/types/fs"
+	registrySdk "github.com/we7coreteam/registry-go-sdk"
 )
+
+type ImagePullOption struct {
+	RegistryAddresses []string
+	RegistryAuth      string
+	Platform          string
+}
+
+func (self Client) ImagePull(ctx context.Context, imageName string, option ImagePullOption) (out io.ReadCloser, imageNameDetail *function.Tag, err error) {
+	imageNameDetail = function.ImageTag(imageName)
+	pullOption := image.PullOptions{
+		RegistryAuth: option.RegistryAuth,
+		Platform:     option.Platform,
+	}
+
+	// 配置了加速地址时逐个尝试，全部失败后回退到原始仓库。
+	if len(option.RegistryAddresses) > 1 {
+		originalRegistryAddress := imageNameDetail.Registry
+		registryOptions := make([]registrySdk.Option, 0, len(option.RegistryAddresses)+1)
+		for _, address := range option.RegistryAddresses {
+			registryOptions = append(registryOptions, registrySdk.WithServer(address, "", ""))
+		}
+		registryOptions = append(registryOptions, registrySdk.WithRepository(imageNameDetail.BaseName, imageNameDetail.Version))
+
+		availableRegistry := registrySdk.New(registryOptions...).GetAvailableServers()
+		for {
+			registryServer, ok := <-availableRegistry
+			if !ok {
+				imageNameDetail.Registry = originalRegistryAddress
+				out, err = self.Client.ImagePull(ctx, imageNameDetail.Uri(), pullOption)
+				return out, imageNameDetail, err
+			}
+
+			imageNameDetail.Registry = registryServer.Url
+			out, err = self.Client.ImagePull(ctx, imageNameDetail.Uri(), pullOption)
+			if err == nil {
+				return out, imageNameDetail, nil
+			}
+			slog.Debug("image remote", "type", "pull", "error", err)
+		}
+	}
+
+	out, err = self.Client.ImagePull(ctx, imageNameDetail.Uri(), pullOption)
+	return out, imageNameDetail, err
+}
 
 func (self Client) ImageInspectFileList(ctx context.Context, imageID string) (pathInfo []*fs.FileData, pathList []string, err error) {
 	_, err = self.Client.ImageInspect(ctx, imageID)

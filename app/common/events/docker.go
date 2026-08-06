@@ -213,9 +213,12 @@ func (self Docker) Message(e event.DockerMessagePayload) {
 		define.DockerMessageTypeContainerDestroy, define.DockerMessageTypeContainerCreate,
 		define.DockerMessageTypeContainerDie, define.DockerMessageTypeContainerStart,
 	}, msgType) {
-		crontab.Client.RunByEvent(msgType, []types.EnvItem{
+		environment := []types.EnvItem{
 			types.NewEnvItemFromKV("DP_DOCKER_ENV_NAME", e.DockerEnvName),
 			types.NewEnvItemFromKV("DP_CONTAINER_NAME", e.Message.Actor.Attributes["name"]),
-		})
+		}
+		for _, job := range crontab.Client.GetJobs(fmt.Sprintf(logic.CronEventJobSearch, msgType)) {
+			job.Run(crontab.WithEnvironment(environment))
+		}
 	}
 }

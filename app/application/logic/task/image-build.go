@@ -164,12 +164,12 @@ func (self Docker) ImageBuild(sdk *docker.Client, messageId string, task accesso
 			if err == io.EOF {
 				break
 			}
-			msg := types.BuildMessage{}
+			msg := types.ImageProgress{}
 			if err = json.Unmarshal(line, &msg); err == nil {
 				if msg.ErrorDetail.Message != "" {
 					wsBuffer.BroadcastMessage(msg.ErrorDetail.Message)
-				} else if msg.PullMessage.Id != "" {
-					wsBuffer.BroadcastMessage(fmt.Sprintf("\r%s: %s", msg.PullMessage.Id, msg.PullMessage.Progress))
+				} else if msg.Id != "" {
+					wsBuffer.BroadcastMessage(fmt.Sprintf("\r%s: %s", msg.Id, msg.Progress))
 				} else {
 					wsBuffer.BroadcastMessage(msg.Stream)
 				}

@@ -183,7 +183,7 @@ recreate:
 	defer self.mu.Unlock()
 
 	options := []builder.Option{
-		builder.WithImage(service.Image, false),
+		builder.WithImage(service.Image),
 		builder.WithContainerName(self.containerName),
 		builder.WithHostname(self.containerName),
 		builder.WithNetworkMode(network.NetworkDefault),
@@ -226,22 +226,24 @@ recreate:
 		}))
 	}
 
-	b, err := builder.New(options...)
+	b, err := builder.New(self.dockerSdk, options...)
 	if err != nil {
 		return err
 	}
-	response, err := b.Execute()
+	containerID, err := b.Execute()
+	if containerID != "" {
+		self.containerName = containerID
+	}
 	if err != nil {
 		return err
 	}
 
-	err = self.dockerSdk.Client.ContainerStart(self.dockerSdk.Ctx, response.ID, container.StartOptions{})
+	err = self.dockerSdk.Client.ContainerStart(self.dockerSdk.Ctx, containerID, container.StartOptions{})
 	if err != nil {
 		return err
 	}
 
-	self.containerName = response.ID
-	function.Wait(self.dockerSdk.Ctx, response.ID, func(v string) bool {
+	function.Wait(self.dockerSdk.Ctx, containerID, func(v string) bool {
 		if info, err := self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, v); err == nil && info.State.Running {
 			return true
 		}

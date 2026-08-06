@@ -165,7 +165,7 @@ func WithContainerSpec(option *accessor.SiteEnvOption) Option {
 	options := make([]containerBuilder.Option, 0)
 	options = append(options, []containerBuilder.Option{
 		containerBuilder.WithHostname(option.Hostname),
-		containerBuilder.WithImage(option.ImageName, false),
+		containerBuilder.WithImage(option.ImageName),
 		containerBuilder.WithEnv(option.Environment...),
 		containerBuilder.WithPort(option.Ports...),
 		containerBuilder.WithVolume(option.Volumes...),

@@ -28,7 +28,8 @@ import (
 var Sdk *Client
 
 func NewClientWithUser(http *gin.Context) (*Client, error) {
-	// TODO 后续根据当前用户权限及所选 Docker 环境，从共享连接 Map 获取或创建 Client。
+	// TODO 用户级 Docker Client 尚未落地，当前仍返回全局 Sdk。HTTP 请求链路允许分阶段迁移，
+	// 未改造的调用点继续使用 docker.Sdk，待共享连接 Map 实现后统一收口。
 	if Sdk == nil || Sdk.Client == nil || Sdk.DockerEnv == nil {
 		return nil, errors.New("docker client is not initialized")
 	}

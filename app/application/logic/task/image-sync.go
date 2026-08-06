@@ -20,6 +20,8 @@ func (self Docker) ImageSync(w *ws.ProgressPip, r io.ReadCloser) error {
 	if r == nil {
 		return function.ErrorMessage(define.ErrorMessageImagePullRegistryBad)
 	}
+	defer r.Close()
+
 	lastSendTime := time.Now()
 	pg := make(map[string]*types.PullProgress)
 
@@ -32,7 +34,7 @@ func (self Docker) ImageSync(w *ws.ProgressPip, r io.ReadCloser) error {
 		}
 		slog.Debug("image pull task", "data", p)
 		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
-		pd := types.BuildMessage{}
+		pd := types.ImageProgress{}
 		for {
 			line, _, err := newReader.ReadLine()
 			if err == io.EOF {

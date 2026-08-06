@@ -1,20 +1,13 @@
 package crontab
 
 import (
-	"errors"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
-var (
-	SkipRun = errors.New("skip this tasks")
-)
-
 type RunFuncContext struct {
-	mu          sync.Mutex
 	StartTime   time.Time
 	Output      string
 	Err         error
@@ -22,6 +15,19 @@ type RunFuncContext struct {
 }
 
 type RunFunc func(ctx *RunFuncContext)
+
+type RunOption func(options *runOptions)
+
+type runOptions struct {
+	environment []types.EnvItem
+}
+
+func WithEnvironment(environment []types.EnvItem) RunOption {
+	environment = append([]types.EnvItem(nil), environment...)
+	return func(options *runOptions) {
+		options.environment = append([]types.EnvItem(nil), environment...)
+	}
+}
 
 type Option func(job *Job)
 
@@ -37,6 +43,12 @@ func WithName(name string) Option {
 	}
 }
 
+func WithSkipIfStillRunning() Option {
+	return func(job *Job) {
+		job.skipIfStillRunning = true
+	}
+}
+
 func New(opts ...Option) *Job {
 	c := &Job{
 		runFunc: make([]RunFunc, 0),
@@ -44,44 +56,53 @@ func New(opts ...Option) *Job {
 	for _, opt := range opts {
 		opt(c)
 	}
+	if c.skipIfStillRunning {
+		c.runGate = make(chan struct{}, 1)
+		c.runGate <- struct{}{}
+	}
 	return c
 }
 
 type Job struct {
-	Name        string
-	runFunc     []RunFunc
-	environment []types.EnvItem
+	Name               string
+	runFunc            []RunFunc
+	skipIfStillRunning bool
+	runGate            chan struct{}
 }
 
-func (self *Job) SetEnvironment(env []types.EnvItem) {
-	self.environment = env
-}
-
-func (self *Job) Run() {
+func (self *Job) Run(opts ...RunOption) {
 	if self.runFunc == nil {
 		slog.Debug("invalid crontab job")
 		return
+	}
+	if self.runGate != nil {
+		select {
+		case token := <-self.runGate:
+			defer func() {
+				self.runGate <- token
+			}()
+		default:
+			cronLogger{name: self.Name}.Info("skip")
+			return
+		}
+	}
+
+	options := &runOptions{}
+	for _, opt := range opts {
+		opt(options)
 	}
 
 	ctx := &RunFuncContext{
 		Output:      "",
 		Err:         nil,
 		StartTime:   time.Now(),
-		Environment: self.environment,
+		Environment: options.environment,
 	}
 
 	for _, runFunc := range self.runFunc {
-		func() {
-			ctx.mu.Lock()
-			defer ctx.mu.Unlock()
-			runFunc(ctx)
-			if ctx.Err != nil {
-				slog.Debug("crontab crash", "err", ctx.Err.Error())
-			}
-		}()
-
-		if ctx.Err != nil && errors.Is(ctx.Err, SkipRun) {
-			break
+		runFunc(ctx)
+		if ctx.Err != nil {
+			slog.Debug("crontab crash", "err", ctx.Err.Error())
 		}
 	}
 }

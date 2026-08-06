@@ -62,18 +62,19 @@ const (
 )
 
 type CronSettingOption struct {
-	NextRunTime      []time.Time             `json:"nextRunTime,omitempty"`
-	Expression       []CronSettingExpression `json:"expression,omitempty"`
-	ContainerName    string                  `json:"containerName,omitempty"`
-	Script           string                  `json:"script,omitempty"`
-	JobIds           []cron.EntryID          `json:"jobIds,omitempty"`
-	Environment      []types.EnvItem         `json:"environment,omitempty"`
-	EnableRunBlock   bool                    `json:"enableRunBlock,omitempty"`
-	KeepLogTotal     int                     `json:"keepLogTotal,omitempty"`
-	Disable          bool                    `json:"disable,omitempty"`
-	DockerEnvName    string                  `json:"dockerEnvName,omitempty"`
-	EntryShell       string                  `json:"entryShell,omitempty"`
-	ScriptRunTimeout int                     `json:"scriptRunTimeout,omitempty"`
-	TriggerType      string                  `json:"triggerType,omitempty" binding:"oneof=cron event manual"`
-	EventType        string                  `json:"eventType,omitempty"`
+	NextRunTime   []time.Time             `json:"nextRunTime,omitempty"`
+	Expression    []CronSettingExpression `json:"expression,omitempty"`
+	ContainerName string                  `json:"containerName,omitempty"`
+	Script        string                  `json:"script,omitempty"`
+	// Deprecated: Entry ID 仅在当前进程有效，任务调度统一通过 Name 操作。
+	JobIds           []cron.EntryID  `json:"jobIds,omitempty"`
+	Environment      []types.EnvItem `json:"environment,omitempty"`
+	EnableRunBlock   bool            `json:"enableRunBlock,omitempty"`
+	KeepLogTotal     int             `json:"keepLogTotal,omitempty"`
+	Disable          bool            `json:"disable,omitempty"`
+	DockerEnvName    string          `json:"dockerEnvName,omitempty"`
+	EntryShell       string          `json:"entryShell,omitempty"`
+	ScriptRunTimeout int             `json:"scriptRunTimeout,omitempty"`
+	TriggerType      string          `json:"triggerType,omitempty" binding:"oneof=cron event manual"`
+	EventType        string          `json:"eventType,omitempty"`
 }
