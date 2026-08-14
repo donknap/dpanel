@@ -149,4 +149,4 @@ QQ: 837583876
 - Ant Design & Ant Design Pro & Ant Design Charts
 
 #### Star History
-[![Star History Chart](https://api.star-history.com/svg?repos=donknap/dpanel&type=Timeline)](https://star-history.com/#donknap/dpanel&Timeline)
+[![Star History Chart](https://star-history.dera.page/svg?repos=donknap/dpanel&type=Timeline)](https://star-history.dera.page/#donknap/dpanel&Timeline)

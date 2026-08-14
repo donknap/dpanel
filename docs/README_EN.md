@@ -99,4 +99,4 @@ If this project has helped you and you want me to keep going, please sponsor me 
 ![system-basic.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/system-basic-en.png)
 
 #### Star History
-[![Star History Chart](https://api.star-history.com/svg?repos=donknap/dpanel&type=Timeline)](https://star-history.com/#donknap/dpanel&Timeline)
+[![Star History Chart](https://star-history.dera.page/svg?repos=donknap/dpanel&type=Timeline)](https://star-history.dera.page/#donknap/dpanel&Timeline)
