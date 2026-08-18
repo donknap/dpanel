@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -20,6 +21,96 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 )
 
+const (
+	ContainerFilterID       = "id"
+	ContainerFilterName     = "name"
+	ContainerFilterStatus   = "status"
+	ContainerFilterLabel    = "label"
+	ContainerFilterAncestor = "ancestor"
+)
+
+const (
+	ContainerFilterExtendPrefix = "x-"
+
+	ContainerFilterNameContains  = "x-name-contains"
+	ContainerFilterImageContains = "x-image-contains"
+	ContainerFilterCompose       = "x-compose"
+)
+
+func (self Client) ContainerSearchList(ctx context.Context, option container.ListOptions) ([]container.Summary, error) {
+	filter := option.Filters.Clone()
+	extendFilters := make(map[string][]string)
+	for _, key := range filter.Keys() {
+		if !strings.HasPrefix(key, ContainerFilterExtendPrefix) {
+			continue
+		}
+		switch key {
+		case ContainerFilterNameContains, ContainerFilterImageContains, ContainerFilterCompose:
+			extendFilters[key] = filter.Get(key)
+			for _, value := range extendFilters[key] {
+				filter.Del(key, value)
+			}
+		default:
+			return nil, fmt.Errorf("invalid container extension filter %s", key)
+		}
+	}
+
+	option.Filters = filter
+	if composeValues, ok := extendFilters[ContainerFilterCompose]; ok && len(composeValues) == 1 {
+		option.Filters.Add(ContainerFilterLabel, fmt.Sprintf("%s=%s", define.ComposeLabelProject, composeValues[0]))
+	}
+	limit := option.Limit
+	if len(extendFilters) > 0 && limit > 0 {
+		option.Limit = 0
+	}
+	list, err := self.Client.ContainerList(ctx, option)
+	if err != nil {
+		return nil, err
+	}
+	if len(extendFilters) == 0 {
+		return list, nil
+	}
+
+	result := make([]container.Summary, 0, len(list))
+	for _, item := range list {
+		match := true
+		for key, values := range extendFilters {
+			keyMatch := false
+			for _, value := range values {
+				// 名称和镜像 contains 的空字符串按既有语义匹配全部；DPanel 强制排除仍由上层在筛选完成后执行。
+				switch key {
+				case ContainerFilterNameContains:
+					for _, name := range item.Names {
+						if strings.Contains(strings.TrimPrefix(name, "/"), value) {
+							keyMatch = true
+							break
+						}
+					}
+				case ContainerFilterImageContains:
+					keyMatch = strings.Contains(item.Image, value)
+				case ContainerFilterCompose:
+					composeProject, exists := item.Labels[define.ComposeLabelProject]
+					keyMatch = exists && composeProject == value
+				}
+				if keyMatch {
+					break
+				}
+			}
+			if !keyMatch {
+				match = false
+				break
+			}
+		}
+		if match {
+			result = append(result, item)
+		}
+	}
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
+}
+
 // ContainerByField 获取单条容器 field 支持 id,name
 func (self Client) ContainerByField(ctx context.Context, field string, name ...string) (result map[string]*container.Summary, err error) {
 	if len(name) == 0 {
@@ -31,15 +122,15 @@ func (self Client) ContainerByField(ctx context.Context, field string, name ...s
 		filtersArgs.Add(field, value)
 	}
 
-	filtersArgs.Add("status", "created")
-	filtersArgs.Add("status", "restarting")
-	filtersArgs.Add("status", "running")
-	filtersArgs.Add("status", "removing")
-	filtersArgs.Add("status", "paused")
-	filtersArgs.Add("status", "exited")
-	filtersArgs.Add("status", "dead")
+	filtersArgs.Add(ContainerFilterStatus, string(container.StateCreated))
+	filtersArgs.Add(ContainerFilterStatus, string(container.StateRestarting))
+	filtersArgs.Add(ContainerFilterStatus, string(container.StateRunning))
+	filtersArgs.Add(ContainerFilterStatus, string(container.StateRemoving))
+	filtersArgs.Add(ContainerFilterStatus, string(container.StatePaused))
+	filtersArgs.Add(ContainerFilterStatus, string(container.StateExited))
+	filtersArgs.Add(ContainerFilterStatus, string(container.StateDead))
 
-	containerList, err := self.Client.ContainerList(ctx, container.ListOptions{
+	containerList, err := self.ContainerSearchList(ctx, container.ListOptions{
 		Filters: filtersArgs,
 	})
 	if err != nil {
@@ -53,9 +144,9 @@ func (self Client) ContainerByField(ctx context.Context, field string, name ...s
 	var key string
 	for _, value := range containerList {
 		temp := value
-		if field == "name" {
+		if field == ContainerFilterName {
 			key = strings.Trim(temp.Names[0], "/")
-		} else if field == "id" {
+		} else if field == ContainerFilterID {
 			key = value.ID
 		} else {
 			key = value.ID

@@ -53,7 +53,7 @@ func (self JobContext) Err() error {
 type Cron struct {
 }
 
-func (Cron) GetJobName(task *entity.Cron) string {
+func (self Cron) GetJobName(task *entity.Cron) string {
 	if task.Setting != nil && task.Setting.TriggerType == accessor.CronTriggerTypeEvent {
 		return fmt.Sprintf(CronEventJobName, task.Setting.EventType, task.ID)
 	}

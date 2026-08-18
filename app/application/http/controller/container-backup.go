@@ -102,9 +102,9 @@ func (self ContainerBackup) Create(http *gin.Context) {
 		select {
 		case <-progress.Done():
 			_ = notice.Message{}.Info(".containerBackupFinish", "name", strings.TrimLeft(containerInfo.Name, "/"))
-			if closeErr := b.Close(); closeErr != nil {
+			if err := b.Close(); err != nil {
 				backupRow.Setting.Status = define.DockerImageBuildStatusError
-				backupRow.Setting.Error = closeErr.Error()
+				backupRow.Setting.Error = err.Error()
 				_ = dao.Backup.Save(backupRow)
 			}
 		}
@@ -351,19 +351,13 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			} else {
 				imageNameDetail := function.ImageTag(containerInfo.Config.Image)
 				registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Registry)
-				out, err := docker.Sdk.Client.ImagePull(docker.Sdk.Ctx, containerInfo.Config.Image, image.PullOptions{
-					RegistryAuth: registryConfig.AuthString(),
+				_, err = docker.Sdk.ImagePull(docker.Sdk.Ctx, containerInfo.Config.Image, docker.ImagePullOption{
+					Registry: *registryConfig,
 				})
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return
 				}
-				_, err = io.Copy(io.Discard, out)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
-				}
-				_ = out.Close()
 			}
 		}
 

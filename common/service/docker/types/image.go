@@ -1,14 +1,9 @@
 package types
 
-import (
-	"strings"
-
-	registryTypes "github.com/we7coreteam/registry-go-sdk/types"
-)
+import "strings"
 
 type ImageDigestInspectOption struct {
-	RegistryAddresses  []string
-	RegistryCredential registryTypes.Credential
+	Registry Registry
 }
 
 type ImageDigestInspectResult struct {

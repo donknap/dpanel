@@ -172,7 +172,7 @@ func (self ImageBuildx) Prune(http *gin.Context) {
 		// 旧版请求没有 enableForceRemove 字段，默认保持原有的强制删除行为。
 		forceRemove := params.EnableForceRemove == nil || *params.EnableForceRemove
 		removeBuilderArgs := []string{"buildx", "rm", builderName}
-		if _, inspectErr := docker.Sdk.RunResult("buildx", "inspect", builderName); inspectErr == nil {
+		if _, err := docker.Sdk.RunResult("buildx", "inspect", builderName); err == nil {
 			_, removeErr := docker.Sdk.RunResult(removeBuilderArgs...)
 			if removeErr != nil && forceRemove {
 				removeBuilderArgs = append(removeBuilderArgs, "--force")
@@ -182,7 +182,7 @@ func (self ImageBuildx) Prune(http *gin.Context) {
 				self.JsonResponseWithError(http, removeErr, 500)
 				return
 			}
-			if _, inspectErr := docker.Sdk.RunResult("buildx", "inspect", builderName); inspectErr == nil {
+			if _, err := docker.Sdk.RunResult("buildx", "inspect", builderName); err == nil {
 				self.JsonResponseWithError(http, fmt.Errorf("buildx builder %s still exists after removal", builderName), 500)
 				return
 			}
@@ -198,7 +198,7 @@ func (self ImageBuildx) Prune(http *gin.Context) {
 				self.JsonResponseWithError(http, removeErr, 500)
 				return
 			}
-			if _, inspectErr := local.QuickRun("docker context inspect", contextName); inspectErr == nil {
+			if _, err := local.QuickRun("docker context inspect", contextName); err == nil {
 				self.JsonResponseWithError(http, fmt.Errorf("docker context %s still exists after removal", contextName), 500)
 				return
 			}

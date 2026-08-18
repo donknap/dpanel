@@ -1,15 +1,14 @@
 package controller
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/build"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/application/logic/task"
@@ -121,19 +120,20 @@ func (self ImageBuild) Create(http *gin.Context) {
 			if params.ImageSettingOption.BuildEnablePush {
 				wsBuffer := ws.NewProgressPip(messageId)
 				defer wsBuffer.Close()
+				pushCtx, cancelPush := context.WithCancel(docker.Sdk.Ctx)
+				defer cancelPush()
+				stopWatchProgress := context.AfterFunc(wsBuffer.Context(), cancelPush)
+				defer stopWatchProgress()
 				for _, tag := range params.ImageSettingOption.Tags {
-					pushOption := image.PushOptions{}
-					if v := (logic.Image{}).GetRegistryConfig(tag.Registry); v != nil {
-						pushOption.RegistryAuth = v.AuthString()
-					}
-					reader, err := docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, tag.Uri(), pushOption)
+					registryConfig := logic.Image{}.GetRegistryConfig(tag.Registry)
+					err = docker.Sdk.ImagePush(pushCtx, tag.Uri(), docker.ImagePushOption{
+						Registry: *registryConfig,
+						OnProgress: func(progress map[string]*types.PullProgress) {
+							wsBuffer.BroadcastMessage(progress)
+						},
+					})
 					if err != nil {
 						self.JsonResponseWithError(http, err, 500)
-						return
-					}
-					_, err = io.Copy(wsBuffer, reader)
-					if err != nil {
-						self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonCancelOperator, "message", err.Error()), 500)
 						return
 					}
 				}

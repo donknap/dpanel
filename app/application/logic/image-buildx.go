@@ -8,10 +8,10 @@ import (
 	"strings"
 	"text/template"
 
+	dockerregistry "github.com/docker/docker/registry"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/donknap/dpanel/common/types/define"
 )
 
 const buildxConfigTmpl = `
@@ -47,7 +47,7 @@ type BuildxConfigRegistry struct {
 	EnableHttp    bool
 }
 
-func (ImageBuildx) ResolveConfig(dockerEnvName string) (BuildxConfig, error) {
+func (self ImageBuildx) ResolveConfig(dockerEnvName string) (BuildxConfig, error) {
 	result := BuildxConfig{
 		ConfigPath:        filepath.Join(storage.Local{}.GetStorageLocalPath(), "buildx", dockerEnvName, "config.toml"),
 		WorkerNetworkMode: "host",
@@ -75,7 +75,7 @@ func (ImageBuildx) ResolveConfig(dockerEnvName string) (BuildxConfig, error) {
 			}
 			mirrorHost := strings.Split(mirror, "/")[0]
 			mirrorHost = strings.TrimSuffix(strings.TrimSuffix(strings.ToLower(mirrorHost), ":443"), ":80")
-			if mirrorHost == define.RegistryDefaultName || mirrorHost == "index.docker.io" || mirrorHost == "registry-1.docker.io" {
+			if mirrorHost == dockerregistry.DefaultNamespace || mirrorHost == dockerregistry.IndexHostname || mirrorHost == dockerregistry.DefaultRegistryHost {
 				continue
 			}
 			mirrors = append(mirrors, mirror)
@@ -92,7 +92,7 @@ func (ImageBuildx) ResolveConfig(dockerEnvName string) (BuildxConfig, error) {
 	return result, nil
 }
 
-func (ImageBuildx) WriteConfig(option BuildxConfig) error {
+func (self ImageBuildx) WriteConfig(option BuildxConfig) error {
 	var config bytes.Buffer
 	if option.ConfigContent != nil {
 		config.WriteString(*option.ConfigContent)

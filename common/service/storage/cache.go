@@ -9,28 +9,30 @@ import (
 )
 
 var (
-	CacheKeyExplorerUsername        = "explorer:%s:uid:%d"
-	CacheKeyExplorerAfs             = "explorer:%s"
-	CacheKeyCommonUserInfo          = "user:%d"
-	CacheKeyCommonServerStartTime   = "server:startTime"
-	CacheKeyXkStorageInfo           = "xk:storageInfo"
-	CacheKeyLoginFailed             = "login:failed:%s"
-	CacheKeyOauthState              = "oauth:state:%s"
-	CacheKeyOauthCode               = "oauth:code:%s"
-	CacheKeySetting                 = "setting:%s"
-	CacheKeySettingLocale           = fmt.Sprintf(CacheKeySetting, "locale")
-	CacheKeyContainerUpgrade        = "container:upgrade:%s:%s"
-	CacheKeyContainerUpgradeRunning = "container:upgrade:running:%s:%s"
-	CacheKeyImageRootFs             = "image:rootfs:%s"
-	CacheKeyDockerStatus            = "docker:status:%s"
-	CacheKeyDockerEvents            = "docker:events"
-	CacheKeyDockerContainerRuntime  = "docker:container:runtime:%s:%s"
-	CacheKeyConsoleData             = "console:data:%s" // 用于脚本存储一些自定义数据
-	CacheKeyDockerEventJob          = "docker:event:%s:%s"
-	CacheKeyRsaKey                  = "rsa:key"
-	CacheKeyRsaPub                  = "rsa:pub"
-	CacheKeyAttach                  = "attach:%s"
-	CacheKeyAsset                   = "asset"
+	CacheKeyExplorerUsername              = "explorer:%s:uid:%d"
+	CacheKeyExplorerAfs                   = "explorer:%s"
+	CacheKeyCommonUserInfo                = "user:%d"
+	CacheKeyCommonServerStartTime         = "server:startTime"
+	CacheKeyXkStorageInfo                 = "xk:storageInfo"
+	CacheKeyLoginFailed                   = "login:failed:%s"
+	CacheKeyOauthState                    = "oauth:state:%s"
+	CacheKeyOauthCode                     = "oauth:code:%s"
+	CacheKeySetting                       = "setting:%s"
+	CacheKeySettingLocale                 = fmt.Sprintf(CacheKeySetting, "locale")
+	CacheKeyContainerUpgradeCheck         = "container:upgrade:check:%s:%s"  // 镜像更新检查结果：Docker 环境、容器 ID
+	CacheKeyContainerUpgradeLogs          = "container:upgrade:logs:%d"      // 计划任务执行日志：计划 ID
+	CacheKeyContainerUpgradeContainerLock = "container:upgrade:lock:%s:%s"   // 容器操作锁：Docker 环境、容器名
+	CacheKeyContainerUpgradeTaskLock      = "container:upgrade:task:lock:%d" // 计划任务执行锁：任务 ID
+	CacheKeyImageRootFs                   = "image:rootfs:%s"
+	CacheKeyDockerStatus                  = "docker:status:%s"
+	CacheKeyDockerEvents                  = "docker:events"
+	CacheKeyDockerContainerRuntime        = "docker:container:runtime:%s:%s"
+	CacheKeyConsoleData                   = "console:data:%s" // 用于脚本存储一些自定义数据
+	CacheKeyDockerEventJob                = "docker:event:%s:%s"
+	CacheKeyRsaKey                        = "rsa:key"
+	CacheKeyRsaPub                        = "rsa:pub"
+	CacheKeyAttach                        = "attach:%s"
+	CacheKeyAsset                         = "asset"
 )
 
 var (

@@ -65,7 +65,7 @@ func (self *Builder) Execute() (containerID string, err error) {
 		return "", errors.New("container name is empty")
 	}
 	if self.rollback == nil {
-		response, createErr := self.dockerSdk.Client.ContainerCreate(
+		response, err := self.dockerSdk.Client.ContainerCreate(
 			self.dockerSdk.Ctx,
 			self.containerConfig,
 			self.hostConfig,
@@ -73,7 +73,7 @@ func (self *Builder) Execute() (containerID string, err error) {
 			self.platform,
 			containerName,
 		)
-		return response.ID, createErr
+		return response.ID, err
 	}
 	self.rollback.platform = self.platform
 	if err = self.rollback.prepare(self.dockerSdk, containerName); err != nil {

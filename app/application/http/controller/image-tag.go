@@ -3,17 +3,15 @@ package controller
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
-	"strings"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	dockerRegistry "github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/app/application/logic"
-	"github.com/donknap/dpanel/app/application/logic/task"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	dockerTypes "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
@@ -33,37 +31,40 @@ func (self Image) TagSync(http *gin.Context) {
 	imageNameDetail := function.ImageTag(params.Tag)
 	registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Registry)
 
-	var out io.ReadCloser
 	var err error
-	var dockerClient *docker.Client
+
+	dockerClient, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 
 	slog.Debug("image remote", "type", params.Type, "tag", imageNameDetail.Uri())
 
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, params.Tag))
 	defer wsBuffer.Close()
+	operationCtx, cancelOperation := context.WithCancel(dockerClient.Ctx)
+	defer cancelOperation()
+	stopWatchProgress := context.AfterFunc(wsBuffer.Context(), cancelOperation)
+	defer stopWatchProgress()
 
 	if params.Type == "pull" {
-		dockerClient, err = docker.NewClientWithUser(http)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		pullCtx, cancelPull := context.WithCancel(dockerClient.Ctx)
-		defer cancelPull()
-		stopWatchProgress := context.AfterFunc(wsBuffer.Context(), cancelPull)
-		defer stopWatchProgress()
-
-		out, imageNameDetail, err = dockerClient.ImagePull(pullCtx, params.Tag, docker.ImagePullOption{
-			RegistryAddresses: registryConfig.Address,
-			RegistryAuth:      registryConfig.AuthString(),
-			Platform:          params.Platform,
+		imageNameDetail, err = dockerClient.ImagePull(operationCtx, params.Tag, docker.ImagePullOption{
+			Registry: *registryConfig,
+			Platform: params.Platform,
+			OnProgress: func(progress map[string]*dockerTypes.PullProgress) {
+				wsBuffer.BroadcastMessage(progress)
+			},
 		})
 	} else {
 		// 推荐送镜像时保持原样
 		// 自建仓库不需要添加 library
 		// 即使推送 hub 镜像，library 命名空间属于官方空间，也不应该添加
-		out, err = docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, params.Tag, image.PushOptions{
-			RegistryAuth: registryConfig.AuthString(),
+		err = dockerClient.ImagePush(operationCtx, params.Tag, docker.ImagePushOption{
+			Registry: *registryConfig,
+			OnProgress: func(progress map[string]*dockerTypes.PullProgress) {
+				wsBuffer.BroadcastMessage(progress)
+			},
 		})
 	}
 
@@ -80,24 +81,7 @@ func (self Image) TagSync(http *gin.Context) {
 		return
 	}
 
-	err = task.Docker{}.ImageSync(wsBuffer, out)
-	// 可能最后循环后还包含错误
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
 	if params.Type == "pull" {
-		// 如果使用了加速，需要给镜像 tag 一个原来的名称
-		// 当 tag 中包含 @ digest 值时，不能直接 tag 成新名称，需要获取到其实中的版本号
-		if tag, _, ok := strings.Cut(params.Tag, "@"); ok {
-			params.Tag = tag
-		}
-		err = dockerClient.Client.ImageTag(dockerClient.Ctx, imageNameDetail.Uri(), params.Tag)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
 		// 不能取消掉原有的镜像文件会导致 digest 丢失
 		//oldImageNameDetail := registry2.GetImageTagDetail(params.Tag)
 		//
@@ -175,14 +159,19 @@ func (self Image) TagPushBatch(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	dockerClient, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 
 	for _, address := range params.RegistryServerAddress {
 		registryConfig := logic.Image{}.GetRegistryConfig(address)
-		imagePushOption := image.PushOptions{
-			RegistryAuth: registryConfig.AuthString(),
+		imagePushOption := docker.ImagePushOption{
+			Registry: *registryConfig,
 		}
 		for _, md5 := range params.Md5 {
-			imageDetail, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, md5)
+			imageDetail, err := dockerClient.Client.ImageInspect(dockerClient.Ctx, md5)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
@@ -192,18 +181,13 @@ func (self Image) TagPushBatch(http *gin.Context) {
 				newImageName.Registry = address
 				newImageName.Namespace = params.NewNamespace
 				if !function.InArray(imageDetail.RepoTags, newImageName.Uri()) {
-					err = docker.Sdk.Client.ImageTag(docker.Sdk.Ctx, tag, newImageName.Uri())
+					err = dockerClient.Client.ImageTag(dockerClient.Ctx, tag, newImageName.Uri())
 					if err != nil {
 						self.JsonResponseWithError(http, err, 500)
 						return
 					}
 				}
-				out, err := docker.Sdk.Client.ImagePush(docker.Sdk.Ctx, newImageName.Uri(), imagePushOption)
-				if err != nil {
-					self.JsonResponseWithError(http, err, 500)
-					return
-				}
-				_, err = io.Copy(io.Discard, out)
+				err = dockerClient.ImagePush(dockerClient.Ctx, newImageName.Uri(), imagePushOption)
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return

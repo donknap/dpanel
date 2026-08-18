@@ -142,9 +142,9 @@ func (self *Local) RunInPip() (io.ReadCloser, error) {
 	go func() {
 		err := self.cmd.Wait()
 		if err != nil {
-			fullErr := fmt.Errorf("%s: %s", err.Error(), stderrBuf.String())
-			slog.Debug("run command wait", "err", fullErr)
-			pw.CloseWithError(fullErr)
+			err = fmt.Errorf("%s: %s", err.Error(), stderrBuf.String())
+			slog.Debug("run command wait", "err", err)
+			pw.CloseWithError(err)
 		} else {
 			pw.Close()
 		}
@@ -177,9 +177,9 @@ func (self *Local) RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser, 
 		go func() {
 			err := self.cmd.Wait()
 			if err != nil {
-				fullErr := fmt.Errorf("%s: %s", err.Error(), stderrBuf.String())
-				slog.Debug("run command wait", "err", fullErr)
-				_ = stdoutWriter.CloseWithError(fullErr)
+				err = fmt.Errorf("%s: %s", err.Error(), stderrBuf.String())
+				slog.Debug("run command wait", "err", err)
+				_ = stdoutWriter.CloseWithError(err)
 			} else {
 				_ = stdoutWriter.Close()
 			}

@@ -11,7 +11,7 @@ import (
 	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/donknap/dpanel/common/types/define"
+	dockerregistry "github.com/docker/docker/registry"
 	"github.com/mattn/go-shellwords"
 )
 
@@ -89,7 +89,7 @@ type Tag struct {
 
 func (self Tag) Uri() string {
 	if self.Registry == "" {
-		self.Registry = define.RegistryDefaultName
+		self.Registry = dockerregistry.DefaultNamespace
 	}
 	self.Registry = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(self.Registry, "http://"), "https://"), "/")
 	split := ":"

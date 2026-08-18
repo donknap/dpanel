@@ -61,12 +61,12 @@ func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if containerInfo.Name == "/"+facade.GetConfig().GetString("APP_NAME") {
+	if strings.TrimPrefix(strings.TrimSpace(containerInfo.Name), "/") == strings.TrimPrefix(strings.TrimSpace(facade.GetConfig().GetString("app.name")), "/") {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerUpgradeDPanel), 500)
 		return
 	}
 	upgradeMutex := storage.NewMutex(fmt.Sprintf(
-		storage.CacheKeyContainerUpgradeRunning,
+		storage.CacheKeyContainerUpgradeContainerLock,
 		dockerClient.Name,
 		strings.TrimPrefix(strings.TrimSpace(containerInfo.Name), "/"),
 	))
@@ -341,7 +341,7 @@ func (self ContainerUpgrade) GetList(http *gin.Context) {
 		checkedAt := ""
 		errorMessage := ""
 		status := define.ContainerUpgradeStatusUnchecked
-		cacheKey := fmt.Sprintf(storage.CacheKeyContainerUpgrade, dockerSdk.Name, item.ID)
+		cacheKey := fmt.Sprintf(storage.CacheKeyContainerUpgradeCheck, dockerSdk.Name, item.ID)
 		if result, ok := storage.LoadCache[logic.ContainerUpgradeCheckResult](cacheKey); ok {
 			checkedAt = result.CheckedAt
 			// 容器镜像如果已经更新，这里的名称会变成 sha256 的形式，但是返回的值必须是镜像的原始名称

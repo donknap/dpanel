@@ -19,6 +19,7 @@ const (
 	ErrorMessageComposeParseYamlIncorrect                   = ".composeParseYamlIncorrect"
 	ErrorMessageComposeDeployIncorrect                      = ".composeDeployIncorrect"
 	ErrorMessageContainerUpgradeDPanel                      = ".containerUpgradeDPanel"
+	ErrorMessageContainerUpgradeTaskRunning                 = ".containerUpgradeTaskRunning"
 	ErrorMessageContainerExplorerInvalidFilename            = ".containerExplorerInvalidFilename"
 	ErrorMessageContainerExplorerUnzipTargetUnsupportedType = ".containerExplorerUnzipTargetUnsupportedType"
 	ErrorMessageContainerExplorerEditDeleteUnsafe           = ".containerExplorerEditDeleteUnsafe"

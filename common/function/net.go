@@ -26,6 +26,24 @@ var ssrfBlockedPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("100.64.0.0/10"),
 }
 
+// ParseURL parses URLs and registry addresses without a scheme.
+func ParseURL(rawURL string) (*url.URL, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL != "" && !strings.HasPrefix(rawURL, "//") && !strings.Contains(rawURL, "://") {
+		rawURL = "//" + rawURL
+	}
+	return url.Parse(rawURL)
+}
+
+// RegistryReference returns the host:port form accepted in Docker image names.
+func RegistryReference(rawAddress string) string {
+	rawAddress = strings.TrimSpace(rawAddress)
+	if parsed, err := ParseURL(rawAddress); err == nil && parsed.Host != "" {
+		return parsed.Host
+	}
+	return strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(rawAddress, "http://"), "https://"), "/")
+}
+
 type safeHTTPAddressesKey struct{}
 
 type safeHTTPRoundTripper struct {

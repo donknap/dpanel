@@ -676,10 +676,10 @@ func (self Home) Usage(http *gin.Context) {
 		containerLogic := applicationLogic.Container{}
 		for _, item := range containerList {
 			unhealthy := false
-			if item.State == "exited" {
+			if item.State == string(container.StateExited) {
 				containerRunningTotal.Stop += 1
 			}
-			if item.State == "paused" {
+			if item.State == string(container.StatePaused) {
 				containerRunningTotal.Pause += 1
 			}
 			if strings.Contains(item.Status, "unhealthy") {

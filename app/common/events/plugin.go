@@ -23,8 +23,8 @@ func (self Plugin) DestroyExplorer(e event.DockerDaemonPayload) {
 		if dockerSdk, err := docker.NewClientWithDockerEnv(dockerEnv); err == nil {
 			defer dockerSdk.Close()
 			filter := filters.NewArgs()
-			filter.Add("label", fmt.Sprintf("%s=%s", define.DPanelLabelContainerName, plugin.ExplorerName))
-			if list, err := dockerSdk.Client.ContainerList(dockerSdk.Ctx, container.ListOptions{
+			filter.Add(docker.ContainerFilterLabel, fmt.Sprintf("%s=%s", define.DPanelLabelContainerName, plugin.ExplorerName))
+			if list, err := dockerSdk.ContainerSearchList(dockerSdk.Ctx, container.ListOptions{
 				All:     true,
 				Filters: filter,
 			}); err == nil {

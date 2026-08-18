@@ -37,7 +37,7 @@ type ContainerUpgradeCheckResult struct {
 }
 
 func (self Container) CheckUpgrade(dockerSdk *docker.Client, containerInfo container.InspectResponse, force bool) ContainerUpgradeCheckResult {
-	cacheKey := fmt.Sprintf(storage.CacheKeyContainerUpgrade, dockerSdk.Name, containerInfo.ID)
+	cacheKey := fmt.Sprintf(storage.CacheKeyContainerUpgradeCheck, dockerSdk.Name, containerInfo.ID)
 	refreshCache := func() ContainerUpgradeCheckResult {
 		imageName := ""
 		if containerInfo.Config != nil {
@@ -45,14 +45,13 @@ func (self Container) CheckUpgrade(dockerSdk *docker.Client, containerInfo conta
 		}
 		imageNameDetail := function.ImageTag(imageName)
 		registryConfig := Image{}.GetRegistryConfig(imageNameDetail.Registry)
-		result, checkErr := dockerSdk.ImageDigestInspect(dockerSdk.Ctx, containerInfo.Image, imageName, dockerTypes.ImageDigestInspectOption{
-			RegistryAddresses:  registryConfig.Address,
-			RegistryCredential: registryConfig.Credential(),
+		result, err := dockerSdk.ImageDigestInspect(dockerSdk.Ctx, containerInfo.Image, imageName, dockerTypes.ImageDigestInspectOption{
+			Registry: *registryConfig,
 		})
 		errorMessage := ""
 		status := define.ContainerUpgradeStatusLatest
-		if checkErr != nil {
-			errorMessage = checkErr.Error()
+		if err != nil {
+			errorMessage = err.Error()
 			status = define.ContainerUpgradeStatusFailed
 		} else if !result.IsAvailable() {
 			status = define.ContainerUpgradeStatusUnavailable

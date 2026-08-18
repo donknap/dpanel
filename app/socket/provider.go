@@ -16,7 +16,7 @@ import (
 type Provider struct {
 }
 
-func (Provider) Register(engine *gin.Engine) {
+func (self Provider) Register(engine *gin.Engine) {
 	socketPath := facade.GetConfig().GetString("server.http.socket")
 	if socketPath == "" {
 		return
@@ -42,8 +42,8 @@ func (Provider) Register(engine *gin.Engine) {
 	handler = socketMiddleware.FnnasGateway{}.Process(handler)
 	go func() {
 		slog.Info("http socket listen", "path", socketPath)
-		if serveErr := http.Serve(listener, handler); serveErr != nil {
-			slog.Error("http socket listen", "path", socketPath, "error", serveErr.Error())
+		if err := http.Serve(listener, handler); err != nil {
+			slog.Error("http socket listen", "path", socketPath, "error", err.Error())
 		}
 	}()
 }

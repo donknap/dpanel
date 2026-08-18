@@ -42,7 +42,7 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 	}
 
 	if task.ContainerId != "" {
-		if inspectInfo, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, task.ContainerId); inspectErr == nil {
+		if inspectInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, task.ContainerId); err == nil {
 			_ = notice.Message{}.Info(".containerRemove", task.ContainerId[0:11])
 			// 此处提前停止用于单独记录耗时操作的执行进度；rollback 中的停止是事务正常流程，不能替代这里。
 			// 后续配置校验失败时旧容器仍保留为停止状态，由用户修正配置后重试，不在此处自动重启。
@@ -55,8 +55,8 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (string, error) 
 				builder.WithContainerRollback(inspectInfo, false),
 				builder.WithContainerInfo(inspectInfo),
 			)
-		} else if !errdefs.IsNotFound(inspectErr) {
-			return "", inspectErr
+		} else if !errdefs.IsNotFound(err) {
+			return "", err
 		}
 	}
 

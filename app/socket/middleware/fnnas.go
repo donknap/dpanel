@@ -10,7 +10,7 @@ import (
 type FnnasGateway struct {
 }
 
-func (FnnasGateway) Process(next http.Handler) http.Handler {
+func (self FnnasGateway) Process(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		if os.Getenv("DP_RUN_IN_FNNAS") != "1" || request.URL == nil {
 			next.ServeHTTP(response, request)

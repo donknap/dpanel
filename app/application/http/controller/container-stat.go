@@ -31,7 +31,7 @@ func (self Container) GetStatInfo(http *gin.Context) {
 	}
 	response, err := docker.Sdk.ContainerStats(progress.Context(), types.ContainerStatsOption{
 		Stream:  true,
-		Filters: filters.NewArgs(filters.Arg("id", params.Id)),
+		Filters: filters.NewArgs(filters.Arg(docker.ContainerFilterID, params.Id)),
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

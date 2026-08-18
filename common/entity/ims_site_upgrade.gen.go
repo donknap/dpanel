@@ -13,8 +13,6 @@ const TableNameSiteUpgrade = "ims_site_upgrade"
 // SiteUpgrade mapped from table <ims_site_upgrade>
 type SiteUpgrade struct {
 	ID      int32                              `gorm:"column:id;primaryKey" json:"id"`
-	Title   string                             `gorm:"column:title;not null" json:"title"`
-	Status  int32                              `gorm:"column:status;not null" json:"status"`
 	Setting *accessor.SiteUpgradeSettingOption `gorm:"column:setting;serializer:json" json:"setting"`
 	Logs    *accessor.SiteUpgradeLogsOption    `gorm:"column:logs;serializer:json" json:"logs"`
 }

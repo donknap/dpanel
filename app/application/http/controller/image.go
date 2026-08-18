@@ -397,9 +397,9 @@ func (self Image) Delete(http *gin.Context) {
 			force := false
 			// 如果镜像没有被使用，包含之个 tag 时需要增加 force 参数
 			if len(imageInfo.RepoTags) > 1 {
-				if list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+				if list, err := docker.Sdk.ContainerSearchList(docker.Sdk.Ctx, container.ListOptions{
 					All:     true,
-					Filters: filters.NewArgs(filters.Arg("ancestor", sha)),
+					Filters: filters.NewArgs(filters.Arg(docker.ContainerFilterAncestor, sha)),
 				}); err == nil && len(list) == 0 {
 					force = true
 				}

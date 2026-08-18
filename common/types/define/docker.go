@@ -3,7 +3,7 @@ package define
 import "time"
 
 const (
-	DockerConnectServerTimeout = time.Second * 10
+	DockerConnectServerTimeout = time.Second * 30
 )
 
 const (

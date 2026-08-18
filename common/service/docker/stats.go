@@ -15,10 +15,17 @@ import (
 )
 
 func (self Client) ContainerStats(ctx context.Context, option types.ContainerStatsOption) (<-chan []*stats.Usage, error) {
-	containerList, err := self.Client.ContainerList(ctx, container.ListOptions{
+	listOption := container.ListOptions{
 		Filters: option.Filters,
 		All:     true,
-	})
+	}
+	var containerList []container.Summary
+	var err error
+	if option.Filters.Len() == 0 {
+		containerList, err = self.Client.ContainerList(ctx, listOption)
+	} else {
+		containerList, err = self.ContainerSearchList(ctx, listOption)
+	}
 	if err != nil {
 		return nil, err
 	}

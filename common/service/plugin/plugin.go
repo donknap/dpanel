@@ -113,7 +113,7 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 			reg := registry.New(
 				registry.WithServer(proxy, "", ""),
 			)
-			if ok, _, manifestErr := reg.Client().ManifestExist(imageNameDetail.BaseName, imageNameDetail.Version); manifestErr == nil && ok {
+			if ok, _, err := reg.Client().ManifestExist(imageNameDetail.BaseName, imageNameDetail.Version); err == nil && ok {
 				imageNameDetail.Registry = proxy
 				break
 			}

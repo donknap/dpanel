@@ -90,11 +90,9 @@ func (self Container) GetList(http *gin.Context) {
 		return
 	}
 	list := make([]container.Summary, 0)
-	filter := filters.NewArgs()
 	list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
-		All:     true,
-		Latest:  true,
-		Filters: filter,
+		All:    true,
+		Latest: true,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

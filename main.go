@@ -179,13 +179,19 @@ func isDebug() bool {
 }
 
 func initHomeDir() {
-	if _, err := os.UserHomeDir(); err != nil {
-		homeDir := storage.Local{}.GetStorageLocalPath()
-		if setErr := os.Setenv("HOME", homeDir); setErr != nil {
-			slog.Warn("main set home dir", "path", homeDir, "error", setErr)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = storage.Local{}.GetStorageLocalPath()
+		if err = os.Setenv("HOME", homeDir); err != nil {
+			slog.Warn("main set home dir", "path", homeDir, "error", err)
 			return
 		}
-		slog.Debug("main set home dir", "path", homeDir, "error", err)
+		slog.Debug("main set home dir", "path", homeDir)
+	}
+
+	sshDir := filepath.Join(homeDir, ".ssh")
+	if err := os.MkdirAll(sshDir, 0700); err != nil {
+		slog.Warn("main create ssh dir", "path", sshDir, "error", err)
 	}
 }
 
@@ -205,6 +211,7 @@ func initDb() error {
 		&entity.Registry{},
 		&entity.Setting{},
 		&entity.Site{},
+		&entity.SiteUpgrade{},
 		&entity.SiteDomain{},
 		&entity.Compose{},
 		&entity.Backup{},

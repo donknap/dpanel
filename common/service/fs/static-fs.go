@@ -56,9 +56,9 @@ func (self StaticFs) Open(name string) (http.File, error) {
 	origFile, err := self.fs.Open(name)
 
 	if os.IsNotExist(err) || errors.Is(err, fs.ErrNotExist) {
-		gzFile, gzErr := self.fs.Open(name + ".gz")
-		if gzErr != nil {
-			return nil, gzErr
+		gzFile, err := self.fs.Open(name + ".gz")
+		if err != nil {
+			return nil, err
 		}
 		defer gzFile.Close()
 
