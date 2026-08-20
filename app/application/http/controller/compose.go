@@ -193,10 +193,14 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
-	// 验证 yaml 是否正确
-	_, warning, err := logic.Compose{}.GetTasker(composeRow)
+	// 解析 Compose 配置
+	tasker, warning, err := logic.Compose{}.GetTasker(composeRow)
 	if err != nil {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
+		return
+	}
+	if err = (logic.Compose{}).ValidateProject(tasker.Project); err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 

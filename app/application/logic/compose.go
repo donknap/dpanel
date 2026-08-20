@@ -309,32 +309,51 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
 	linkComposePath := ""
+	volumeComposePath := ""
 	dpanelInfo := logic.Setting{}.GetDPanelInfo()
 
-	for i, mount := range dpanelInfo.ContainerInfo.Mounts {
-		if mount.Type != types.VolumeTypeBind {
-			continue
+	if function.IsRunInDocker() {
+		for i, mount := range dpanelInfo.ContainerInfo.Mounts {
+			if mount.Type != types.VolumeTypeBind {
+				continue
+			}
+			if v, ok := function.PathConvertWinPath2Unix(mount.Source); ok {
+				dpanelInfo.ContainerInfo.Mounts[i].Source = filepath.Join("/", "mnt", "host", v)
+			}
 		}
-		if v, ok := function.PathConvertWinPath2Unix(mount.Source); ok {
-			dpanelInfo.ContainerInfo.Mounts[i].Source = filepath.Join("/", "mnt", "host", v)
+
+		for _, mount := range dpanelInfo.ContainerInfo.Mounts {
+			if mount.Destination != "/dpanel" {
+				continue
+			}
+			if mount.Type == types.VolumeTypeBind && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
+				linkComposePath = filepath.Join(mount.Source, filepath.Base(workingDir))
+			} else if mount.Type == types.VolumeTypeVolume {
+				volumeComposePath = filepath.Join(define.ComposeVolumeCheckPath, dbRow.Setting.DockerEnvName)
+			}
 		}
-	}
 
-	for _, mount := range dpanelInfo.ContainerInfo.Mounts {
-		if mount.Type == types.VolumeTypeBind && mount.Destination == "/dpanel" && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
-			linkComposePath = filepath.Join(mount.Source, filepath.Base(workingDir))
+		// 如果开启了独立目录，获取挂载目录也应该只取对应的的
+		mountComposePath := "/dpanel/compose"
+
+		if docker.Sdk.DockerEnv.EnableComposePath {
+			mountComposePath = filepath.Join("/", "dpanel", "compose-"+dbRow.Setting.DockerEnvName)
 		}
-	}
-	// 如果开启了独立目录，获取挂载目录也应该只取对应的的
-	mountComposePath := "/dpanel/compose"
 
-	if docker.Sdk.DockerEnv.EnableComposePath {
-		mountComposePath = filepath.Join("/", "dpanel", "compose-"+dbRow.Setting.DockerEnvName)
-	}
-
-	for _, mount := range dpanelInfo.ContainerInfo.Mounts {
-		if mount.Type == types.VolumeTypeBind && mount.Destination == mountComposePath && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
-			linkComposePath = mount.Source
+		for _, mount := range dpanelInfo.ContainerInfo.Mounts {
+			if mount.Destination != mountComposePath {
+				continue
+			}
+			if mount.Type == types.VolumeTypeBind && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
+				linkComposePath = mount.Source
+				volumeComposePath = ""
+			} else if mount.Type == types.VolumeTypeVolume {
+				volumeComposePath = filepath.Join(define.ComposeVolumeCheckPath, dbRow.Setting.DockerEnvName)
+				linkComposePath = ""
+			}
+		}
+		if volumeComposePath != "" {
+			linkComposePath = volumeComposePath
 		}
 	}
 
@@ -421,6 +440,28 @@ func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, erro
 		return nil, nil, err
 	}
 	return task, warning, nil
+}
+
+func (self Compose) ValidateProject(project *types.Project) error {
+	if project == nil || !strings.HasPrefix(filepath.Clean(project.WorkingDir), define.ComposeVolumeCheckPath+string(filepath.Separator)) {
+		return nil
+	}
+	for serviceName, service := range project.Services {
+		for _, volume := range service.Volumes {
+			if volume.Type != types.VolumeTypeBind {
+				continue
+			}
+			source := filepath.Clean(volume.Source)
+			if !strings.HasPrefix(source, define.ComposeVolumeCheckPath+string(filepath.Separator)) {
+				continue
+			}
+			return function.ErrorMessage(
+				define.ErrorMessageComposeRelativeBindOnVolume,
+				serviceName, volume.Source, volume.Target,
+			)
+		}
+	}
+	return nil
 }
 
 func (self Compose) makeDeployYamlHeader(yaml []byte) []byte {

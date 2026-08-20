@@ -17,6 +17,7 @@ const (
 	ErrorMessageComposeDisableStorageType                   = ".composeDisableStorageType"
 	ErrorMessageComposeDisableStore                         = ".composeDisableStore"
 	ErrorMessageComposeParseYamlIncorrect                   = ".composeParseYamlIncorrect"
+	ErrorMessageComposeRelativeBindOnVolume                 = ".composeRelativeBindOnVolume"
 	ErrorMessageComposeDeployIncorrect                      = ".composeDeployIncorrect"
 	ErrorMessageContainerUpgradeDPanel                      = ".containerUpgradeDPanel"
 	ErrorMessageContainerUpgradeTaskRunning                 = ".containerUpgradeTaskRunning"

@@ -69,6 +69,10 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
 	}
+	if err = (logic.Compose{}).ValidateProject(tasker.Project); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 
 	// 添加禁用服务，只有部署的时候需要，避免在获取详情时拿不到全部服务
 	if !function.IsEmptyArray(composeRow.Setting.DeployServiceName) {
@@ -270,7 +274,6 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-
 		if !function.IsEmptyArray(params.DestroyServiceName) {
 			for _, item := range params.DestroyServiceName {
 				tasker.Project = tasker.Project.WithServicesDisabled(item)
@@ -351,7 +354,6 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
 	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer progress.Close()
 

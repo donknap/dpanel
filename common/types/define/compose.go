@@ -1,6 +1,8 @@
 package define
 
 const (
+	ComposeVolumeCheckPath = "/dpanel/.compose-volume"
+
 	ComposeLabelProject     = "com.docker.compose.project"
 	ComposeLabelService     = "com.docker.compose.service"
 	ComposeLabelConfigFiles = "com.docker.compose.project.config_files"

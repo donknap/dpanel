@@ -165,6 +165,8 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 			}
 		} else {
 			result.RunIn = types2.DPanelRunInHost
+			// 二进制运行时没有容器挂载信息，清理容器模式遗留的持久化数据。
+			result.ContainerInfo = container.InspectResponse{}
 			// 如果是二进制运行，则挂载数据存储目录
 			// 如果在 windows 默认是远程 docker 那么需要转换一个安全路径
 			// 否则保持原样就可以了
