@@ -871,11 +871,11 @@ func (self Home) GetStatList(http *gin.Context) {
 
 func (self Home) Reset(http *gin.Context) {
 	type ParamsValidate struct {
-		User       string `json:"user"`
-		Password   string `json:"password"`
-		Entrance   string `json:"entrance"`
-		Cache      bool   `json:"cache"`
-		OnlineUser bool   `json:"onlineUser"`
+		User       string  `json:"user"`
+		Password   string  `json:"password"`
+		Entrance   *string `json:"entrance"`
+		Cache      bool    `json:"cache"`
+		OnlineUser bool    `json:"onlineUser"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -924,26 +924,7 @@ func (self Home) Reset(http *gin.Context) {
 		}
 	}
 
-	if params.Entrance != "" {
-		entrance := params.Entrance
-		switch strings.ToLower(entrance) {
-		case "random":
-			entrance = uuid.New().String()[24:]
-		case "none":
-			entrance = ""
-		default:
-			entrance = strings.Trim(entrance, "/")
-			if entrance == "" {
-				self.JsonResponseWithError(http, errors.New("security entrance cannot be empty; use none to disable it"), 500)
-				return
-			}
-			for _, segment := range strings.Split(entrance, "/") {
-				if segment == "" || segment == "." || segment == ".." || strings.ContainsAny(segment, `\\?#%`) {
-					self.JsonResponseWithError(http, errors.New("security entrance must be a relative path without ., .., \\, ?, #, or %"), 500)
-					return
-				}
-			}
-		}
+	if params.Entrance != nil {
 		setting, _ := (logic.Setting{}).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingLogin)
 		if setting == nil {
 			setting = &entity.Setting{GroupName: logic.SettingGroupSetting, Name: logic.SettingGroupSettingLogin, Value: &accessor.SettingValueOption{Login: &accessor.Login{}}}
@@ -954,7 +935,7 @@ func (self Home) Reset(http *gin.Context) {
 		if setting.Value.Login == nil {
 			setting.Value.Login = &accessor.Login{}
 		}
-		setting.Value.Login.Entrance = entrance
+		setting.Value.Login.Entrance = *params.Entrance
 		if err := (logic.Setting{}).Save(setting); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -962,15 +943,24 @@ func (self Home) Reset(http *gin.Context) {
 	}
 
 	if params.Cache {
+		cacheKeys := []string{
+			storage.CacheKeyLoginFailed,
+			storage.CacheKeyOauthCode,
+			storage.CacheKeyContainerUpgradeCheck,
+			storage.CacheKeyContainerUpgradeLogs,
+			storage.CacheKeyImageRootFs,
+			storage.CacheKeyDockerEvents,
+			storage.CacheKeyDockerContainerRuntime,
+			storage.CacheKeyAttach,
+			storage.CacheKeyAsset,
+		}
 		for key := range storage.Cache.Items() {
-			resettable := false
-			for _, prefix := range []string{"explorer:", "docker:status:", "docker:events", "docker:container:runtime:", "docker:event:", "container:upgrade:check:", "container:upgrade:logs:", "image:rootfs:", "oauth:", "login:failed:", "attach:", "setting:login", "xk:storageInfo"} {
-				if strings.HasPrefix(key, prefix) {
-					resettable = true
-					break
+			if _, ok := function.IndexArrayWalk(cacheKeys, func(pattern string) bool {
+				if index := strings.Index(pattern, "%s"); index >= 0 {
+					return strings.HasPrefix(key, pattern[:index])
 				}
-			}
-			if resettable {
+				return key == pattern
+			}); ok {
 				storage.Cache.Delete(key)
 			}
 		}
@@ -1004,13 +994,6 @@ func (self Home) Reset(http *gin.Context) {
 
 	if params.OnlineUser {
 		storage.Cache.Set(storage.CacheKeyCommonServerStartTime, time.Now().Add(time.Second).Truncate(time.Second), cache.NoExpiration)
-		for key := range storage.Cache.Items() {
-			if strings.HasPrefix(key, "user:") {
-				storage.Cache.Delete(key)
-			} else if strings.HasPrefix(key, "login:failed:") {
-				storage.Cache.Delete(key)
-			}
-		}
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{

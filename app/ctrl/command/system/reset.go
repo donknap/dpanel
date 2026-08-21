@@ -1,9 +1,12 @@
 package system
 
 import (
+	"strings"
+
 	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/common"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
+	"github.com/google/uuid"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
 )
@@ -23,9 +26,9 @@ func (self Reset) Configure(cmd *cobra.Command) {
 	userFlag := cmd.Flags().Lookup("user")
 	userFlag.NoOptDefVal = "admin"
 	cmd.Flags().String("password", "", "Set the password; omitted with --user generates a random password")
-	cmd.Flags().String("entrance", "", "Set security entrance: random, none, or a relative path")
+	cmd.Flags().String("entrance", "", "Set security entrance: no value for random, none to disable, or a relative path")
 	entranceFlag := cmd.Flags().Lookup("entrance")
-	entranceFlag.NoOptDefVal = "random"
+	entranceFlag.NoOptDefVal = uuid.New().String()[24:30]
 	cmd.Flags().Bool("cache", false, "Clear rebuildable caches, notices, Docker events, and temporary files")
 	cmd.Flags().Bool("online-user", false, "Invalidate all online users")
 }
@@ -33,7 +36,7 @@ func (self Reset) Configure(cmd *cobra.Command) {
 func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	user, _ := cmd.Flags().GetString("user")
 	password, _ := cmd.Flags().GetString("password")
-	entrance, _ := cmd.Flags().GetString("entrance")
+	entranceValue, _ := cmd.Flags().GetString("entrance")
 	clearCache, _ := cmd.Flags().GetBool("cache")
 	onlineUser, _ := cmd.Flags().GetBool("online-user")
 
@@ -47,6 +50,13 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	}
 	if cmd.Flags().Changed("user") && user == "" {
 		user = "admin"
+	}
+	var entrance *string
+	if cmd.Flags().Changed("entrance") {
+		if strings.EqualFold(entranceValue, "none") {
+			entranceValue = ""
+		}
+		entrance = &entranceValue
 	}
 
 	proxyClient, err := proxy.NewProxyClient()
