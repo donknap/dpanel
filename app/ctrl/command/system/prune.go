@@ -19,6 +19,7 @@ func (self Prune) GetDescription() string {
 }
 
 func (self Prune) Configure(cmd *cobra.Command) {
+	cmd.Deprecated = "use system:reset --cache instead"
 	cmd.Flags().Bool("enable-notice", false, "Cleanup notices and events")
 	cmd.Flags().Bool("enable-temp-file", false, "Cleanup temporary files")
 }
@@ -33,9 +34,8 @@ func (self Prune) Handle(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	result, err := proxyClient.CommonPrune(common.PruneOption{
-		EnableNotice:   enableNotice,
-		EnableTempFile: enableTempFile,
+	result, err := proxyClient.CommonReset(common.ResetOption{
+		Cache: enableNotice || enableTempFile,
 	})
 	if err != nil {
 		utils.Result{}.Error(err)

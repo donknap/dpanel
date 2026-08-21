@@ -113,14 +113,12 @@ func (self Setting) SaveConfig(http *gin.Context) {
 		Notification *accessor.Notification       `json:"notification"`
 		Login        *accessor.Login              `json:"login"`
 		TwoFa        *accessor.TwoFa              `json:"twoFa"`
-		SaveCache    bool                         `json:"saveCache"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
-	var value interface{}
 	settingRow := &entity.Setting{}
 
 	if params.Theme != nil {
@@ -131,7 +129,6 @@ func (self Setting) SaveConfig(http *gin.Context) {
 				ThemeConfig: params.Theme,
 			},
 		}
-		value = params.Theme
 	}
 
 	if params.Console != nil {
@@ -142,7 +139,6 @@ func (self Setting) SaveConfig(http *gin.Context) {
 				ThemeConsoleConfig: params.Console,
 			},
 		}
-		value = params.Console
 	}
 
 	if params.Notification != nil {
@@ -153,10 +149,10 @@ func (self Setting) SaveConfig(http *gin.Context) {
 				Notification: params.Notification,
 			},
 		}
-		value = params.Notification
 	}
 
 	if params.Login != nil {
+		params.Login.Entrance = strings.Trim(params.Login.Entrance, "/")
 		settingRow = &entity.Setting{
 			GroupName: logic.SettingGroupSetting,
 			Name:      logic.SettingGroupSettingLogin,
@@ -170,7 +166,6 @@ func (self Setting) SaveConfig(http *gin.Context) {
 				storage.Cache.Delete(key)
 			}
 		}
-		value = params.Login
 	}
 
 	err := logic.Setting{}.Save(settingRow)
@@ -178,10 +173,6 @@ func (self Setting) SaveConfig(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.SaveCache && settingRow != nil {
-		storage.Cache.Set(fmt.Sprintf(storage.CacheKeySetting, settingRow.Name), value, cache.DefaultExpiration)
-	}
-
 	facade.GetEvent().Publish(event.SettingSaveEvent, event.SettingPayload{
 		GroupName: settingRow.GroupName,
 		Name:      settingRow.Name,

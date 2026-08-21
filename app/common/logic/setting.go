@@ -13,20 +13,20 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/service/storage"
 	types2 "github.com/donknap/dpanel/common/types"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 // 全局配置
 var (
 	SettingGroupSetting                     = "setting"
-	SettingGroupSettingServer               = "server" // 服务器
 	SettingGroupSettingDocker               = "docker" // docker env
 	SettingGroupSettingTwoFa                = "twoFa"  // 双因素
 	SettingGroupSettingDiskUsage            = "diskUsage"
 	SettingGroupSettingCheckContainerIgnore = "containerCheckIgnoreUpgrade"
-	SettingGroupSettingCheckContainerAll    = "containerCheckAllUpgrade"
 	SettingGroupSettingDPanelInfo           = "DPanelInfo"
 	SettingGroupSettingThemeConfig          = "themeConfig"
 	SettingGroupSettingThemeUserConfig      = "themeUserConfig"
@@ -70,6 +70,9 @@ func (self Setting) Save(settingRow *entity.Setting) error {
 		if err != nil {
 			return err
 		}
+	}
+	if settingRow.GroupName == SettingGroupSetting && settingRow.Value != nil {
+		storage.Cache.Set(fmt.Sprintf(storage.CacheKeySetting, settingRow.Name), settingRow.Value, cache.NoExpiration)
 	}
 	return nil
 }
@@ -175,6 +178,9 @@ func (self Setting) Delete(groupName string, name string) error {
 		dao.Setting.GroupName.Eq(groupName),
 		dao.Setting.Name.Eq(name),
 	).Delete()
+	if groupName == SettingGroupSetting {
+		storage.Cache.Delete(fmt.Sprintf(storage.CacheKeySetting, name))
+	}
 	return nil
 }
 
@@ -234,11 +240,6 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 			if setting.Value.Notification != nil {
 				exists = true
 				*v = *setting.Value.Notification
-			}
-		case *accessor.ContainerCheckAllUpgrade:
-			if setting.Value.ContainerCheckAllUpgrade != nil {
-				exists = true
-				*v = *setting.Value.ContainerCheckAllUpgrade
 			}
 		case *[]accessor.Tag:
 			if setting.Value.Tag != nil {

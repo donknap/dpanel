@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"strings"
 
@@ -21,8 +22,9 @@ import (
 )
 
 const (
-	CommonKey    = "DPanelCommonAseKey20231208"
-	CryptoPrefix = "RSA:"
+	CommonKey            = "DPanelCommonAseKey20231208"
+	CryptoPrefix         = "RSA:"
+	SensitivePlaceholder = "******"
 )
 
 // RSAEncode 统一加密入口：强制使用 RSA 加密（支持超长文本自动分段）
@@ -252,13 +254,31 @@ func Sha256Struct(data interface{}) string {
 
 // MaskSensitiveValue 将敏感值转换为占位符
 func MaskSensitiveValue(value string) string {
-	if value == "" || value == "******" {
+	if value == "" || IsSensitivePlaceholder(value) {
 		return value
 	}
-	return "******"
+	if parsed, err := url.Parse(value); err == nil && parsed.Scheme != "" && parsed.Host != "" {
+		if parsed.User != nil {
+			if _, hasPassword := parsed.User.Password(); hasPassword {
+				username := parsed.User.Username()
+				parsed.User = url.UserPassword(username, SensitivePlaceholder)
+				return strings.Replace(parsed.String(), url.QueryEscape(SensitivePlaceholder), SensitivePlaceholder, 1)
+			}
+		}
+		return value
+	}
+	runes := []rune(value)
+	if len(runes) == 1 {
+		return string(runes[0]) + SensitivePlaceholder + string(runes[0])
+	}
+	return string(runes[0]) + SensitivePlaceholder + string(runes[len(runes)-1])
 }
 
 // IsSensitivePlaceholder 判断值是否为敏感占位符
 func IsSensitivePlaceholder(value string) bool {
-	return value == "******"
+	if value == SensitivePlaceholder {
+		return true
+	}
+	runes := []rune(value)
+	return len(runes) == 8 && string(runes[1:7]) == SensitivePlaceholder
 }

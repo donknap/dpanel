@@ -77,7 +77,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 
 		cors.POST("/common/home/usage", controller.Home{}.Usage)
 		cors.POST("/common/home/get-stat-list", controller.Home{}.GetStatList)
-		cors.POST("/common/home/prune", controller.Home{}.Prune)
+		cors.POST("/common/home/reset", controller.Home{}.Reset)
 
 		// 环境管理
 		cors.POST("/common/env/get-list", controller.Env{}.GetList)

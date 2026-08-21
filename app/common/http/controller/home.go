@@ -30,6 +30,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	commonmiddleware "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/service/docker"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
@@ -40,12 +41,15 @@ import (
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	ssh2 "golang.org/x/crypto/ssh"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
+	"gorm.io/gorm"
 )
 
 type command struct {
@@ -556,8 +560,18 @@ func (self Home) Info(http *gin.Context) {
 
 	dpanelInfoResult := function.StructToMap(dpanelInfo)
 	dpanelInfoResult["containerInfo"] = containerInfo
+	dpanelInfoResult["securityEntrance"] = (commonmiddleware.EntranceMiddleware{}).GetSecurityEntrance()
+	var founder gin.H
+	if founderSetting, _ := dao.Setting.
+		Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
+		Where(dao.Setting.Name.Eq(logic.SettingGroupUserFounder)).First(); founderSetting != nil && founderSetting.Value != nil {
+		founder = gin.H{
+			"username": founderSetting.Value.Username,
+			"password": function.MaskSensitiveValue(founderSetting.Value.Password),
+		}
+	}
 
-	self.JsonResponseWithoutError(http, gin.H{
+	result := gin.H{
 		"info":          info,
 		"clientVersion": docker.Sdk.Client.ClientVersion(),
 		"sdkVersion":    api.DefaultVersion,
@@ -567,7 +581,11 @@ func (self Home) Info(http *gin.Context) {
 		"rsa": gin.H{
 			"public": public,
 		},
-	})
+	}
+	if founder != nil {
+		result["founder"] = founder
+	}
+	self.JsonResponseWithoutError(http, result)
 	return
 }
 
@@ -851,10 +869,13 @@ func (self Home) GetStatList(http *gin.Context) {
 	}
 }
 
-func (self Home) Prune(http *gin.Context) {
+func (self Home) Reset(http *gin.Context) {
 	type ParamsValidate struct {
-		EnableNotice   bool `json:"enableNotice"`
-		EnableTempFile bool `json:"enableTempFile"`
+		User       string `json:"user"`
+		Password   string `json:"password"`
+		Entrance   string `json:"entrance"`
+		Cache      bool   `json:"cache"`
+		OnlineUser bool   `json:"onlineUser"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -864,23 +885,133 @@ func (self Home) Prune(http *gin.Context) {
 	var eventTotal int64
 	var noticeTotal int64
 
-	if params.EnableNotice {
-		if oldRow, _ := dao.Notice.Last(); oldRow != nil {
-			query := dao.Notice.Where(dao.Notice.ID.Lte(oldRow.ID))
-			noticeTotal, _ = query.Count()
-			_, _ = query.Delete()
+	if params.User != "" || params.Password != "" {
+		username := params.User
+		password := params.Password
+		founder, findErr := dao.Setting.
+			Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
+			Where(dao.Setting.Name.Eq(logic.SettingGroupUserFounder)).First()
+		if username == "" {
+			if founder != nil && founder.Value != nil {
+				username = founder.Value.Username
+			} else {
+				username = "admin"
+			}
 		}
-		if db, err := facade.GetDbFactory().Channel("default"); err == nil {
-			db.Exec("vacuum")
+		if password == "" {
+			password = uuid.New().String()[24:]
+		}
+		if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+			self.JsonResponseWithError(http, findErr, 500)
+			return
+		}
+		if founder == nil {
+			if _, err := (logic.User{}).CreateFounderUser(username, password); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		} else {
+			if founder.Value == nil {
+				self.JsonResponseWithError(http, errors.New("founder user data is invalid"), 500)
+				return
+			}
+			founder.Value.Username = username
+			founder.Value.Password = (logic.User{}).GetMd5Password(password, username)
+			if err := dao.Setting.Save(founder); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 	}
 
-	if params.EnableTempFile {
-		_ = os.RemoveAll(storage.Local{}.GetLocalTempDir())
+	if params.Entrance != "" {
+		entrance := params.Entrance
+		switch strings.ToLower(entrance) {
+		case "random":
+			entrance = uuid.New().String()[24:]
+		case "none":
+			entrance = ""
+		default:
+			entrance = strings.Trim(entrance, "/")
+			if entrance == "" {
+				self.JsonResponseWithError(http, errors.New("security entrance cannot be empty; use none to disable it"), 500)
+				return
+			}
+			for _, segment := range strings.Split(entrance, "/") {
+				if segment == "" || segment == "." || segment == ".." || strings.ContainsAny(segment, `\\?#%`) {
+					self.JsonResponseWithError(http, errors.New("security entrance must be a relative path without ., .., \\, ?, #, or %"), 500)
+					return
+				}
+			}
+		}
+		setting, _ := (logic.Setting{}).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingLogin)
+		if setting == nil {
+			setting = &entity.Setting{GroupName: logic.SettingGroupSetting, Name: logic.SettingGroupSettingLogin, Value: &accessor.SettingValueOption{Login: &accessor.Login{}}}
+		}
+		if setting.Value == nil {
+			setting.Value = &accessor.SettingValueOption{}
+		}
+		if setting.Value.Login == nil {
+			setting.Value.Login = &accessor.Login{}
+		}
+		setting.Value.Login.Entrance = entrance
+		if err := (logic.Setting{}).Save(setting); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 
+	if params.Cache {
+		for key := range storage.Cache.Items() {
+			resettable := false
+			for _, prefix := range []string{"explorer:", "docker:status:", "docker:events", "docker:container:runtime:", "docker:event:", "container:upgrade:check:", "container:upgrade:logs:", "image:rootfs:", "oauth:", "login:failed:", "attach:", "setting:login", "xk:storageInfo"} {
+				if strings.HasPrefix(key, prefix) {
+					resettable = true
+					break
+				}
+			}
+			if resettable {
+				storage.Cache.Delete(key)
+			}
+		}
+	}
+
+	if params.Cache {
+		if notices, err := dao.Notice.Find(); err == nil {
+			noticeTotal = int64(len(notices))
+		}
+		db, err := facade.GetDbFactory().Channel("default")
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if err = db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&entity.Notice{}).Error; err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		_ = db.Exec("vacuum").Error
+	}
+	if params.Cache {
+		if _, err := os.Stat(storage.Local{}.GetLocalTempDir()); err == nil {
+			if err = os.RemoveAll(storage.Local{}.GetLocalTempDir()); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
+	}
 	runtime.GC()
 	debug.FreeOSMemory()
+
+	if params.OnlineUser {
+		storage.Cache.Set(storage.CacheKeyCommonServerStartTime, time.Now().Add(time.Second).Truncate(time.Second), cache.NoExpiration)
+		for key := range storage.Cache.Items() {
+			if strings.HasPrefix(key, "user:") {
+				storage.Cache.Delete(key)
+			} else if strings.HasPrefix(key, "login:failed:") {
+				storage.Cache.Delete(key)
+			}
+		}
+	}
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"gc":     true,
@@ -888,5 +1019,4 @@ func (self Home) Prune(http *gin.Context) {
 		"events": eventTotal,
 		"notice": noticeTotal,
 	})
-	return
 }

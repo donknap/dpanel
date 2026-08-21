@@ -159,7 +159,7 @@ func (self Registry) GetList(http *gin.Context) {
 	}
 	list, _ = query.Find()
 	for index, _ := range list {
-		list[index].Setting.Password = "****"
+		list[index].Setting.Password = function.MaskSensitiveValue(list[index].Setting.Password)
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": list,

@@ -142,7 +142,7 @@ func main() {
 		if v := (family.Provider{}).Middleware(); v != nil {
 			httpServer.Use(v...)
 		}
-		httpServer.Use(common2.AuthMiddleware{}.Process, common2.CacheMiddleware{}.Process)
+		httpServer.Use(common2.AuthMiddleware{}.Process, common2.EntranceMiddleware{}.Process, common2.CacheMiddleware{}.Process)
 		httpServer.RegisterRouters(
 			func(engine *gin.Engine) {
 				subFs, _ := fs.Sub(Asset, "asset/static")

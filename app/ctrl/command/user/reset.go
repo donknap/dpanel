@@ -1,9 +1,9 @@
 package user
 
 import (
-	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/dao"
-	"github.com/google/uuid"
+	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
+	"github.com/donknap/dpanel/app/ctrl/sdk/types/common"
+	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
@@ -18,18 +18,16 @@ func (self Reset) GetName() string {
 }
 
 func (self Reset) GetDescription() string {
-	return "Reset the Admin username or password."
+	return "Reset the Admin username or password (compatibility command)."
 }
 
 func (self Reset) Configure(command *cobra.Command) {
+	command.Deprecated = "use system:reset --user instead"
 	command.Flags().String("password", "", "Reset password")
 	command.Flags().String("username", "", "Reset username")
 }
 
 func (self Reset) Handle(cmd *cobra.Command, args []string) {
-	founder, _ := dao.Setting.
-		Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
-		Where(dao.Setting.Name.Eq(logic.SettingGroupUserFounder)).First()
 	username, err := cmd.Flags().GetString("username")
 	if err != nil {
 		color.Errorln("Error: ", err.Error())
@@ -40,40 +38,26 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 		color.Errorln("Error: ", err.Error())
 		return
 	}
-	if username == "" && password == "" {
-		username = "admin"
-		password = uuid.New().String()[24:]
-	}
-
 	if username != "" && password == "" {
 		color.Errorln("When resetting the username, the password must also be reset.")
 		return
 	}
-
-	if founder == nil {
-		_, err = logic.User{}.CreateFounderUser(username, password)
-		if err != nil {
-			color.Errorln("Error: ", err.Error())
-			return
-		}
-		color.Println("用户名 (Username): ", username)
-		color.Println("密  码 (Password): ", password)
-		color.Successln("Success")
-		return
+	if username == "" && password == "" {
+		username = "admin"
 	}
 
-	if username != "" {
-		founder.Value.Username = username
-	}
-
-	founder.Value.Password = logic.User{}.GetMd5Password(password, founder.Value.Username)
-
-	err = dao.Setting.Save(founder)
+	client, err := proxy.NewProxyClient()
 	if err != nil {
 		color.Errorln("Error: ", err.Error())
 		return
 	}
-	color.Println("用户名 (Username): ", username)
-	color.Println("密  码 (Password): ", password)
-	color.Successln("Success")
+	result, err := client.CommonReset(common.ResetOption{
+		User:     username,
+		Password: password,
+	})
+	if err != nil {
+		color.Errorln("Error: ", err.Error())
+		return
+	}
+	utils.Result{}.Success(result)
 }

@@ -19,7 +19,6 @@ type SettingValueOption struct {
 	DiskUsage                   *DiskUsage                   `json:"diskUsage,omitempty"`
 	TwoFa                       *TwoFa                       `json:"twoFa,omitempty"`
 	ContainerCheckIgnoreUpgrade ContainerCheckIgnoreUpgrade  `json:"containerCheckIgnoreUpgrade,omitempty"`
-	ContainerCheckAllUpgrade    *ContainerCheckAllUpgrade    `json:"containerCheckAllUpgrade,omitempty"`
 	DPanelInfo                  *types3.DPanelInfo           `json:"DPanelInfo,omitempty"`
 	ThemeConfig                 *ThemeConfig                 `json:"themeConfig,omitempty"`
 	ThemeUserConfig             *ThemeUserConfig             `json:"themeUserConfig,omitempty"`
@@ -82,14 +81,6 @@ type DnsApi struct {
 	Env        []types2.EnvItem `json:"env,omitempty"`
 }
 
-type ContainerCheckAllUpgrade struct {
-	Upgrade   int                 `json:"upgrade"`
-	Failed    int                 `json:"failed"`
-	Local     int                 `json:"local"`
-	Ignore    int                 `json:"ignore"`
-	Container []map[string]string `json:"container"`
-}
-
 type TagItem struct {
 	Name        string `json:"name,omitempty"`
 	Title       string `json:"title,omitempty"`
@@ -107,6 +98,7 @@ type Tag struct {
 }
 
 type Login struct {
+	Entrance            string   `json:"entrance,omitempty"`
 	FailedEnable        bool     `json:"failedEnable,omitempty"`
 	FailedTotal         int      `json:"failedTotal,omitempty"`
 	FailedLockTime      int      `json:"failedLockTime,omitempty"`

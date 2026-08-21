@@ -17,8 +17,3 @@ type NotificationOption struct {
 	Content string `json:"content"`
 	Target  string `json:"target"`
 }
-
-type PruneOption struct {
-	EnableNotice   bool `json:"enableNotice"`
-	EnableTempFile bool `json:"enableTempFile"`
-}

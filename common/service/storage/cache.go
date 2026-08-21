@@ -18,6 +18,7 @@ var (
 	CacheKeyOauthState                    = "oauth:state:%s"
 	CacheKeyOauthCode                     = "oauth:code:%s"
 	CacheKeySetting                       = "setting:%s"
+	CacheKeySettingLogin                  = fmt.Sprintf(CacheKeySetting, "login")
 	CacheKeySettingLocale                 = fmt.Sprintf(CacheKeySetting, "locale")
 	CacheKeyContainerUpgradeCheck         = "container:upgrade:check:%s:%s"  // 镜像更新检查结果：Docker 环境、容器 ID
 	CacheKeyContainerUpgradeLogs          = "container:upgrade:logs:%d"      // 计划任务执行日志：计划 ID

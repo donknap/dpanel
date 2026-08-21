@@ -40,6 +40,7 @@ database:
       _journal_mode: ${DP_DB_JOURNAL-DELETE} # WAL
 system:
   baseurl: ${DP_SYSTEM_BASEURL}
+  entrance: ${DP_SYSTEM_ENTRANCE}
   storage:
     local:
       path: ${STORAGE_LOCAL_PATH}

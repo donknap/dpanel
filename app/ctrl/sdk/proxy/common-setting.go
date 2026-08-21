@@ -26,8 +26,17 @@ func (self *Client) CommonNotification(params common.NotificationOption) (result
 	return result, err
 }
 
-func (self *Client) CommonPrune(params common.PruneOption) (result interface{}, err error) {
-	data, err := self.Post(function.RouterApiUri("/common/home/prune"), params)
+func (self *Client) CommonReset(params common.ResetOption) (result map[string]any, err error) {
+	data, err := self.Post(function.RouterApiUri("/common/home/reset"), params)
+	if err != nil {
+		return result, err
+	}
+	err = json.NewDecoder(data).Decode(&result)
+	return result, err
+}
+
+func (self *Client) CommonHomeInfo() (result map[string]any, err error) {
+	data, err := self.Post(function.RouterApiUri("/common/home/info"), nil)
 	if err != nil {
 		return result, err
 	}
