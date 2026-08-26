@@ -22,10 +22,10 @@ func (self Reset) GetDescription() string {
 }
 
 func (self Reset) Configure(cmd *cobra.Command) {
-	cmd.Flags().String("user", "", "Reset the user; without a value, reset admin with a random password")
-	userFlag := cmd.Flags().Lookup("user")
-	userFlag.NoOptDefVal = "admin"
-	cmd.Flags().String("password", "", "Set the password; omitted with --user generates a random password")
+	cmd.Flags().String("username", "", "Reset the username; without a value, reset admin with a random password")
+	usernameFlag := cmd.Flags().Lookup("username")
+	usernameFlag.NoOptDefVal = "admin"
+	cmd.Flags().String("password", "", "Set the password; omitted with --username generates a random password")
 	cmd.Flags().String("entrance", "", "Set security entrance: no value for random, none to disable, or a relative path")
 	entranceFlag := cmd.Flags().Lookup("entrance")
 	entranceFlag.NoOptDefVal = uuid.New().String()[24:30]
@@ -34,22 +34,22 @@ func (self Reset) Configure(cmd *cobra.Command) {
 }
 
 func (self Reset) Handle(cmd *cobra.Command, args []string) {
-	user, _ := cmd.Flags().GetString("user")
+	username, _ := cmd.Flags().GetString("username")
 	password, _ := cmd.Flags().GetString("password")
 	entranceValue, _ := cmd.Flags().GetString("entrance")
 	clearCache, _ := cmd.Flags().GetBool("cache")
 	onlineUser, _ := cmd.Flags().GetBool("online-user")
 
-	if !cmd.Flags().Changed("user") && password != "" {
-		color.Errorln("--password requires --user")
+	if !cmd.Flags().Changed("username") && password != "" {
+		color.Errorln("--password requires --username")
 		return
 	}
-	if !cmd.Flags().Changed("user") && !cmd.Flags().Changed("entrance") && !clearCache && !onlineUser {
+	if !cmd.Flags().Changed("username") && !cmd.Flags().Changed("entrance") && !clearCache && !onlineUser {
 		color.Errorln("at least one reset option is required")
 		return
 	}
-	if cmd.Flags().Changed("user") && user == "" {
-		user = "admin"
+	if cmd.Flags().Changed("username") && username == "" {
+		username = "admin"
 	}
 	var entrance *string
 	if cmd.Flags().Changed("entrance") {
@@ -65,7 +65,7 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 		return
 	}
 	result, err := proxyClient.CommonReset(common.ResetOption{
-		User:       user,
+		User:       username,
 		Password:   password,
 		Entrance:   entrance,
 		Cache:      clearCache,

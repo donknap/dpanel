@@ -22,7 +22,7 @@ func (self Reset) GetDescription() string {
 }
 
 func (self Reset) Configure(command *cobra.Command) {
-	command.Deprecated = "use system:reset --user instead"
+	command.Deprecated = "use system:reset --username instead"
 	command.Flags().String("password", "", "Reset password")
 	command.Flags().String("username", "", "Reset username")
 }

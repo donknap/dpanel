@@ -935,7 +935,7 @@ func (self Home) Reset(http *gin.Context) {
 		if setting.Value.Login == nil {
 			setting.Value.Login = &accessor.Login{}
 		}
-		setting.Value.Login.Entrance = *params.Entrance
+		setting.Value.Login.Entrance = params.Entrance
 		if err := (logic.Setting{}).Save(setting); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

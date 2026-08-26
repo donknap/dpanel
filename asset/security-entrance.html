@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panel Access Is Protected</title>
+    <script>
+        (function () {
+            var language = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+            var isChinese = /^zh(?:-|$)/i.test(language);
+            document.documentElement.classList.toggle("lang-zh", isChinese);
+            document.documentElement.lang = isChinese ? "zh-CN" : "en";
+            document.title = isChinese ? "面板访问受保护" : "Panel Access Is Protected";
+        })();
+    </script>
+    <style>
+        :root {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #1f1f1f;
+        }
+
+        body {
+            margin: 0;
+        }
+
+        .dp-login {
+            align-items: center;
+            background: #f5f5f5;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            padding: 16px;
+            position: relative;
+        }
+
+        .dp-login::before {
+            background:
+                radial-gradient(circle at 50% 18%, #e6f4ff, transparent 38%),
+                radial-gradient(circle at 50% 42%, #f0f5ff, transparent 34%);
+            content: "";
+            inset: 0;
+            opacity: .78;
+            pointer-events: none;
+            position: absolute;
+        }
+
+        .dp-login::after {
+            background-image:
+                linear-gradient(135deg, transparent 49.7%, #d9d9d9 50%, transparent 50.3%),
+                linear-gradient(135deg, transparent 49.7%, #d9d9d9 50%, transparent 50.3%),
+                linear-gradient(135deg, transparent 49.7%, #d9d9d9 50%, transparent 50.3%);
+            background-position: 16% 20%, 72% 18%, 28% 78%;
+            background-repeat: no-repeat;
+            background-size: 260px 260px, 340px 340px, 300px 300px;
+            content: "";
+            inset: 0;
+            opacity: .28;
+            pointer-events: none;
+            position: absolute;
+        }
+
+        .dp-login-card {
+            -webkit-backdrop-filter: blur(18px) saturate(1.08);
+            backdrop-filter: blur(18px) saturate(1.08);
+            background: rgba(255, 255, 255, .78);
+            border: 1px solid rgba(217, 217, 217, .72);
+            border-radius: 8px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, .08);
+            box-sizing: border-box;
+            max-width: 800px;
+            padding: 48px 56px;
+            position: relative;
+            text-align: center;
+            width: min(600px, calc(100vw - 48px));
+            z-index: 1;
+        }
+
+        .dp-login-logo {
+            display: block;
+            height: auto;
+            margin: 0 auto 24px;
+            max-width: min(360px, 100%);
+            width: min(360px, 100%);
+        }
+
+        .dp-login-card hr {
+            background: #e8e8e8;
+            border: 0;
+            height: 1px;
+            margin: 0 0 24px;
+        }
+
+        .dp-login-message p {
+            color: #595959;
+            line-height: 1.6;
+            margin: 10px 0;
+            text-align: left;
+        }
+
+        .dp-login-message a {
+            color: #1677ff;
+            overflow-wrap: anywhere;
+            text-underline-offset: 3px;
+        }
+
+        .lang-zh .lang-en {
+            display: none;
+        }
+
+        html:not(.lang-zh) .lang-zh {
+            display: none;
+        }
+
+        @media (max-width: 575px) {
+            .dp-login-card {
+                padding: 32px 24px;
+                width: 100%;
+            }
+
+            .dp-login-logo {
+                margin-bottom: 18px;
+            }
+
+            .dp-login-card hr {
+                margin-bottom: 18px;
+            }
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .dp-login {
+                background: #141414;
+            }
+
+            .dp-login-card {
+                background: rgba(31, 31, 31, .78);
+                border-color: rgba(66, 66, 66, .72);
+                box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+            }
+
+            .dp-login::before {
+                background:
+                    radial-gradient(circle at 50% 18%, #111d2c, transparent 38%),
+                    radial-gradient(circle at 50% 42%, #171d2a, transparent 34%);
+            }
+
+            .dp-login::after {
+                background-image:
+                    linear-gradient(135deg, transparent 49.7%, #303030 50%, transparent 50.3%),
+                    linear-gradient(135deg, transparent 49.7%, #303030 50%, transparent 50.3%),
+                    linear-gradient(135deg, transparent 49.7%, #303030 50%, transparent 50.3%);
+            }
+
+            .dp-login-logo {
+                content: url("data:image/png;base64,{{.DarkLogoData}}");
+            }
+
+            .dp-login-card hr {
+                background: #434343;
+            }
+
+            .dp-login-message p {
+                color: #bfbfbf;
+            }
+
+            .dp-login-message a {
+                color: #69b1ff;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dp-login">
+        <main class="dp-login-card">
+            <img class="dp-login-logo" src="data:image/png;base64,{{.LogoData}}" alt="DPanel">
+            <hr />
+            <section class="dp-login-message">
+                <p>
+                    <span class="lang-en">
+                        This DPanel instance is protected by a security entrance. Please use the configured entrance to
+                        access the sign-in page. To find the current security entrance, see the
+                        <a href="https://dpanel.cc//install/ctrl#system:info" target="_blank"
+                            rel="noopener noreferrer">documentation</a>.
+                    </span>
+                    <span class="lang-zh">
+                        此 DPanel 实例已启用安全入口，请通过已配置的安全入口访问登录页面。如需查看当前安全入口，请参考<a
+                            href="https://dpanel.cc//install/ctrl#system:info" target="_blank"
+                            rel="noopener noreferrer">文档</a>。
+                    </span>
+                </p>
+            </section>
+        </main>
+    </div>
+</body>
+
+</html>

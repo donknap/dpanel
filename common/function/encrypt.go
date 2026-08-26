@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
@@ -242,6 +243,12 @@ func Sha256(str []byte) string {
 	hash := sha256.New()
 	hash.Write(str)
 	return fmt.Sprintf("sha256:%x", hash.Sum(nil))
+}
+
+func HmacSha256(key, data []byte) string {
+	hash := hmac.New(sha256.New, key)
+	_, _ = hash.Write(data)
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
 func Sha256Struct(data interface{}) string {

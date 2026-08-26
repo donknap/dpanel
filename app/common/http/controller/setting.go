@@ -152,7 +152,10 @@ func (self Setting) SaveConfig(http *gin.Context) {
 	}
 
 	if params.Login != nil {
-		params.Login.Entrance = strings.Trim(params.Login.Entrance, "/")
+		if params.Login.Entrance != nil {
+			entrance := strings.Trim(*params.Login.Entrance, "/")
+			params.Login.Entrance = &entrance
+		}
 		settingRow = &entity.Setting{
 			GroupName: logic.SettingGroupSetting,
 			Name:      logic.SettingGroupSettingLogin,

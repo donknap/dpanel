@@ -98,7 +98,7 @@ type Tag struct {
 }
 
 type Login struct {
-	Entrance            string   `json:"entrance,omitempty"`
+	Entrance            *string  `json:"entrance,omitempty"`
 	FailedEnable        bool     `json:"failedEnable,omitempty"`
 	FailedTotal         int      `json:"failedTotal,omitempty"`
 	FailedLockTime      int      `json:"failedLockTime,omitempty"`

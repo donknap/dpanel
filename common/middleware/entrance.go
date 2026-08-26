@@ -1,8 +1,15 @@
 package common
 
 import (
+	"bytes"
+	"crypto/hmac"
+	"encoding/base64"
+	"html/template"
+	"io/fs"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -41,42 +48,84 @@ func (self EntranceMiddleware) Process(httpContext *gin.Context) {
 		requestPath = "/"
 	}
 	if requestPath == rootPath {
-		http.NotFound(httpContext.Writer, httpContext.Request)
-		httpContext.Abort()
+		self.renderUnavailable(httpContext)
 		return
 	}
 
-	if cookie, err := httpContext.Request.Cookie(EntranceCookieName); err == nil && cookie.Value == entrance {
+	startTime, ok := storage.LoadCache[time.Time](storage.CacheKeyCommonServerStartTime)
+	if !ok {
+		self.renderUnavailable(httpContext)
+		return
+	}
+	cookieValue := function.HmacSha256([]byte(strconv.FormatInt(startTime.UnixNano(), 10)), []byte(entrance))
+	if cookie, err := httpContext.Request.Cookie(EntranceCookieName); err == nil && hmac.Equal([]byte(cookie.Value), []byte(cookieValue)) {
 		httpContext.Next()
 		return
 	}
 
 	entrancePath := strings.TrimRight(function.RouterUri("/"+entrance), "/")
 	if requestPath != entrancePath {
-		http.NotFound(httpContext.Writer, httpContext.Request)
+		http.Redirect(httpContext.Writer, httpContext.Request, function.RouterUri("/"), http.StatusFound)
 		httpContext.Abort()
 		return
 	}
-	httpContext.SetCookie(EntranceCookieName, entrance, 0, "/", "", false, true)
+	httpContext.SetCookie(EntranceCookieName, cookieValue, 0, "/", "", false, true)
 	httpContext.Next()
 }
 
-func (self EntranceMiddleware) GetSecurityEntrance() string {
-	if cached, ok := storage.LoadCache[*accessor.SettingValueOption](storage.CacheKeySettingLogin); ok {
-		if cached == nil || cached.Login == nil {
-			return ""
+func (self EntranceMiddleware) renderUnavailable(httpContext *gin.Context) {
+	if value, ok := storage.Cache.Get(storage.CacheKeyAsset); ok {
+		if asset, ok := value.(fs.FS); ok {
+			if content, err := fs.ReadFile(asset, "asset/security-entrance.html"); err == nil {
+				logoData := ""
+				darkLogoData := ""
+				if logo, err := fs.ReadFile(asset, "asset/static/img/logo.png"); err == nil {
+					logoData = base64.StdEncoding.EncodeToString(logo)
+				}
+				if logo, err := fs.ReadFile(asset, "asset/static/img/logo-dark.png"); err == nil {
+					darkLogoData = base64.StdEncoding.EncodeToString(logo)
+				}
+				pageData := struct {
+					LogoData     string
+					DarkLogoData string
+				}{LogoData: logoData, DarkLogoData: darkLogoData}
+
+				page, err := template.New("security-entrance").Parse(string(content))
+				if err == nil {
+					var rendered bytes.Buffer
+					err = page.Execute(&rendered, pageData)
+					if err == nil {
+						httpContext.Data(http.StatusOK, "text/html; charset=utf-8", rendered.Bytes())
+						httpContext.Abort()
+						return
+					}
+				}
+			}
 		}
-		return strings.Trim(cached.Login.Entrance, "/")
 	}
 
-	login := accessor.Login{}
-	if (logic.Setting{}).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingLogin, &login) {
-		login.Entrance = strings.Trim(login.Entrance, "/")
-		storage.Cache.Set(storage.CacheKeySettingLogin, &accessor.SettingValueOption{Login: &login}, cache.NoExpiration)
-		return login.Entrance
+	http.NotFound(httpContext.Writer, httpContext.Request)
+	httpContext.Abort()
+}
+
+func (self EntranceMiddleware) GetSecurityEntrance() string {
+	var entrance *string
+
+	if cached, ok := storage.LoadCache[*accessor.SettingValueOption](storage.CacheKeySettingLogin); ok && cached != nil && cached.Login != nil {
+		entrance = cached.Login.Entrance
 	}
 
-	entrance := strings.Trim(facade.GetConfig().GetString("system.entrance"), "/")
-	storage.Cache.Set(storage.CacheKeySettingLogin, &accessor.SettingValueOption{Login: &accessor.Login{Entrance: entrance}}, cache.NoExpiration)
-	return entrance
+	if entrance == nil {
+		login := accessor.Login{}
+		if ok := (logic.Setting{}).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingLogin, &login); ok && login.Entrance != nil {
+			entrance = login.Entrance
+			storage.Cache.Set(storage.CacheKeySettingLogin, &accessor.SettingValueOption{Login: &login}, cache.NoExpiration)
+		}
+	}
+
+	if entrance == nil {
+		entrance = function.Ptr[string](facade.GetConfig().GetString("system.entrance"))
+	}
+
+	return strings.Trim(*entrance, "/")
 }
