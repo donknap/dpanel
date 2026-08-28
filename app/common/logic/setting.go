@@ -89,6 +89,36 @@ func (self Setting) GetValue(groupName string, name string) (*entity.Setting, er
 
 }
 
+// GetLoginSetting returns the persisted login settings together with the
+// effective security entrance configuration. The effective entrance prefers
+// the persisted override and falls back to system.entrance.
+func (self Setting) GetLoginSetting() accessor.Login {
+	login := accessor.Login{}
+	if cached, ok := storage.LoadCache[*accessor.SettingValueOption](storage.CacheKeySettingLogin); ok && cached != nil && cached.Login != nil {
+		login = *cached.Login
+	} else {
+		self.GetByKey(SettingGroupSetting, SettingGroupSettingLogin, &login)
+	}
+
+	configured := strings.Trim(facade.GetConfig().GetString("system.entrance"), "/")
+	var entrance *string
+	if login.SystemEntrance != nil && login.SystemEntrance.Entrance != nil {
+		normalized := strings.Trim(*login.SystemEntrance.Entrance, "/")
+		entrance = &normalized
+	}
+	effective := configured
+	if entrance != nil {
+		effective = *entrance
+	}
+
+	login.SystemEntrance = &accessor.SystemEntrance{
+		Config:   configured,
+		Entrance: entrance,
+		Enable:   effective != "",
+	}
+	return login
+}
+
 func (self Setting) GetValueById(id int32) (*entity.Setting, error) {
 	setting, _ := dao.Setting.Where(dao.Setting.ID.Eq(id)).First()
 	if setting == nil {

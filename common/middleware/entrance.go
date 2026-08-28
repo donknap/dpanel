@@ -12,12 +12,9 @@ import (
 	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
-	"github.com/patrickmn/go-cache"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
 )
 
@@ -33,8 +30,16 @@ func (self EntranceMiddleware) Process(httpContext *gin.Context) {
 		return
 	}
 
-	entrance := self.GetSecurityEntrance()
-	if entrance == "" {
+	login := logic.Setting{}.GetLoginSetting()
+	if login.SystemEntrance == nil {
+		httpContext.Next()
+		return
+	}
+	entrance := login.SystemEntrance.Config
+	if login.SystemEntrance.Entrance != nil {
+		entrance = *login.SystemEntrance.Entrance
+	}
+	if !login.SystemEntrance.Enable || entrance == "" {
 		httpContext.Next()
 		return
 	}
@@ -106,26 +111,4 @@ func (self EntranceMiddleware) renderUnavailable(httpContext *gin.Context) {
 
 	http.NotFound(httpContext.Writer, httpContext.Request)
 	httpContext.Abort()
-}
-
-func (self EntranceMiddleware) GetSecurityEntrance() string {
-	var entrance *string
-
-	if cached, ok := storage.LoadCache[*accessor.SettingValueOption](storage.CacheKeySettingLogin); ok && cached != nil && cached.Login != nil {
-		entrance = cached.Login.Entrance
-	}
-
-	if entrance == nil {
-		login := accessor.Login{}
-		if ok := (logic.Setting{}).GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingLogin, &login); ok && login.Entrance != nil {
-			entrance = login.Entrance
-			storage.Cache.Set(storage.CacheKeySettingLogin, &accessor.SettingValueOption{Login: &login}, cache.NoExpiration)
-		}
-	}
-
-	if entrance == nil {
-		entrance = function.Ptr[string](facade.GetConfig().GetString("system.entrance"))
-	}
-
-	return strings.Trim(*entrance, "/")
 }

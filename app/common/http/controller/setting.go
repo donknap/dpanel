@@ -106,6 +106,11 @@ func (self Setting) GetSetting(http *gin.Context) {
 	return
 }
 
+func (self Setting) GetLoginSetting(http *gin.Context) {
+	setting := logic.Setting{}.GetLoginSetting()
+	self.JsonResponseWithoutError(http, setting)
+}
+
 func (self Setting) SaveConfig(http *gin.Context) {
 	type ParamsValidate struct {
 		Theme        *accessor.ThemeConfig        `json:"theme"`
@@ -152,9 +157,16 @@ func (self Setting) SaveConfig(http *gin.Context) {
 	}
 
 	if params.Login != nil {
-		if params.Login.Entrance != nil {
-			entrance := strings.Trim(*params.Login.Entrance, "/")
-			params.Login.Entrance = &entrance
+		if params.Login.SystemEntrance != nil {
+			if params.Login.SystemEntrance.Entrance != nil {
+				entrance := strings.Trim(*params.Login.SystemEntrance.Entrance, "/")
+				params.Login.SystemEntrance = &accessor.SystemEntrance{
+					Entrance: &entrance,
+					Enable:   entrance != "",
+				}
+			} else {
+				params.Login.SystemEntrance = &accessor.SystemEntrance{}
+			}
 		}
 		settingRow = &entity.Setting{
 			GroupName: logic.SettingGroupSetting,

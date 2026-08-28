@@ -97,16 +97,22 @@ type Tag struct {
 	Item            []TagItem `json:"item,omitempty"`
 }
 
+type SystemEntrance struct {
+	Config   string  `json:"config"`             // system.entrance 默认值
+	Entrance *string `json:"entrance,omitempty"` // nil 表示使用 Config，空字符串表示显式关闭
+	Enable   bool    `json:"enable"`             // 最终是否启用
+}
+
 type Login struct {
-	Entrance            *string  `json:"entrance,omitempty"`
-	FailedEnable        bool     `json:"failedEnable,omitempty"`
-	FailedTotal         int      `json:"failedTotal,omitempty"`
-	FailedLockTime      int      `json:"failedLockTime,omitempty"`
-	NoPasswordEnable    bool     `json:"noPasswordEnable,omitempty"`
-	NoPasswordUrl       string   `json:"noPasswordUrl,omitempty"`
-	NoPasswordUserAgent string   `json:"noPasswordUserAgent,omitempty"`
-	NoPasswordIpList    []string `json:"noPasswordIpList,omitempty"`
-	DefaultRedirect     string   `json:"defaultRedirect,omitempty"`
+	SystemEntrance      *SystemEntrance `json:"systemEntrance,omitempty"`
+	FailedEnable        bool            `json:"failedEnable,omitempty"`
+	FailedTotal         int             `json:"failedTotal,omitempty"`
+	FailedLockTime      int             `json:"failedLockTime,omitempty"`
+	NoPasswordEnable    bool            `json:"noPasswordEnable,omitempty"`
+	NoPasswordUrl       string          `json:"noPasswordUrl,omitempty"`
+	NoPasswordUserAgent string          `json:"noPasswordUserAgent,omitempty"`
+	NoPasswordIpList    []string        `json:"noPasswordIpList,omitempty"`
+	DefaultRedirect     string          `json:"defaultRedirect,omitempty"`
 }
 
 type NotificationEmailServer struct {

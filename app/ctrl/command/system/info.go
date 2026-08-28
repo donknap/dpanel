@@ -7,6 +7,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/spf13/cobra"
 )
@@ -31,19 +32,19 @@ type founderInfo struct {
 }
 
 type systemInfo struct {
-	Name             string `json:"name"`
-	Version          string `json:"version"`
-	Family           string `json:"family"`
-	Environment      string `json:"env"`
-	RunIn            string `json:"runIn"`
-	ServerHost       string `json:"serverHost"`
-	ServerPort       int    `json:"serverPort"`
-	BaseURL          string `json:"baseUrl"`
-	StoragePath      string `json:"storageLocalPath"`
-	DNS              string `json:"dns"`
-	Proxy            string `json:"proxy"`
-	NoProxy          string `json:"noProxy"`
-	SecurityEntrance string `json:"securityEntrance"`
+	Name           string                   `json:"name"`
+	Version        string                   `json:"version"`
+	Family         string                   `json:"family"`
+	Environment    string                   `json:"env"`
+	RunIn          string                   `json:"runIn"`
+	ServerHost     string                   `json:"serverHost"`
+	ServerPort     int                      `json:"serverPort"`
+	BaseURL        string                   `json:"baseUrl"`
+	StoragePath    string                   `json:"storageLocalPath"`
+	DNS            string                   `json:"dns"`
+	Proxy          string                   `json:"proxy"`
+	NoProxy        string                   `json:"noProxy"`
+	SystemEntrance *accessor.SystemEntrance `json:"systemEntrance"`
 }
 
 func (self Info) GetName() string {
@@ -96,7 +97,14 @@ func (self Info) Handle(cmd *cobra.Command, args []string) {
 	_, _ = fmt.Fprintln(writer, "DNS:\t", result.DPanel.DNS)
 	_, _ = fmt.Fprintln(writer, "Proxy:\t", function.MaskSensitiveValue(result.DPanel.Proxy))
 	_, _ = fmt.Fprintln(writer, "No Proxy:\t", result.DPanel.NoProxy)
-	_, _ = fmt.Fprintln(writer, "Security Entrance:\t", result.DPanel.SecurityEntrance)
+	securityEntrance := ""
+	if result.DPanel.SystemEntrance != nil {
+		securityEntrance = result.DPanel.SystemEntrance.Config
+		if result.DPanel.SystemEntrance.Entrance != nil {
+			securityEntrance = *result.DPanel.SystemEntrance.Entrance
+		}
+	}
+	_, _ = fmt.Fprintln(writer, "Security Entrance:\t", securityEntrance)
 	_, _ = fmt.Fprintln(writer, "Username:\t", result.Founder.Username)
 	_, _ = fmt.Fprintln(writer, "Password (masked):\t", result.Founder.Password)
 	_, _ = fmt.Fprintln(writer, "Official Website:\t", "https://dpanel.cc")

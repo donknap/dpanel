@@ -30,7 +30,6 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
-	commonmiddleware "github.com/donknap/dpanel/common/middleware"
 	"github.com/donknap/dpanel/common/service/docker"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
@@ -560,7 +559,10 @@ func (self Home) Info(http *gin.Context) {
 
 	dpanelInfoResult := function.StructToMap(dpanelInfo)
 	dpanelInfoResult["containerInfo"] = containerInfo
-	dpanelInfoResult["securityEntrance"] = (commonmiddleware.EntranceMiddleware{}).GetSecurityEntrance()
+	loginSetting := logic.Setting{}.GetLoginSetting()
+	if loginSetting.SystemEntrance != nil {
+		dpanelInfoResult["systemEntrance"] = loginSetting.SystemEntrance
+	}
 	var founder gin.H
 	if founderSetting, _ := dao.Setting.
 		Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
@@ -935,7 +937,11 @@ func (self Home) Reset(http *gin.Context) {
 		if setting.Value.Login == nil {
 			setting.Value.Login = &accessor.Login{}
 		}
-		setting.Value.Login.Entrance = params.Entrance
+		entrance := strings.Trim(*params.Entrance, "/")
+		setting.Value.Login.SystemEntrance = &accessor.SystemEntrance{
+			Entrance: &entrance,
+			Enable:   entrance != "",
+		}
 		if err := (logic.Setting{}).Save(setting); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

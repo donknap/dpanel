@@ -1,8 +1,7 @@
 package user
 
 import (
-	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
-	"github.com/donknap/dpanel/app/ctrl/sdk/types/common"
+	"github.com/donknap/dpanel/app/ctrl/command/system"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
@@ -22,7 +21,6 @@ func (self Reset) GetDescription() string {
 }
 
 func (self Reset) Configure(command *cobra.Command) {
-	command.Deprecated = "use system:reset --username instead"
 	command.Flags().String("password", "", "Reset password")
 	command.Flags().String("username", "", "Reset username")
 }
@@ -46,18 +44,13 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 		username = "admin"
 	}
 
-	client, err := proxy.NewProxyClient()
+	username, password, err = system.ResetFounderUser(username, password)
 	if err != nil {
 		color.Errorln("Error: ", err.Error())
 		return
 	}
-	result, err := client.CommonReset(common.ResetOption{
-		User:     username,
-		Password: password,
+	utils.Result{}.Success(map[string]string{
+		"username": username,
+		"password": password,
 	})
-	if err != nil {
-		color.Errorln("Error: ", err.Error())
-		return
-	}
-	utils.Result{}.Success(result)
 }
