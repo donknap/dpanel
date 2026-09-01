@@ -158,14 +158,15 @@ func (self Setting) SaveConfig(http *gin.Context) {
 
 	if params.Login != nil {
 		if params.Login.SystemEntrance != nil {
+			systemEntrance := params.Login.SystemEntrance
+			var entrance *string
 			if params.Login.SystemEntrance.Entrance != nil {
-				entrance := strings.Trim(*params.Login.SystemEntrance.Entrance, "/")
-				params.Login.SystemEntrance = &accessor.SystemEntrance{
-					Entrance: &entrance,
-					Enable:   entrance != "",
-				}
-			} else {
-				params.Login.SystemEntrance = &accessor.SystemEntrance{}
+				normalized := strings.Trim(*params.Login.SystemEntrance.Entrance, "/")
+				entrance = &normalized
+			}
+			params.Login.SystemEntrance = &accessor.SystemEntrance{
+				Entrance: entrance,
+				Enable:   systemEntrance.Enable,
 			}
 		}
 		settingRow = &entity.Setting{

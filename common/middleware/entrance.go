@@ -31,7 +31,7 @@ func (self EntranceMiddleware) Process(httpContext *gin.Context) {
 	}
 
 	login := logic.Setting{}.GetLoginSetting()
-	if login.SystemEntrance == nil {
+	if login.SystemEntrance == nil || !login.SystemEntrance.Enable {
 		httpContext.Next()
 		return
 	}
@@ -39,7 +39,7 @@ func (self EntranceMiddleware) Process(httpContext *gin.Context) {
 	if login.SystemEntrance.Entrance != nil {
 		entrance = *login.SystemEntrance.Entrance
 	}
-	if !login.SystemEntrance.Enable || entrance == "" {
+	if entrance == "" {
 		httpContext.Next()
 		return
 	}

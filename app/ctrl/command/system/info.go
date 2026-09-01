@@ -98,7 +98,7 @@ func (self Info) Handle(cmd *cobra.Command, args []string) {
 	_, _ = fmt.Fprintln(writer, "Proxy:\t", function.MaskSensitiveValue(result.DPanel.Proxy))
 	_, _ = fmt.Fprintln(writer, "No Proxy:\t", result.DPanel.NoProxy)
 	securityEntrance := ""
-	if result.DPanel.SystemEntrance != nil {
+	if result.DPanel.SystemEntrance != nil && result.DPanel.SystemEntrance.Enable {
 		securityEntrance = result.DPanel.SystemEntrance.Config
 		if result.DPanel.SystemEntrance.Entrance != nil {
 			securityEntrance = *result.DPanel.SystemEntrance.Entrance

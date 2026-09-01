@@ -99,8 +99,8 @@ type Tag struct {
 
 type SystemEntrance struct {
 	Config   string  `json:"config"`             // system.entrance 默认值
-	Entrance *string `json:"entrance,omitempty"` // nil 表示使用 Config，空字符串表示显式关闭
-	Enable   bool    `json:"enable"`             // 最终是否启用
+	Entrance *string `json:"entrance,omitempty"` // nil 表示使用 Config，非 nil 表示用户配置的入口
+	Enable   bool    `json:"enable"`             // 用户配置的启用状态；无持久化配置时根据 Config 初始化
 }
 
 type Login struct {

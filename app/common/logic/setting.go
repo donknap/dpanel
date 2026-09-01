@@ -90,8 +90,8 @@ func (self Setting) GetValue(groupName string, name string) (*entity.Setting, er
 }
 
 // GetLoginSetting returns the persisted login settings together with the
-// effective security entrance configuration. The effective entrance prefers
-// the persisted override and falls back to system.entrance.
+// effective security entrance configuration. Persisted settings keep the
+// user-controlled enable state; only missing settings derive it from Config.
 func (self Setting) GetLoginSetting() accessor.Login {
 	login := accessor.Login{}
 	if cached, ok := storage.LoadCache[*accessor.SettingValueOption](storage.CacheKeySettingLogin); ok && cached != nil && cached.Login != nil {
@@ -101,20 +101,23 @@ func (self Setting) GetLoginSetting() accessor.Login {
 	}
 
 	configured := strings.Trim(facade.GetConfig().GetString("system.entrance"), "/")
+	if login.SystemEntrance == nil {
+		login.SystemEntrance = &accessor.SystemEntrance{
+			Config: configured,
+			Enable: configured != "",
+		}
+		return login
+	}
+
 	var entrance *string
-	if login.SystemEntrance != nil && login.SystemEntrance.Entrance != nil {
+	if login.SystemEntrance.Entrance != nil {
 		normalized := strings.Trim(*login.SystemEntrance.Entrance, "/")
 		entrance = &normalized
 	}
-	effective := configured
-	if entrance != nil {
-		effective = *entrance
-	}
-
 	login.SystemEntrance = &accessor.SystemEntrance{
 		Config:   configured,
 		Entrance: entrance,
-		Enable:   effective != "",
+		Enable:   login.SystemEntrance.Enable,
 	}
 	return login
 }
