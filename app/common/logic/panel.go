@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"text/template"
 	"time"
 
@@ -22,12 +21,24 @@ import (
 type Panel struct {
 }
 
-var installerArgKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]*$`)
+var panelUpdateAllowedArgKeys = []string{
+	"version",
+	"edition",
+	"dev",
+	"release",
+	"proxy",
+	"base-url",
+	"log-level",
+	"backup",
+	"base-image",
+	"dns",
+	"network-mode",
+}
 
 // 容器内触发升级时必须以 detached 模式运行 installer，避免当前进程/容器退出后升级中断。
 const panelUpdateCommandTemplate = `
 {{- if eq .type "container" -}}
-docker run -d --rm --pull always -v /var/run/docker.sock:/var/run/docker.sock -v {{ shellSafe .mountHost }}:/dpanel {{ .installerDownloadSource }} upgrade -y --log-path {{ shellSafe .installerLogPath }} --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
+docker run -d --rm --pull always -v {{ shellSafe .dockerSockHost }}:/var/run/docker.sock -v {{ shellSafe .mountHost }}:/dpanel {{ .installerDownloadSource }} upgrade -y --log-path {{ shellSafe .installerLogPath }} --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
 {{- else -}}
 curl -sSL https://dpanel.cc/quick.sh | bash -s -- upgrade -y -d --log-path {{ shellSafe .installerLogPath }} --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
 {{- end }}`
@@ -110,7 +121,7 @@ func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
 			return "", errors.New("invalid update params")
 		}
 		for key := range args {
-			if !installerArgKeyPattern.MatchString(key) {
+			if !function.InArray(panelUpdateAllowedArgKeys, key) {
 				return "", fmt.Errorf("invalid update param key: %s", key)
 			}
 		}
@@ -144,6 +155,17 @@ func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
 	if dpanelInfo.RunIn == types2.DPanelRunInContainer {
 		templateParams["mountHost"] = storagePath
 		templateParams["installerLogPath"] = filepath.Join("/dpanel", "logs", logFileName)
+		dockerSockHost := ""
+		for _, mount := range dpanelInfo.ContainerInfo.Mounts {
+			if mount.Destination == "/var/run/docker.sock" {
+				dockerSockHost = mount.Source
+				break
+			}
+		}
+		if dockerSockHost == "" {
+			return "", errors.New("dpanel docker socket mount not found")
+		}
+		templateParams["dockerSockHost"] = dockerSockHost
 	}
 
 	commandTemplate, err := template.New("panel-update-command").Funcs(template.FuncMap{
