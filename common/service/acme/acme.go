@@ -5,20 +5,23 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/exec/local"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 )
 
 const (
 	DefaultCommandName     = "/root/.acme.sh/acme.sh"
 	EnvOverrideCommandName = "DP_ACME_COMMAND_NAME"
-	EnvOverrideConfigHome  = "DP_ACME_CONFIG_HOME"
+	EnvOverrideConfigHome  = define.EnvOverrideConfigHome
 )
 
 func New(ctx context.Context, opts ...Option) (*Acme, error) {
@@ -31,12 +34,8 @@ func New(ctx context.Context, opts ...Option) (*Acme, error) {
 	if override := os.Getenv(EnvOverrideCommandName); override != "" {
 		b.commandName = override
 	}
-	if override := os.Getenv(EnvOverrideConfigHome); override != "" {
-		b.configHome = override
-		b.argv = append(b.argv, "--config-home", b.configHome)
-	} else {
-		b.configHome = filepath.Dir(b.commandName)
-	}
+	b.configHome = storage.Local{}.GetCertDomainPath()
+	b.argv = append(b.argv, "--config-home", b.configHome)
 	b.env = append(b.env, "HTTP_PROXY="+os.Getenv("HTTP_PROXY"), "HTTPS_PROXY="+os.Getenv("HTTP_PROXY"))
 	for _, opt := range opts {
 		err := opt(b)
@@ -128,7 +127,97 @@ func (self Acme) List() ([]*Cert, error) {
 	if err != nil {
 		return nil, err
 	}
-	return self.ParseListRaw(out), nil
+	return self.listExtend(self.ParseListRaw(out)), nil
+}
+
+// listExtend 补充 acme.sh --list 遗漏的证书。acme.sh 会忽略无点号域名，
+// 因此这里只扫描 config home 一级目录中的 ${domain}_ecc，并要求同目录存在
+// ${domain}.conf；每个缺失域名单独执行一次 --info --ecc -d，异常项直接跳过。
+func (self Acme) listExtend(list []*Cert) []*Cert {
+	existing := make(map[string]struct{}, len(list))
+	for _, cert := range list {
+		if cert != nil && cert.MainDomain != "" {
+			existing[cert.MainDomain] = struct{}{}
+		}
+	}
+	entries, err := os.ReadDir(self.configHome)
+	if err != nil {
+		slog.Debug("acme discover certificate directory failed", "path", self.configHome, "error", err)
+		return list
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() || !strings.HasSuffix(name, "_ecc") {
+			continue
+		}
+		domain := strings.TrimSuffix(name, "_ecc")
+		if domain == "" {
+			continue
+		}
+		confPath := filepath.Join(self.configHome, name, domain+".conf")
+		if info, err := os.Stat(confPath); err != nil || info.IsDir() {
+			slog.Debug("acme discover certificate config missing", "domain", domain, "path", confPath, "error", err)
+			continue
+		}
+
+		if _, ok := existing[domain]; ok {
+			continue
+		}
+		// 必须按域名单独调用，避免 acme.sh 将多个 -d 合并成一次查询。
+		infoArgv := append(append([]string{}, self.argv...), "--info", "--ecc", "-d", domain)
+		infoCmd, err := local.New(local.WithCommandName(self.commandName), local.WithArgs(infoArgv...))
+		if err != nil {
+			slog.Debug("acme discover certificate info command failed", "domain", domain, "error", err)
+			continue
+		}
+		info, err := infoCmd.RunWithResult()
+		if err != nil {
+			slog.Debug("acme discover certificate info failed", "domain", domain, "error", err)
+			continue
+		}
+		values := make(map[string]string)
+		scanner := bufio.NewScanner(bytes.NewReader(info))
+		for scanner.Scan() {
+			key, value, ok := strings.Cut(scanner.Text(), "=")
+			if !ok {
+				continue
+			}
+			key = strings.TrimSpace(key)
+			switch key {
+			case "Le_Domain", "Le_Alt", "Le_API", "Le_CertCreateTimeStr", "Le_NextRenewTimeStr":
+				values[key] = strings.Trim(strings.TrimSpace(value), "'\"")
+			}
+		}
+		mainDomain := strings.TrimSpace(values["Le_Domain"])
+		if scanner.Err() != nil || mainDomain == "" || mainDomain != domain {
+			slog.Debug("acme discover certificate info output invalid", "domain", domain)
+			continue
+		}
+		domainList := []string{mainDomain}
+		if alt := values["Le_Alt"]; alt != "" && !strings.EqualFold(alt, "no") {
+			for _, item := range strings.Split(alt, ",") {
+				if item = strings.TrimSpace(item); item != "" && !strings.EqualFold(item, "no") {
+					domainList = append(domainList, item)
+				}
+			}
+		}
+		// --list 的 CA 列对应 --info 输出中的 Le_API，时间字段同样直接沿用原值。
+		cert := &Cert{
+			RootPath:   filepath.Join(self.configHome, mainDomain),
+			MainDomain: mainDomain,
+			Domain:     domainList,
+			CA:         values["Le_API"],
+			CreatedAt:  values["Le_CertCreateTimeStr"],
+			RenewAt:    values["Le_NextRenewTimeStr"],
+			Success:    values["Le_API"] != "" && values["Le_CertCreateTimeStr"] != "",
+		}
+		if _, ok := existing[cert.MainDomain]; !ok {
+			list = append(list, cert)
+			existing[cert.MainDomain] = struct{}{}
+		}
+	}
+	return list
 }
 
 func (self Acme) Info(mainDomain string) (*Cert, error) {

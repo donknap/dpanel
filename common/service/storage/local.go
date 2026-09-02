@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/acme"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/google/uuid"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -35,7 +34,7 @@ func (self Local) GetCertPath() string {
 }
 
 func (self Local) GetCertDomainPath() string {
-	if override := os.Getenv(acme.EnvOverrideConfigHome); override != "" {
+	if override := os.Getenv(define.EnvOverrideConfigHome); override != "" {
 		return override
 	}
 	return fmt.Sprintf("%s/acme/", self.GetStorageLocalPath())
