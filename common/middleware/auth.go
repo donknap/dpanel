@@ -35,10 +35,14 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		return
 	}
 
-	var authToken = ""
-	authToken = http.GetHeader("Authorization")
+	authToken := http.GetHeader("X-DPanel-Authorization")
 	if authToken == "" {
-		authToken = "Bearer " + http.Query("token")
+		authToken = http.GetHeader("Authorization")
+	}
+	if authToken == "" {
+		if queryToken := http.Query("token"); queryToken != "" {
+			authToken = "Bearer " + queryToken
+		}
 	}
 
 	if authToken == "" {

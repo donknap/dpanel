@@ -205,7 +205,6 @@ func initDb() error {
 	}
 	// 同步数据库
 	err = db.Migrator().AutoMigrate(
-		&entity.Event{},
 		&entity.Image{},
 		&entity.Notice{},
 		&entity.Registry{},

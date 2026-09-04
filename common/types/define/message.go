@@ -66,6 +66,7 @@ const (
 	ErrorMessageUserFailedLock                              = ".userFailedLock"
 	ErrorMessageUserResetTokenExpire                        = ".userResetTokenExpire"
 	ErrorMessageUserNoPermission                            = ".userNoPermission"
+	ErrorMessageOauthAdminRequired                          = ".oauthAdminRequired"
 	ErrorMessageHomeWsHostConsoleSshNotSetting              = ".homeWsHostConsoleSshNotSetting"
 	ErrorMessageTagUrlNotFound                              = ".tagUrlNotFound"
 )

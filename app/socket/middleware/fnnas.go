@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 )
 
 type FnnasGateway struct {
@@ -16,22 +15,17 @@ func (self FnnasGateway) Process(next http.Handler) http.Handler {
 			next.ServeHTTP(response, request)
 			return
 		}
-
-		appName := strings.Trim(os.Getenv("TRIM_APPNAME"), "/")
-		if appName == "" {
-			appName = "dpanel"
+		if request.Header.Get("X-Trim-Userid") != "" ||
+			request.Header.Get("X-Trim-Username") != "" ||
+			request.Header.Get("X-Trim-Isadmin") != "" {
+			slog.Debug("fnnas socket request",
+				"X-Trim-Userid", request.Header.Get("X-Trim-Userid"),
+				"X-Trim-Username", request.Header.Get("X-Trim-Username"),
+				"X-Trim-Isadmin", request.Header.Get("X-Trim-Isadmin"),
+			)
 		}
-		prefix := "/app/" + appName
-		if request.URL.Path == prefix || strings.HasPrefix(request.URL.Path, prefix+"/") {
-			rawPath := request.URL.Path
-			request.URL.Path = strings.TrimPrefix(request.URL.Path, prefix)
-			if request.URL.Path == "" {
-				request.URL.Path = "/"
-			}
-			request.URL.RawPath = ""
-			slog.Debug("fnnas socket gateway rewrite", "from", rawPath, "to", request.URL.Path, "prefix", prefix)
-		}
-
+		// FNNAS forwards the gateway prefix to the Unix socket. The application
+		// is configured with the same baseurl, so Gin must receive the path as-is.
 		next.ServeHTTP(response, request)
 	})
 }

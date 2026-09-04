@@ -235,7 +235,11 @@ func (self User) OauthCallback(http *gin.Context) {
 	})
 	if err != nil {
 		slog.Debug("oauth callback failed", "provider", params.Provider, "error", err.Error())
-		self.JsonResponseWithError(http, err, 500)
+		if !function.IsErrorMessage(err) {
+			self.JsonResponseWithServerError(http, err)
+			return
+		}
+		self.JsonResponseWithError(http, err, 403)
 		return
 	}
 	self.JsonResponseWithoutError(http, gin.H{

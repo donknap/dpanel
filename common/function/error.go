@@ -9,6 +9,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type messageError struct {
+	value string
+}
+
+func (e *messageError) Error() string {
+	return e.value
+}
+
+func IsErrorMessage(err error) bool {
+	var target *messageError
+	return errors.As(err, &target)
+}
+
 func ErrorHasKeyword(e error, keyword ...string) bool {
 	for _, k := range keyword {
 		if strings.Contains(e.Error(), k) {
@@ -27,5 +40,5 @@ func ErrorMessage(title string, message ...string) error {
 		"createdAt": time.Now().Local(),
 	}
 	result, _ := json.Marshal(row)
-	return errors.New(string(result))
+	return &messageError{value: string(result)}
 }

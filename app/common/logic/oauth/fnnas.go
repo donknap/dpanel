@@ -3,11 +3,11 @@ package oauth
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,8 +15,8 @@ import (
 	commonLogic "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/google/uuid"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"gorm.io/gorm"
 )
 
@@ -59,7 +59,6 @@ func (self Fnnas) Authorize(request *http.Request) (string, error) {
 		return "", errors.New("fnnas oauth is not enabled")
 	}
 	if err := self.ValidateAuthorizeRequest(request); err != nil {
-		slog.Debug("fnnas oauth authorize validate failed", "error", err.Error())
 		return "", err
 	}
 	return self.AuthorizeByGateway(request)
@@ -71,41 +70,48 @@ func (self Fnnas) Exchange(option ExchangeOption) (string, error) {
 	cacheKey := fmt.Sprintf(storage.CacheKeyOauthCode, option.Code)
 	item, exists := storage.Cache.Get(cacheKey)
 	if !exists {
-		slog.Debug("fnnas oauth exchange failed", "reason", "code cache missing")
 		return "", errors.New("oauth code is invalid")
 	}
 	codeInfo, ok := item.(*FnnasCode)
 	if !ok || codeInfo.Provider != ProviderFnnas {
-		slog.Debug("fnnas oauth exchange failed", "reason", "code cache type or provider invalid")
 		return "", errors.New("oauth code is invalid")
 	}
 	if codeInfo.Used {
-		slog.Debug("fnnas oauth exchange failed", "reason", "code used")
 		return "", errors.New("oauth code has been used")
 	}
 	if time.Now().After(codeInfo.ExpiresAt) {
 		storage.Cache.Delete(cacheKey)
-		slog.Debug("fnnas oauth exchange failed", "reason", "code expired", "expiresAt", codeInfo.ExpiresAt)
 		return "", errors.New("oauth code has expired")
 	}
 	if option.State == "" || codeInfo.State != option.State {
-		slog.Debug("fnnas oauth exchange failed", "reason", "state mismatch")
 		return "", errors.New("oauth state is invalid")
 	}
 	if option.RedirectURI != "" && codeInfo.RedirectURI != option.RedirectURI {
-		slog.Debug("fnnas oauth exchange failed", "reason", "redirect uri mismatch", "cachedRedirectURI", codeInfo.RedirectURI, "requestRedirectURI", option.RedirectURI)
 		return "", errors.New("oauth redirect uri is invalid")
+	}
+	if !codeInfo.User.IsAdmin {
+		codeInfo.Used = true
+		storage.Cache.Set(cacheKey, codeInfo, time.Second)
+		storage.Cache.Delete(fmt.Sprintf(storage.CacheKeyOauthState, codeInfo.State))
+		return "", function.ErrorMessage(define.ErrorMessageOauthAdminRequired)
 	}
 
 	founder, err := commonLogic.User{}.GetFounderUser()
-	if err != nil {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if founder, err = (commonLogic.User{}).CreateFounderUser(codeInfo.User.Username, uuid.NewString()); err != nil {
+			return "", err
+		}
+	} else if err != nil {
 		return "", err
 	}
 	codeInfo.Used = true
 	storage.Cache.Set(cacheKey, codeInfo, time.Second)
 	storage.Cache.Delete(fmt.Sprintf(storage.CacheKeyOauthState, codeInfo.State))
-	slog.Debug("fnnas oauth exchange success")
-	return commonLogic.User{}.GetUserOauthToken(founder, false)
+	accessToken, err := commonLogic.User{}.GetUserOauthToken(founder, false)
+	if err != nil {
+		return "", err
+	}
+	return accessToken, nil
 }
 
 func (self Fnnas) Enable() bool {
@@ -134,27 +140,10 @@ func (self Fnnas) AuthorizeByGateway(request *http.Request) (string, error) {
 	}
 	fnnasUser, err := self.User(request)
 	if err != nil {
-		slog.Debug("fnnas oauth authorize gateway failed", "reason", "user header invalid", "error", err.Error())
 		return "", err
-	}
-	if !fnnasUser.IsAdmin {
-		slog.Debug("fnnas oauth authorize gateway failed", "reason", "user is not admin")
-		return "", errors.New("fnnas user is not administrator")
-	}
-	if _, err = (commonLogic.User{}).GetFounderUser(); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if _, err = (commonLogic.User{}).CreateFounderUser(fnnasUser.Username, uuid.NewString()); err != nil {
-				slog.Debug("fnnas oauth authorize gateway failed", "reason", "founder create failed", "error", err.Error())
-				return "", err
-			}
-		} else {
-			slog.Debug("fnnas oauth authorize gateway failed", "reason", "founder invalid", "error", err.Error())
-			return "", err
-		}
 	}
 	redirectURI, err := self.RedirectURI(request)
 	if err != nil {
-		slog.Debug("fnnas oauth authorize gateway failed", "reason", "redirect uri invalid", "error", err.Error())
 		return "", err
 	}
 	state := uuid.NewString()
@@ -178,10 +167,6 @@ func (self Fnnas) AuthorizeByGateway(request *http.Request) (string, error) {
 	query.Set("code", code)
 	query.Set("state", state)
 	redirectURL.RawQuery = query.Encode()
-	slog.Debug("fnnas oauth authorize gateway success",
-		"callbackHost", redirectURL.Hostname(),
-		"callbackPort", redirectURL.Port(),
-	)
 	return redirectURL.String(), nil
 }
 
@@ -193,15 +178,19 @@ func (self Fnnas) HasUserHeader(request *http.Request) bool {
 
 func (self Fnnas) User(request *http.Request) (FnnasUser, error) {
 	userID := request.Header.Get("X-Trim-Userid")
-	isAdmin := request.Header.Get("X-Trim-Isadmin")
+	isAdminRaw := request.Header.Get("X-Trim-Isadmin")
 	username := request.Header.Get("X-Trim-Username")
-	if userID == "" || isAdmin == "" || username == "" {
+	parsedAdmin, parseErr := strconv.ParseBool(strings.TrimSpace(isAdminRaw))
+	if userID == "" || isAdminRaw == "" || username == "" {
 		return FnnasUser{}, errors.New("fnnas user header is empty")
+	}
+	if parseErr != nil {
+		return FnnasUser{}, errors.New("fnnas user isadmin header is invalid")
 	}
 	return FnnasUser{
 		UserID:   userID,
 		Username: username,
-		IsAdmin:  strings.EqualFold(strings.TrimSpace(isAdmin), "true"),
+		IsAdmin:  parsedAdmin,
 	}, nil
 }
 
@@ -253,21 +242,6 @@ func (self Fnnas) RedirectURI(request *http.Request) (string, error) {
 	if host == "" {
 		return "", errors.New("oauth redirect uri host is empty")
 	}
-	hostname := host
-	if value, _, err := net.SplitHostPort(host); err == nil {
-		hostname = value
-	}
-	appPort := ""
-	if facade.Config != nil {
-		appPort = strings.TrimSpace(facade.Config.GetString("server.http.port"))
-	}
-	if appPort == "" {
-		appPort = strings.TrimSpace(os.Getenv("APP_SERVER_PORT"))
-	}
-	if appPort == "" {
-		return "", errors.New("oauth redirect uri app port is empty")
-	}
-	host = net.JoinHostPort(strings.Trim(hostname, "[]"), appPort)
 	scheme := "http"
 	if request.TLS != nil {
 		scheme = "https"
@@ -278,6 +252,9 @@ func (self Fnnas) RedirectURI(request *http.Request) (string, error) {
 	if scheme != "http" && scheme != "https" {
 		return "", errors.New("oauth redirect uri scheme is invalid")
 	}
+
+	// Preserve the forwarded Host, including its port, and apply the panel
+	// baseurl exactly once to the callback path.
 	return scheme + "://" + host + function.RouterUri("/dpanel/ui/user/oauth/callback/fnnas"), nil
 }
 
