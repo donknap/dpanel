@@ -177,6 +177,25 @@ func (self Container) GetList(http *gin.Context) {
 				list[index].Ports = ports
 			}
 		}
+		sort.Slice(list[index].Ports, func(i, j int) bool {
+			left, right := list[index].Ports[i], list[index].Ports[j]
+			if left.PublicPort != right.PublicPort {
+				if left.PublicPort == 0 {
+					return false
+				}
+				if right.PublicPort == 0 {
+					return true
+				}
+				return left.PublicPort < right.PublicPort
+			}
+			if left.PrivatePort != right.PrivatePort {
+				return left.PrivatePort < right.PrivatePort
+			}
+			if left.Type != right.Type {
+				return left.Type < right.Type
+			}
+			return left.IP < right.IP
+		})
 	}
 
 	query := dao.Site.Where(dao.Site.SiteName.In(function.PluckArrayWalk(containerName, func(i string) (string, bool) {

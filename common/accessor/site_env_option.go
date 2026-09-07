@@ -41,6 +41,11 @@ type SiteEnvOption struct {
 	Healthcheck     *types.HealthcheckItem   `json:"healthcheck,omitempty"`
 	HostPid         bool                     `json:"hostPid,omitempty"`
 	CapAdd          []string                 `json:"capAdd,omitempty"`
+	SecurityOpt     []string                 `json:"securityOpt,omitempty"`
+	Runtime         string                   `json:"runtime,omitempty"`
+	ReadonlyRootfs  bool                     `json:"readonlyRootfs,omitempty"`
+	Sysctls         map[string]string        `json:"sysctls,omitempty"`
+	Tmpfs           []types.VolumeItem       `json:"tmpfs,omitempty"`
 	Constraint      *types.Constraint        `json:"constraint,omitempty"`
 	ImageRegistry   int32                    `json:"imageRegistry,omitempty"`
 	Placement       []types.ValueItem        `json:"placement,omitempty"`

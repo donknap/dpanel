@@ -129,6 +129,55 @@ func WithPrivileged(b bool) Option {
 	}
 }
 
+func WithSecurityOpt(items ...string) Option {
+	return func(self *Builder) error {
+		self.hostConfig.SecurityOpt = append([]string(nil), items...)
+		return nil
+	}
+}
+
+func WithRuntime(runtime string) Option {
+	return func(self *Builder) error {
+		self.hostConfig.Runtime = runtime
+		return nil
+	}
+}
+
+func WithReadonlyRootfs(readonly bool) Option {
+	return func(self *Builder) error {
+		self.hostConfig.ReadonlyRootfs = readonly
+		return nil
+	}
+}
+
+func WithSysctls(items map[string]string) Option {
+	return func(self *Builder) error {
+		self.hostConfig.Sysctls = make(map[string]string, len(items))
+		for key, value := range items {
+			self.hostConfig.Sysctls[key] = value
+		}
+		return nil
+	}
+}
+
+func WithTmpfs(items ...types.VolumeItem) Option {
+	return func(self *Builder) error {
+		self.hostConfig.Tmpfs = make(map[string]string, len(items))
+		for _, item := range items {
+			if item.Dest == "" {
+				return errors.New("tmpfs dest path is empty")
+			}
+			if item.Permission == "readonly" {
+				self.hostConfig.Tmpfs[item.Dest] = "ro"
+			} else {
+				// Empty options let Docker apply its default tmpfs size and mount flags.
+				self.hostConfig.Tmpfs[item.Dest] = ""
+			}
+		}
+		return nil
+	}
+}
+
 func WithVolume(item ...types.VolumeItem) Option {
 	return func(self *Builder) error {
 		self.hostConfig.Binds = make([]string, 0)

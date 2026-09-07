@@ -17,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	dockertypes "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
@@ -195,11 +196,17 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if !self.Validate(http, &buildParams) {
 		return
 	}
+
+	var err error
+	var oldContainerInfo *container.InspectResponse
+
 	if params.ContainerId == "" {
-		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); err == nil {
+		if _, err = docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); err == nil {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.SiteName), 500)
 			return
 		}
+	} else if inspectInfo, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId); inspectErr == nil {
+		oldContainerInfo = &inspectInfo
 	}
 
 	checkIpInSubnet := make([][2]string, 0)
@@ -228,9 +235,9 @@ func (self Site) CreateByImage(http *gin.Context) {
 		}
 	}
 
-	var err error
+	startErr := errors.New("")
 	var siteRow *entity.Site
-	var oldContainerInfo *container.InspectResponse
+
 	if params.ContainerId != "" {
 		siteRow, err = dao.Site.
 			Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(params.ContainerId, "Id"))...).
@@ -245,9 +252,6 @@ func (self Site) CreateByImage(http *gin.Context) {
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			self.JsonResponseWithError(http, err, 500)
 			return
-		}
-		if inspectInfo, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId); inspectErr == nil {
-			oldContainerInfo = &inspectInfo
 		}
 	}
 
@@ -269,8 +273,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 
 	buildParams.DockerEnvName = docker.Sdk.Name
 
-	createSiteRow := siteRow == nil
-	if createSiteRow {
+	// 新建站点或编辑非面板创建的容器时，先建立站点记录。
+	if siteRow == nil {
 		siteRow = &entity.Site{
 			SiteName:      params.SiteName,
 			SiteTitle:     params.SiteTitle,
@@ -278,11 +282,10 @@ func (self Site) CreateByImage(http *gin.Context) {
 			Status:        define.DockerImageBuildStatusStop,
 			ContainerInfo: &accessor.SiteContainerInfoOption{},
 		}
-		// 获取一下当前是否有容器，出错后，还可以获取到最后一次成功的配置
-		if detail, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.SiteName); inspectErr == nil {
+		if oldContainerInfo != nil {
 			siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
-				Id:   detail.ID,
-				Info: detail,
+				Id:   oldContainerInfo.ID,
+				Info: *oldContainerInfo,
 			}
 		}
 
@@ -292,6 +295,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			return
 		}
 	}
+
 	runTaskRow := &task.CreateContainerOption{
 		SiteName:    params.SiteName,
 		SiteId:      siteRow.ID,
@@ -300,53 +304,22 @@ func (self Site) CreateByImage(http *gin.Context) {
 	}
 	containerId, err := task.Docker{}.ContainerCreate(runTaskRow)
 	if err != nil {
-		if !createSiteRow {
-			// 重建时只要新容器已经创建，即使后续网络连接或启动失败也保留它，供用户修正配置后再次提交。
-			finalContainer := containerId
-			if finalContainer == "" {
-				finalContainer = params.SiteName
-			}
-			detail, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, finalContainer)
+		// 空 ID 或原 ID 表示未产生需要接管的新实例。返回不同 ID 表示最终容器实例已经变化；
+		// 即使该实例由回滚重建产生，也按新实例更新站点配置、容器信息及相关引用。
+		if containerId == "" || containerId == params.ContainerId {
 			updateValue := &entity.Site{
 				Status:  define.DockerImageBuildStatusError,
 				Message: err.Error(),
 			}
-			if containerId != "" {
-				finalInfo := container.InspectResponse{}
-				finalInfo.ID = containerId
-				updateValue.ContainerInfo = &accessor.SiteContainerInfoOption{Id: containerId, Info: finalInfo}
-			}
-			if inspectErr == nil {
-				containerId = detail.ID
-				updateValue.ContainerInfo = &accessor.SiteContainerInfoOption{Id: detail.ID, Info: detail}
-			}
-			if _, updateErr := dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(updateValue); updateErr != nil {
-				self.JsonResponseWithError(http, errors.Join(err, updateErr), 500)
-				return
-			}
-			if inspectErr == nil && oldContainerInfo != nil && oldContainerInfo.ID != detail.ID {
-				facade.GetEvent().Publish(event.ContainerEditEvent, event.ContainerPayload{
-					InspectInfo:    &detail,
-					OldInspectInfo: oldContainerInfo,
-					Ctx:            http,
-				})
+			_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(updateValue)
+			if params.ContainerId == "" {
+				_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
 			}
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		// 如果是新建容器失败时需要清理掉创建的容器，否则用户再次提交会提示容器已经存在
-		if params.ContainerId == "" && containerId != "" {
-			if _, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerId); inspectErr == nil {
-				_ = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, containerId, container.RemoveOptions{})
-			}
-		}
-		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(entity.Site{
-			Status:  define.DockerImageBuildStatusError,
-			Message: err.Error(),
-		})
-		_, _ = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Delete()
-		self.JsonResponseWithError(http, err, 500)
-		return
+		// 最终容器实例已经变化，保存最新实例及本次提交配置，并保留执行错误供用户修正后重试。
+		startErr = err
 	}
 
 	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, containerId)
@@ -354,12 +327,20 @@ func (self Site) CreateByImage(http *gin.Context) {
 		finalInfo := container.InspectResponse{}
 		finalInfo.ID = containerId
 		_, updateErr := dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Updates(&entity.Site{
-			ContainerInfo: &accessor.SiteContainerInfoOption{Id: containerId, Info: finalInfo},
-			Status:        define.DockerImageBuildStatusError,
-			Message:       err.Error(),
+			ContainerInfo: &accessor.SiteContainerInfoOption{
+				Id:   containerId,
+				Info: finalInfo,
+			},
+			Status:  define.DockerImageBuildStatusError,
+			Message: err.Error(),
 		})
 		self.JsonResponseWithError(http, errors.Join(err, updateErr), 500)
 		return
+	}
+
+	status := int32(define.DockerImageBuildStatusSuccess)
+	if startErr.Error() != "" {
+		status = define.DockerImageBuildStatusError
 	}
 
 	_, err = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Select(
@@ -377,9 +358,10 @@ func (self Site) CreateByImage(http *gin.Context) {
 			Id:   detail.ID,
 			Info: detail,
 		},
-		Status:  define.DockerImageBuildStatusSuccess,
-		Message: "",
+		Status:  status,
+		Message: startErr.Error(),
 	})
+
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -398,10 +380,12 @@ func (self Site) CreateByImage(http *gin.Context) {
 		})
 	}
 
-	self.JsonResponseWithoutError(http, gin.H{
+	response := gin.H{
 		"siteId":      siteRow.ID,
 		"containerId": detail.ID,
-	})
+		"error":       startErr.Error(),
+	}
+	self.JsonResponseWithoutError(http, response)
 	return
 }
 
@@ -546,6 +530,32 @@ func (self Site) GetDetail(http *gin.Context) {
 	}
 
 	if siteRow.ContainerInfo != nil && siteRow.ContainerInfo.Info.Config != nil && siteRow.ContainerInfo.Info.Config.Image != "" {
+		if siteRow.Env == nil {
+			siteRow.Env = &accessor.SiteEnvOption{}
+		}
+		if hostConfig := siteRow.ContainerInfo.Info.HostConfig; hostConfig != nil {
+			siteRow.Env.SecurityOpt = append([]string(nil), hostConfig.SecurityOpt...)
+			siteRow.Env.Runtime = hostConfig.Runtime
+			siteRow.Env.ReadonlyRootfs = hostConfig.ReadonlyRootfs
+			siteRow.Env.Sysctls = make(map[string]string, len(hostConfig.Sysctls))
+			for key, value := range hostConfig.Sysctls {
+				siteRow.Env.Sysctls[key] = value
+			}
+			siteRow.Env.Tmpfs = make([]dockertypes.VolumeItem, 0, len(hostConfig.Tmpfs))
+			for dest, optionString := range hostConfig.Tmpfs {
+				permission := "write"
+				for _, option := range strings.Split(optionString, ",") {
+					option = strings.TrimSpace(option)
+					if option == "ro" {
+						permission = "readonly"
+					}
+				}
+				siteRow.Env.Tmpfs = append(siteRow.Env.Tmpfs, dockertypes.VolumeItem{
+					Dest:       dest,
+					Permission: permission,
+				})
+			}
+		}
 		imageNameDetail := function.ImageTag(siteRow.ContainerInfo.Info.Config.Image)
 		siteRow.ContainerInfo.Info.Config.Image = imageNameDetail.Uri()
 	}
