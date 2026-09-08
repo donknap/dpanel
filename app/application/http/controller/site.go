@@ -182,13 +182,7 @@ func (self Site) CreateByCommand(http *gin.Context) {
 }
 
 func (self Site) CreateByImage(http *gin.Context) {
-	type ParamsValidate struct {
-		SiteTitle   string `json:"siteTitle"`
-		SiteName    string `json:"siteName" binding:"required"`
-		ImageName   string `json:"imageName" binding:"required"`
-		ContainerId string `json:"id"`
-	}
-	params := ParamsValidate{}
+	params := task.CreateContainerOption{}
 	if !self.Validate(http, &params) {
 		return
 	}
@@ -254,7 +248,10 @@ func (self Site) CreateByImage(http *gin.Context) {
 			return
 		}
 	}
-
+	if buildParams.ImageAutoCommit != nil && siteRow != nil && siteRow.Env != nil && siteRow.Env.ImageAutoCommit != nil {
+		buildParams.ImageAutoCommit.CommitName = siteRow.Env.ImageAutoCommit.CommitName
+	}
+	isEdit := siteRow != nil
 	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.ImageName)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -296,13 +293,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 		}
 	}
 
-	runTaskRow := &task.CreateContainerOption{
-		SiteName:    params.SiteName,
-		SiteId:      siteRow.ID,
-		BuildParams: &buildParams,
-		ContainerId: params.ContainerId,
-	}
-	containerId, err := task.Docker{}.ContainerCreate(runTaskRow)
+	params.BuildParams = &buildParams
+	containerId, err := task.Docker{}.ContainerCreate(&params)
 	if err != nil {
 		// 空 ID 或原 ID 表示未产生需要接管的新实例。返回不同 ID 表示最终容器实例已经变化；
 		// 即使该实例由回滚重建产生，也按新实例更新站点配置、容器信息及相关引用。
@@ -343,24 +335,42 @@ func (self Site) CreateByImage(http *gin.Context) {
 		status = define.DockerImageBuildStatusError
 	}
 
-	_, err = dao.Site.Where(dao.Site.ID.Eq(siteRow.ID)).Select(
-		dao.Site.SiteName,
-		dao.Site.SiteTitle,
-		dao.Site.Env,
-		dao.Site.ContainerInfo,
-		dao.Site.Status,
-		dao.Site.Message,
-	).Updates(&entity.Site{
-		SiteName:  params.SiteName,
-		SiteTitle: params.SiteTitle,
-		Env:       &buildParams,
-		ContainerInfo: &accessor.SiteContainerInfoOption{
-			Id:   detail.ID,
-			Info: detail,
-		},
-		Status:  status,
-		Message: startErr.Error(),
-	})
+	siteRow.SiteName = params.SiteName
+	siteRow.SiteTitle = params.SiteTitle
+	siteRow.Env = &buildParams
+	siteRow.ContainerInfo = &accessor.SiteContainerInfoOption{
+		Id:   detail.ID,
+		Info: detail,
+	}
+	siteRow.Status = status
+	siteRow.Message = startErr.Error()
+	if isEdit && startErr.Error() == "" {
+		oldSiteID := siteRow.ID
+		err = dao.Q.Transaction(func(tx *dao.Query) error {
+			if _, err = tx.Site.Where(dao.Site.ID.Eq(oldSiteID)).Delete(); err != nil {
+				return err
+			}
+			siteRow.ID = 0
+			siteRow.DeletedAt = gorm.DeletedAt{}
+			if err = tx.Site.Save(siteRow); err != nil {
+				return err
+			}
+
+			deleteQuery := tx.Site.Unscoped().Order(dao.Site.ID.Desc()).Where(gen.Cond(
+				datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
+			)...).Where(dao.Site.SiteName.Eq(siteRow.SiteName)).Where(dao.Site.DeletedAt.IsNotNull())
+			keepIds := make([]int32, 0, 5)
+			if err = deleteQuery.Limit(5).Pluck(dao.Site.ID, &keepIds); err != nil {
+				return err
+			}
+			if len(keepIds) > 0 {
+				_, err = deleteQuery.Where(dao.Site.ID.NotIn(keepIds...)).Delete()
+			}
+			return err
+		})
+	} else {
+		err = dao.Site.Save(siteRow)
+	}
 
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

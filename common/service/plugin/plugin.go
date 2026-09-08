@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
@@ -284,7 +285,9 @@ func (self *Plugin) Close() error {
 		})
 
 		if serviceExt.ImageAutoRemove {
-			if err = self.dockerSdk.ImageRemoveAll(self.dockerSdk.Ctx, containerInfo.Config.Image); err != nil {
+			if err = self.dockerSdk.ImageRemove(self.dockerSdk.Ctx, filters.NewArgs(
+				filters.Arg(docker.ImageFilterReference, containerInfo.Config.Image),
+			)); err != nil {
 				slog.Debug("plugin delete explorer image", "id", containerInfo.Config.Image)
 			}
 		}

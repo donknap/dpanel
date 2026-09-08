@@ -413,7 +413,10 @@ func (self Container) Delete(http *gin.Context) {
 	runOption.Entrypoint = ""
 	runOption.WorkDir = ""
 
-	siteRow, _ := dao.Site.Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "Id"))...).First()
+	siteRow, _ := dao.Site.
+		Where(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "id"))...).
+		Or(gen.Cond(datatypes.JSONQuery("container_info").Equals(containerInfo.ID, "Id"))...).
+		First()
 	// 创建回收站数据
 	if siteRow == nil {
 		siteRow = &entity.Site{

@@ -19,6 +19,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/donknap/dpanel/common/function"
@@ -40,6 +42,12 @@ type ImagePushOption struct {
 	Platform   *ocispec.Platform
 	OnProgress func(map[string]*dockerTypes.PullProgress)
 }
+
+const (
+	ImageFilterLabel     = "label"
+	ImageFilterBefore    = "before"
+	ImageFilterReference = "reference"
+)
 
 type imageProgressReader struct {
 	progressItems    map[string]*dockerTypes.PullProgress
@@ -344,14 +352,26 @@ func (self Client) ImageLoadFsFile(ctx context.Context, file ioFs.File) error {
 	return nil
 }
 
-func (self Client) ImageRemoveAll(ctx context.Context, imageName string) error {
-	imageInfo, err := self.Client.ImageInspect(ctx, imageName)
+func (self Client) ImageRemove(ctx context.Context, filter filters.Args) error {
+	if filter.Len() == 0 {
+		return errors.New("image remove filter is empty")
+	}
+	imageList, err := self.Client.ImageList(ctx, image.ListOptions{
+		All:     true,
+		Filters: filter,
+	})
 	if err != nil {
 		return err
 	}
-	for _, tag := range imageInfo.RepoTags {
-		_, err = self.Client.ImageRemove(ctx, tag, image.RemoveOptions{})
-		if err != nil {
+	for _, item := range imageList {
+		for _, tag := range item.RepoTags {
+			_, err = self.Client.ImageRemove(ctx, tag, image.RemoveOptions{})
+			if err != nil && !errdefs.IsNotFound(err) {
+				return err
+			}
+		}
+		_, err = self.Client.ImageRemove(ctx, item.ID, image.RemoveOptions{PruneChildren: true})
+		if err != nil && !errdefs.IsNotFound(err) {
 			return err
 		}
 	}

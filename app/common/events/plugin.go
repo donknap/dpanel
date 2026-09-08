@@ -41,7 +41,9 @@ func (self Plugin) DestroyExplorer(e event.DockerDaemonPayload) {
 					if err != nil {
 						errors.Join(removeErr, err)
 					}
-					err = dockerSdk.ImageRemoveAll(dockerSdk.Ctx, containerInfo.Image)
+					err = dockerSdk.ImageRemove(dockerSdk.Ctx, filters.NewArgs(
+						filters.Arg(docker.ImageFilterReference, containerInfo.Image),
+					))
 					if err != nil {
 						errors.Join(removeErr, err)
 					}
