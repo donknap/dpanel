@@ -6,13 +6,11 @@ import (
 )
 
 type CreateContainerOption struct {
-	SiteTitle   string `json:"siteTitle"`
-	SiteName    string `json:"siteName" binding:"required"`
-	ImageName   string `json:"imageName" binding:"required"`
-	ContainerId string `json:"id"`
-	// ImageAutoCommitMerge 是本次容器重建的镜像层合并开关，独立于 BuildParams，避免持久化后在后续重建中重复执行。
-	ImageAutoCommitMerge bool                    `json:"imageAutoCommitMerge"`
-	BuildParams          *accessor.SiteEnvOption `json:"-"`
+	SiteTitle   string                  `json:"siteTitle"`
+	SiteName    string                  `json:"siteName" binding:"required"`
+	ImageName   string                  `json:"imageName" binding:"required"`
+	ContainerId string                  `json:"id"`
+	BuildParams *accessor.SiteEnvOption `json:"-"`
 }
 
 type ImageRemoteOption struct {

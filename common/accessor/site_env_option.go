@@ -4,9 +4,8 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
-type ImageAutoCommit struct {
-	Enable     bool   `json:"enable"`
-	CommitName string `json:"commitName,omitempty"` // 首次提交时生成，后续提交复用
+type ImageCommit struct {
+	TriggerEdit bool `json:"triggerEdit"`
 }
 
 type SiteEnvOption struct {
@@ -21,7 +20,7 @@ type SiteEnvOption struct {
 	Network         []types.NetworkItem      `json:"network,omitempty"`
 	ImageName       string                   `json:"imageName,omitempty"` // 非表单提交
 	ImageId         string                   `json:"imageId,omitempty"`   // 非表单提交
-	ImageAutoCommit *ImageAutoCommit         `json:"imageAutoCommit,omitempty"`
+	ImageCommit     *ImageCommit             `json:"imageCommit,omitempty"`
 	Privileged      bool                     `json:"privileged,omitempty"`
 	AutoRemove      bool                     `json:"autoRemove,omitempty"`
 	RestartPolicy   *types.RestartPolicy     `json:"restartPolicy,omitempty"`

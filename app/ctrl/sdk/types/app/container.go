@@ -10,7 +10,7 @@ type ContainerDetailResult struct {
 
 type ContainerUpgradeOption struct {
 	Md5       string `json:"md5" binding:"required"`
-	ImageTag  string `json:"imageTag"`
+	ImageName string `json:"imageName"`
 	EnableBak bool   `json:"enableBak"`
 }
 

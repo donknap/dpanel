@@ -420,7 +420,8 @@ func (self Image) Delete(http *gin.Context) {
 
 func (self Image) Prune(http *gin.Context) {
 	type ParamsValidate struct {
-		EnableUnuseTag bool `json:"enableUnuseTag"`
+		EnableUnuseTag    bool `json:"enableUnuseTag"`
+		EnableDependImage bool `json:"enableDependImage"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -428,7 +429,7 @@ func (self Image) Prune(http *gin.Context) {
 	}
 	// 清理未使用的 tag 时，直接调用 Prune 处理
 	// 只清理未使用镜像时，需要手动删除，避免 tag 被删除
-	if params.EnableUnuseTag {
+	if params.EnableUnuseTag && params.EnableDependImage {
 		filter := filters.NewArgs()
 		filter.Add("dangling", "0")
 		res, err := docker.Sdk.Client.ImagesPrune(docker.Sdk.Ctx, filter)
@@ -451,19 +452,39 @@ func (self Image) Prune(http *gin.Context) {
 		if imageList, err := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, image.ListOptions{
 			All: true,
 		}); err == nil {
+			dependImageList := make([]string, 0)
 			for _, item := range imageList {
-				if !function.InArray(useImageList, item.ID) {
-					deleteImageSpaceReclaimed += item.Size
-					deleteImageTotal += 1
-					// 当 tag 没有的时候把 id 也附加上
-					item.RepoTags = append(item.RepoTags, item.ID)
-					for _, tag := range item.RepoTags {
-						_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, tag, image.RemoveOptions{
-							PruneChildren: true,
-						})
-						if err != nil {
-							slog.Debug("image prune image remove", "error", err)
+				if history, err := docker.Sdk.Client.ImageHistory(docker.Sdk.Ctx, item.ID); err == nil {
+					for _, historyItem := range history {
+						if historyItem.ID != "" && historyItem.ID != item.ID {
+							dependImageList = append(dependImageList, historyItem.ID)
 						}
+					}
+				}
+			}
+			for _, item := range imageList {
+				isDependImage := function.InArray(dependImageList, item.ID)
+				if function.InArray(useImageList, item.ID) {
+					continue
+				}
+				if isDependImage && !params.EnableDependImage {
+					continue
+				}
+				if !isDependImage && !params.EnableUnuseTag && (len(item.RepoTags) > 0 || len(item.RepoDigests) > 0) {
+					continue
+				}
+
+				deleteImageSpaceReclaimed += item.Size
+				deleteImageTotal += 1
+				// 删除镜像的 tag、digest 后，再尝试删除镜像本身
+				imageReferences := append(item.RepoTags, item.RepoDigests...)
+				imageReferences = append(imageReferences, item.ID)
+				for _, tag := range imageReferences {
+					_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, tag, image.RemoveOptions{
+						PruneChildren: true,
+					})
+					if err != nil {
+						slog.Debug("image prune image remove", "error", err)
 					}
 				}
 			}

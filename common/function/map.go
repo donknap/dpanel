@@ -15,14 +15,19 @@ func IsEmptyMap[K cmp.Ordered, V interface{}](v map[K]V) bool {
 	return false
 }
 
-func PluckMapWalkArray[K cmp.Ordered, U interface{}, R interface{}](m map[K]U, walk func(k K, v U) (R, bool)) []R {
-	var keys []K
-	for key := range m {
+func SortedMapKeys[K cmp.Ordered, V interface{}](v map[K]V) []K {
+	keys := make([]K, 0, len(v))
+	for key := range v {
 		keys = append(keys, key)
 	}
 	sort.Slice(keys, func(i, j int) bool {
 		return keys[i] < keys[j]
 	})
+	return keys
+}
+
+func PluckMapWalkArray[K cmp.Ordered, U interface{}, R interface{}](m map[K]U, walk func(k K, v U) (R, bool)) []R {
+	keys := SortedMapKeys(m)
 	result := make([]R, 0)
 	for _, key := range keys {
 		newItem, ok := walk(key, m[key])
@@ -34,13 +39,7 @@ func PluckMapWalkArray[K cmp.Ordered, U interface{}, R interface{}](m map[K]U, w
 }
 
 func PluckMapWalk[K cmp.Ordered, U interface{}](m map[K]U, walk func(k K, v U) bool) map[K]U {
-	var keys []K
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i] < keys[j]
-	})
+	keys := SortedMapKeys(m)
 	result := make(map[K]U)
 	for _, key := range keys {
 		if walk(key, m[key]) {

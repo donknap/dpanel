@@ -91,7 +91,7 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 	containerUpgradeResult, err := proxyClient.AppContainerUpgrade(&app.ContainerUpgradeOption{
 		Md5:       containerInfo.Info.ID,
 		EnableBak: enableBak,
-		ImageTag:  imageName,
+		ImageName: imageName,
 	})
 
 	if err != nil {

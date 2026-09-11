@@ -43,7 +43,7 @@ type containerUpgradeProgress struct {
 func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 	type ParamsValidate struct {
 		Md5                    string `json:"md5" binding:"required"`
-		ImageTag               string `json:"imageTag"`
+		ImageName              string `json:"imageName"`
 		EnableBak              bool   `json:"enableBak"`
 		EnableResetImageConfig bool   `json:"enableResetImageConfig"` // 重置镜像内的配置
 	}
@@ -100,7 +100,7 @@ func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("container inspect info is incomplete"), 500)
 		return
 	}
-	imageName := params.ImageTag
+	imageName := params.ImageName
 	if imageName == "" {
 		imageName = containerInfo.Config.Image
 	}

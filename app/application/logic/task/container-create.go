@@ -1,30 +1,20 @@
 package task
 
 import (
-	"errors"
-	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/types/define"
 )
 
-const imageAutoCommitLabel = "com.dpanel.auto-commit.name"
-
 func (self Docker) ContainerCreate(task *CreateContainerOption) (containerID string, err error) {
-	runImageName := task.ImageName
 	var containerOwnerNetwork string
-	cleanupImageFilter := filters.NewArgs()
-	resetAutoCommit := false
 
 	// 如果绑定了 ipv6 需要先创建一个 ipv6 的自身网络
 	// 如果容器配置了 Ip，需要先创建一个自身网络
@@ -55,52 +45,21 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (containerID str
 		}
 	}
 
-	if inspectInfo.ID != "" {
-		_ = notice.Message{}.Info(".containerRemove", task.ContainerId[0:11])
+	hasExistingContainer := inspectInfo.ID != ""
+	if hasExistingContainer {
+		shortContainerID := inspectInfo.ID
+		if len(shortContainerID) > 11 {
+			shortContainerID = shortContainerID[:11]
+		}
+		_ = notice.Message{}.Info(".containerRemove", shortContainerID)
 	}
 
-	// 此处提前停止用于单独记录耗时操作的执行进度；rollback 中的停止是事务正常流程，不能替代这里。
-	// 后续配置校验失败时旧容器仍保留为停止状态，由用户修正配置后重试，不在此处自动重启。
-	if inspectInfo.ID != "" && inspectInfo.State.Running {
-		if err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, inspectInfo.ID, container.StopOptions{}); err != nil {
-			return "", err
-		}
-	}
-
-	if inspectInfo.ID != "" && task.BuildParams.ImageAutoCommit != nil {
-		autoCommit := task.BuildParams.ImageAutoCommit
-		if autoCommit.CommitName != "" && autoCommit.CommitName != task.ImageName {
-			cleanupImageFilter.Add(docker.ImageFilterLabel, fmt.Sprintf("%s=%s", imageAutoCommitLabel, autoCommit.CommitName))
-			resetAutoCommit = true
-		} else if autoCommit.Enable {
-			_ = notice.Message{}.Info(".containerCommit", "name", task.SiteName)
-			if autoCommit.CommitName == "" {
-				autoCommit.CommitName = fmt.Sprintf("%s-%s", task.ImageName, time.Now().Format(define.DateYmdHis))
-			}
-			commitImageID, err := docker.Sdk.ContainerCommit(
-				docker.Sdk.Ctx,
-				inspectInfo.ID,
-				docker.ContainerCommitOption{
-					Merge:  task.ImageAutoCommitMerge,
-					Tag:    autoCommit.CommitName,
-					Labels: map[string]string{imageAutoCommitLabel: autoCommit.CommitName},
-				},
-			)
-			if err != nil {
-				return "", err
-			}
-			runImageName = autoCommit.CommitName
-			if task.ImageAutoCommitMerge {
-				cleanupImageFilter.Add(docker.ImageFilterLabel, fmt.Sprintf("%s=%s", imageAutoCommitLabel, autoCommit.CommitName))
-				cleanupImageFilter.Add(docker.ImageFilterBefore, commitImageID)
-			}
-		}
-	}
+	wasRunning := hasExistingContainer && inspectInfo.State != nil && inspectInfo.State.Running
 
 	options := []builder.Option{
 		builder.WithContainerName(task.SiteName),
 	}
-	if inspectInfo.ID != "" {
+	if hasExistingContainer {
 		options = append(options,
 			builder.WithContainerRollback(inspectInfo, false),
 			builder.WithContainerInfo(inspectInfo),
@@ -117,7 +76,7 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (containerID str
 		}),
 		builder.WithStdioKeepAlive(true),
 		builder.WithHostname(task.BuildParams.Hostname),
-		builder.WithImage(runImageName),
+		builder.WithImage(task.ImageName),
 		builder.WithEnv(task.BuildParams.Environment...),
 		builder.WithVolumesFrom(task.BuildParams.Links...),
 		builder.WithPort(task.BuildParams.Ports...),
@@ -170,27 +129,21 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (containerID str
 
 	b, err := builder.New(docker.Sdk, options...)
 	if err != nil {
-		return "", err
+		return inspectInfo.ID, err
+	}
+
+	// 创建参数校验完成后再停止旧容器，避免参数错误导致旧容器提前停止。
+	// rollback 中的停止是事务正常流程，不能替代这里单独记录耗时操作的执行进度。
+	if wasRunning {
+		if err = docker.Sdk.Client.ContainerStop(docker.Sdk.Ctx, inspectInfo.ID, container.StopOptions{}); err != nil {
+			return "", err
+		}
 	}
 	_ = notice.Message{}.Info(".containerCreate", task.SiteName)
 	containerID, err = b.Execute()
 	if err != nil {
 		return containerID, err
 	}
-	if cleanupImageFilter.Len() > 0 || resetAutoCommit {
-		defer func() {
-			if cleanupImageFilter.Len() > 0 {
-				if cleanupErr := docker.Sdk.ImageRemove(docker.Sdk.Ctx, cleanupImageFilter); cleanupErr != nil {
-					err = errors.Join(err, cleanupErr)
-					return
-				}
-			}
-			if resetAutoCommit {
-				task.BuildParams.ImageAutoCommit.CommitName = ""
-			}
-		}()
-	}
-
 	// 当前如果新建了容器自身网络，创建完后加入
 	// 如果在创建时加入，则会丢失 bridge 网络
 	if containerOwnerNetwork != "" {

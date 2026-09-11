@@ -585,22 +585,39 @@ func (self Container) Export(http *gin.Context) {
 
 func (self Container) Commit(http *gin.Context) {
 	type ParamsValidate struct {
-		Md5  string `json:"md5" binding:"required"`
-		Name string `json:"name" binding:"required"`
+		Md5   string `json:"md5" binding:"required"`
+		Name  string `json:"name"`
+		Merge bool   `json:"merge"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	response, err := docker.Sdk.Client.ContainerCommit(docker.Sdk.Ctx, params.Md5, container.CommitOptions{
-		Reference: params.Name,
+	dockerClient, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	containerInfo, err := dockerClient.Client.ContainerInspect(dockerClient.Ctx, params.Md5)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	imageName, err := dockerClient.ContainerCommit(dockerClient.Ctx, params.Md5, docker.ContainerCommitOption{
+		Tag:   params.Name,
+		Merge: params.Merge,
 	})
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	noticeTitle := ".containerCommit"
+	if params.Merge {
+		noticeTitle = ".containerCommitMerge"
+	}
+	_ = notice.Message{}.Info(noticeTitle, "name", strings.TrimPrefix(containerInfo.Name, "/"))
 	self.JsonResponseWithoutError(http, gin.H{
-		"md5": response.ID,
+		"name": imageName,
 	})
 	return
 }

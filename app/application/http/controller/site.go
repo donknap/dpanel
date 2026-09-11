@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/application/logic/task"
+	commonLogic "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -203,6 +204,17 @@ func (self Site) CreateByImage(http *gin.Context) {
 		oldContainerInfo = &inspectInfo
 	}
 
+	// CreateByImage 会停止并替换目标容器，不能用于操作承载当前服务的 DPanel 容器。
+	if oldContainerInfo != nil && docker.Sdk.DockerEnv.Default {
+		dpanelInfo := commonLogic.Setting{}.GetDPanelInfo()
+		if dpanelInfo.ContainerInfo.ContainerJSONBase != nil &&
+			(dpanelInfo.ContainerInfo.ID == oldContainerInfo.ID || dpanelInfo.ContainerInfo.Name == oldContainerInfo.Name) {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerUpgradeDPanel), 500)
+			return
+		}
+	}
+
+	// 在产生站点记录和容器变更前完成网络参数校验。
 	checkIpInSubnet := make([][2]string, 0)
 	if buildParams.IpV4 != nil {
 		checkIpInSubnet = append(checkIpInSubnet, [2]string{
@@ -248,16 +260,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			return
 		}
 	}
-	if buildParams.ImageAutoCommit != nil && siteRow != nil && siteRow.Env != nil && siteRow.Env.ImageAutoCommit != nil {
-		buildParams.ImageAutoCommit.CommitName = siteRow.Env.ImageAutoCommit.CommitName
-	}
 	isEdit := siteRow != nil
-	imageInfo, err := docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, params.ImageName)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	buildParams.ImageId = imageInfo.ID
 
 	for i, volume := range buildParams.Volumes {
 		if volume.Host == "" {
@@ -334,6 +337,8 @@ func (self Site) CreateByImage(http *gin.Context) {
 	if startErr.Error() != "" {
 		status = define.DockerImageBuildStatusError
 	}
+	buildParams.ImageName = detail.Config.Image
+	buildParams.ImageId = detail.Image
 
 	siteRow.SiteName = params.SiteName
 	siteRow.SiteTitle = params.SiteTitle
