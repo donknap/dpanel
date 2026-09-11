@@ -1,10 +1,8 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 
 	"github.com/donknap/dpanel/app/common/logic"
@@ -66,23 +64,8 @@ func (self Attach) Delete(http *gin.Context) {
 		return
 	}
 	params.Path = function.PathClean(params.Path)
-	uploadFile, err := storage.Local{}.CreateTempFile(params.Path)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	path := uploadFile.Name()
-	err = uploadFile.Close()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	_, err = os.Stat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	err = os.Remove(path)
+	path := storage.Local{}.GetSaveRealPath(params.Path)
+	err := function.SafeDelete(storage.Local{}.GetLocalTempDir(), path)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
