@@ -3,6 +3,7 @@ package oauth
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -219,43 +220,24 @@ func (self Fnnas) ParseRedirectURI(redirectURI string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	if redirectURL.Scheme != "http" && redirectURL.Scheme != "https" {
-		return nil, errors.New("oauth redirect uri scheme is invalid")
-	}
-	if redirectURL.Host == "" {
-		return nil, errors.New("oauth redirect uri host is empty")
-	}
-	if redirectURL.Path != function.RouterUri("/dpanel/ui/user/oauth/callback/fnnas") {
+	if redirectURI != function.RouterUri("/dpanel/ui/user/oauth/callback/fnnas") {
 		return nil, errors.New("oauth redirect uri path is invalid")
-	}
-	if redirectURL.RawQuery != "" || redirectURL.Fragment != "" {
-		return nil, errors.New("oauth redirect uri is invalid")
 	}
 	return redirectURL, nil
 }
 
 func (self Fnnas) RedirectURI(request *http.Request) (string, error) {
-	host := strings.TrimSpace(request.Host)
-	if forwardedHost := request.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
-		host = strings.TrimSpace(strings.Split(forwardedHost, ",")[0])
-	}
-	if host == "" {
-		return "", errors.New("oauth redirect uri host is empty")
-	}
-	scheme := "http"
-	if request.TLS != nil {
-		scheme = "https"
-	}
-	if forwardedProto := request.Header.Get("X-Forwarded-Proto"); forwardedProto != "" {
-		scheme = strings.TrimSpace(strings.Split(forwardedProto, ",")[0])
-	}
-	if scheme != "http" && scheme != "https" {
-		return "", errors.New("oauth redirect uri scheme is invalid")
-	}
-
-	// Preserve the forwarded Host, including its port, and apply the panel
-	// baseurl exactly once to the callback path.
-	return scheme + "://" + host + function.RouterUri("/dpanel/ui/user/oauth/callback/fnnas"), nil
+	// Let the browser preserve its origin; the Unix socket gateway may omit
+	// the external port from Host and forwarded headers.
+	redirectURI := function.RouterUri("/dpanel/ui/user/oauth/callback/fnnas")
+	slog.Debug("fnnas oauth redirect uri",
+		"requestHost", request.Host,
+		"forwardedHost", request.Header.Get("X-Forwarded-Host"),
+		"forwardedPort", request.Header.Get("X-Forwarded-Port"),
+		"forwardedProto", request.Header.Get("X-Forwarded-Proto"),
+		"redirectURI", redirectURI,
+	)
+	return redirectURI, nil
 }
 
 func (self Fnnas) IsTcpRequest(request *http.Request) bool {

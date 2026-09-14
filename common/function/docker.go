@@ -77,6 +77,19 @@ func DefaultCapabilities() []string {
 	}
 }
 
+// IsDockerObjectID 判断值是否为完整或默认短格式的 Docker 对象 ID。
+func IsDockerObjectID(value string) bool {
+	if len(value) != 12 && len(value) != 64 {
+		return false
+	}
+	for _, char := range value {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 // Tag {registry}/{{namespace-可能有多个路径}/{imageName}basename}:{version}
 type Tag struct {
 	Name      string `json:"name"`

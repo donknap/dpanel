@@ -55,10 +55,8 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 
 	slog.Debug("docker daemon/event status", "cacheKey", dockerStatusCacheKey, "status", e.Status)
 
-	// 如果有错误记录缓存返回,并删除缓存信息，默认为的状态为 false
+	// 连接失败时保留错误状态，供环境列表展示断连原因
 	if !e.Status.Available {
-		slog.Debug("docker daemon/event delete cache", "name", e.Status)
-		storage.Cache.Delete(dockerStatusCacheKey)
 		return
 	}
 
@@ -71,6 +69,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 	// 连接成功后，并且判断一下是否是当前连接, 如果当前连接不通，就重置一下
 	if docker.Sdk.Name == dockerEnv.Name {
 		if _, err := docker.Sdk.Client.Ping(docker.Sdk.Ctx); err != nil {
+			docker.Sdk.Close()
 			if v, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithSockProxy()); err == nil {
 				docker.Sdk = v
 				slog.Debug("docker daemon/event update docker.Sdk", "address", v.Client.DaemonHost())

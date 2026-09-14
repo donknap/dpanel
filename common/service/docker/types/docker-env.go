@@ -31,6 +31,7 @@ type DockerEnv struct {
 	DockerType        string          `json:"dockerType,omitempty"` // 远程客户端类型，docker podman
 	DockerInfo        *DockerInfo     `json:"dockerInfo,omitempty"`
 	DockerStatus      *DockerStatus   `json:"dockerStatus,omitempty"`
+	Enable            *bool           `json:"enable,omitempty"`
 }
 
 func (self DockerEnv) IsLocal() bool {

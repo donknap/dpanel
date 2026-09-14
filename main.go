@@ -339,6 +339,9 @@ func initDocker() error {
 	}
 	// 初始化一个 sdk 连接，只是为了防止报错，里面不包含实际的 docker client，真实的连接在后续协程或是切换中处理
 	docker.Sdk = docker.NewEmptyClient(defaultDockerEnv)
+	if defaultDockerEnv.Enable != nil && !*defaultDockerEnv.Enable {
+		return nil
+	}
 	go func() {
 		// 改为异步连接后，如果用户在连接期间切换到其它服务端。如果在连接期间用户主动切换了连接，这里就不再赋值了
 		if dockerClient, err := docker.NewClientWithDockerEnv(defaultDockerEnv, docker.WithSockProxy()); err == nil {

@@ -43,6 +43,14 @@ func (self Client) ContainerRuntimeCollect(ctx context.Context, message events.M
 		return
 	}
 
+	cacheKey := self.containerRuntimeCacheKey(message.Actor.ID)
+	if message.Action == events.ActionDestroy {
+		containerRuntimeMu.Lock()
+		storage.Cache.Delete(cacheKey)
+		containerRuntimeMu.Unlock()
+		return
+	}
+
 	runtimeEvent, ok := self.containerRuntimeEvent(message)
 	if !ok {
 		return
@@ -51,7 +59,6 @@ func (self Client) ContainerRuntimeCollect(ctx context.Context, message events.M
 	containerRuntimeMu.Lock()
 	defer containerRuntimeMu.Unlock()
 
-	cacheKey := self.containerRuntimeCacheKey(message.Actor.ID)
 	runtime := types2.ContainerRuntime{}
 	if v, ok := storage.Cache.Get(cacheKey); ok {
 		if cachedRuntime, ok := v.(types2.ContainerRuntime); ok {

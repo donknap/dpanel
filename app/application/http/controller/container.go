@@ -106,8 +106,13 @@ func (self Container) GetList(http *gin.Context) {
 		return
 	}
 
+	containerID := params.SiteTitle
+	isContainerID := function.IsDockerObjectID(containerID)
+	imageID := strings.TrimPrefix(params.Image, "sha256:")
+	isImageID := function.IsDockerObjectID(imageID)
+
 	searchContainerIds := make([]string, 0)
-	if params.SiteTitle != "" {
+	if params.SiteTitle != "" && !isContainerID {
 		searchSiteList, _ := dao.Site.Where(dao.Site.SiteTitle.Like("%" + params.SiteTitle + "%")).Find()
 		for _, item := range searchSiteList {
 			if item.ContainerInfo.Id != "" {
@@ -124,19 +129,29 @@ func (self Container) GetList(http *gin.Context) {
 		if function.IsEmptyArray(searchContainerIds) && params.Image == "" && params.SiteTitle == "" {
 			return item, true
 		}
-		if function.InArray(searchContainerIds, item.ID) {
-			return item, true
-		}
-		if params.Image != "" && (strings.Contains(item.Image, params.Image) || strings.Contains(item.ImageID, params.Image)) {
-			return item, true
-		}
-		if params.SiteTitle != "" {
-			if strings.HasPrefix(item.ID, params.SiteTitle) {
+		if params.Image != "" {
+			if isImageID {
+				itemImageID := strings.TrimPrefix(item.ImageID, "sha256:")
+				if itemImageID == imageID || len(imageID) == 12 && strings.HasPrefix(itemImageID, imageID) {
+					return item, true
+				}
+			} else if strings.Contains(item.Image, params.Image) {
 				return item, true
 			}
-			for _, name := range item.Names {
-				if strings.Contains(name, params.SiteTitle) {
+		}
+		if params.SiteTitle != "" {
+			if isContainerID {
+				if item.ID == containerID || len(containerID) == 12 && strings.HasPrefix(item.ID, containerID) {
 					return item, true
+				}
+			} else {
+				if function.InArray(searchContainerIds, item.ID) {
+					return item, true
+				}
+				for _, name := range item.Names {
+					if strings.Contains(name, params.SiteTitle) {
+						return item, true
+					}
 				}
 			}
 		}

@@ -9,6 +9,7 @@ import (
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/common"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
 	"github.com/donknap/dpanel/common/dao"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/google/uuid"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
@@ -111,7 +112,7 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	if !resetOther {
 		utils.Result{}.Success(map[string]any{
 			"username": resetUsername,
-			"password": resetPassword,
+			"password": function.MaskSensitiveValue(resetPassword),
 		})
 		return
 	}
@@ -140,7 +141,7 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	}
 	if resetUser {
 		result["username"] = resetUsername
-		result["password"] = resetPassword
+		result["password"] = function.MaskSensitiveValue(resetPassword)
 	}
 	utils.Result{}.Success(result)
 }

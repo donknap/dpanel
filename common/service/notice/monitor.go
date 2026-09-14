@@ -13,6 +13,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -77,6 +78,8 @@ func (self *monitor) Close() {
 }
 
 // Join 在加入时，首先检查之前是否存在，如果存在也强制退出，适用于编辑更新配置时
+// TODO: Leave 与 Store 不是原子替换，同名 Join 并发时可能留下未取消的监听；
+// dockerClient 在 listen、Close 和 Clients 之间的读写也未同步，后续需一并处理。
 func (self *monitor) Join(dockerEnv *types.DockerEnv) {
 	self.Leave(dockerEnv.Name)
 
@@ -84,7 +87,7 @@ func (self *monitor) Join(dockerEnv *types.DockerEnv) {
 		dockerEnv: dockerEnv,
 		createdAt: time.Now(),
 	}
-	c.ctx, c.ctxCancel = context.WithCancel(context.Background())
+	c.ctx, c.ctxCancel = context.WithCancel(self.ctx)
 	self.clients.Store(dockerEnv.Name, c)
 
 	go self.listen(c)
@@ -96,6 +99,7 @@ func (self *monitor) Leave(name string) {
 			c.Close()
 		}
 	}
+	storage.Cache.Delete(fmt.Sprintf(storage.CacheKeyDockerStatus, name))
 }
 
 func (self *monitor) Clients() map[string]*docker.Client {
@@ -147,9 +151,19 @@ func (self *monitor) listen(c *client) {
 			continue
 		}
 
-		if _, initErr = c.dockerClient.Client.Ping(self.ctx); initErr != nil {
+		pingCtx, pingCancel := context.WithTimeout(c.ctx, define.DockerConnectServerTimeout)
+		_, initErr = c.dockerClient.Client.Ping(pingCtx)
+		pingCancel()
+		if initErr != nil {
 			c.Clear()
+			if c.ctx.Err() != nil {
+				return
+			}
 			continue
+		}
+		if c.ctx.Err() != nil {
+			c.Clear()
+			return
 		}
 
 		slog.Debug("monitor publish event", "name", c.dockerEnv.Name)
@@ -169,12 +183,16 @@ func (self *monitor) listen(c *client) {
 			case <-c.ctx.Done():
 				slog.Debug("monitor closed by monitor", "name", c.dockerEnv.Name)
 				c.Close()
-				break eventLoop
+				return
 			case <-self.ctx.Done():
 				slog.Debug("monitor closed")
 				self.Close()
 				return
 			case message, ok := <-eventChan:
+				if !ok {
+					initErr = fmt.Errorf("docker event stream closed")
+					break eventLoop
+				}
 				if os.Getenv("APP_ENV") == "debug" {
 					if _, _, ok := function.PluckArrayItemWalk(skipActionLog, func(item string) bool {
 						return strings.HasPrefix(string(message.Action), item)
@@ -183,18 +201,24 @@ func (self *monitor) listen(c *client) {
 						slog.Debug("monitor message", "name", c.dockerEnv.Name, "message", message)
 					}
 				}
-				if !ok {
-					slog.Debug("monitor closed by message event chan", "name", c.dockerEnv.Name)
-					break eventLoop
-				}
 				self.processor(c.dockerEnv.Name, message)
 			case err, ok := <-errChan:
-				if !ok {
-					slog.Debug("monitor closed by error event chan", "name", c.dockerEnv.Name, "error", err)
-					break eventLoop
+				if c.ctx.Err() != nil || self.ctx.Err() != nil {
+					c.Close()
+					return
 				}
+				if !ok || err == nil {
+					initErr = fmt.Errorf("docker event stream closed")
+				} else {
+					initErr = fmt.Errorf("docker event stream failed: %w", err)
+				}
+				slog.Warn("monitor event stream failed", "name", c.dockerEnv.Name, "error", initErr)
+				break eventLoop
 			}
 		}
+
+		c.Clear()
+		c.dockerClient = nil
 	}
 }
 

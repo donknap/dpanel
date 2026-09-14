@@ -99,6 +99,7 @@ func (self Env) GetList(http *gin.Context) {
 func (self Env) Create(http *gin.Context) {
 	type ParamsValidate struct {
 		types2.DockerEnv
+		Check *bool `json:"check"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -127,26 +128,16 @@ func (self Env) Create(http *gin.Context) {
 			params.TlsKey = oldDockerEnv.TlsKey
 		}
 	}
+	if params.Enable == nil {
+		params.Enable = function.Ptr(true)
+	}
+	check := params.Check == nil || *params.Check
 
 	if params.EnableSSH {
-		knownHostsCallback := ssh.NewDefaultKnownHostCallback()
-		if params.SshServerInfo != nil && params.SshServerInfo.Address != "" {
-			_ = knownHostsCallback.Delete(params.SshServerInfo.Address, params.SshServerInfo.Port)
-		}
-		sshClient, err := ssh.NewClient(ssh.WithServerInfo(params.SshServerInfo)...)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer func() {
-			sshClient.Close()
-		}()
-		// ssh 密码加密
-		if v, err := function.RSAEncode(params.SshServerInfo.Password); err == nil && params.SshServerInfo.Password != "" {
+		if v, err := function.RSADecode(params.SshServerInfo.Password, nil); err == nil {
 			params.SshServerInfo.Password = v
 		}
-		// ssh 证书加密
-		if v, err := function.RSAEncode(params.SshServerInfo.PrivateKey); err == nil && params.SshServerInfo.PrivateKey != "" {
+		if v, err := function.RSADecode(params.SshServerInfo.PrivateKey, nil); err == nil {
 			params.SshServerInfo.PrivateKey = v
 		}
 	}
@@ -183,6 +174,7 @@ func (self Env) Create(http *gin.Context) {
 		SshServerInfo:     params.SshServerInfo,
 		RemoteType:        params.RemoteType,
 		DockerType:        params.DockerType,
+		Enable:            params.Enable,
 	}
 
 	if params.EnableTLS {
@@ -224,35 +216,71 @@ func (self Env) Create(http *gin.Context) {
 		dockerEnv.TlsKey = filepath.Join(dockerEnv.CertRoot(), "key.pem")
 	}
 
-	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithSockProxy())
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	_, err = dockerClient.Client.Info(dockerClient.GetTryCtx())
-	if err != nil {
-		dockerClient.Close()
-		if function.ErrorHasKeyword(err, "Maximum supported") {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvApiTooOld, "err", err.Error()), 500)
+	var dockerClient *docker.Client
+	if check {
+		if params.EnableSSH {
+			knownHostsCallback := ssh.NewDefaultKnownHostCallback()
+			if params.SshServerInfo != nil && params.SshServerInfo.Address != "" {
+				_ = knownHostsCallback.Delete(params.SshServerInfo.Address, params.SshServerInfo.Port)
+			}
+			sshClient, err := ssh.NewClient(ssh.WithServerInfo(params.SshServerInfo)...)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			defer func() {
+				sshClient.Close()
+			}()
+		}
+
+		client, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithSockProxy())
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiFailed, "error", err.Error()), 500)
-		return
+		_, err = client.Client.Info(client.GetTryCtx())
+		if err != nil {
+			client.Close()
+			if function.ErrorHasKeyword(err, "Maximum supported") {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvApiTooOld, "err", err.Error()), 500)
+				return
+			}
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiFailed, "error", err.Error()), 500)
+			return
+		}
+		dockerClient = client
 	}
+
+	if params.EnableSSH {
+		// ssh 密码加密
+		if v, err := function.RSAEncode(params.SshServerInfo.Password); err == nil && params.SshServerInfo.Password != "" {
+			params.SshServerInfo.Password = v
+		}
+		// ssh 证书加密
+		if v, err := function.RSAEncode(params.SshServerInfo.PrivateKey); err == nil && params.SshServerInfo.PrivateKey != "" {
+			params.SshServerInfo.PrivateKey = v
+		}
+	}
+
 	logic.Env{}.UpdateEnv(dockerEnv)
 
-	time.AfterFunc(1*time.Second, func() {
-		if newDockerEnv, err := (logic.Env{}).GetEnvByName(dockerEnv.Name); err == nil {
-			event2.Monitor.Join(newDockerEnv)
-		}
-	})
-
-	// 如果修改的是当前客户端的连接地址，则更新 docker sdk
-	if docker.Sdk.Name == params.Name {
-		docker.Sdk.Close()
-		docker.Sdk = dockerClient
+	if *dockerEnv.Enable {
+		time.AfterFunc(1*time.Second, func() {
+			if newDockerEnv, err := (logic.Env{}).GetEnvByName(dockerEnv.Name); err == nil {
+				event2.Monitor.Join(newDockerEnv)
+			}
+		})
 	} else {
-		dockerClient.Close()
+		event2.Monitor.Leave(dockerEnv.Name)
+	}
+	if dockerClient != nil {
+		// 如果修改的是当前客户端的连接地址，则更新 docker sdk
+		if docker.Sdk.Name == params.Name {
+			docker.Sdk.Close()
+			docker.Sdk = dockerClient
+		} else {
+			dockerClient.Close()
+		}
 	}
 	self.JsonSuccessResponse(http)
 	return
@@ -280,6 +308,7 @@ func (self Env) Switch(http *gin.Context) {
 	}
 	_, err = dockerClient.Client.Info(dockerClient.GetTryCtx())
 	if err != nil {
+		dockerClient.Close()
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiFailed, "error", err.Error()), 500)
 		return
 	}

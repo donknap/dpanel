@@ -181,6 +181,8 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 	dockerEnvList := make(map[string]*types2.DockerEnv)
 	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDocker, &dockerEnvList)
 	for _, env := range dockerEnvList {
-		notice.Monitor.Join(env)
+		if env.Enable == nil || *env.Enable {
+			notice.Monitor.Join(env)
+		}
 	}
 }
