@@ -2,7 +2,6 @@ package common
 
 import (
 	"log/slog"
-	"net/http"
 	"os"
 
 	"github.com/donknap/dpanel/app/common/events"
@@ -94,7 +93,9 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/store/sync", controller.Store{}.Sync)
 		cors.POST("/common/store/deploy", controller.Store{}.Deploy)
 
-		engine.StaticFS("/dpanel/static/store/file", http.FS(logic.StoreLogoFileSystem{}))
+		storeAssetPath := function.RouterUri("/dpanel/static/store/file/*filepath")
+		engine.GET(storeAssetPath, controller.Store{}.Asset)
+		engine.HEAD(storeAssetPath, controller.Store{}.Asset)
 
 		// 计划任务
 		cors.POST("/common/cron/create", controller.Cron{}.Create)

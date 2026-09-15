@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"github.com/donknap/dpanel/common/function"
 	"log/slog"
 	"runtime"
 	"strings"
@@ -21,7 +22,7 @@ func (self DebugMiddleware) Process(ctx *gin.Context) {
 
 	if strings.Contains(ctx.Request.URL.String(), "/dpanel/api") {
 		slog.Info("runtime",
-			"url", ctx.Request.URL,
+			"url", function.LogURL(ctx.Request.URL),
 			"goroutine", fmt.Sprintf("%d", runtime.NumGoroutine()),
 			"client", ws.GetCollect().Total(),
 			"progress", ws.GetCollect().ProgressTotal(),

@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -37,6 +38,7 @@ type UserInfo struct {
 	RoleIdentity     string                          `json:"roleIdentity"`
 	Permission       *accessor.PermissionValueOption `json:"permission"`
 	AutoLogin        bool                            `json:"autoLogin"`
+	SessionVersion   string                          `json:"sessionVersion"`
 	jwt.RegisteredClaims
 }
 
@@ -119,7 +121,11 @@ func (self User) CreateFounderUser(username string, password string) (*entity.Se
 
 	passwordValue := ""
 	if password != "" {
-		passwordValue = self.GetMd5Password(password, username)
+		var err error
+		passwordValue, err = self.HashPassword(password)
+		if err != nil {
+			return nil, err
+		}
 	}
 	registerAt := time.Now()
 	founder := &entity.Setting{
@@ -147,7 +153,11 @@ func (self User) GetUserOauthToken(user *entity.Setting, autoLogin bool) (string
 		AutoLogin:        autoLogin,
 	}
 	userInfo.RegisteredClaims.IssuedAt = jwt.NewNumericDate(time.Now())
-	// TODO: autoLogin 后续补充独立的过期策略，避免长期 token 无明确 exp。
+	expiresIn := 24 * time.Hour
+	if autoLogin {
+		expiresIn = 7 * 24 * time.Hour
+	}
+	userInfo.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(expiresIn))
 	var rsaKeyContent []byte
 	if v, ok := storage.Cache.Get(storage.CacheKeyRsaKey); ok {
 		rsaKeyContent = v.([]byte)
@@ -156,8 +166,20 @@ func (self User) GetUserOauthToken(user *entity.Setting, autoLogin bool) (string
 	if err != nil {
 		return "", err
 	}
+	userInfo.SessionVersion = self.SessionVersion(user, rsaKeyContent)
 	jwtClaims := jwt.NewWithClaims(jwt.SigningMethodRS512, userInfo)
 	// 登录成功后在缓存中写入用户数据，用于后端主动退出用户时使用
-	storage.Cache.Set(fmt.Sprintf(storage.CacheKeyCommonUserInfo, userInfo.UserId), userInfo, cache.DefaultExpiration)
+	storage.Cache.Set(fmt.Sprintf(storage.CacheKeyCommonUserInfo, userInfo.UserId), userInfo, expiresIn)
 	return jwtClaims.SignedString(privateKey)
+}
+
+// SessionVersion 将令牌绑定到当前账户凭据和状态，避免改密后旧令牌继续生效。
+// 使用签名私钥计算 HMAC，避免令牌中的摘要被用于离线猜测密码。
+func (self User) SessionVersion(user *entity.Setting, signingKey []byte) string {
+	if user == nil || user.Value == nil || len(signingKey) == 0 {
+		return ""
+	}
+	value, _ := json.Marshal([]any{user.ID, user.GroupName, user.Name,
+		user.Value.Username, user.Value.Password, user.Value.UserStatus})
+	return function.HmacSha256(signingKey, value)
 }
