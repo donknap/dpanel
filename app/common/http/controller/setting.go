@@ -11,9 +11,11 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -38,27 +40,33 @@ func (self Setting) Founder(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	if oldUser.Value.Password != function.Md5(params.Password+oldUser.Value.Username) {
+	userLogic := logic.User{}
+	if oldUser.Value.Password != userLogic.GetMd5Password(params.Password, oldUser.Value.Username, oldUser.Value.Salt) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserUsernameOrPasswordError), 500)
 		return
 	}
-
-	// 修改密码
+	password := params.Password
 	if params.NewPassword != "" {
-		oldUser.Value.Password = function.Md5(params.NewPassword + oldUser.Value.Username)
-		params.Password = params.NewPassword
+		password = params.NewPassword
 	}
 
 	// 修改用户名
 	if params.Username != "" {
 		oldUser.Value.Username = params.Username
-		oldUser.Value.Password = function.Md5(params.Password + params.Username)
+	}
+
+	if params.NewPassword != "" || params.Username != "" {
+		oldUser.Value.Salt = uuid.NewString()
+		oldUser.Value.Password = userLogic.GetMd5Password(password, oldUser.Value.Username, oldUser.Value.Salt)
 	}
 
 	err = logic.Setting{}.Save(oldUser)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+	if params.NewPassword != "" || params.Username != "" {
+		ws.GetCollect().LeaveByUserId(oldUser.ID)
 	}
 	self.JsonSuccessResponse(http)
 	return

@@ -2,6 +2,7 @@ package system
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 
 	"github.com/donknap/dpanel/app/common/logic"
@@ -9,7 +10,6 @@ import (
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/common"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
 	"github.com/donknap/dpanel/common/dao"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/google/uuid"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
@@ -17,6 +17,8 @@ import (
 )
 
 type Reset struct{}
+
+var securityEntrancePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$`)
 
 func (self Reset) GetName() string {
 	return "system:reset"
@@ -27,9 +29,9 @@ func (self Reset) GetDescription() string {
 }
 
 func (self Reset) Configure(cmd *cobra.Command) {
-	cmd.Flags().String("username", "", "Reset the username; without a value, reset admin with a random password")
+	cmd.Flags().String("username", "", "Reset the username; without a value, generate a random username and password")
 	usernameFlag := cmd.Flags().Lookup("username")
-	usernameFlag.NoOptDefVal = "admin"
+	usernameFlag.NoOptDefVal = uuid.New().String()[24:]
 	cmd.Flags().String("password", "", "Set the password; omitted with --username generates a random password")
 	cmd.Flags().String("entrance", "", "Set security entrance: no value for random, none to disable, or a relative path")
 	entranceFlag := cmd.Flags().Lookup("entrance")
@@ -50,11 +52,7 @@ func ResetFounderUser(username string, password string) (string, string, error) 
 	}
 
 	if username == "" {
-		if founder != nil && founder.Value != nil {
-			username = founder.Value.Username
-		} else {
-			username = "admin"
-		}
+		username = uuid.New().String()[24:]
 	}
 	if password == "" {
 		password = uuid.New().String()[24:]
@@ -71,7 +69,8 @@ func ResetFounderUser(username string, password string) (string, string, error) 
 	}
 
 	founder.Value.Username = username
-	founder.Value.Password = (logic.User{}).GetMd5Password(password, username)
+	founder.Value.Salt = uuid.NewString()
+	founder.Value.Password = (logic.User{}).GetMd5Password(password, username, founder.Value.Salt)
 	if err := dao.Setting.Save(founder); err != nil {
 		return "", "", err
 	}
@@ -94,12 +93,13 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 		color.Errorln("at least one reset option is required")
 		return
 	}
+	if cmd.Flags().Changed("entrance") && entranceValue != "" && !strings.EqualFold(entranceValue, "none") && !securityEntrancePattern.MatchString(entranceValue) {
+		color.Errorln("--entrance may contain only letters, numbers, hyphens, underscores, and path separators")
+		return
+	}
 
 	var resetUsername, resetPassword string
 	if resetUser {
-		if username == "" {
-			username = "admin"
-		}
 		var err error
 		resetUsername, resetPassword, err = ResetFounderUser(username, password)
 		if err != nil {
@@ -108,11 +108,13 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	resetOther := cmd.Flags().Changed("entrance") || clearCache || onlineUser
+	explicitRemoteReset := cmd.Flags().Changed("entrance") || clearCache || onlineUser
+	invalidateOnlineUser := onlineUser || resetUser
+	resetOther := explicitRemoteReset || resetUser
 	if !resetOther {
 		utils.Result{}.Success(map[string]any{
 			"username": resetUsername,
-			"password": function.MaskSensitiveValue(resetPassword),
+			"password": resetPassword,
 		})
 		return
 	}
@@ -133,15 +135,23 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 	result, err := proxyClient.CommonReset(common.ResetOption{
 		Entrance:   entrance,
 		Cache:      clearCache,
-		OnlineUser: onlineUser,
+		OnlineUser: invalidateOnlineUser,
 	})
 	if err != nil {
+		if resetUser && !explicitRemoteReset {
+			color.Warnln("Warning: founder reset succeeded, but failed to invalidate online users:", err)
+			utils.Result{}.Success(map[string]any{
+				"username": resetUsername,
+				"password": resetPassword,
+			})
+			return
+		}
 		color.Errorln("Error:", err)
 		return
 	}
 	if resetUser {
 		result["username"] = resetUsername
-		result["password"] = function.MaskSensitiveValue(resetPassword)
+		result["password"] = resetPassword
 	}
 	utils.Result{}.Success(result)
 }

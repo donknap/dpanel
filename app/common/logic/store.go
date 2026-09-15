@@ -28,7 +28,31 @@ type StoreLogoFileSystem struct {
 }
 
 func (self StoreLogoFileSystem) Open(name string) (fs.File, error) {
-	return os.Open(filepath.Join(storage.Local{}.GetStorePath(), name))
+	if !fs.ValidPath(name) {
+		return nil, fs.ErrNotExist
+	}
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".md", ".png":
+	default:
+		return nil, fs.ErrNotExist
+	}
+
+	root, err := os.OpenRoot(storage.Local{}.GetStorePath())
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = root.Close()
+	}()
+
+	info, err := root.Lstat(name)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fs.ErrNotExist
+	}
+	return root.Open(name)
 }
 
 type Store struct {

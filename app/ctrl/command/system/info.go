@@ -8,6 +8,7 @@ import (
 
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
+	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/spf13/cobra"
@@ -60,6 +61,9 @@ func (self Info) Configure(command *cobra.Command) {
 }
 
 func (self Info) Handle(cmd *cobra.Command, args []string) {
+	if utils.IsQuiet() {
+		return
+	}
 	if _, err := (logic.Setting{}).GetValue(logic.SettingGroupUser, logic.SettingGroupUserFounder); err != nil {
 		self.printInfo(self.localInfo(), false, true)
 		return

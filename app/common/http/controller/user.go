@@ -66,7 +66,7 @@ func (self User) Login(http *gin.Context) {
 		return
 	}
 
-	password := logic.User{}.GetMd5Password(params.Password, params.Username)
+	password := logic.User{}.GetMd5Password(params.Password, currentUser.Value.Username, currentUser.Value.Salt)
 	if params.Username == currentUser.Value.Username && currentUser.Value.Password == password {
 		if !function.InArray((family.Provider{}).Feature(), types.FeatureFamilyCe) {
 			twoFa := accessor.TwoFa{}

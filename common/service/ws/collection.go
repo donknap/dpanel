@@ -99,6 +99,22 @@ func (self *Collection) Leave(c *Client) {
 	}
 }
 
+func (self *Collection) LeaveByUserId(userID int32) {
+	self.clients.Range(func(key, value any) bool {
+		client, ok := value.(*Client)
+		if !ok || client.UserId != userID {
+			return true
+		}
+		if err := client.SendMessage(NewRespMessage(client.Fd, MessageTypeEventRefresh, "")); err != nil {
+			slog.Warn("websocket leave by user id", "fd", client.Fd, "error", err)
+		}
+		if err := client.Close(); err != nil {
+			slog.Warn("websocket leave by user id close", "fd", client.Fd, "error", err)
+		}
+		return true
+	})
+}
+
 func (self *Collection) sendMessage(message *RespMessage) {
 	self.clients.Range(func(key, value any) bool {
 		c, ok := value.(*Client)

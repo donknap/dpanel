@@ -154,12 +154,17 @@ func (self Panel) Backup(http *gin.Context) {
 	}
 	params.BackupVolumePathList = append(params.BackupVolumePathList, "dpanel.lic")
 	manifest := make([]backup.Manifest, 0)
-	targetFile, err := archives.FilesFromDisk(b.Context(), nil, function.PluckArrayMapWalk(params.BackupVolumePathList, func(item string) (string, string, bool) {
+	backupPathMap := function.PluckArrayMapWalk(params.BackupVolumePathList, func(item string) (string, string, bool) {
 		if !function.InArray(panelAllPath, item) {
 			return "", "", false
 		}
-		return filepath.Join(storage.Local{}.GetStorageLocalPath(), item), item, true
-	}))
+		realPath := filepath.Join(storage.Local{}.GetStorageLocalPath(), item)
+		if _, statErr := os.Lstat(realPath); errors.Is(statErr, os.ErrNotExist) {
+			return "", "", false
+		}
+		return realPath, item, true
+	})
+	targetFile, err := archives.FilesFromDisk(b.Context(), nil, backupPathMap)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

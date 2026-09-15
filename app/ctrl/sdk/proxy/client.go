@@ -120,6 +120,7 @@ func (self *Client) token() (string, error) {
 		RoleIdentity: currentUser.Name,
 		AutoLogin:    true,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        (logic.User{}).GetTokenId(currentUser),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(self.tokenExpire)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},

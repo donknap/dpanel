@@ -2,8 +2,9 @@ package user
 
 import (
 	"github.com/donknap/dpanel/app/ctrl/command/system"
+	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
+	"github.com/donknap/dpanel/app/ctrl/sdk/types/common"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/gookit/color"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
@@ -41,17 +42,20 @@ func (self Reset) Handle(cmd *cobra.Command, args []string) {
 		color.Errorln("When resetting the username, the password must also be reset.")
 		return
 	}
-	if username == "" && password == "" {
-		username = "admin"
-	}
-
 	username, password, err = system.ResetFounderUser(username, password)
 	if err != nil {
 		color.Errorln("Error: ", err.Error())
 		return
 	}
+	proxyClient, err := proxy.NewProxyClient()
+	if err == nil {
+		_, err = proxyClient.CommonReset(common.ResetOption{OnlineUser: true})
+	}
+	if err != nil {
+		color.Warnln("Warning: founder reset succeeded, but failed to invalidate online users:", err)
+	}
 	utils.Result{}.Success(map[string]string{
 		"username": username,
-		"password": function.MaskSensitiveValue(password),
+		"password": password,
 	})
 }

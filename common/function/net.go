@@ -35,6 +35,22 @@ func ParseURL(rawURL string) (*url.URL, error) {
 	return url.Parse(rawURL)
 }
 
+// ResolveHTTPURL resolves an HTTP URL reference against its base URL.
+func ResolveHTTPURL(baseURL *url.URL, rawReference string) (*url.URL, error) {
+	if baseURL == nil {
+		return nil, errors.New("http base url is nil")
+	}
+	reference, err := url.Parse(strings.TrimSpace(rawReference))
+	if err != nil {
+		return nil, err
+	}
+	resolvedURL := baseURL.ResolveReference(reference)
+	if (resolvedURL.Scheme != "http" && resolvedURL.Scheme != "https") || resolvedURL.Host == "" {
+		return nil, errors.New("invalid http url")
+	}
+	return resolvedURL, nil
+}
+
 // RegistryReference returns the host:port form accepted in Docker image names.
 func RegistryReference(rawAddress string) string {
 	rawAddress = strings.TrimSpace(rawAddress)
@@ -203,6 +219,7 @@ func SafeHTTPGet(ctx context.Context, rawURL string, timeout time.Duration, maxB
 	if err != nil {
 		return nil, err
 	}
+	request.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, err

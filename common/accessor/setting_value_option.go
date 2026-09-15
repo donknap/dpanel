@@ -11,6 +11,7 @@ import (
 type SettingValueOption struct {
 	Username                    string                       `json:"username,omitempty"`
 	Password                    string                       `json:"password,omitempty"`
+	Salt                        string                       `json:"salt,omitempty"`
 	Email                       string                       `json:"email,omitempty"`
 	UserStatus                  uint8                        `json:"userStatus,omitempty"`
 	UserRemark                  string                       `json:"userRemark,omitempty"`

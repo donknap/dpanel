@@ -12,6 +12,8 @@ type CacheMiddleware struct {
 }
 
 func (self CacheMiddleware) Process(http *gin.Context) {
+	http.Header("X-Content-Type-Options", "nosniff")
+
 	url := http.Request.URL.Path
 	if strings.HasPrefix(url, "/dpanel/static") || strings.HasPrefix(url, "/favicon.ico") {
 		http.Header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0")

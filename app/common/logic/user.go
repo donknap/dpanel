@@ -13,6 +13,7 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"gorm.io/datatypes"
@@ -47,8 +48,12 @@ func (self User) GetBuiltInPublicUsername() string {
 	return facade.GetConfig().GetString("system.permission.default_username")
 }
 
-func (self User) GetMd5Password(password string, key string) string {
-	return function.Md5(password + key)
+func (self User) GetMd5Password(password, username, salt string) string {
+	return function.Md5(password + username + salt)
+}
+
+func (self User) GetTokenId(user *entity.Setting) string {
+	return function.Sha256([]byte(fmt.Sprintf("%d:%s", user.ID, user.Value.Salt)))
 }
 
 func (self User) CheckLock(username string) error {
@@ -117,20 +122,19 @@ func (self User) CreateFounderUser(username string, password string) (*entity.Se
 		return nil, err
 	}
 
-	passwordValue := ""
-	if password != "" {
-		passwordValue = self.GetMd5Password(password, username)
-	}
 	registerAt := time.Now()
 	founder := &entity.Setting{
 		GroupName: SettingGroupUser,
 		Name:      SettingGroupUserFounder,
 		Value: &accessor.SettingValueOption{
 			Username:   username,
-			Password:   passwordValue,
 			UserStatus: SettingGroupUserStatusEnable,
 			RegisterAt: &registerAt,
 		},
+	}
+	if password != "" {
+		founder.Value.Salt = uuid.NewString()
+		founder.Value.Password = self.GetMd5Password(password, username, founder.Value.Salt)
 	}
 	if err := dao.Setting.Create(founder); err != nil {
 		return nil, err
@@ -139,15 +143,17 @@ func (self User) CreateFounderUser(username string, password string) (*entity.Se
 }
 
 func (self User) GetUserOauthToken(user *entity.Setting, autoLogin bool) (string, error) {
+	now := time.Now()
 	userInfo := UserInfo{
-		UserId:           user.ID,
-		Username:         user.Value.Username,
-		RoleIdentity:     user.Name,
-		RegisteredClaims: jwt.RegisteredClaims{},
-		AutoLogin:        autoLogin,
+		UserId:       user.ID,
+		Username:     user.Value.Username,
+		RoleIdentity: user.Name,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:       self.GetTokenId(user),
+			IssuedAt: jwt.NewNumericDate(now),
+		},
+		AutoLogin: autoLogin,
 	}
-	userInfo.RegisteredClaims.IssuedAt = jwt.NewNumericDate(time.Now())
-	// TODO: autoLogin 后续补充独立的过期策略，避免长期 token 无明确 exp。
 	var rsaKeyContent []byte
 	if v, ok := storage.Cache.Get(storage.CacheKeyRsaKey); ok {
 		rsaKeyContent = v.([]byte)

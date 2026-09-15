@@ -94,8 +94,16 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 			return
 		}
 
+		currentUser, err := new(logic.Setting).GetValueById(myUserInfo.UserId)
+		if err != nil || currentUser.Value == nil || currentUser.GroupName != logic.SettingGroupUser || currentUser.Value.UserStatus == logic.SettingGroupUserStatusDisable ||
+			myUserInfo.ID != (logic.User{}).GetTokenId(currentUser) {
+			self.JsonResponseWithError(http, ErrLogin, 401)
+			http.AbortWithStatus(401)
+			return
+		}
+
 		if myUserInfo.AutoLogin {
-			if _, err := new(logic.Setting).GetValueById(myUserInfo.UserId); err == nil {
+			if currentUser != nil {
 				myUserInfo.Fd = http.GetHeader("AuthorizationFd")
 				http.Set("userInfo", myUserInfo)
 				http.Next()

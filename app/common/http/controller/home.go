@@ -40,7 +40,6 @@ import (
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -873,8 +872,6 @@ func (self Home) GetStatList(http *gin.Context) {
 
 func (self Home) Reset(http *gin.Context) {
 	type ParamsValidate struct {
-		User       string  `json:"user"`
-		Password   string  `json:"password"`
 		Entrance   *string `json:"entrance"`
 		Cache      bool    `json:"cache"`
 		OnlineUser bool    `json:"onlineUser"`
@@ -886,45 +883,6 @@ func (self Home) Reset(http *gin.Context) {
 	total := 0
 	var eventTotal int64
 	var noticeTotal int64
-
-	if params.User != "" || params.Password != "" {
-		username := params.User
-		password := params.Password
-		founder, findErr := dao.Setting.
-			Where(dao.Setting.GroupName.Eq(logic.SettingGroupUser)).
-			Where(dao.Setting.Name.Eq(logic.SettingGroupUserFounder)).First()
-		if username == "" {
-			if founder != nil && founder.Value != nil {
-				username = founder.Value.Username
-			} else {
-				username = "admin"
-			}
-		}
-		if password == "" {
-			password = uuid.New().String()[24:]
-		}
-		if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
-			self.JsonResponseWithError(http, findErr, 500)
-			return
-		}
-		if founder == nil {
-			if _, err := (logic.User{}).CreateFounderUser(username, password); err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		} else {
-			if founder.Value == nil {
-				self.JsonResponseWithError(http, errors.New("founder user data is invalid"), 500)
-				return
-			}
-			founder.Value.Username = username
-			founder.Value.Password = (logic.User{}).GetMd5Password(password, username)
-			if err := dao.Setting.Save(founder); err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
-	}
 
 	if params.Entrance != nil {
 		setting, _ := (logic.Setting{}).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingLogin)
@@ -1000,6 +958,11 @@ func (self Home) Reset(http *gin.Context) {
 
 	if params.OnlineUser {
 		storage.Cache.Set(storage.CacheKeyCommonServerStartTime, time.Now().Add(time.Second).Truncate(time.Second), cache.NoExpiration)
+		if value, exists := http.Get("userInfo"); exists {
+			if userInfo, ok := value.(logic.UserInfo); ok {
+				ws.GetCollect().LeaveByUserId(userInfo.UserId)
+			}
+		}
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
