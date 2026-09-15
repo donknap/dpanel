@@ -24,7 +24,7 @@ func (self Result) Error(err error) {
 }
 
 func (self Result) Errorf(format string, a ...any) {
-	self.Error(fmt.Errorf(format, a))
+	self.Error(fmt.Errorf(format, a...))
 	return
 }
 

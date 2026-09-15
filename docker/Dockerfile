@@ -3,7 +3,7 @@ ARG VERSION=12.3
 ARG TARGETARCH
 
 FROM --platform=${BUILDPLATFORM} dpanel/builder:${TARGETARCH}-${LIBC}-${VERSION} AS toolchain
-FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
+FROM --platform=${BUILDPLATFORM} golang:1.26-bookworm AS builder
 
 ARG HTTP_PROXY
 

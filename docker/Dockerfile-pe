@@ -33,7 +33,7 @@ RUN --mount=type=secret,id=GIT_TOKEN \
         echo ">> REPO_PULL disabled. Using local source code..." ; \
     fi
 
-FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
+FROM --platform=${BUILDPLATFORM} golang:1.26-bookworm AS builder
 
 ARG HTTP_PROXY
 
@@ -77,7 +77,7 @@ RUN --mount=type=secret,id=GARBLE_SEED \
 FROM scratch AS binary-export
 COPY --from=builder /src/runtime /
 
-FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS reverse
+FROM --platform=${BUILDPLATFORM} golang:1.26-bookworm AS reverse
 
 ARG HTTP_PROXY
 
