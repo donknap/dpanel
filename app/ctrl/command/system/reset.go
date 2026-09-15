@@ -71,7 +71,10 @@ func ResetFounderUser(username string, password string) (string, string, error) 
 	}
 
 	founder.Value.Username = username
-	founder.Value.Password = (logic.User{}).GetMd5Password(password, username)
+	founder.Value.Password, err = (logic.User{}).HashPassword(password)
+	if err != nil {
+		return "", "", err
+	}
 	if err := dao.Setting.Save(founder); err != nil {
 		return "", "", err
 	}

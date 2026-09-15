@@ -2,7 +2,9 @@ package controller
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
+	nethttp "net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,6 +34,31 @@ import (
 
 type Store struct {
 	controller.Abstract
+}
+
+// Asset 仅公开商店图标和说明文件，不直接公开同步后的仓库目录。
+func (self Store) Asset(http *gin.Context) {
+	name := strings.TrimPrefix(http.Param("filepath"), "/")
+	file, err := (logic.StoreLogoFileSystem{}).Open(name)
+	if err != nil {
+		http.Status(nethttp.StatusNotFound)
+		return
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		http.Status(nethttp.StatusNotFound)
+		return
+	}
+	content, ok := file.(io.ReadSeeker)
+	if !ok {
+		http.Status(nethttp.StatusNotFound)
+		return
+	}
+	http.Header("Content-Type", logic.StoreAssetContentType(name))
+	http.Header("X-Content-Type-Options", "nosniff")
+	http.Header("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox")
+	nethttp.ServeContent(http.Writer, http.Request, info.Name(), info.ModTime(), content)
 }
 
 func (self Store) Create(http *gin.Context) {

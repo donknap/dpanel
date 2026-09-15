@@ -68,7 +68,7 @@ type Home struct {
 
 func (self Home) Index(http *gin.Context) {
 	uri := http.Request.URL.String()
-	slog.Debug("http route not found", "ip", http.ClientIP(), "user-agent", http.Request.Header.Get("User-Agent"), "uri", uri)
+	slog.Debug("http route not found", "ip", http.ClientIP(), "user-agent", http.Request.Header.Get("User-Agent"), "uri", function.LogURL(http.Request.URL))
 	var asset embed.FS
 	if v, ok := storage.Cache.Get(storage.CacheKeyAsset); ok {
 		asset = v.(embed.FS)

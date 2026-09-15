@@ -66,8 +66,7 @@ func (self User) Login(http *gin.Context) {
 		return
 	}
 
-	password := logic.User{}.GetMd5Password(params.Password, params.Username)
-	if params.Username == currentUser.Value.Username && currentUser.Value.Password == password {
+	if params.Username == currentUser.Value.Username && (logic.User{}).CheckPassword(params.Password, params.Username, currentUser.Value.Password) {
 		if !function.InArray((family.Provider{}).Feature(), types.FeatureFamilyCe) {
 			twoFa := accessor.TwoFa{}
 			exists := logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingTwoFa, &twoFa)
@@ -80,6 +79,13 @@ func (self User) Login(http *gin.Context) {
 					self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserTwoFaNotCorrect), 500)
 					return
 				}
+			}
+		}
+		if (logic.User{}).NeedsPasswordUpgrade(currentUser.Value.Password) {
+			err = (logic.User{}).UpgradePassword(currentUser, params.Password)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
 			}
 		}
 		code, err = logic.User{}.GetUserOauthToken(currentUser, params.AutoLogin)

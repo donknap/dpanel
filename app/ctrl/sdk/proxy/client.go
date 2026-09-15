@@ -83,7 +83,7 @@ func (self *Client) Post(uri string, payload any) (data io.Reader, err error) {
 			v, _ := json.Marshal(payload)
 			return nil, fmt.Errorf("url: %s, error: %s, data: %s", strings.ReplaceAll(uri, self.apiUrl, ""), responseMessage.Error, string(v))
 		case 401:
-			return nil, errors.New("invalid auth token, please configure the DP_JWT_SECRET environment variable of the dpanel container")
+			return nil, errors.New("invalid auth token, please check the account status and RSA key configuration")
 		case 200:
 			buffer := new(bytes.Buffer)
 			// 如果是 success 返回整个结构，如果有具体的数据，则返回数据
@@ -115,10 +115,11 @@ func (self *Client) token() (string, error) {
 		return "", err
 	}
 	jwtClaims := jwt.NewWithClaims(jwt.SigningMethodRS512, logic.UserInfo{
-		UserId:       currentUser.ID,
-		Username:     currentUser.Value.Username,
-		RoleIdentity: currentUser.Name,
-		AutoLogin:    true,
+		UserId:         currentUser.ID,
+		Username:       currentUser.Value.Username,
+		RoleIdentity:   currentUser.Name,
+		AutoLogin:      true,
+		SessionVersion: (logic.User{}).SessionVersion(currentUser, privateKeyContent),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(self.tokenExpire)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

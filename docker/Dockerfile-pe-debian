@@ -32,7 +32,7 @@ RUN --mount=type=secret,id=GIT_TOKEN \
         echo ">> REPO_PULL disabled. Using local source code..." ; \
     fi
 
-FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
+FROM --platform=${BUILDPLATFORM} golang:1.26-bookworm AS builder
 
 ARG HTTP_PROXY
 RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \

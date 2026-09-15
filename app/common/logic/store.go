@@ -28,7 +28,60 @@ type StoreLogoFileSystem struct {
 }
 
 func (self StoreLogoFileSystem) Open(name string) (fs.File, error) {
-	return os.Open(filepath.Join(storage.Local{}.GetStorePath(), name))
+	if !fs.ValidPath(name) || StoreAssetContentType(name) == "" {
+		return nil, fs.ErrNotExist
+	}
+	for _, part := range strings.Split(name, "/") {
+		if strings.HasPrefix(part, ".") {
+			return nil, fs.ErrNotExist
+		}
+	}
+	root, err := os.OpenRoot(storage.Local{}.GetStorePath())
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	path := ""
+	for _, part := range strings.Split(name, "/") {
+		path = filepath.Join(path, part)
+		info, err := root.Lstat(path)
+		if err != nil || info.Mode()&os.ModeSymlink != 0 {
+			return nil, fs.ErrNotExist
+		}
+	}
+	file, err := root.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		_ = file.Close()
+		return nil, fs.ErrNotExist
+	}
+	return file, nil
+}
+
+func StoreAssetContentType(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".ico":
+		return "image/x-icon"
+	case ".svg":
+		return "image/svg+xml"
+	case ".md":
+		base := strings.ToLower(filepath.Base(name))
+		if base == "readme.md" || base == "readme_en.md" {
+			return "text/plain; charset=utf-8"
+		}
+	}
+	return ""
 }
 
 type Store struct {
