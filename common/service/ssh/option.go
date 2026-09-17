@@ -8,7 +8,6 @@ import (
 
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -92,14 +91,22 @@ func WithServerInfo(info *ServerInfo) []Option {
 
 func WithSftpClient() Option {
 	return func(self *Client) error {
-		self.SftpConn = &sftp.Client{}
+		self.needSftp = true
 		return nil
 	}
 }
 
 func WithContext(ctx context.Context) Option {
 	return func(self *Client) error {
-		self.ctx, self.ctxCancel = context.WithCancel(ctx)
+		self.ctx = ctx
+		return nil
+	}
+}
+
+// WithConnectContext 仅在 SSH 客户端建立完成前传递取消信号。
+func WithConnectContext(ctx context.Context) Option {
+	return func(self *Client) error {
+		self.connectCtx = ctx
 		return nil
 	}
 }

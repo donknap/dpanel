@@ -208,7 +208,9 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (containerID str
 			return containerID, err
 		}
 		if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
-			_, err := docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, containerID, task.BuildParams.Hook.ContainerCreate)
+			_, err := docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, containerID, container.ExecOptions{
+				Cmd: []string{"/bin/sh", "-c", task.BuildParams.Hook.ContainerCreate},
+			})
 			if err != nil {
 				slog.Debug("container create run hook", "hook", "container create", "error", err.Error())
 			}

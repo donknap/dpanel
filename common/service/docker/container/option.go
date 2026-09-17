@@ -611,6 +611,22 @@ func WithCap(caps ...string) Option {
 	}
 }
 
+func WithCapDrop(caps ...string) Option {
+	return func(self *Builder) error {
+		if function.IsEmptyArray(caps) {
+			return nil
+		}
+		if function.InArray(caps, "ALL") {
+			self.hostConfig.CapDrop = []string{
+				"ALL",
+			}
+		} else {
+			self.hostConfig.CapDrop = caps
+		}
+		return nil
+	}
+}
+
 func WithGroupAdd(gid ...string) Option {
 	return func(self *Builder) error {
 		if function.IsEmptyArray(gid) {

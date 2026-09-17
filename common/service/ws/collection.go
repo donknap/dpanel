@@ -36,6 +36,7 @@ func GetCollect() *Collection {
 type Collection struct {
 	clients     sync.Map
 	progressPip sync.Map
+	progressMu  sync.Mutex
 	ctx         context.Context
 }
 
@@ -82,7 +83,7 @@ func (self *Collection) Leave(c *Client) {
 		self.progressPip.Range(func(key, value any) bool {
 			if p, success := value.(*ProgressPip); success && !p.IsKeepAlive {
 				p.Close()
-				self.progressPip.Delete(p.messageType)
+				self.progressPip.CompareAndDelete(key, p)
 			}
 			return true
 		})

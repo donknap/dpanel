@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -33,33 +34,57 @@ func NewClient(opt ...Option) (*Client, error) {
 		c.ctx, c.ctxCancel = context.WithCancel(c.ctx)
 	}
 
-	c.Conn, err = ssh.Dial(c.protocol, c.address, c.sshClientConfig)
-	if err != nil {
-		return nil, err
+	connectCtx := c.ctx
+	if c.connectCtx != nil {
+		connectCtx = c.connectCtx
+	}
+	if c.sshClientConfig.Timeout > 0 {
+		var connectCancel context.CancelFunc
+		connectCtx, connectCancel = context.WithTimeout(connectCtx, c.sshClientConfig.Timeout)
+		defer connectCancel()
 	}
 
-	if c.SftpConn != nil {
+	conn, err := (&net.Dialer{}).DialContext(connectCtx, c.protocol, c.address)
+	if err != nil {
+		if connectCtx.Err() != nil {
+			err = connectCtx.Err()
+		}
+		return nil, err
+	}
+	connectDone := make(chan struct{})
+	defer close(connectDone)
+	go func() {
+		select {
+		case <-connectCtx.Done():
+			_ = conn.Close()
+		case <-connectDone:
+		}
+	}()
+
+	sshConn, channels, requests, err := ssh.NewClientConn(conn, c.address, c.sshClientConfig)
+	if err != nil {
+		_ = conn.Close()
+		if connectCtx.Err() != nil {
+			err = connectCtx.Err()
+		}
+		return nil, err
+	}
+	c.Conn = ssh.NewClient(sshConn, channels, requests)
+
+	if c.needSftp {
 		c.SftpConn, err = c.NewSftpSession()
 		if err != nil {
 			c.Close()
+			if connectCtx.Err() != nil {
+				err = connectCtx.Err()
+			}
 			return nil, err
 		}
 	}
 
 	go func() {
 		<-c.ctx.Done()
-		if c.SftpConn != nil {
-			err = c.SftpConn.Close()
-			if err != nil {
-				slog.Debug("ssh sftp close", "error", err)
-			}
-		}
-		if c.Conn != nil {
-			err = c.Conn.Close()
-			if err != nil {
-				slog.Debug("ssh client close", "error", err)
-			}
-		}
+		c.Close()
 	}()
 
 	return c, nil
@@ -118,16 +143,28 @@ func (self *Client) NewSftpSession() (*sftp.Client, error) {
 		return nil, err
 	}
 	go func() {
-		select {
-		case <-self.ctx.Done():
-			_ = sftpClient.Close()
-		}
+		<-self.ctx.Done()
+		_ = sftpClient.Close()
 	}()
 	return sftpClient, nil
 }
 
 func (self *Client) Close() {
-	self.ctxCancel()
+	self.closeOnce.Do(func() {
+		if self.ctxCancel != nil {
+			self.ctxCancel()
+		}
+		if self.SftpConn != nil {
+			if err := self.SftpConn.Close(); err != nil {
+				slog.Debug("ssh sftp close", "error", err)
+			}
+		}
+		if self.Conn != nil {
+			if err := self.Conn.Close(); err != nil {
+				slog.Debug("ssh client close", "error", err)
+			}
+		}
+	})
 }
 
 func (self *Client) Ctx() context.Context {
