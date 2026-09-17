@@ -87,6 +87,9 @@ func parseOptions(args []string) (options, error) {
 	if err := validateAbsolutePath("root", values["--root"]); err != nil {
 		return option, err
 	}
+	if values["--root"] == "/proc" || strings.HasPrefix(values["--root"], "/proc/") {
+		return option, errors.New("option --root must not point to /proc")
+	}
 	if err := validateAbsolutePath("path", values["--path"]); err != nil {
 		return option, err
 	}
