@@ -41,6 +41,9 @@ type ConsoleInstance struct {
 type DiskUsage struct {
 	DockerEnvName string           `json:"dockerEnvName"`
 	Usage         *types.DiskUsage `json:"usage,omitempty"`
+	HostUsed      *uint64          `json:"hostUsed,omitempty"`
+	HostAvailable *uint64          `json:"hostAvailable,omitempty"`
+	HostTotal     *uint64          `json:"hostTotal,omitempty"`
 	UpdatedAt     time.Time        `json:"updatedAt,omitempty"`
 }
 

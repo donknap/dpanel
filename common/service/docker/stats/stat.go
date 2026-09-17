@@ -3,19 +3,25 @@ package stats
 import (
 	"math"
 	"sync"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 )
 
 type Usage struct {
-	Cpu           float64  `json:"cpu"`
-	Memory        UsageIo  `json:"memory"`
-	PrevBlockIO   *UsageIo `json:"-"`
-	BlockIO       UsageIo  `json:"blockIO"`
-	PrevNetworkIO *UsageIo `json:"-"`
-	NetworkIO     UsageIo  `json:"networkIO"`
-	Name          string   `json:"name"`
-	Container     string   `json:"container"`
+	Cpu            float64                     `json:"cpu"`
+	Memory         UsageIo                     `json:"memory"`
+	PrevBlockIO    *UsageIo                    `json:"-"`
+	BlockIO        UsageIo                     `json:"blockIO"`
+	PrevNetworkIO  *UsageIo                    `json:"-"`
+	NetworkIO      UsageIo                     `json:"networkIO"`
+	Name           string                      `json:"name"`
+	Container      string                      `json:"container"`
+	CPUThrottled   *float64                    `json:"cpuThrottled,omitempty"`
+	BlockIOWaiting *float64                    `json:"blockIOWaiting,omitempty"`
+	Read           time.Time                   `json:"-"`
+	ThrottledTime  *uint64                     `json:"-"`
+	IOWaitTime     *[]container.BlkioStatEntry `json:"-"`
 }
 
 type UsageIo struct {
@@ -41,7 +47,7 @@ func (self *Container) SetError(err error) {
 	self.err = err
 }
 
-func (self *Container) SetStatistics(v *container.StatsResponse, osType string) {
+func (self *Container) SetStatistics(v *container.StatsResponse, osType string, throttledTime *uint64, ioWaitTime *[]container.BlkioStatEntry) {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 	var (
@@ -49,14 +55,21 @@ func (self *Container) SetStatistics(v *container.StatsResponse, osType string) 
 	)
 
 	usage := &Usage{
-		Cpu:       0,
-		Memory:    UsageIo{},
-		BlockIO:   UsageIo{},
-		NetworkIO: UsageIo{},
-		Name:      v.Name,
-		Container: v.ID,
+		Cpu:           0,
+		Memory:        UsageIo{},
+		BlockIO:       UsageIo{},
+		NetworkIO:     UsageIo{},
+		Name:          v.Name,
+		Container:     v.ID,
+		Read:          v.Read,
+		ThrottledTime: throttledTime,
+		IOWaitTime:    ioWaitTime,
 	}
 	if osType != "windows" {
+		if self.Usage != nil && self.Container == v.ID {
+			usage.CPUThrottled = calculateCPUThrottled(self.ThrottledTime, throttledTime, self.Read, v.Read)
+			usage.BlockIOWaiting = calculateBlockIOWaiting(self.IOWaitTime, ioWaitTime, self.Read, v.Read)
+		}
 		usage.Cpu = calculateCPUPercentUnix(v.PreCPUStats.CPUUsage.TotalUsage, v.PreCPUStats.SystemUsage, v)
 		blkRead, blkWrite = calculateBlockIO(v.BlkioStats)
 

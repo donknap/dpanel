@@ -12,7 +12,7 @@ type Collect struct {
 func (s *Collect) Add(container *Container) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, exists := s.isKnownContainer(container.Name); !exists {
+	if _, exists := s.isKnownContainer(container.GetStatistics().Name); !exists {
 		s.List = append(s.List, container)
 		return true
 	}
@@ -29,7 +29,7 @@ func (self *Collect) Unlock() {
 
 func (self *Collect) isKnownContainer(cid string) (int, bool) {
 	for i, c := range self.List {
-		if c.Name == cid {
+		if usage := c.GetStatistics(); usage != nil && usage.Name == cid {
 			return i, true
 		}
 	}
