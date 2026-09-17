@@ -23,12 +23,18 @@ func (self *MkdirCommand) Run(root *os.Root, option options) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = root.Lstat(name)
-	created := errors.Is(err, os.ErrNotExist)
-	if err != nil && !created {
-		return nil, fmt.Errorf("lstat directory %q: %w", option.path, err)
+	created := true
+	if option.recursive {
+		_, statErr := root.Lstat(name)
+		created = errors.Is(statErr, os.ErrNotExist)
+		if statErr != nil && !created {
+			return nil, fmt.Errorf("lstat directory %q: %w", option.path, statErr)
+		}
+		err = root.MkdirAll(name, mode.Perm())
+	} else {
+		err = root.Mkdir(name, mode.Perm())
 	}
-	if err = root.MkdirAll(name, mode.Perm()); err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("mkdir %q: %w", option.path, err)
 	}
 	if created {

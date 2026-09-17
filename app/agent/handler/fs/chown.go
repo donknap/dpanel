@@ -42,6 +42,12 @@ func (self *ChownCommand) Run(root *os.Root, option options) (any, error) {
 	if uid == -1 && gid == -1 {
 		return nil, errors.New("chown requires --uid or --gid")
 	}
+	if !option.recursive {
+		if err = root.Chown(name, uid, gid); err != nil {
+			return nil, fmt.Errorf("chown %q: %w", option.path, err)
+		}
+		return nil, nil
+	}
 	var chown func(string) error
 	chown = func(filePath string) error {
 		info, err := root.Lstat(filePath)
@@ -51,7 +57,7 @@ func (self *ChownCommand) Run(root *os.Root, option options) (any, error) {
 		if info.Mode()&os.ModeSymlink != 0 {
 			return nil
 		}
-		if option.recursive && info.IsDir() {
+		if info.IsDir() {
 			entries, err := readDirectory(root, filePath)
 			if err != nil {
 				return err

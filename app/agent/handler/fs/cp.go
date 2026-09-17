@@ -1,12 +1,13 @@
 package fs
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
-	"strings"
 	"syscall"
 )
 
@@ -49,10 +50,7 @@ func (self *CpCommand) copyPath(root *os.Root, source, target string, move, over
 	if err != nil {
 		return fmt.Errorf("lstat source: %w", err)
 	}
-	if sourceInfo.IsDir() && strings.HasPrefix(target+"/", source+"/") {
-		return errors.New("a directory cannot be copied or moved into itself")
-	}
-	_, err = root.Lstat(target)
+	targetInfo, err := root.Lstat(target)
 	targetExists := err == nil
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("lstat target: %w", err)
@@ -75,7 +73,33 @@ func (self *CpCommand) copyPath(root *os.Root, source, target string, move, over
 			return err
 		}
 	}
-	if err = self.copyEntry(root, source, target, overwrite, make(map[copyFileID]string)); err != nil {
+	sourceDirectories, err := preflightSource(root, source)
+	if err != nil {
+		return fmt.Errorf("inspect source: %w", err)
+	}
+	if targetExists {
+		if sameFile(sourceInfo, targetInfo) {
+			return errors.New("source and target are the same file")
+		}
+		if resolvedTarget, statErr := root.Stat(target); statErr == nil && sameFile(sourceInfo, resolvedTarget) {
+			return errors.New("source and target are the same file")
+		}
+		if err = preflightTargetAliases(root, source, target); err != nil {
+			return err
+		}
+	}
+	if sourceInfo.IsDir() {
+		targetInsideSource := targetExists && directoryIDExists(sourceDirectories, targetInfo)
+		if targetExists {
+			if resolvedTarget, statErr := root.Stat(target); statErr == nil {
+				targetInsideSource = targetInsideSource || directoryIDExists(sourceDirectories, resolvedTarget)
+			}
+		}
+		if directoryIDExists(sourceDirectories, parentInfo) || targetInsideSource {
+			return errors.New("a directory cannot be copied or moved into itself")
+		}
+	}
+	if err = self.copyEntry(root, source, target, overwrite); err != nil {
 		return err
 	}
 	if move {
@@ -86,14 +110,118 @@ func (self *CpCommand) copyPath(root *os.Root, source, target string, move, over
 	return nil
 }
 
-func (self *CpCommand) copyEntry(root *os.Root, source, target string, overwrite bool, hardlinks map[copyFileID]string) error {
-	info, err := root.Lstat(source)
+func preflightSource(root *os.Root, name string) (map[copyFileID]struct{}, error) {
+	result := make(map[copyFileID]struct{})
+	var walk func(string) error
+	walk = func(current string) error {
+		info, err := root.Lstat(current)
+		if err != nil {
+			return err
+		}
+		switch {
+		case info.Mode()&os.ModeSymlink != 0:
+			linkName, err := root.Readlink(current)
+			if err != nil {
+				return err
+			}
+			if linkName == "" {
+				return errors.New("symbolic link target is empty")
+			}
+			return nil
+		case info.Mode().IsRegular():
+			return nil
+		case info.IsDir():
+			id, err := copyID(info)
+			if err != nil {
+				return err
+			}
+			if _, exists := result[id]; exists {
+				return errors.New("source directory contains a filesystem cycle")
+			}
+			result[id] = struct{}{}
+			entries, err := readDirectory(root, current)
+			if err != nil {
+				return err
+			}
+			for _, entry := range entries {
+				if err = walk(path.Join(current, entry.Name())); err != nil {
+					return err
+				}
+			}
+			return nil
+		default:
+			return fmt.Errorf("unsupported file type %s", info.Mode().Type())
+		}
+	}
+	if err := walk(name); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func directoryIDExists(directories map[copyFileID]struct{}, info os.FileInfo) bool {
+	id, err := copyID(info)
+	if err != nil {
+		return false
+	}
+	_, exists := directories[id]
+	return exists
+}
+
+func copyID(info os.FileInfo) (copyFileID, error) {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return copyFileID{}, errors.New("file identity is unavailable")
+	}
+	return copyFileID{device: uint64(stat.Dev), inode: uint64(stat.Ino)}, nil
+}
+
+func sameFile(left, right os.FileInfo) bool {
+	leftID, leftErr := copyID(left)
+	rightID, rightErr := copyID(right)
+	return leftErr == nil && rightErr == nil && leftID == rightID
+}
+
+func preflightTargetAliases(root *os.Root, source, target string) error {
+	sourceInfo, err := root.Lstat(source)
 	if err != nil {
 		return err
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return errors.New("file owner is unavailable")
+	targetInfo, err := root.Lstat(target)
+	if err != nil {
+		return err
+	}
+	if sameFile(sourceInfo, targetInfo) {
+		return errors.New("source and target are the same file")
+	}
+	if !sourceInfo.IsDir() || !targetInfo.IsDir() {
+		return nil
+	}
+	entries, err := readDirectory(root, source)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		sourceChild := path.Join(source, entry.Name())
+		targetChild := path.Join(target, entry.Name())
+		_, err = root.Lstat(targetChild)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if err = preflightTargetAliases(root, sourceChild, targetChild); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (self *CpCommand) copyEntry(root *os.Root, source, target string, overwrite bool) error {
+	info, err := root.Lstat(source)
+	if err != nil {
+		return err
 	}
 	targetInfo, err := root.Lstat(target)
 	targetExists := err == nil
@@ -104,11 +232,29 @@ func (self *CpCommand) copyEntry(root *os.Root, source, target string, overwrite
 		return os.ErrExist
 	}
 	mergeDirectory := targetExists && info.IsDir() && targetInfo.IsDir()
-	if targetExists && !mergeDirectory {
-		if err = root.RemoveAll(target); err != nil {
+	if mergeDirectory {
+		entries, err := readDirectory(root, source)
+		if err != nil {
 			return err
 		}
-		targetExists = false
+		for _, entry := range entries {
+			if err = self.copyEntry(root, path.Join(source, entry.Name()), path.Join(target, entry.Name()), overwrite); err != nil {
+				return err
+			}
+		}
+		return setMetadata(root, target, info)
+	}
+	return self.replaceEntry(root, source, target, targetExists)
+}
+
+func (self *CpCommand) copyEntryRaw(root *os.Root, source, target string, hardlinks map[copyFileID]string) error {
+	info, err := root.Lstat(source)
+	if err != nil {
+		return err
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return errors.New("file owner is unavailable")
 	}
 	switch {
 	case info.Mode()&os.ModeSymlink != 0:
@@ -121,24 +267,28 @@ func (self *CpCommand) copyEntry(root *os.Root, source, target string, overwrite
 		}
 		return root.Lchown(target, int(stat.Uid), int(stat.Gid))
 	case info.IsDir():
-		if !targetExists {
-			if err = root.Mkdir(target, info.Mode().Perm()); err != nil {
-				return err
-			}
+		if err = root.Mkdir(target, info.Mode().Perm()); err != nil {
+			return err
 		}
 		entries, err := readDirectory(root, source)
 		if err != nil {
 			return err
 		}
 		for _, entry := range entries {
-			if err = self.copyEntry(root, path.Join(source, entry.Name()), path.Join(target, entry.Name()), overwrite, hardlinks); err != nil {
+			if err = self.copyEntryRaw(root, path.Join(source, entry.Name()), path.Join(target, entry.Name()), hardlinks); err != nil {
 				return err
 			}
 		}
 	case info.Mode().IsRegular():
-		id := copyFileID{device: uint64(stat.Dev), inode: uint64(stat.Ino)}
+		id, err := copyID(info)
+		if err != nil {
+			return err
+		}
 		if existing, ok := hardlinks[id]; ok {
-			return root.Link(existing, target)
+			if err = root.Link(existing, target); err != nil {
+				return err
+			}
+			return nil
 		}
 		sourceFile, err := root.Open(source)
 		if err != nil {
@@ -165,11 +315,72 @@ func (self *CpCommand) copyEntry(root *os.Root, source, target string, overwrite
 	default:
 		return fmt.Errorf("unsupported file type %s", info.Mode().Type())
 	}
-	if err = root.Chown(target, int(stat.Uid), int(stat.Gid)); err != nil {
+	return setMetadata(root, target, info)
+}
+
+func setMetadata(root *os.Root, target string, info os.FileInfo) error {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return errors.New("file owner is unavailable")
+	}
+	if err := root.Chown(target, int(stat.Uid), int(stat.Gid)); err != nil {
 		return err
 	}
-	if err = root.Chmod(target, info.Mode()); err != nil {
+	if err := root.Chmod(target, info.Mode()); err != nil {
 		return err
 	}
 	return root.Chtimes(target, info.ModTime(), info.ModTime())
+}
+
+func (self *CpCommand) replaceEntry(root *os.Root, source, target string, targetExists bool) error {
+	staging, err := unusedSibling(root, target, "copy")
+	if err != nil {
+		return err
+	}
+	if err = self.copyEntryRaw(root, source, staging, make(map[copyFileID]string)); err != nil {
+		return errors.Join(err, root.RemoveAll(staging))
+	}
+	if !targetExists {
+		if err = root.Rename(staging, target); err != nil {
+			return errors.Join(err, root.RemoveAll(staging))
+		}
+		return nil
+	}
+	backup, err := unusedSibling(root, target, "backup")
+	if err != nil {
+		return errors.Join(err, root.RemoveAll(staging))
+	}
+	if err = root.Rename(target, backup); err != nil {
+		return errors.Join(err, root.RemoveAll(staging))
+	}
+	if err = root.Rename(staging, target); err != nil {
+		rollbackErr := root.Rename(backup, target)
+		cleanupErr := root.RemoveAll(staging)
+		if rollbackErr != nil {
+			return fmt.Errorf("commit copy: %w; rollback failed and the original target remains at %q: %v", err, backup, rollbackErr)
+		}
+		return errors.Join(err, cleanupErr)
+	}
+	if err = root.RemoveAll(backup); err != nil {
+		return fmt.Errorf("remove copy backup %q: %w", backup, err)
+	}
+	return nil
+}
+
+func unusedSibling(root *os.Root, target, purpose string) (string, error) {
+	for range 16 {
+		value := make([]byte, 8)
+		if _, err := rand.Read(value); err != nil {
+			return "", err
+		}
+		name := path.Join(path.Dir(target), ".dpanel-"+purpose+"-"+hex.EncodeToString(value))
+		_, err := root.Lstat(name)
+		if errors.Is(err, os.ErrNotExist) {
+			return name, nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	return "", errors.New("cannot allocate a temporary copy path")
 }

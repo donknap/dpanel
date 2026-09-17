@@ -27,6 +27,12 @@ func (self *ChmodCommand) Run(root *os.Root, option options) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !option.recursive {
+		if err = root.Chmod(name, mode); err != nil {
+			return nil, fmt.Errorf("chmod %q: %w", option.path, err)
+		}
+		return nil, nil
+	}
 	var chmod func(string) error
 	chmod = func(filePath string) error {
 		info, err := root.Lstat(filePath)
@@ -36,7 +42,7 @@ func (self *ChmodCommand) Run(root *os.Root, option options) (any, error) {
 		if info.Mode()&os.ModeSymlink != 0 {
 			return nil
 		}
-		if option.recursive && info.IsDir() {
+		if info.IsDir() {
 			entries, err := readDirectory(root, filePath)
 			if err != nil {
 				return err

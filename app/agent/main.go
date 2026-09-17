@@ -16,11 +16,11 @@ var version = "dev"
 func main() {
 	handlers := internal.Handlers{}
 	new(Provider).Register(handlers)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	args := os.Args[1:]
 	if len(args) == 0 {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer stop()
 		<-ctx.Done()
 		return
 	}
@@ -29,8 +29,26 @@ func main() {
 	var err error
 	if selected, ok := handlers[args[0]]; !ok {
 		err = fmt.Errorf("unknown operation: %s", args[0])
+	} else if args[0] == "version" {
+		data, err = selected.Handle(ctx, args[1:])
 	} else {
-		data, err = selected.Handle(context.Background(), args[1:])
+		var capabilities map[string]struct{}
+		capabilities, err = internal.ParseCapabilities(os.Getenv("DP_AGENT_CAPS"))
+		if err == nil {
+			if _, allowed := capabilities[args[0]]; !allowed {
+				err = fmt.Errorf("operation %q is not authorized by DP_AGENT_CAPS", args[0])
+			} else if stream, ok := selected.(internal.StreamHandler); ok {
+				encoder := json.NewEncoder(os.Stdout)
+				err = stream.HandleStream(ctx, args[1:], func(value any) error {
+					return encoder.Encode(value)
+				})
+				if err == nil {
+					return
+				}
+			} else {
+				data, err = selected.Handle(ctx, args[1:])
+			}
+		}
 	}
 
 	message := internal.Message{Data: data, Code: 200}

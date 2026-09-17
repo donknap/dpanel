@@ -12,15 +12,16 @@ import (
 )
 
 type Handler struct {
-	ls    *LsCommand
-	users *UsersCommand
-	du    *DuCommand
-	cp    *CpCommand
-	mv    *MvCommand
-	mkdir *MkdirCommand
-	rm    *RmCommand
-	chmod *ChmodCommand
-	chown *ChownCommand
+	ls      *LsCommand
+	users   *UsersCommand
+	du      *DuCommand
+	cp      *CpCommand
+	mv      *MvCommand
+	mkdir   *MkdirCommand
+	rm      *RmCommand
+	chmod   *ChmodCommand
+	chown   *ChownCommand
+	chtimes *ChtimesCommand
 }
 
 type options struct {
@@ -32,6 +33,8 @@ type options struct {
 	mode         string
 	uid          string
 	gid          string
+	atime        string
+	mtime        string
 	overwrite    bool
 	recursive    bool
 }
@@ -42,6 +45,7 @@ func New() *Handler {
 	return &Handler{
 		ls: NewLsCommand(users), users: users, du: NewDuCommand(), cp: cp, mv: NewMvCommand(cp),
 		mkdir: NewMkdirCommand(), rm: NewRmCommand(), chmod: NewChmodCommand(), chown: NewChownCommand(),
+		chtimes: NewChtimesCommand(),
 	}
 }
 
@@ -64,7 +68,7 @@ func newOptions(args []string) (options, error) {
 			}
 			option.recursive = true
 			continue
-		case "--container-pid", "--root", "--path", "--source", "--target", "--mode", "--uid", "--gid":
+		case "--container-pid", "--root", "--path", "--source", "--target", "--mode", "--uid", "--gid", "--atime", "--mtime":
 		default:
 			return option, fmt.Errorf("unknown option: %s", name)
 		}
@@ -85,6 +89,8 @@ func newOptions(args []string) (options, error) {
 	option.mode = values["--mode"]
 	option.uid = values["--uid"]
 	option.gid = values["--gid"]
+	option.atime = values["--atime"]
+	option.mtime = values["--mtime"]
 	return option, nil
 }
 
@@ -156,6 +162,8 @@ func (self *Handler) Handle(_ context.Context, args []string) (any, error) {
 		return self.chmod.Run(root, option)
 	case self.chown.Name:
 		return self.chown.Run(root, option)
+	case self.chtimes.Name:
+		return self.chtimes.Run(root, option)
 	default:
 		return nil, fmt.Errorf("unknown fs operation: %s", args[0])
 	}

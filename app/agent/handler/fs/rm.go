@@ -22,7 +22,12 @@ func (self *RmCommand) Run(root *os.Root, option options) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = root.RemoveAll(name); err != nil {
+	if option.recursive {
+		err = root.RemoveAll(name)
+	} else {
+		err = root.Remove(name)
+	}
+	if err != nil {
 		return nil, fmt.Errorf("rm %q: %w", option.path, err)
 	}
 	return nil, nil
