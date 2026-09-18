@@ -6,21 +6,13 @@ import (
 	"fmt"
 	"runtime"
 
+	agentTypes "github.com/donknap/dpanel/app/agent/types"
 	"github.com/shirou/gopsutil/v4/disk"
 )
 
 const dockerDataMountPath = "/mnt_docker"
 
 type Handler struct{}
-
-type filesystemUsage struct {
-	Used           uint64  `json:"used"`
-	Available      uint64  `json:"available"`
-	Total          uint64  `json:"total"`
-	InodeUsed      *uint64 `json:"inodeUsed,omitempty"`
-	InodeAvailable *uint64 `json:"inodeAvailable,omitempty"`
-	InodeTotal     *uint64 `json:"inodeTotal,omitempty"`
-}
 
 func New() *Handler {
 	return &Handler{}
@@ -38,7 +30,7 @@ func (*Handler) Handle(_ context.Context, args []string) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read filesystem usage: %w", err)
 	}
-	result := filesystemUsage{Used: value.Used, Available: value.Free, Total: value.Total}
+	result := agentTypes.FilesystemUsage{Used: value.Used, Available: value.Free, Total: value.Total}
 	if value.InodesTotal > 0 {
 		result.InodeUsed = &value.InodesUsed
 		result.InodeAvailable = &value.InodesFree

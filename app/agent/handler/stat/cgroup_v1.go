@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	agentTypes "github.com/donknap/dpanel/app/agent/types"
 )
 
 const cgroupV1ClockTicks = 100
@@ -58,11 +60,11 @@ func containsController(value, target string) bool {
 	return false
 }
 
-func readStatsV1(result *containerStat, paths map[string]string, hostCPU cpuCounters, hostMemory uint64) {
+func readStatsV1(result *agentTypes.ContainerStat, paths map[string]string, hostCPU cpuCounters, hostMemory uint64) {
 	if directory := paths["cpuacct"]; directory != "" {
 		if total, err := readUintFile(filepath.Join(directory, "cpuacct.usage")); err == nil {
-			value := &dockerCPUStats{
-				CPUUsage:    dockerCPUUsage{TotalUsage: total},
+			value := &agentTypes.CPUStats{
+				CPUUsage:    agentTypes.CPUUsage{TotalUsage: total},
 				SystemUsage: hostCPU.dockerSystemUsage,
 				OnlineCPUs:  uint32(hostCPU.cores),
 			}
@@ -79,7 +81,7 @@ func readStatsV1(result *containerStat, paths map[string]string, hostCPU cpuCoun
 	if result.CPUStats != nil {
 		if directory := paths["cpu"]; directory != "" {
 			if items, err := readKeyValues(filepath.Join(directory, "cpu.stat")); err == nil {
-				result.CPUStats.ThrottlingData = dockerThrottlingData{
+				result.CPUStats.ThrottlingData = agentTypes.ThrottlingData{
 					Periods: items["nr_periods"], ThrottledPeriods: items["nr_throttled"], ThrottledTime: items["throttled_time"],
 				}
 			}
@@ -90,7 +92,7 @@ func readStatsV1(result *containerStat, paths map[string]string, hostCPU cpuCoun
 		if err != nil {
 			return
 		}
-		value := &dockerMemoryStats{Usage: usage}
+		value := &agentTypes.MemoryStats{Usage: usage}
 		if items, err := readKeyValues(filepath.Join(directory, "memory.stat")); err == nil {
 			value.Stats = items
 		}

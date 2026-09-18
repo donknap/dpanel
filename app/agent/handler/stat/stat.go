@@ -1,15 +1,15 @@
 package stat
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
+	"sort"
 	"time"
 
+	"github.com/donknap/dpanel/app/agent/internal/statparser"
+	agentTypes "github.com/donknap/dpanel/app/agent/types"
 	gopsutilCommon "github.com/shirou/gopsutil/v4/common"
 	"github.com/shirou/gopsutil/v4/disk"
 )
@@ -21,70 +21,10 @@ const (
 
 type Handler struct{}
 
-type systemStat struct {
-	SampledAt      time.Time       `json:"sampledAt"`
-	CPU            cpuStat         `json:"cpu"`
-	Memory         memoryStat      `json:"memory"`
-	Pressure       *pressureStat   `json:"pressure,omitempty"`
-	Disk           *diskStat       `json:"disk,omitempty"`
-	ContainerStats []containerStat `json:"containerStats,omitempty"`
-}
-
-type cpuStat struct {
-	Cores        int     `json:"cores"`
-	UsagePercent float64 `json:"usagePercent"`
-	Load1        float64 `json:"load1"`
-	Load5        float64 `json:"load5"`
-	Load15       float64 `json:"load15"`
-}
-
-type memoryStat struct {
-	Total         uint64 `json:"total"`
-	Available     uint64 `json:"available"`
-	SwapTotal     uint64 `json:"swapTotal"`
-	SwapAvailable uint64 `json:"swapAvailable"`
-}
-
-type pressureStat struct {
-	CPU    *pressureResource `json:"cpu,omitempty"`
-	Memory *pressureResource `json:"memory,omitempty"`
-	IO     *pressureResource `json:"io,omitempty"`
-}
-
-type pressureResource struct {
-	Some pressureValue  `json:"some"`
-	Full *pressureValue `json:"full,omitempty"`
-}
-
-type pressureValue struct {
-	Avg10  float64 `json:"avg10"`
-	Avg60  float64 `json:"avg60"`
-	Avg300 float64 `json:"avg300"`
-	Total  uint64  `json:"total"`
-}
-
-type diskStat struct {
-	ReadBytesPerSecond       float64  `json:"readBytesPerSecond"`
-	WriteBytesPerSecond      float64  `json:"writeBytesPerSecond"`
-	ReadOperationsPerSecond  float64  `json:"readOperationsPerSecond"`
-	WriteOperationsPerSecond float64  `json:"writeOperationsPerSecond"`
-	BusyPercent              *float64 `json:"busyPercent,omitempty"`
-}
-
 type cpuCounters struct {
-	total             uint64
-	idle              uint64
+	stat              agentTypes.CPUStat
 	dockerSystemUsage uint64
 	cores             int
-}
-
-type diskCounters struct {
-	readOperations  uint64
-	writeOperations uint64
-	readBytes       uint64
-	writeBytes      uint64
-	busyMillis      uint64
-	devices         uint64
 }
 
 func New() *Handler {
@@ -101,56 +41,42 @@ func (*Handler) HandleStream(ctx context.Context, args []string, write func(any)
 		return err
 	}
 	containerReader := newContainerReader(option.containers)
-	previousCPU, err := readCPU()
-	if err != nil {
-		return err
-	}
-	previousDisk, diskErr := readDisk(ctx)
-	previousAt := time.Now()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	sampledAt := time.Now()
 
 	for {
+		currentCPU, readErr := readCPU()
+		if readErr != nil {
+			return readErr
+		}
+		memory, readErr := readMemory()
+		if readErr != nil {
+			return readErr
+		}
+		load, readErr := readLoad()
+		if readErr != nil {
+			return readErr
+		}
+		result := agentTypes.SystemStat{
+			SchemaVersion:  agentTypes.StatSchemaVersion,
+			SampledAt:      sampledAt,
+			CPU:            currentCPU.stat,
+			Load:           load,
+			Memory:         memory,
+			Pressure:       readPressure(),
+			ContainerStats: containerReader.Read(sampledAt, currentCPU, memory.Total),
+		}
+		if result.Disk, readErr = readDisk(ctx); readErr != nil {
+			result.Disk = nil
+		}
+		if err = write(result); err != nil {
+			return fmt.Errorf("write stat sample: %w", err)
+		}
 		select {
 		case <-ctx.Done():
 			return nil
-		case sampledAt := <-ticker.C:
-			currentCPU, readErr := readCPU()
-			if readErr != nil {
-				return readErr
-			}
-			memory, readErr := readMemory()
-			if readErr != nil {
-				return readErr
-			}
-			load1, load5, load15, readErr := readLoad()
-			if readErr != nil {
-				return readErr
-			}
-			result := systemStat{
-				SampledAt: sampledAt,
-				CPU: cpuStat{
-					Cores:        currentCPU.cores,
-					UsagePercent: calculateCPU(previousCPU, currentCPU),
-					Load1:        load1,
-					Load5:        load5,
-					Load15:       load15,
-				},
-				Memory:   memory,
-				Pressure: readPressure(),
-			}
-			result.ContainerStats = containerReader.Read(sampledAt, currentCPU, memory.Total)
-			currentDisk, readDiskErr := readDisk(ctx)
-			if diskErr == nil && readDiskErr == nil {
-				result.Disk = calculateDisk(previousDisk, currentDisk, sampledAt.Sub(previousAt))
-			}
-			previousCPU = currentCPU
-			previousDisk = currentDisk
-			diskErr = readDiskErr
-			previousAt = sampledAt
-			if err = write(result); err != nil {
-				return fmt.Errorf("write stat sample: %w", err)
-			}
+		case sampledAt = <-ticker.C:
 		}
 	}
 }
@@ -160,109 +86,31 @@ func readCPU() (cpuCounters, error) {
 	if err != nil {
 		return cpuCounters{}, fmt.Errorf("read host cpu stat: %w", err)
 	}
-	result := cpuCounters{}
-	scanner := bufio.NewScanner(strings.NewReader(string(data)))
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) == 0 {
-			continue
-		}
-		if fields[0] == "cpu" {
-			for index, field := range fields[1:] {
-				value, parseErr := strconv.ParseUint(field, 10, 64)
-				if parseErr != nil {
-					return cpuCounters{}, fmt.Errorf("parse host cpu stat: %w", parseErr)
-				}
-				if index != 8 && index != 9 {
-					result.total += value
-				}
-				if index <= 6 {
-					result.dockerSystemUsage += value
-				}
-				if index == 3 || index == 4 {
-					result.idle += value
-				}
-			}
-		} else if strings.HasPrefix(fields[0], "cpu") && len(fields[0]) > 3 {
-			if _, parseErr := strconv.Atoi(fields[0][3:]); parseErr == nil {
-				result.cores++
-			}
-		}
+	parsed, err := statparser.ParseCPU(data)
+	if err != nil {
+		return cpuCounters{}, err
 	}
-	if err = scanner.Err(); err != nil {
-		return cpuCounters{}, fmt.Errorf("scan host cpu stat: %w", err)
-	}
-	if result.total == 0 || result.cores == 0 {
-		return cpuCounters{}, errors.New("host cpu stat is empty")
-	}
-	result.dockerSystemUsage *= uint64(time.Second) / 100
-	return result, nil
+	return cpuCounters{stat: parsed.Stat, dockerSystemUsage: parsed.DockerSystemUsage, cores: parsed.Stat.Cores}, nil
 }
 
-func calculateCPU(previous, current cpuCounters) float64 {
-	if current.total <= previous.total || current.idle < previous.idle {
-		return 0
-	}
-	totalDelta := current.total - previous.total
-	idleDelta := current.idle - previous.idle
-	if idleDelta >= totalDelta {
-		return 0
-	}
-	return float64(totalDelta-idleDelta) / float64(totalDelta) * 100
-}
-
-func readLoad() (float64, float64, float64, error) {
+func readLoad() (agentTypes.LoadStat, error) {
 	data, err := os.ReadFile(hostProcPath + "/loadavg")
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("read host load: %w", err)
+		return agentTypes.LoadStat{}, fmt.Errorf("read host load: %w", err)
 	}
-	fields := strings.Fields(string(data))
-	if len(fields) < 3 {
-		return 0, 0, 0, errors.New("host load data is incomplete")
-	}
-	values := make([]float64, 3)
-	for index := range values {
-		values[index], err = strconv.ParseFloat(fields[index], 64)
-		if err != nil {
-			return 0, 0, 0, fmt.Errorf("parse host load: %w", err)
-		}
-	}
-	return values[0], values[1], values[2], nil
+	return statparser.ParseLoad(data)
 }
 
-func readMemory() (memoryStat, error) {
+func readMemory() (agentTypes.MemoryStat, error) {
 	data, err := os.ReadFile(hostProcPath + "/meminfo")
 	if err != nil {
-		return memoryStat{}, fmt.Errorf("read host memory: %w", err)
+		return agentTypes.MemoryStat{}, fmt.Errorf("read host memory: %w", err)
 	}
-	values := make(map[string]uint64)
-	scanner := bufio.NewScanner(strings.NewReader(string(data)))
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 2 {
-			continue
-		}
-		value, parseErr := strconv.ParseUint(fields[1], 10, 64)
-		if parseErr == nil {
-			values[strings.TrimSuffix(fields[0], ":")] = value * 1024
-		}
-	}
-	if err = scanner.Err(); err != nil {
-		return memoryStat{}, fmt.Errorf("scan host memory: %w", err)
-	}
-	if values["MemTotal"] == 0 {
-		return memoryStat{}, errors.New("host memory data is empty")
-	}
-	return memoryStat{
-		Total:         values["MemTotal"],
-		Available:     values["MemAvailable"],
-		SwapTotal:     values["SwapTotal"],
-		SwapAvailable: values["SwapFree"],
-	}, nil
+	return statparser.ParseMemory(data)
 }
 
-func readPressure() *pressureStat {
-	result := &pressureStat{
+func readPressure() *agentTypes.PressureStat {
+	result := &agentTypes.PressureStat{
 		CPU:    readPressureResource("cpu"),
 		Memory: readPressureResource("memory"),
 		IO:     readPressureResource("io"),
@@ -273,69 +121,25 @@ func readPressure() *pressureStat {
 	return result
 }
 
-func readPressureResource(name string) *pressureResource {
+func readPressureResource(name string) *agentTypes.PressureResource {
 	data, err := os.ReadFile(hostProcPath + "/pressure/" + name)
 	if err != nil {
 		return nil
 	}
-	result := &pressureResource{}
-	found := false
-	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 5 {
-			continue
-		}
-		value := pressureValue{}
-		valid := true
-		for _, field := range fields[1:] {
-			key, raw, ok := strings.Cut(field, "=")
-			if !ok {
-				valid = false
-				break
-			}
-			switch key {
-			case "avg10":
-				value.Avg10, err = strconv.ParseFloat(raw, 64)
-			case "avg60":
-				value.Avg60, err = strconv.ParseFloat(raw, 64)
-			case "avg300":
-				value.Avg300, err = strconv.ParseFloat(raw, 64)
-			case "total":
-				value.Total, err = strconv.ParseUint(raw, 10, 64)
-			}
-			if err != nil {
-				valid = false
-				break
-			}
-		}
-		if !valid {
-			continue
-		}
-		switch fields[0] {
-		case "some":
-			result.Some = value
-			found = true
-		case "full":
-			result.Full = &value
-			found = true
-		}
-	}
-	if !found {
-		return nil
-	}
+	result, _ := statparser.ParsePressure(data)
 	return result
 }
 
-func readDisk(ctx context.Context) (diskCounters, error) {
+func readDisk(ctx context.Context) ([]agentTypes.DiskStat, error) {
 	ctx = context.WithValue(ctx, gopsutilCommon.EnvKey, gopsutilCommon.EnvMap{
 		gopsutilCommon.HostProcEnvKey: hostProcPath,
 		gopsutilCommon.HostSysEnvKey:  hostSysPath,
 	})
 	ioCounters, err := disk.IOCountersWithContext(ctx)
 	if err != nil {
-		return diskCounters{}, fmt.Errorf("read host disk stat: %w", err)
+		return nil, fmt.Errorf("read host disk stat: %w", err)
 	}
-	result := diskCounters{}
+	result := make([]agentTypes.DiskStat, 0, len(ioCounters))
 	for device, value := range ioCounters {
 		devicePath := hostSysPath + "/block/" + device
 		if _, err = os.Stat(devicePath + "/device"); err != nil {
@@ -345,38 +149,24 @@ func readDisk(ctx context.Context) (diskCounters, error) {
 		if readErr != nil || len(slaves) != 0 {
 			continue
 		}
-		result.readOperations += value.ReadCount
-		result.readBytes += value.ReadBytes
-		result.writeOperations += value.WriteCount
-		result.writeBytes += value.WriteBytes
-		result.busyMillis += value.IoTime
-		result.devices++
+		result = append(result, agentTypes.DiskStat{
+			Name:                 device,
+			ReadCount:            value.ReadCount,
+			MergedReadCount:      value.MergedReadCount,
+			WriteCount:           value.WriteCount,
+			MergedWriteCount:     value.MergedWriteCount,
+			ReadBytes:            value.ReadBytes,
+			WriteBytes:           value.WriteBytes,
+			ReadTimeMillis:       value.ReadTime,
+			WriteTimeMillis:      value.WriteTime,
+			IOPSInProgress:       value.IopsInProgress,
+			IOTimeMillis:         value.IoTime,
+			WeightedIOTimeMillis: value.WeightedIO,
+		})
 	}
-	if result.devices == 0 {
-		return diskCounters{}, errors.New("host disk stat is empty")
+	if len(result) == 0 {
+		return nil, errors.New("host disk stat is empty")
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
 	return result, nil
-}
-
-func calculateDisk(previous, current diskCounters, interval time.Duration) *diskStat {
-	seconds := interval.Seconds()
-	if seconds <= 0 || current.readOperations < previous.readOperations ||
-		current.writeOperations < previous.writeOperations || current.readBytes < previous.readBytes ||
-		current.writeBytes < previous.writeBytes || current.busyMillis < previous.busyMillis {
-		return nil
-	}
-	result := &diskStat{
-		ReadBytesPerSecond:       float64(current.readBytes-previous.readBytes) / seconds,
-		WriteBytesPerSecond:      float64(current.writeBytes-previous.writeBytes) / seconds,
-		ReadOperationsPerSecond:  float64(current.readOperations-previous.readOperations) / seconds,
-		WriteOperationsPerSecond: float64(current.writeOperations-previous.writeOperations) / seconds,
-	}
-	if previous.devices > 0 && current.devices == previous.devices {
-		busy := float64(current.busyMillis-previous.busyMillis) / (interval.Seconds() * 1000 * float64(current.devices)) * 100
-		if busy > 100 {
-			busy = 100
-		}
-		result.BusyPercent = &busy
-	}
-	return result
 }

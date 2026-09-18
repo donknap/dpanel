@@ -6,6 +6,8 @@ import (
 	"os"
 	"path"
 	"syscall"
+
+	agentTypes "github.com/donknap/dpanel/app/agent/types"
 )
 
 type DuCommand struct{ Name string }
@@ -70,5 +72,5 @@ func (self *DuCommand) Run(root *os.Root, option options) (any, error) {
 	if err = walk(directoryPath); err != nil {
 		return nil, err
 	}
-	return map[string]int64{"size": total}, nil
+	return agentTypes.SizeData{Size: total}, nil
 }

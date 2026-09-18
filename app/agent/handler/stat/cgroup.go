@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	agentTypes "github.com/donknap/dpanel/app/agent/types"
 )
 
 const hostCgroupPath = hostSysPath + "/fs/cgroup"
@@ -19,7 +21,7 @@ const hostCgroupPath = hostSysPath + "/fs/cgroup"
 type containerReader struct {
 	containers []containerTarget
 	locations  map[string]containerCgroupLocation
-	previous   map[string]containerStat
+	previous   map[string]agentTypes.ContainerStat
 }
 
 type containerCgroupLocation struct {
@@ -31,15 +33,15 @@ func newContainerReader(containers []containerTarget) *containerReader {
 	return &containerReader{
 		containers: containers,
 		locations:  make(map[string]containerCgroupLocation),
-		previous:   make(map[string]containerStat),
+		previous:   make(map[string]agentTypes.ContainerStat),
 	}
 }
 
-func (reader *containerReader) Read(sampledAt time.Time, hostCPU cpuCounters, hostMemory uint64) []containerStat {
+func (reader *containerReader) Read(sampledAt time.Time, hostCPU cpuCounters, hostMemory uint64) []agentTypes.ContainerStat {
 	if len(reader.containers) == 0 {
 		return nil
 	}
-	result := make([]containerStat, 0, len(reader.containers))
+	result := make([]agentTypes.ContainerStat, 0, len(reader.containers))
 	for _, target := range reader.containers {
 		value, ok := reader.read(target, sampledAt, hostCPU, hostMemory)
 		if !ok {
@@ -59,13 +61,13 @@ func (reader *containerReader) Read(sampledAt time.Time, hostCPU cpuCounters, ho
 	return result
 }
 
-func (reader *containerReader) read(target containerTarget, sampledAt time.Time, hostCPU cpuCounters, hostMemory uint64) (containerStat, bool) {
+func (reader *containerReader) read(target containerTarget, sampledAt time.Time, hostCPU cpuCounters, hostMemory uint64) (agentTypes.ContainerStat, bool) {
 	location, exists := reader.locations[target.id]
 	if !exists {
 		var err error
 		location, err = locateContainerCgroup(target)
 		if err != nil {
-			return containerStat{}, false
+			return agentTypes.ContainerStat{}, false
 		}
 		reader.locations[target.id] = location
 	}
@@ -125,8 +127,8 @@ func parseCgroupFile(name string) (map[string]string, string, error) {
 	return legacy, unified, nil
 }
 
-func readContainerStat(containerID string, location containerCgroupLocation, sampledAt time.Time, hostCPU cpuCounters, hostMemory uint64) (containerStat, bool) {
-	result := containerStat{ID: containerID, OSType: "linux", Read: sampledAt}
+func readContainerStat(containerID string, location containerCgroupLocation, sampledAt time.Time, hostCPU cpuCounters, hostMemory uint64) (agentTypes.ContainerStat, bool) {
+	result := agentTypes.ContainerStat{ID: containerID, OSType: "linux", Read: sampledAt}
 	if location.unified != "" {
 		readStatsV2(&result, location.unified, hostCPU, hostMemory)
 	} else {

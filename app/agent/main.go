@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/donknap/dpanel/app/agent/internal"
+	agentTypes "github.com/donknap/dpanel/app/agent/types"
 )
 
 var version = "dev"
@@ -51,10 +52,10 @@ func main() {
 		}
 	}
 
-	message := internal.Message{Data: data, Code: 200}
+	message := agentTypes.Message[any]{Data: data, Code: 200}
 	exitCode := 0
 	if err != nil {
-		message = internal.Message{Error: err.Error(), Code: 500}
+		message = agentTypes.Message[any]{Error: err.Error(), Code: 500}
 		exitCode = 1
 	}
 

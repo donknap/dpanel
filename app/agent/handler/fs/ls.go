@@ -6,22 +6,10 @@ import (
 	"path"
 	"strconv"
 	"syscall"
-	"time"
 	"unicode/utf8"
-)
 
-type fileData struct {
-	Name     string      `json:"name"`
-	Size     int64       `json:"size"`
-	Mode     os.FileMode `json:"mode"`
-	ModeText string      `json:"modeText"`
-	ModTime  time.Time   `json:"modTime"`
-	UID      uint32      `json:"uid"`
-	GID      uint32      `json:"gid"`
-	User     string      `json:"user"`
-	Group    string      `json:"group"`
-	LinkName string      `json:"linkName"`
-}
+	agentTypes "github.com/donknap/dpanel/app/agent/types"
+)
 
 type LsCommand struct {
 	Name  string
@@ -63,7 +51,7 @@ func (self *LsCommand) Run(root *os.Root, option options) (any, error) {
 		groups[0] = "root"
 	}
 
-	result := make([]fileData, 0, len(entries))
+	result := make([]agentTypes.FileData, 0, len(entries))
 	for _, entry := range entries {
 		if !utf8.ValidString(entry.Name()) {
 			return nil, fmt.Errorf("directory contains a non-UTF-8 filename: %q", []byte(entry.Name()))
@@ -78,7 +66,7 @@ func (self *LsCommand) Run(root *os.Root, option options) (any, error) {
 			return nil, fmt.Errorf("read owner for %q: owner is unavailable", entry.Name())
 		}
 		uid, gid := stat.Uid, stat.Gid
-		item := fileData{Name: entry.Name(), Size: info.Size(), Mode: info.Mode(), ModeText: self.modeText(info.Mode()), ModTime: info.ModTime(), UID: uid, GID: gid, User: identityName(users, uid), Group: identityName(groups, gid)}
+		item := agentTypes.FileData{Name: entry.Name(), Size: info.Size(), Mode: info.Mode(), ModeText: self.modeText(info.Mode()), ModTime: info.ModTime(), UID: uid, GID: gid, User: identityName(users, uid), Group: identityName(groups, gid)}
 		if info.Mode()&os.ModeSymlink != 0 {
 			item.LinkName, err = root.Readlink(entryPath)
 			if err != nil {
