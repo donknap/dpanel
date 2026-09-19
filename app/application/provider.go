@@ -90,21 +90,6 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/image-buildx/create", controller.ImageBuildx{}.Create)
 			cors.POST("/app/image-buildx/prune", controller.ImageBuildx{}.Prune)
 
-			// 文件相关
-			cors.POST("/app/explorer/export", controller.Explorer{}.Export)
-			cors.POST("/app/explorer/import", controller.Explorer{}.Import)
-			cors.POST("/app/explorer/import-file-content", controller.Explorer{}.ImportFileContent)
-			cors.POST("/app/explorer/unzip", controller.Explorer{}.Unzip)
-			cors.POST("/app/explorer/get-path-list", controller.Explorer{}.GetPathList)
-			cors.POST("/app/explorer/delete", controller.Explorer{}.Delete)
-			cors.POST("/app/explorer/get-content", controller.Explorer{}.GetContent)
-			cors.POST("/app/explorer/chmod", controller.Explorer{}.Chmod)
-			cors.POST("/app/explorer/get-file-stat", controller.Explorer{}.GetFileStat)
-			cors.POST("/app/explorer/get-user-list", controller.Explorer{}.GetUserList)
-			cors.POST("/app/explorer/mkdir", controller.Explorer{}.MkDir)
-			cors.POST("/app/explorer/copy", controller.Explorer{}.Copy)
-			cors.POST("/app/explorer/destroy-proxy-container", controller.Explorer{}.DestroyProxyContainer)
-
 			// 日志相关
 			cors.POST("/app/log/run", controller.RunLog{}.Run)
 

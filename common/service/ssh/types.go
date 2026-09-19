@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"context"
+	"sync"
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -14,10 +15,13 @@ const (
 )
 
 type Client struct {
+	closeOnce       sync.Once
 	Conn            *ssh.Client
 	SftpConn        *sftp.Client
 	ctx             context.Context
 	ctxCancel       context.CancelFunc
+	connectCtx      context.Context
+	needSftp        bool
 	sshClientConfig *ssh.ClientConfig
 	address         string
 	protocol        string // 连接协议，tcp or tpc6

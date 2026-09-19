@@ -10,6 +10,7 @@ import (
 
 	types3 "github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
+	dockerEvents "github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/network"
 	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
@@ -193,6 +194,8 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 }
 
 func (self Docker) Message(e event.DockerMessagePayload) {
+	e.Level = dockerMessageLevel(e.Message)
+
 	if client, ok := notice.Monitor.Clients()[e.DockerEnvName]; ok {
 		client.ContainerRuntimeCollect(context.Background(), e.Message)
 	} else if docker.Sdk != nil && docker.Sdk.Name == e.DockerEnvName {
@@ -221,5 +224,37 @@ func (self Docker) Message(e event.DockerMessagePayload) {
 		for _, job := range crontab.Client.GetJobs(fmt.Sprintf(logic.CronEventJobSearch, msgType)) {
 			job.Run(crontab.WithEnvironment(environment))
 		}
+	}
+}
+
+func dockerMessageLevel(message dockerEvents.Message) event.DockerMessageLevel {
+	action := string(message.Action)
+	if index := strings.Index(action, ": "); index >= 0 {
+		action = action[:index]
+	}
+
+	switch dockerEvents.Action(action) {
+	case dockerEvents.ActionCreate,
+		dockerEvents.ActionUpdate,
+		dockerEvents.ActionDestroy,
+		dockerEvents.ActionRemove,
+		dockerEvents.ActionDelete,
+		dockerEvents.ActionPrune,
+		dockerEvents.ActionStop,
+		dockerEvents.ActionRestart,
+		dockerEvents.ActionKill,
+		dockerEvents.ActionPause,
+		dockerEvents.ActionOOM,
+		dockerEvents.ActionMount,
+		dockerEvents.ActionUnmount,
+		dockerEvents.ActionConnect,
+		dockerEvents.ActionDisconnect,
+		dockerEvents.ActionEnable,
+		dockerEvents.ActionDisable,
+		dockerEvents.ActionExecCreate,
+		dockerEvents.ActionExecStart:
+		return event.DockerMessageLevelHigh
+	default:
+		return event.DockerMessageLevelNormal
 	}
 }

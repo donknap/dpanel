@@ -3,7 +3,6 @@ package controller
 import (
 	"archive/tar"
 	"compress/gzip"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -308,6 +307,12 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		Total:   len(progressSteps),
 	})
 
+	var hostExplorer *plugin.Plugin
+	defer func() {
+		if hostExplorer != nil {
+			_ = hostExplorer.Close()
+		}
+	}()
 	for _, item := range manifest {
 		config, err := b.Reader.ReadBlobsContent(item.Config)
 		if err != nil {
@@ -505,15 +510,11 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 
 		if !function.IsEmptyArray(item.VolumeList) {
 			err = func() error {
-				var proxyContainerName string
-
 				// 仅当有挂载文件的时候才新建文件管理助手
 				if _, _, ok := function.PluckArrayItemWalk(item.VolumeList, func(item backup.ManifestVolumeInfo) bool {
 					return item.Mode.IsRegular()
-				}); ok {
-					ctx, ctxCancel := context.WithCancel(docker.Sdk.Ctx)
-					defer ctxCancel()
-					proxyContainerName, err = plugin.NewHostExplorer(ctx, docker.Sdk)
+				}); ok && hostExplorer == nil {
+					hostExplorer, err = plugin.NewHostExplorer(docker.Sdk.Ctx, docker.Sdk)
 					if err != nil {
 						return err
 					}
@@ -531,14 +532,23 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 					// 例如 docker cp caddy:/etc/caddy/ . 只会保存 caddy 目录，那么这里恢复的时候，也需要脱去一层目录
 					importOption := make([]imports.ImportFileOption, 0)
 					if volume.Mode.IsRegular() {
-						targetImportPath = path.Join("/", "mnt", "host", path.Dir(volume.Source))
-						targetImportContainerName = proxyContainerName
+						p := path.Dir(volume.Source)
+						targetImportPath = path.Join(plugin.HostExplorerMountPath, p)
+						targetImportContainerName = hostExplorer.ContainerName()
 						importOption = append(importOption, imports.WithImportFileInTar(tarReader, path.Base(volume.Source), func(header *tar.Header) bool {
 							return strings.HasSuffix(volume.Destination, header.Name)
 						}))
-						if p := function.PathClean(targetImportPath); p != "" {
-							_, err = docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, proxyContainerName, "mkdir -p "+p)
-						}
+						_, err = docker.Sdk.ContainerExecResult(
+							docker.Sdk.Ctx,
+							hostExplorer.ContainerName(),
+							container.ExecOptions{Cmd: []string{
+								"/agent", "fs", "mkdir",
+								"--root", plugin.HostExplorerMountPath,
+								"--path", p,
+								"--mode", "0755",
+								"--recursive",
+							}},
+						)
 						if err != nil {
 							return err
 						}

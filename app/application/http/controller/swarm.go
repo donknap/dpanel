@@ -203,14 +203,17 @@ func (self Swarm) Log(http *gin.Context) {
 	if params.LineTotal > 0 {
 		option.Tail = strconv.Itoa(params.LineTotal)
 	}
-	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id))
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	if progress.IsShadow() {
-		option.Follow = false
+	var progress *ws.ProgressPip
+	var err error
+	if !params.Download {
+		progress, err = ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if progress.IsShadow() {
+			option.Follow = false
+		}
 	}
 	var response io.ReadCloser
 	if params.Type == "service" {
@@ -222,6 +225,9 @@ func (self Swarm) Log(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	defer func() {
+		_ = response.Close()
+	}()
 	if params.Download {
 		http.Header("Content-Type", "text/plain")
 		http.Header("Content-Disposition", "attachment; filename="+params.Id+".log")
@@ -235,14 +241,12 @@ func (self Swarm) Log(http *gin.Context) {
 	}
 
 	go func() {
-		if progress.IsShadow() {
-			return
-		}
 		select {
+		case <-http.Request.Context().Done():
 		case <-progress.Done():
-			err = response.Close()
-			slog.Info("service run log response close", "id", fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id), "err", err)
 		}
+		closeErr := response.Close()
+		slog.Info("service run log response close", "id", fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id), "err", closeErr)
 	}()
 	_, err = io.Copy(progress, response)
 	self.JsonResponseWithoutError(http, gin.H{

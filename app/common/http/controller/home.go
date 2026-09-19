@@ -26,11 +26,13 @@ import (
 	"github.com/docker/docker/api/types/network"
 	applicationLogic "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
+	statLogic "github.com/donknap/dpanel/app/common/logic/stat"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/stats"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
@@ -530,9 +532,17 @@ func (self Home) ConsoleLink(http *gin.Context) {
 }
 
 func (self Home) Info(http *gin.Context) {
-	info, err := docker.Sdk.Client.Info(docker.Sdk.Ctx)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if err = (statLogic.Stat{}).ReconcileSystemStat(dockerSdk); err != nil {
+		slog.Warn("reconcile system stat", "dockerEnvName", dockerSdk.Name, "error", err)
+	}
+	info, err := dockerSdk.Client.Info(dockerSdk.Ctx)
 	if err == nil && info.ID != "" {
-		info.Name = fmt.Sprintf("%s - %s", docker.Sdk.Name, docker.Sdk.DockerEnv.Address)
+		info.Name = fmt.Sprintf("%s - %s", dockerSdk.Name, dockerSdk.DockerEnv.Address)
 	}
 	var public string
 	if v, ok := storage.Cache.Get(storage.CacheKeyRsaPub); ok {
@@ -550,7 +560,7 @@ func (self Home) Info(http *gin.Context) {
 		}
 	}
 
-	dockerEnv := *docker.Sdk.DockerEnv
+	dockerEnv := *dockerSdk.DockerEnv
 	dockerEnv.SshServerInfo = nil
 	dockerEnv.TlsCert = ""
 	dockerEnv.TlsCa = ""
@@ -574,7 +584,7 @@ func (self Home) Info(http *gin.Context) {
 
 	result := gin.H{
 		"info":          info,
-		"clientVersion": docker.Sdk.Client.ClientVersion(),
+		"clientVersion": dockerSdk.Client.ClientVersion(),
 		"sdkVersion":    api.DefaultVersion,
 		"dpanel":        dpanelInfoResult,
 		"dockerEnv":     dockerEnv,
@@ -591,83 +601,95 @@ func (self Home) Info(http *gin.Context) {
 }
 
 func (self Home) Usage(http *gin.Context) {
+	sdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	// 有些设备的docker获取磁盘占用比较耗时，跑一下后台协程去获取数据
 	go func() {
 		progress, err := ws.NewFdProgressPip(http, ws.MessageTypeDiskUsage)
-		defer func() {
-			progress.Close()
-		}()
+		if err != nil {
+			slog.Warn("create disk usage progress", "dockerEnvName", sdk.Name, "error", err)
+			return
+		}
+		defer progress.Close()
 		// 20 分种后强制终止
-		ctx, _ := context.WithTimeout(docker.Sdk.Ctx, time.Minute*20)
-		diskUsage, err := docker.Sdk.Client.DiskUsage(ctx, types.DiskUsageOptions{
-			Types: []types.DiskUsageObject{
-				types.ContainerObject,
-				types.ImageObject,
-				types.VolumeObject,
-				types.BuildCacheObject,
+		ctx, cancel := context.WithTimeout(sdk.Ctx, time.Minute*20)
+		defer cancel()
+		stopCancel := context.AfterFunc(progress.Context(), cancel)
+		defer stopCancel()
+
+		result := accessor.DiskUsage{DockerEnvName: sdk.Name}
+		type dockerUsageResult struct {
+			usage types.DiskUsage
+			err   error
+		}
+		type hostUsageResult struct {
+			usage accessor.SystemDiskUsage
+			err   error
+		}
+		dockerResult := make(chan dockerUsageResult, 1)
+		go func() {
+			usage, collectErr := (statLogic.Stat{}).DockerDiskUsage(ctx, sdk)
+			dockerResult <- dockerUsageResult{usage: usage, err: collectErr}
+		}()
+
+		var hostResult chan hostUsageResult
+		if sdk.DockerEnv.EnableSystemStat {
+			hostResult = make(chan hostUsageResult, 1)
+			go func() {
+				usage, collectErr := (statLogic.Stat{}).HostDiskUsage(ctx, sdk)
+				hostResult <- hostUsageResult{usage: usage, err: collectErr}
+			}()
+		}
+
+		dockerSucceeded := false
+		completedTotal := 1
+		if hostResult != nil {
+			completedTotal++
+		}
+		for completed := 0; completed < completedTotal; completed++ {
+			select {
+			case collected := <-dockerResult:
+				if collected.err != nil {
+					slog.Warn("collect Docker disk usage", "dockerEnvName", sdk.Name, "error", collected.err)
+					continue
+				}
+				result.Docker = collected.usage
+				dockerSucceeded = true
+			case collected := <-hostResult:
+				if collected.err != nil {
+					slog.Warn("collect system disk usage", "dockerEnvName", sdk.Name, "error", collected.err)
+					continue
+				}
+				result.System = &collected.usage
+			case <-ctx.Done():
+				slog.Warn("collect disk usage", "dockerEnvName", sdk.Name, "error", ctx.Err())
+				return
+			}
+		}
+		if !dockerSucceeded {
+			return
+		}
+		result.UpdatedAt = time.Now()
+		_ = logic.Setting{}.Save(&entity.Setting{
+			GroupName: logic.SettingGroupSetting,
+			Name:      logic.SettingGroupSettingDiskUsage,
+			Value: &accessor.SettingValueOption{
+				DiskUsage: &result,
 			},
 		})
-		if err == nil {
-			// 去掉无用的信息
-			for i := range diskUsage.Containers {
-				diskUsage.Containers[i].Labels = make(map[string]string)
-			}
-			for i := range diskUsage.Images {
-				diskUsage.Images[i].Labels = make(map[string]string)
-			}
-			for i := range diskUsage.Volumes {
-				diskUsage.Volumes[i].Labels = make(map[string]string)
-			}
-			if !function.IsEmptyArray(diskUsage.Images) {
-				sort.Slice(diskUsage.Images, func(i, j int) bool {
-					return diskUsage.Images[i].Size > diskUsage.Images[j].Size
-				})
-			}
-			if !function.IsEmptyArray(diskUsage.Containers) {
-				sort.Slice(diskUsage.Containers, func(i, j int) bool {
-					return diskUsage.Containers[i].SizeRw+diskUsage.Containers[i].SizeRootFs > diskUsage.Containers[j].SizeRw+diskUsage.Containers[j].SizeRootFs
-				})
-			}
 
-			if !function.IsEmptyArray(diskUsage.Volumes) {
-				sort.Slice(diskUsage.Volumes, func(i, j int) bool {
-					if diskUsage.Volumes[i].UsageData != nil && diskUsage.Volumes[j].UsageData != nil {
-						return diskUsage.Volumes[i].UsageData.Size > diskUsage.Volumes[j].UsageData.Size
-					}
-					return false
-				})
-			}
-
-			_ = logic.Setting{}.Save(&entity.Setting{
-				GroupName: logic.SettingGroupSetting,
-				Name:      logic.SettingGroupSettingDiskUsage,
-				Value: &accessor.SettingValueOption{
-					DiskUsage: &accessor.DiskUsage{
-						DockerEnvName: docker.Sdk.Name,
-						Usage:         &diskUsage,
-						UpdatedAt:     time.Now(),
-					},
-				},
-			})
-
-			time.Sleep(time.Second * 3)
-			progress.BroadcastMessage(&accessor.DiskUsage{
-				Usage:     &diskUsage,
-				UpdatedAt: time.Now(),
-			})
-		}
-		return
+		time.Sleep(time.Second * 3)
+		progress.BroadcastMessage(&result)
 	}()
 
-	diskUsage := accessor.DiskUsage{
-		Usage: &types.DiskUsage{},
-	}
+	diskUsage := accessor.DiskUsage{}
 	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDiskUsage, &diskUsage)
-	if diskUsage.DockerEnvName != docker.Sdk.Name {
+	if diskUsage.DockerEnvName != sdk.Name {
 		// 用量统计如果不是当前环境的变清空掉，等待获取
-		diskUsage = accessor.DiskUsage{
-			Usage: &types.DiskUsage{},
-		}
+		diskUsage = accessor.DiskUsage{}
 	}
 
 	type portItem struct {
@@ -687,9 +709,8 @@ func (self Home) Usage(http *gin.Context) {
 	}
 
 	var containerList []container.Summary
-	var err error
 
-	if containerList, err = docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+	if containerList, err = sdk.Client.ContainerList(sdk.Ctx, container.ListOptions{
 		All: true,
 	}); err == nil {
 		containerLogic := applicationLogic.Container{}
@@ -712,7 +733,7 @@ func (self Home) Usage(http *gin.Context) {
 			var containerInfo container.InspectResponse
 			var inspectInfo *container.InspectResponse
 			containerInspectOK := false
-			if info, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID); err == nil {
+			if info, err := sdk.Client.ContainerInspect(sdk.Ctx, item.ID); err == nil {
 				containerInfo = info
 				inspectInfo = &containerInfo
 				containerInspectOK = true
@@ -766,9 +787,9 @@ func (self Home) Usage(http *gin.Context) {
 		})
 	}
 
-	networkRow, _ := docker.Sdk.Client.NetworkList(docker.Sdk.Ctx, network.ListOptions{})
+	networkRow, _ := sdk.Client.NetworkList(sdk.Ctx, network.ListOptions{})
 	recycleQuery := dao.Site.Where(dao.Site.DeletedAt.IsNotNull()).Unscoped().Where(gen.Cond(
-		datatypes.JSONQuery("env").Equals(docker.Sdk.Name, "dockerEnvName"),
+		datatypes.JSONQuery("env").Equals(sdk.Name, "dockerEnvName"),
 	)...)
 	if containerList != nil {
 		names := make([]string, 0)
@@ -798,6 +819,11 @@ func (self Home) Usage(http *gin.Context) {
 }
 
 func (self Home) GetStatList(http *gin.Context) {
+	type runtimeStat struct {
+		DockerEnvName string                `json:"dockerEnvName"`
+		Docker        []*stats.Usage        `json:"docker"`
+		System        *statLogic.SystemStat `json:"system,omitempty"`
+	}
 	type ParamsValidate struct {
 		Follow bool `json:"follow"`
 	}
@@ -805,67 +831,107 @@ func (self Home) GetStatList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	var err error
-
-	if !params.Follow {
-		list, err := docker.Sdk.ContainerStatsOneShot(docker.Sdk.Ctx)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		self.JsonResponseWithoutError(http, gin.H{
-			"list": list,
-		})
-		return
-	}
-
-	progress, err := ws.NewFdProgressPip(http, ws.MessageTypeContainerAllStat)
+	sdk, err := docker.NewClientWithUser(http)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
-	closeTimer := time.AfterFunc(time.Hour, func() {
-		progress.Close()
-	})
-
-	if progress.IsShadow() {
-		self.JsonResponseWithoutError(http, gin.H{
-			"list": "",
-		})
-		return
-	}
-	defer progress.Close()
-
-	out, err := docker.Sdk.ContainerStats(progress.Context(), types2.ContainerStatsOption{
-		Stream: true,
-	})
-	if err != nil {
-		slog.Debug("home get stat list", "error", err)
-		self.JsonResponseWithoutError(http, gin.H{
-			"list": "",
-		})
-		return
-	}
-
-	for {
-		select {
-		case <-docker.Sdk.Ctx.Done():
-			progress.Close()
-		case <-progress.Done():
-			slog.Debug("home get stat list progress done")
-			closeTimer.Stop()
-			self.JsonResponseWithoutError(http, gin.H{
-				"list": "",
+	var progress *ws.ProgressPip
+	var progressDone <-chan struct{}
+	if params.Follow {
+		progress, err = ws.NewFdProgressPip(http, ws.MessageTypeContainerAllStat)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if progress.IsShadow() {
+			self.JsonResponseWithoutError(http, runtimeStat{
+				DockerEnvName: sdk.Name,
+				Docker:        make([]*stats.Usage, 0),
 			})
 			return
-		case list, ok := <-out:
+		}
+		defer progress.Close()
+		closeTimer := time.AfterFunc(time.Hour, progress.Close)
+		defer closeTimer.Stop()
+		progressDone = progress.Done()
+	}
+
+	// Docker 与系统统计独立采样，发送时使用各自最近一帧。
+	readerCtx, cancel := context.WithCancel(sdk.Ctx)
+	defer cancel()
+	dockerData := (statLogic.Stat{}).ReadDockerStat(readerCtx, sdk)
+
+	var systemData <-chan statLogic.SystemStatFrame
+	if sdk.DockerEnv.EnableSystemStat {
+		systemData = (statLogic.Stat{}).ReadSystemStat(readerCtx, sdk)
+	}
+
+	// 固定间隔组装快照；普通请求返回一次，WebSocket 持续广播。
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	var latestDocker statLogic.DockerStatFrame
+	var latestSystem *statLogic.SystemStatFrame
+	for {
+		select {
+		case <-http.Request.Context().Done():
+			return
+		case <-sdk.Ctx.Done():
+			return
+		case <-progressDone:
+			slog.Debug("home get stat list progress done")
+			return
+		case value, ok := <-dockerData:
 			if !ok {
-				// 关闭通道继续执行，正常回收资源
-				progress.Close()
+				dockerData = nil
 				continue
 			}
-			progress.BroadcastMessage(list)
+			latestDocker = value
+		case value, ok := <-systemData:
+			if !ok {
+				systemData = nil
+				continue
+			}
+			latestSystem = &value
+		case <-ticker.C:
+			result := runtimeStat{
+				DockerEnvName: sdk.Name,
+				Docker:        make([]*stats.Usage, 0, len(latestDocker)),
+			}
+			var systemContainers map[string]statLogic.SystemContainerStat
+			if latestSystem != nil {
+				system := latestSystem.System
+				result.System = &system
+				systemContainers = latestSystem.Containers
+			}
+			// 系统采样仅修正 Sysbox 容器中明确可用的指标，其余字段保留 Docker 原值。
+			for _, item := range latestDocker {
+				if item == nil {
+					continue
+				}
+				usage := *item
+				if systemUsage, exists := systemContainers[item.Container]; exists && systemUsage.Usage != nil {
+					if systemUsage.HasCPU {
+						usage.Cpu = systemUsage.Usage.Cpu
+						usage.CPUThrottled = systemUsage.Usage.CPUThrottled
+					}
+					if systemUsage.HasMemory {
+						usage.Memory = systemUsage.Usage.Memory
+					}
+					if systemUsage.HasBlockIO {
+						usage.BlockIO = systemUsage.Usage.BlockIO
+						usage.BlockTotal = systemUsage.Usage.BlockTotal
+						usage.BlockIOWaiting = systemUsage.Usage.BlockIOWaiting
+					}
+				}
+				result.Docker = append(result.Docker, &usage)
+			}
+			if !params.Follow {
+				self.JsonResponseWithoutError(http, result)
+				return
+			}
+			progress.BroadcastMessage(result)
 		}
 	}
 }

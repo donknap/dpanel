@@ -4,10 +4,26 @@ import "github.com/donknap/dpanel/common/service/docker"
 
 type Option func(self *Fs) error
 
-func WithTargetContainer(name, root string) Option {
+func WithName(name string) Option {
 	return func(self *Fs) error {
-		self.targetContainerRootPath = root
+		self.name = name
+		return nil
+	}
+}
+
+func WithTargetContainer(name string) Option {
+	return func(self *Fs) error {
 		self.targetContainerName = name
+		self.targetType = targetTypeContainer
+		self.rootPath = "/"
+		return nil
+	}
+}
+
+func WithRoot(root string) Option {
+	return func(self *Fs) error {
+		self.rootPath = root
+		self.targetType = targetTypeMount
 		return nil
 	}
 }
@@ -28,10 +44,14 @@ func WithDockerSdk(sdk *docker.Client) Option {
 
 func WithWorkingDir(workingDir string) Option {
 	return func(self *Fs) error {
-		if workingDir == "" {
-			workingDir = "/"
-		}
 		self.workingDir = workingDir
+		return nil
+	}
+}
+
+func WithDestroy(destroy func() error) Option {
+	return func(self *Fs) error {
+		self.destroy = destroy
 		return nil
 	}
 }

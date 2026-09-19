@@ -24,6 +24,7 @@ type DockerEnv struct {
 	TlsCert           string          `json:"tlsCert,omitempty"`
 	TlsKey            string          `json:"tlsKey,omitempty"`
 	EnableComposePath bool            `json:"enableComposePath,omitempty"` // 启用 compose 独享目录
+	EnableSystemStat  bool            `json:"enableSystemStat,omitempty"`
 	ComposePath       string          `json:"composePath,omitempty"`
 	EnableSSH         bool            `json:"enableSSH,omitempty"`
 	SshServerInfo     *ssh.ServerInfo `json:"sshServerInfo,omitempty"`

@@ -11,6 +11,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/plugin"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 )
@@ -18,37 +19,40 @@ import (
 type Plugin struct {
 }
 
-func (self Plugin) DestroyExplorer(e event.DockerDaemonPayload) {
+func (self Plugin) Destroy(e event.DockerDaemonPayload) {
+	storage.Cache.Delete(fmt.Sprintf(storage.CacheKeyExplorerAfs, e.DockerEnvName, plugin.ExplorerName))
 	if dockerEnv, err := (logic.Env{}).GetEnvByName(e.DockerEnvName); err == nil {
 		if dockerSdk, err := docker.NewClientWithDockerEnv(dockerEnv); err == nil {
 			defer dockerSdk.Close()
 			filter := filters.NewArgs()
-			filter.Add(docker.ContainerFilterLabel, fmt.Sprintf("%s=%s", define.DPanelLabelContainerName, plugin.ExplorerName))
+			filter.Add(docker.ContainerFilterLabel, fmt.Sprintf("%s=true", define.DPanelLabelContainerAutoRemove))
 			if list, err := dockerSdk.ContainerSearchList(dockerSdk.Ctx, container.ListOptions{
 				All:     true,
 				Filters: filter,
 			}); err == nil {
 				var removeErr error
-				// TODO: 如果后续需要更完整的排障信息，再把这里的错误聚合补完整。
+				images := make(map[string]struct{})
 				for _, containerInfo := range list {
+					images[containerInfo.Image] = struct{}{}
 					err = dockerSdk.Client.ContainerStop(dockerSdk.Ctx, containerInfo.ID, container.StopOptions{})
 					if err != nil {
-						errors.Join(removeErr, err)
+						removeErr = errors.Join(removeErr, err)
 					}
 					err = dockerSdk.Client.ContainerRemove(dockerSdk.Ctx, containerInfo.ID, container.RemoveOptions{
 						Force: true,
 					})
 					if err != nil {
-						errors.Join(removeErr, err)
-					}
-					err = dockerSdk.ImageRemove(dockerSdk.Ctx, filters.NewArgs(
-						filters.Arg(docker.ImageFilterReference, containerInfo.Image),
-					))
-					if err != nil {
-						errors.Join(removeErr, err)
+						removeErr = errors.Join(removeErr, err)
 					}
 				}
-				slog.Debug("plugin destroy explorer", "name", function.PluckArrayWalk(list, func(item container.Summary) ([]string, bool) {
+				for imageName := range images {
+					if err = dockerSdk.ImageRemove(dockerSdk.Ctx, filters.NewArgs(
+						filters.Arg(docker.ImageFilterReference, imageName),
+					)); err != nil {
+						removeErr = errors.Join(removeErr, err)
+					}
+				}
+				slog.Debug("plugin destroy", "name", function.PluckArrayWalk(list, func(item container.Summary) ([]string, bool) {
 					return item.Names, true
 				}), "error", removeErr)
 			}

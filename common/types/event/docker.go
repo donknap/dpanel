@@ -18,7 +18,15 @@ const (
 	DockerMessageEvent = "docker_message"
 )
 
+type DockerMessageLevel string
+
+const (
+	DockerMessageLevelNormal DockerMessageLevel = "normal"
+	DockerMessageLevelHigh   DockerMessageLevel = "high"
+)
+
 type DockerMessagePayload struct {
-	DockerEnvName string         `json:"dockerEnvName"`
-	Message       events.Message `json:"message"`
+	DockerEnvName string             `json:"dockerEnvName"`
+	Level         DockerMessageLevel `json:"level"`
+	Message       events.Message     `json:"message"`
 }

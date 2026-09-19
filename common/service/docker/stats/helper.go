@@ -1,6 +1,54 @@
 package stats
 
-import "github.com/docker/docker/api/types/container"
+import (
+	"strings"
+	"time"
+
+	"github.com/docker/docker/api/types/container"
+)
+
+// Optional time rates are seconds/second; unavailable samples stay nil.
+func calculateCPUThrottled(previous, current *uint64, previousRead, read time.Time) *float64 {
+	interval := read.Sub(previousRead)
+	if previous == nil || current == nil || *current < *previous || interval <= 0 {
+		return nil
+	}
+	value := float64(*current-*previous) / float64(interval)
+	return &value
+}
+
+func calculateBlockIOWaiting(previous, current *[]container.BlkioStatEntry, previousRead, read time.Time) *float64 {
+	interval := read.Sub(previousRead)
+	if previous == nil || current == nil || interval <= 0 {
+		return nil
+	}
+	previousValue, previousExists := calculateBlockIOWaitTime(*previous)
+	currentValue, currentExists := calculateBlockIOWaitTime(*current)
+	if !previousExists || !currentExists || currentValue < previousValue {
+		return nil
+	}
+	value := float64(currentValue-previousValue) / float64(interval)
+	return &value
+}
+
+func calculateBlockIOWaitTime(entries []container.BlkioStatEntry) (uint64, bool) {
+	var readWrite, total uint64
+	var hasReadWrite, hasTotal bool
+	for _, entry := range entries {
+		switch strings.ToLower(entry.Op) {
+		case "read", "write":
+			hasReadWrite = true
+			readWrite += entry.Value
+		case "total":
+			hasTotal = true
+			total += entry.Value
+		}
+	}
+	if hasReadWrite {
+		return readWrite, true
+	}
+	return total, hasTotal
+}
 
 func calculateCPUPercentUnix(previousCPU, previousSystem uint64, v *container.StatsResponse) float64 {
 	var (

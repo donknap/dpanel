@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
@@ -18,55 +19,82 @@ func PushEvent(messageType string, data interface{}) {
 }
 
 func NewProgressPip(messageType string) *ProgressPip {
+	collect.progressMu.Lock()
+	defer collect.progressMu.Unlock()
+
+	return newProgressPip(progressNamespace{messageType: messageType})
+}
+
+// newProgressPip 创建并登记管道，调用方必须持有 collect.progressMu。
+func newProgressPip(namespace progressNamespace) *ProgressPip {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	process := &ProgressPip{
-		messageType: messageType,
-		ctx:         ctx,
-		cancel:      cancelFunc,
-		fd:          make([]string, 0),
+		namespace:  namespace,
+		progressMu: &collect.progressMu,
+		ctx:        ctx,
+		cancel:     cancelFunc,
+		fd:         make([]string, 0),
 	}
-	if p, exists := collect.progressPip.LoadAndDelete(messageType); exists {
+	if p, exists := collect.progressPip.LoadAndDelete(namespace); exists {
 		if v, ok := p.(*ProgressPip); ok {
-			v.Close()
+			v.close()
 		}
 	}
-	collect.progressPip.Store(messageType, process)
+	collect.progressPip.Store(namespace, process)
 	go func() {
 		<-process.ctx.Done()
-		collect.progressPip.Delete(process.messageType)
+		collect.progressMu.Lock()
+		defer collect.progressMu.Unlock()
+		collect.progressPip.CompareAndDelete(process.namespace, process)
 	}()
 	return process
 }
 
-// NewFdProgressPip 利用 fd 新建一个公共推送管道，多个 fd 共用一个，直到所有 fd 都退出
+type progressNamespace struct {
+	userID int32
+	// Docker Client 按用户与 DockerEnv 关联后，dockerEnvName 再参与命名空间隔离。
+	dockerEnvName string
+	messageType   string
+}
+
+// NewFdProgressPip 同一用户的多个 fd 共用一个推送管道，直到所有 fd 都退出。
 func NewFdProgressPip(http *gin.Context, messageType string) (*ProgressPip, error) {
 	fd := ""
+	namespace := progressNamespace{messageType: messageType}
 	if data, exists := http.Get("userInfo"); exists {
 		userInfo := data.(logic.UserInfo)
 		fd = userInfo.Fd
+		namespace.userID = userInfo.UserId
 	} else {
 		return nil, errors.New("fd not found")
 	}
+	if fd == "" {
+		return nil, errors.New("fd not found")
+	}
+
+	collect.progressMu.Lock()
+	defer collect.progressMu.Unlock()
+
 	var process *ProgressPip
-	if p, ok := collect.progressPip.Load(messageType); ok {
+	if p, ok := collect.progressPip.Load(namespace); ok {
 		// 当管道的上下文已经关闭过了，就不能再次使用，需要重新创建
 		if v, ok := p.(*ProgressPip); ok && v.ctx.Err() == nil {
-			if !function.InArray(v.fd, fd) {
-				v.fd = append(v.fd, fd)
-			}
+			v.addFd(fd)
 			process = v
 		}
 	}
 	if process == nil {
-		process = NewProgressPip(messageType)
-		process.fd = append(process.fd, fd)
+		process = newProgressPip(namespace)
+		process.addFd(fd)
 	}
 	return process, nil
 }
 
 type ProgressPip struct {
+	namespace    progressNamespace
+	progressMu   *sync.Mutex
+	fdLock       sync.RWMutex
 	fd           []string
-	messageType  string
 	ctx          context.Context
 	cancel       context.CancelFunc
 	OnWrite      func(p string) error
@@ -88,27 +116,61 @@ func (self *ProgressPip) Write(p []byte) (n int, err error) {
 }
 
 func (self *ProgressPip) BroadcastMessage(data interface{}) {
-	BroadcastMessage <- NewRespMessage("", self.messageType, data)
+	self.fdLock.RLock()
+	fds := append([]string(nil), self.fd...)
+	self.fdLock.RUnlock()
+	if len(fds) == 0 {
+		BroadcastMessage <- NewRespMessage("", self.namespace.messageType, data)
+		return
+	}
+	for _, fd := range fds {
+		BroadcastMessage <- NewRespMessage(fd, self.namespace.messageType, data)
+	}
 }
 
 func (self *ProgressPip) Close() {
+	self.progressMu.Lock()
+	defer self.progressMu.Unlock()
+
+	self.close()
+}
+
+// close 关闭管道，调用方必须持有 progressMu。
+func (self *ProgressPip) close() {
 	self.cancel()
 }
 
 func (self *ProgressPip) CloseFd(fd string) {
+	self.progressMu.Lock()
+	defer self.progressMu.Unlock()
+
+	self.fdLock.Lock()
+	total := len(self.fd)
 	self.fd = function.PluckArrayWalk(self.fd, func(i string) (string, bool) {
 		if i != fd {
 			return i, true
 		}
 		return "", false
 	})
-	if len(self.fd) == 0 {
-		self.Close()
+	empty := total > len(self.fd) && len(self.fd) == 0
+	self.fdLock.Unlock()
+	if empty {
+		self.close()
 	}
 }
 
 func (self *ProgressPip) IsShadow() bool {
+	self.fdLock.RLock()
+	defer self.fdLock.RUnlock()
 	return len(self.fd) > 1
+}
+
+func (self *ProgressPip) addFd(fd string) {
+	self.fdLock.Lock()
+	defer self.fdLock.Unlock()
+	if !function.InArray(self.fd, fd) {
+		self.fd = append(self.fd, fd)
+	}
 }
 
 func (self *ProgressPip) Done() <-chan struct{} {
@@ -125,5 +187,7 @@ func (self *ProgressPip) KeepAlive() *ProgressPip {
 }
 
 func (self *ProgressPip) String() string {
-	return fmt.Sprintf("messageType: %s, fd: %s", self.messageType, strings.Join(self.fd, ","))
+	self.fdLock.RLock()
+	defer self.fdLock.RUnlock()
+	return fmt.Sprintf("messageType: %s, fd: %s", self.namespace.messageType, strings.Join(self.fd, ","))
 }

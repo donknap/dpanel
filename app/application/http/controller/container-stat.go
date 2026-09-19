@@ -29,6 +29,7 @@ func (self Container) GetStatInfo(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	defer progress.Close()
 	response, err := docker.Sdk.ContainerStats(progress.Context(), types.ContainerStatsOption{
 		Stream:  true,
 		Filters: filters.NewArgs(filters.Arg(docker.ContainerFilterID, params.Id)),
@@ -39,14 +40,15 @@ func (self Container) GetStatInfo(http *gin.Context) {
 	}
 	for {
 		select {
+		case <-http.Request.Context().Done():
+			return
 		case <-progress.Done():
 			self.JsonSuccessResponse(http)
 			return
 		case list, ok := <-response:
 			if !ok {
-				// 关闭通道继续执行，正常回收资源
-				progress.Close()
-				continue
+				self.JsonSuccessResponse(http)
+				return
 			}
 			if !function.IsEmptyArray(list) {
 				progress.BroadcastMessage(list[0])

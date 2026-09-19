@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/application/logic"
+	commonLogic "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -107,10 +108,12 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		define.DockerRemoteTypeSSH,
 		define.DockerRemoteTypeTcp,
 	}, docker.Sdk.DockerEnv.RemoteType) {
-		_, err := logic.Explorer{}.Afs(docker.Sdk, logic.AfsCreateOption{
-			MountPoint: plugin.ExplorerName,
-			Init:       true,
-		})
+		_, err := (commonLogic.Explorer{}).Afs(
+			http,
+			commonLogic.ExplorerMountTypeContainer,
+			plugin.ExplorerName,
+			docker.Sdk,
+		)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -397,18 +400,12 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	follow := true
 	if params.Download {
-		follow = false
-	}
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeComposeLog, params.Id))
-
-	response, err := tasker.Logs(params.LineTotal, params.ShowTime, follow)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if params.Download {
+		response, err := tasker.Logs(params.LineTotal, params.ShowTime, false)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 		buffer, err := io.ReadAll(response)
 		_ = response.Close()
 		if err != nil {
@@ -420,21 +417,34 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		http.Data(200, "text/plain", buffer)
 		return
 	}
+	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeComposeLog, params.Id))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	response, err := tasker.Logs(params.LineTotal, params.ShowTime, !progress.IsShadow())
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		_ = response.Close()
+	}()
 	go func() {
 		select {
-		case <-wsBuffer.Done():
-			err = response.Close()
-			if err != nil {
-				slog.Warn("compose run log ws buffer close", "id", fmt.Sprintf(ws.MessageTypeComposeLog, params.Id), "error", err)
-			}
+		case <-http.Request.Context().Done():
+		case <-progress.Done():
+		}
+		if closeErr := response.Close(); closeErr != nil {
+			slog.Warn("compose run log progress close", "id", fmt.Sprintf(ws.MessageTypeComposeLog, params.Id), "error", closeErr)
 		}
 	}()
 
-	wsBuffer.OnWrite = func(p string) error {
-		wsBuffer.BroadcastMessage(p)
+	progress.OnWrite = func(p string) error {
+		progress.BroadcastMessage(p)
 		return nil
 	}
-	_, err = io.Copy(wsBuffer, response)
+	_, err = io.Copy(progress, response)
 
 	self.JsonSuccessResponse(http)
 	return

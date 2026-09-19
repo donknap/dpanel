@@ -69,8 +69,8 @@ func (self Volume) GetList(http *gin.Context) {
 	diskUsage := accessor.DiskUsage{}
 	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDiskUsage, &diskUsage)
 	volumeDiskUsage := make([]*volume.Volume, 0)
-	if diskUsage.Usage != nil && diskUsage.Usage.Volumes != nil {
-		volumeDiskUsage = diskUsage.Usage.Volumes
+	if diskUsage.Docker.Volumes != nil {
+		volumeDiskUsage = diskUsage.Docker.Volumes
 	}
 
 	sort.Slice(volumeList.Volumes, func(i, j int) bool {

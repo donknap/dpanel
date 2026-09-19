@@ -30,6 +30,8 @@ type FileData struct {
 	ModTime   time.Time   `json:"modTime"`
 	Change    ChangeType  `json:"change"`
 	Size      int64       `json:"size"`
+	UID       uint32      `json:"uid"`
+	GID       uint32      `json:"gid"`
 	User      string      `json:"user"`
 	Group     string      `json:"group"`
 	LinkName  string      `json:"linkName"`

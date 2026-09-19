@@ -208,7 +208,7 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 					return nil, errors.New("nil serverInfo")
 				}
 				opts := ssh.WithServerInfo(serverInfo)
-				opts = append(opts, ssh.WithContext(ctx))
+				opts = append(opts, ssh.WithConnectContext(ctx))
 				opts = append(opts, ssh.WithTimeout(timeout))
 				sshClient, err := ssh.NewClient(opts...)
 				lock.Unlock()

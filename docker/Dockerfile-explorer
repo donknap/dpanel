@@ -1,4 +1,28 @@
-FROM busybox:latest
+FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+ARG APP_VERSION
+
+WORKDIR /src
+
+COPY app/agent/go.mod app/agent/go.sum ./
+RUN go mod download
+
+COPY app/agent ./
+
+RUN if [ "${TARGETARCH}" = "arm" ]; then export GOARM="${TARGETVARIANT#v}"; fi && \
+    GOTOOLCHAIN=local CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w -X 'main.version=${APP_VERSION}'" -o /agent .
+
+FROM scratch
+
+COPY --from=builder /agent /agent
+
+WORKDIR /
 
 LABEL com.dpanel.container.title=DPanel-文件管理助手
 LABEL com.dpanel.container.auto_remove=true
+
+ENTRYPOINT ["/agent"]

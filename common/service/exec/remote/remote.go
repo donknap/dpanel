@@ -80,6 +80,9 @@ func (self *Remote) Run() error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = session.Close()
+	}()
 	if !function.IsEmptyArray(self.Env) {
 		for _, s := range self.Env {
 			if temp := strings.Split(s, "="); len(temp) > 1 {
@@ -143,7 +146,7 @@ func (self *Remote) RunWithResult() ([]byte, error) {
 	if err != nil {
 		// 如果发生错误，并且 result 有值，result 为真正的错误信息， err 为执行状态，一般为  Process exited with status xxx
 		if result != nil && len(result) > 0 {
-			return nil, errors.New(string(result))
+			return nil, errors.Join(err, errors.New(string(result)))
 		}
 		return nil, err
 	}
@@ -191,11 +194,15 @@ func (self *Remote) RunInPip() (io.ReadCloser, error) {
 		close(waitDone)
 		_ = pipeWriter.CloseWithError(err)
 		_ = session.Close()
+		_ = pipeReader.Close()
 		return nil, err
 	}
 
 	go func() {
 		defer close(waitDone)
+		defer func() {
+			_ = session.Close()
+		}()
 		err := session.Wait()
 		_ = pipeWriter.CloseWithError(err)
 	}()
@@ -206,6 +213,9 @@ func (self *Remote) RunInPip() (io.ReadCloser, error) {
 func (self *Remote) RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser, error) {
 	session, reader, write, err := self.client.NewPtySession(24, 80)
 	if err != nil {
+		if session != nil {
+			_ = session.Close()
+		}
 		return nil, nil, err
 	}
 	go func() {

@@ -1,0 +1,32 @@
+services:
+  dpanel-plugin-monitor:
+    image: dpanel/explorer
+    container_name: dpanel-plugin-monitor
+    restart: unless-stopped
+    privileged: false
+    cgroup: host
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      DP_AGENT_CAPS: "usage,stat"
+    labels:
+      - "com.dpanel.container.title=DPanel-主机资源监控"
+      - "com.dpanel.container.auto_remove=false"
+      - "com.dpanel.container.hash={{.hash}}"
+      - "com.dpanel.container.name=dpanel-plugin-monitor"
+    volumes:
+      - /proc:/mnt_host_proc:ro
+      - /sys:/mnt_host_sys:ro
+#{{- range $item := .volumes }}
+      - {{ $item.host }}:{{ $item.dest }}{{ if eq $item.permission "readonly" }}:ro{{ end }}
+#{{- end }}
+    x-dpanel-service:
+      image_tar:
+        amd64: asset/plugin/dpanel-plugin-explorer/image-amd64.tar
+        arm64: asset/plugin/dpanel-plugin-explorer/image-arm64.tar
+        arm: asset/plugin/dpanel-plugin-explorer/image-arm.tar
+      image_auto_remove: true

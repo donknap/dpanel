@@ -10,7 +10,7 @@ import (
 
 var (
 	CacheKeyExplorerUsername              = "explorer:%s:uid:%d"
-	CacheKeyExplorerAfs                   = "explorer:%s"
+	CacheKeyExplorerAfs                   = "explorer:%s:%s"
 	CacheKeyCommonUserInfo                = "user:%d"
 	CacheKeyCommonServerStartTime         = "server:startTime"
 	CacheKeyXkStorageInfo                 = "xk:storageInfo"

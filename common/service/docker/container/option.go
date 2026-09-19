@@ -143,6 +143,19 @@ func WithRuntime(runtime string) Option {
 	}
 }
 
+func WithCgroupnsMode(mode container.CgroupnsMode) Option {
+	return func(self *Builder) error {
+		if mode.IsEmpty() {
+			return nil
+		}
+		if !mode.Valid() {
+			return fmt.Errorf("invalid cgroup namespace mode %q", mode)
+		}
+		self.hostConfig.CgroupnsMode = mode
+		return nil
+	}
+}
+
 func WithReadonlyRootfs(readonly bool) Option {
 	return func(self *Builder) error {
 		self.hostConfig.ReadonlyRootfs = readonly
@@ -180,8 +193,6 @@ func WithTmpfs(items ...types.VolumeItem) Option {
 
 func WithVolume(item ...types.VolumeItem) Option {
 	return func(self *Builder) error {
-		self.hostConfig.Binds = make([]string, 0)
-
 		for _, volumeItem := range item {
 			if volumeItem.Dest == "" || volumeItem.Host == "" {
 				return errors.New("volume host path or dest path is empty")
@@ -606,6 +617,22 @@ func WithCap(caps ...string) Option {
 			}
 		} else {
 			self.hostConfig.CapAdd = caps
+		}
+		return nil
+	}
+}
+
+func WithCapDrop(caps ...string) Option {
+	return func(self *Builder) error {
+		if function.IsEmptyArray(caps) {
+			return nil
+		}
+		if function.InArray(caps, "ALL") {
+			self.hostConfig.CapDrop = []string{
+				"ALL",
+			}
+		} else {
+			self.hostConfig.CapDrop = caps
 		}
 		return nil
 	}

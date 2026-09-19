@@ -29,11 +29,12 @@ func NewClient(ctx *gin.Context, options ...Option) (*Client, error) {
 		}{}
 		slog.Info("ws event", "event", MessageTypeProgressClose, "fd", fd, "message", string(message.Message))
 		if err := json.Unmarshal(message.Message, &closeMessage); err == nil {
-			if p, ok := collect.progressPip.Load(closeMessage.Data); ok {
-				if v, ok := p.(*ProgressPip); ok {
+			collect.progressPip.Range(func(_, value any) bool {
+				if v, ok := value.(*ProgressPip); ok && v.namespace.messageType == closeMessage.Data {
 					v.CloseFd(fd)
 				}
-			}
+				return true
+			})
 		}
 	}))
 	ws := websocket.Upgrader{

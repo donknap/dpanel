@@ -63,8 +63,18 @@ type ConsoleInstance struct {
 
 type DiskUsage struct {
 	DockerEnvName string           `json:"dockerEnvName"`
-	Usage         *types.DiskUsage `json:"usage,omitempty"`
+	Docker        types.DiskUsage  `json:"docker"`
+	System        *SystemDiskUsage `json:"system,omitempty"`
 	UpdatedAt     time.Time        `json:"updatedAt,omitempty"`
+}
+
+type SystemDiskUsage struct {
+	Total          uint64  `json:"total"`
+	Used           uint64  `json:"used"`
+	Available      uint64  `json:"available"`
+	InodeTotal     *uint64 `json:"inodeTotal,omitempty"`
+	InodeUsed      *uint64 `json:"inodeUsed,omitempty"`
+	InodeAvailable *uint64 `json:"inodeAvailable,omitempty"`
 }
 
 type TwoFa struct {

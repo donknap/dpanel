@@ -138,25 +138,41 @@ func collect(ctx context.Context, containerCollect *stats.Container, sdk *client
 		return
 	}
 
+	defer response.Body.Close()
 	dec := json.NewDecoder(response.Body)
-	go func() {
-		defer func() {
-			_ = response.Body.Close()
-		}()
-		for {
-			var v container.StatsResponse
-			if err := dec.Decode(&v); err != nil {
-				containerCollect.SetErrorAndReset()
-				return
-			}
-			containerCollect.SetStatistics(&v, response.OSType)
-			if !getFirst {
-				getFirst = true
-				waitFirst.Done()
-			}
-			if !stream {
-				return
-			}
+	for {
+		var raw json.RawMessage
+		var v container.StatsResponse
+		var fields struct {
+			CPU struct {
+				Throttling struct {
+					Time *uint64 `json:"throttled_time"`
+				} `json:"throttling_data"`
+			} `json:"cpu_stats"`
+			Block struct {
+				Wait *[]container.BlkioStatEntry `json:"io_wait_time_recursive"`
+			} `json:"blkio_stats"`
 		}
-	}()
+		if err = dec.Decode(&raw); err == nil {
+			err = json.Unmarshal(raw, &v)
+		}
+		if err == nil {
+			err = json.Unmarshal(raw, &fields)
+		}
+		if err != nil {
+			if !getFirst {
+				containerCollect.SetError(err)
+			}
+			containerCollect.SetErrorAndReset()
+			return
+		}
+		containerCollect.SetStatistics(&v, response.OSType, fields.CPU.Throttling.Time, fields.Block.Wait)
+		if !getFirst {
+			getFirst = true
+			waitFirst.Done()
+		}
+		if !stream {
+			return
+		}
+	}
 }

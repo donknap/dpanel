@@ -1,14 +1,12 @@
 package docker
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -230,38 +228,41 @@ func (self Client) ContainerInspectCompat(info container.InspectResponse) (conta
 	return info, nil
 }
 
-// ContainerExecResult 在容器中执行一条命令，返回结果
-func (self Client) ContainerExecResult(ctx context.Context, containerName string, cmd string) (string, error) {
-	execConfig := container.ExecOptions{
-		Privileged:   true,
-		Tty:          false,
-		AttachStdin:  false,
-		AttachStdout: true,
-		AttachStderr: true,
-		Cmd: []string{
-			"/bin/sh",
-			"-c",
-			cmd,
-		},
+// ContainerExecResult 在容器中执行命令并完整收集输出。
+func (self Client) ContainerExecResult(ctx context.Context, containerName string, option container.ExecOptions) (string, error) {
+	if len(option.Cmd) == 0 {
+		return "", errors.New("container exec command is empty")
 	}
-	slog.Info("command", "exec", []string{
-		"/bin/sh",
-		"-c",
-		cmd,
-	})
-	response, err := self.ContainerExec(ctx, containerName, execConfig)
+	option.Tty = false
+	option.Detach = false
+	option.AttachStdout = true
+	option.AttachStderr = true
+	slog.Info("command", "exec", option.Cmd)
+	execResponse, err := self.Client.ContainerExecCreate(ctx, containerName, option)
 	if err != nil {
 		return "", err
 	}
-	defer response.Close()
+	response, err := self.Client.ContainerExecAttach(ctx, execResponse.ID, container.ExecStartOptions{})
+	if err != nil {
+		return "", err
+	}
 
 	var stdout, stderr bytes.Buffer
 	_, err = stdcopy.StdCopy(&stdout, &stderr, response.Reader)
+	response.Close()
 	if err != nil {
-		return "", err
+		return stdout.String(), err
 	}
-	if stderr.Len() > 0 {
-		return "", errors.New(stderr.String())
+	execInspect, err := self.Client.ContainerExecInspect(ctx, execResponse.ID)
+	if err != nil {
+		return stdout.String(), err
+	}
+	if execInspect.ExitCode != 0 || stderr.Len() > 0 {
+		return stdout.String(), fmt.Errorf(
+			"container command exited with code %d, stderr: %s",
+			execInspect.ExitCode,
+			stderr.String(),
+		)
 	}
 	return stdout.String(), nil
 }
@@ -279,43 +280,6 @@ func (self Client) ContainerExec(ctx context.Context, containerName string, opti
 		Detach:      option.Detach,
 	}
 	return self.Client.ContainerExecAttach(ctx, exec.ID, execAttachOption)
-}
-
-// ContainerReadFile 读取容器内的一个文件内容，传入 targetFile 则写入文件 否则返回一个 reader
-func (self Client) ContainerReadFile(ctx context.Context, containerName string, inContainerPath string, targetFile *os.File) (io.ReadCloser, error) {
-	pathStat, err := self.Client.ContainerStatPath(ctx, containerName, inContainerPath)
-	if err != nil {
-		return nil, err
-	}
-	if !pathStat.Mode.IsRegular() {
-		return nil, function.ErrorMessage(define.ErrorMessageContainerExplorerContentUnsupportedType)
-	}
-	out, _, err := self.Client.CopyFromContainer(ctx, containerName, inContainerPath)
-	if err != nil {
-		return nil, err
-	}
-	// 返回的数据是外部是一个 tar 真正的文件 reader 需要先读一次
-	tarReader := tar.NewReader(out)
-	file, err := tarReader.Next()
-	if err != nil {
-		return nil, err
-	}
-
-	if targetFile == nil {
-		return out, nil
-	}
-
-	defer func() {
-		_ = out.Close()
-	}()
-
-	_, err = io.Copy(targetFile, tarReader)
-	if err != nil {
-		return nil, err
-	}
-
-	_ = targetFile.Chmod(file.FileInfo().Mode())
-	return nil, nil
 }
 
 func (self Client) ContainerLogs(ctx context.Context, containerId string, options container.LogsOptions) (io.ReadCloser, error) {
