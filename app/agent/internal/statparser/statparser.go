@@ -166,6 +166,40 @@ func ParseMemory(data []byte) (agentTypes.MemoryStat, error) {
 	}, nil
 }
 
+func ParseNetwork(data []byte, physicalInterfaces map[string]struct{}) (*agentTypes.NetworkStat, error) {
+	result := &agentTypes.NetworkStat{}
+	found := false
+	for _, line := range strings.Split(string(data), "\n") {
+		name, counters, exists := strings.Cut(line, ":")
+		if !exists {
+			continue
+		}
+		name = strings.TrimSpace(name)
+		if _, exists = physicalInterfaces[name]; !exists {
+			continue
+		}
+		fields := strings.Fields(counters)
+		if len(fields) < 9 {
+			return nil, fmt.Errorf("host network data for %s is incomplete", name)
+		}
+		receiveBytes, err := strconv.ParseUint(fields[0], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parse host network receive bytes for %s: %w", name, err)
+		}
+		transmitBytes, err := strconv.ParseUint(fields[8], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parse host network transmit bytes for %s: %w", name, err)
+		}
+		result.ReceiveBytes += receiveBytes
+		result.TransmitBytes += transmitBytes
+		found = true
+	}
+	if !found {
+		return nil, errors.New("host physical network stat is empty")
+	}
+	return result, nil
+}
+
 func memoryValue(values map[string]uint64, name string) *uint64 {
 	value, exists := values[name]
 	if !exists {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/donknap/dpanel/app/agent/internal/statparser"
@@ -67,6 +68,7 @@ func (*Handler) HandleStream(ctx context.Context, args []string, write func(any)
 			Pressure:       readPressure(),
 			ContainerStats: containerReader.Read(sampledAt, currentCPU, memory.Total),
 		}
+		result.Network, _ = readNetwork()
 		if result.Disk, readErr = readDisk(ctx); readErr != nil {
 			result.Disk = nil
 		}
@@ -79,6 +81,27 @@ func (*Handler) HandleStream(ctx context.Context, args []string, write func(any)
 		case sampledAt = <-ticker.C:
 		}
 	}
+}
+
+func readNetwork() (*agentTypes.NetworkStat, error) {
+	interfaces, err := os.ReadDir(hostSysPath + "/class/net")
+	if err != nil {
+		return nil, fmt.Errorf("read host network interfaces: %w", err)
+	}
+	physicalInterfaces := make(map[string]struct{})
+	for _, item := range interfaces {
+		if item.Name() == "lo" {
+			continue
+		}
+		if _, err = os.Stat(hostSysPath + "/class/net/" + item.Name() + "/device"); err == nil {
+			physicalInterfaces[item.Name()] = struct{}{}
+		}
+	}
+	data, err := os.ReadFile(hostProcPath + "/1/net/dev")
+	if err != nil {
+		return nil, fmt.Errorf("read host network stat: %w", err)
+	}
+	return statparser.ParseNetwork(data, physicalInterfaces)
 }
 
 func readCPU() (cpuCounters, error) {
@@ -143,6 +166,10 @@ func readDisk(ctx context.Context) ([]agentTypes.DiskStat, error) {
 	for device, value := range ioCounters {
 		devicePath := hostSysPath + "/block/" + device
 		if _, err = os.Stat(devicePath + "/device"); err != nil {
+			continue
+		}
+		if deviceType, readErr := os.ReadFile(devicePath + "/device/type"); readErr == nil &&
+			strings.TrimSpace(string(deviceType)) != "0" {
 			continue
 		}
 		slaves, readErr := os.ReadDir(devicePath + "/slaves")

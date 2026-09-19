@@ -2,7 +2,10 @@ package types
 
 import "time"
 
-const StatSchemaVersion = 2
+const (
+	PreviousStatSchemaVersion = 2
+	StatSchemaVersion         = 3
+)
 
 type SystemStat struct {
 	SchemaVersion  int             `json:"schemaVersion"`
@@ -12,6 +15,7 @@ type SystemStat struct {
 	Memory         MemoryStat      `json:"memory"`
 	Pressure       *PressureStat   `json:"pressure,omitempty"`
 	Disk           []DiskStat      `json:"disk,omitempty"`
+	Network        *NetworkStat    `json:"network,omitempty"`
 	ContainerStats []ContainerStat `json:"containerStats,omitempty"`
 }
 
@@ -100,4 +104,9 @@ type DiskStat struct {
 	IOPSInProgress       uint64 `json:"iopsInProgress"`
 	IOTimeMillis         uint64 `json:"ioTimeMillis"`
 	WeightedIOTimeMillis uint64 `json:"weightedIOTimeMillis"`
+}
+
+type NetworkStat struct {
+	ReceiveBytes  uint64 `json:"receiveBytes"`
+	TransmitBytes uint64 `json:"transmitBytes"`
 }
