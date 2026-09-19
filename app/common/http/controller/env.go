@@ -10,10 +10,12 @@ import (
 	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
+	statLogic "github.com/donknap/dpanel/app/common/logic/stat"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	event2 "github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -169,6 +171,7 @@ func (self Env) Create(http *gin.Context) {
 		TlsCert:           params.TlsCert,
 		TlsKey:            params.TlsKey,
 		EnableComposePath: params.EnableComposePath,
+		EnableSystemStat:  params.EnableSystemStat,
 		ComposePath:       params.ComposePath,
 		EnableSSH:         params.EnableSSH,
 		SshServerInfo:     params.SshServerInfo,
@@ -312,7 +315,7 @@ func (self Env) Switch(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvDockerApiFailed, "error", err.Error()), 500)
 		return
 	}
-	facade.Event.Publish(event.PluginDestroyExplorer, event.DockerDaemonPayload{
+	facade.Event.Publish(event.PluginDestroy, event.DockerDaemonPayload{
 		DockerEnvName: oldDockerClient.DockerEnv.Name,
 	})
 	oldDockerClient.Close()
@@ -378,6 +381,20 @@ func (self Env) GetDetail(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	if dockerEnv.EnableSystemStat {
+		dockerSdk := docker.Sdk
+		if dockerEnv.Name != docker.Sdk.Name {
+			dockerSdk, err = docker.NewClientWithDockerEnv(dockerEnv)
+			if err == nil {
+				defer dockerSdk.Close()
+			}
+		}
+		if err == nil {
+			if err = (statLogic.Stat{}).ReconcileSystemStat(dockerSdk); err == nil {
+				dockerEnv.EnableSystemStat = dockerSdk.DockerEnv.EnableSystemStat
+			}
+		}
+	}
 	if dockerEnv.ServerUrl == "" {
 		if d, err := url.Parse(dockerEnv.Address); err == nil {
 			if d.Host == "" && d.Scheme == "" {
@@ -395,4 +412,45 @@ func (self Env) GetDetail(http *gin.Context) {
 	}
 	self.JsonResponseWithoutError(http, dockerEnv)
 	return
+}
+
+func (self Env) SystemStat(http *gin.Context) {
+	type ParamsValidate struct {
+		Enable bool `json:"enable"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	dockerEnv, err := (logic.Env{}).GetEnvByName(dockerSdk.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	monitor, err := plugin.NewPlugin(dockerSdk, plugin.MonitorName, plugin.CreateOption{
+		MountDockerRoot: true,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.Enable {
+		err = monitor.Create()
+	} else {
+		err = monitor.Close()
+	}
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	dockerEnv.EnableSystemStat = params.Enable
+	logic.Env{}.UpdateEnv(dockerEnv)
+	dockerSdk.DockerEnv.EnableSystemStat = params.Enable
+	self.JsonSuccessResponse(http)
 }

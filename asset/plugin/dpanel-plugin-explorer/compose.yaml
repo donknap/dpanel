@@ -25,6 +25,8 @@ services:
 #{{- if .pidMode }}
       - SYS_PTRACE
 #{{- end }}
+    environment:
+      DP_AGENT_CAPS: "fs"
     labels:
       - "com.dpanel.container.title=DPanel-文件管理助手"
       - "com.dpanel.container.auto_remove=true"
@@ -33,7 +35,7 @@ services:
 #{{- if .volumes }}
     volumes:
 #{{- range $item := .volumes }}
-      - {{ $item.host }}:{{ $item.dest }}
+      - {{ $item.host }}:{{ $item.dest }}{{ if eq $item.permission "readonly" }}:ro{{ end }}
 #{{- end }}
 #{{- end }}
 #{{- if .workingDir }}

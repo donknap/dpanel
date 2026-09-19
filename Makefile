@@ -48,6 +48,9 @@ PROJECT_GO_DIR     := $(shell pwd)
 PROJECT_JS_DIR     := $(abspath $(PROJECT_GO_DIR)/../../js/d-panel)
 PROJECT_GO_TARGET := $(PROJECT_GO_DIR)/runtime
 
+PLUGIN_EXPLORER_IMAGE_TARGET := dpanel/explorer
+PLUGIN_EXPLORER_IMAGE_DIR    := $(PROJECT_GO_DIR)/asset/plugin/dpanel-plugin-explorer
+
 # 构建时需要指定的构建参数
 APP_VERSION ?= $(_CURRENT_TIME)
 APP_FAMILY  ?= ce
@@ -206,11 +209,31 @@ endef
 .PHONY: build build-js build-explorer-image build-builder release clean debug test
 
 build-explorer-image:
-	@echo ">> Downloading and repackaging images for all architectures using pure Docker..."
-	@rm -f $(PLUGIN_EXPLORER_IMAGE_DIR)/*.tar
-	@for arch in amd64 arm64 arm; do \
-		echo ">> Processing linux/$$arch, Save in: $(PLUGIN_EXPLORER_IMAGE_DIR)/$(subst /,_,$(PLUGIN_EXPLORER_IMAGE_TARGET))_$$arch.tar"; \
-		docker build --platform linux/$$arch --tag $(PLUGIN_EXPLORER_IMAGE_TARGET) --output type=docker,dest=$(PLUGIN_EXPLORER_IMAGE_DIR)/image-$$arch.tar -f docker/Dockerfile-explorer .; \
+	@echo ">> Building explorer images for: linux/amd64 linux/arm64 linux/arm/v7"
+	@mkdir -p "$(PLUGIN_EXPLORER_IMAGE_DIR)"
+	@temp_outputs=""; \
+	cleanup() { for temp_output in $$temp_outputs; do rm -f "$$temp_output"; done; }; \
+	trap cleanup EXIT INT TERM; \
+	for target in linux/amd64:amd64 linux/arm64:arm64 linux/arm/v7:arm; do \
+		platform="$${target%:*}"; \
+		arch="$${target##*:}"; \
+		output="$(PLUGIN_EXPLORER_IMAGE_DIR)/image-$$arch.tar"; \
+		temp_output="$$output.tmp"; \
+		temp_outputs="$$temp_outputs $$temp_output"; \
+		echo ">> Processing $$platform, save in: $$output"; \
+		rm -f "$$temp_output"; \
+		if ! docker build --platform "$$platform" \
+			--build-arg APP_VERSION="$(APP_VERSION)" \
+			--tag "$(PLUGIN_EXPLORER_IMAGE_TARGET)" \
+			--output "type=docker,dest=$$temp_output" \
+			-f docker/Dockerfile-explorer .; then \
+			exit 1; \
+		fi; \
+	done; \
+	for target in linux/amd64:amd64 linux/arm64:arm64 linux/arm/v7:arm; do \
+		arch="$${target##*:}"; \
+		output="$(PLUGIN_EXPLORER_IMAGE_DIR)/image-$$arch.tar"; \
+		mv "$$output.tmp" "$$output"; \
 	done
 	@echo ">> Images successfully saved to $(PLUGIN_EXPLORER_IMAGE_DIR)"
 

@@ -1,35 +1,17 @@
 package controller
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"compress/gzip"
-	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
-	"log/slog"
 	"os"
 	"path"
+	"regexp"
 	"sort"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker/imports"
-	"github.com/donknap/dpanel/common/service/exec/remote"
-	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/donknap/dpanel/common/types/define"
-	fsType "github.com/donknap/dpanel/common/types/fs"
+	"github.com/donknap/dpanel/common/service/docker"
+	serviceafs "github.com/donknap/dpanel/common/service/fs/afs"
 	"github.com/gin-gonic/gin"
-	"github.com/h2non/filetype"
-	"github.com/pkg/sftp"
-	"github.com/spf13/afero"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
@@ -37,129 +19,91 @@ type Explorer struct {
 	controller.Abstract
 }
 
+var explorerMountNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
+
+func (self Explorer) afs(http *gin.Context, mountPointValue string) (serviceafs.Fs, error) {
+	mountType, mountName, ok := strings.Cut(mountPointValue, ":")
+	if !ok || mountType == "" || mountName == "" || strings.Contains(mountName, ":") {
+		return nil, errors.New("invalid explorer mount point")
+	}
+	switch mountType {
+	case logic.ExplorerMountTypeLocal:
+		if mountName != logic.ExplorerMountHost && mountName != logic.ExplorerMountDPanel {
+			return nil, errors.New("invalid local explorer mount point")
+		}
+	case logic.ExplorerMountTypeContainer, logic.ExplorerMountTypeVolume, logic.ExplorerMountTypeDocker:
+		if !explorerMountNamePattern.MatchString(mountName) {
+			return nil, errors.New("invalid explorer mount point name")
+		}
+	default:
+		return nil, errors.New("unknown explorer mount point type")
+	}
+	var dockerSdk *docker.Client
+	var err error
+	if mountType == logic.ExplorerMountTypeContainer || mountType == logic.ExplorerMountTypeVolume {
+		dockerSdk, err = docker.NewClientWithUser(http)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return (logic.Explorer{}).Afs(http, mountType, mountName, dockerSdk)
+}
+
 func (self Explorer) Export(http *gin.Context) {
 	type ParamsValidate struct {
-		Name     string   `json:"name" binding:"required"`
-		FileList []string `json:"fileList" binding:"required"`
+		MountPoint        string   `json:"mountPoint" binding:"required"`
+		FileList          []string `json:"fileList" binding:"required"`
+		ExportToPanelPath bool     `json:"enableExportToPath"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	var err error
-
-	tempFile, err := storage.Local{}.CreateTempFile("")
+	if err := validateExplorerPaths(params.FileList, false); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileSystem, err := self.afs(http, params.MountPoint)
+	var download *logic.ExplorerDownload
+	if err == nil {
+		download, err = (logic.Explorer{}).Export(fileSystem, params.FileList, params.ExportToPanelPath)
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		_ = tempFile.Close()
-		_ = os.Remove(tempFile.Name())
-	}()
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	if download == nil {
+		self.JsonSuccessResponse(http)
 		return
 	}
-	pathInfo := make([]container.PathStat, 0)
-	zipWriter := zip.NewWriter(tempFile)
-
-	for _, p := range params.FileList {
-		p = function.SystemPathFromSlash(p)
-		err = func() error {
-			file, err := afs.Open(p)
-			if err != nil {
-				return err
-			}
-			defer func() {
-				_ = file.Close()
-			}()
-			fileInfo, err := file.Stat()
-			if err != nil {
-				return err
-			}
-			zipFileInfo, err := zip.FileInfoHeader(fileInfo)
-			if err != nil {
-				return err
-			}
-			writer, _ := zipWriter.CreateHeader(zipFileInfo)
-			_, _ = io.Copy(writer, file)
-			return nil
-		}()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-
-	if info, err := json.Marshal(pathInfo); err == nil {
-		writer, _ := zipWriter.CreateHeader(&zip.FileHeader{
-			Name:               "manifest.json",
-			Method:             zip.Deflate,
-			UncompressedSize64: uint64(len(info)),
-			Modified:           time.Now(),
-		})
-		_, _ = writer.Write(info)
-	}
-
-	err = zipWriter.Close()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+	defer download.Close()
 	http.Header("Content-Type", "application/zip")
 	http.Header("Content-Disposition", "attachment; filename=export.zip")
-	http.File(tempFile.Name())
-	return
+	http.File(download.Name())
 }
 
 func (self Explorer) ImportFileContent(http *gin.Context) {
 	type ParamsValidate struct {
-		Name    string `json:"name" binding:"required"`
-		File    string `json:"file" binding:"required"`
-		Content string `json:"content"`
-		DstPath string `json:"dstPath" binding:"required"`
+		MountPoint string `json:"mountPoint" binding:"required"`
+		File       string `json:"file" binding:"required"`
+		Content    string `json:"content"`
+		DstPath    string `json:"dstPath" binding:"required"`
+		FileMode   uint32 `json:"fileMode"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	if strings.HasPrefix(params.File, "/") {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerInvalidFilename), 500)
+	if !validExplorerFileName(params.File) || !validExplorerPath(params.DstPath, true) || params.FileMode > 0o777 {
+		self.JsonResponseWithError(http, errors.New("invalid file content import parameters"), 500)
 		return
 	}
-
-	params.File = function.PathClean(params.File)
-	params.DstPath = function.SystemPathFromSlash(params.DstPath)
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		err = (logic.Explorer{}).ImportFileContent(
+			fileSystem, params.File, params.Content, params.DstPath, params.FileMode,
+		)
 	}
-
-	file, err := afs.OpenFile(path.Join(params.DstPath, params.File), os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o644)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	defer func() {
-		_ = file.Close()
-	}()
-	_, err = file.WriteString(params.Content)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -173,511 +117,300 @@ func (self Explorer) Import(http *gin.Context) {
 		Path string `json:"path"`
 	}
 	type ParamsValidate struct {
-		Name     string         `json:"name" binding:"required"`
-		FileList []fileListItem `json:"fileList" binding:"required"`
-		DstPath  string         `json:"dstPath" binding:"required"`
+		MountPoint string         `json:"mountPoint" binding:"required"`
+		FileList   []fileListItem `json:"fileList" binding:"required"`
+		DstPath    string         `json:"dstPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	params.DstPath = function.SystemPathFromSlash(params.DstPath)
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
+	if !validExplorerPath(params.DstPath, true) {
+		self.JsonResponseWithError(http, errors.New("invalid import destination"), 500)
+		return
+	}
+	files := make([]logic.ExplorerImportFile, 0, len(params.FileList))
+	for _, item := range params.FileList {
+		if !validExplorerRelativePath(item.Name) {
+			self.JsonResponseWithError(http, errors.New("invalid import file name"), 500)
+			return
+		}
+		files = append(files, logic.ExplorerImportFile{Name: item.Name, Path: item.Path})
+	}
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		err = (logic.Explorer{}).Import(fileSystem, params.DstPath, files)
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	for _, item := range params.FileList {
-		err = func() error {
-			item.Path = function.SystemPathFromSlash(item.Path)
-			realPath, err := os.Open(storage.Local{}.GetSaveRealPath(item.Path))
-			if err != nil {
-				return err
-			}
-			defer func() {
-				_ = realPath.Close()
-				_ = os.Remove(realPath.Name())
-			}()
-			err = afs.WriteReader(path.Join(params.DstPath, item.Name), realPath)
-			if err != nil {
-				return err
-			}
-			return nil
-		}()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
 	self.JsonSuccessResponse(http)
-	return
 }
 
 func (self Explorer) Unzip(http *gin.Context) {
 	type ParamsValidate struct {
-		Name string   `json:"name" binding:"required"`
-		File []string `json:"file" binding:"required"`
-		Path string   `json:"path" binding:"required"`
+		MountPoint string   `json:"mountPoint" binding:"required"`
+		File       []string `json:"file" binding:"required"`
+		Path       string   `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
+	if !validExplorerPath(params.Path, true) {
+		self.JsonResponseWithError(http, errors.New("invalid unzip destination"), 500)
+		return
+	}
+	for _, filePath := range params.File {
+		if !validExplorerPath(filePath, false) {
+			self.JsonResponseWithError(http, errors.New("invalid archive path"), 500)
+			return
+		}
+	}
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		err = (logic.Explorer{}).UnArchive(fileSystem, params.File, params.Path)
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
-	}
-	options := make([]imports.ImportFileOption, 0)
-	for _, p := range params.File {
-		p = function.SystemPathFromSlash(p)
-		file, err := afs.OpenFile(p, os.O_RDONLY, 0o644)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer func() {
-			file.Close()
-		}()
-		switch path.Ext(file.Name()) {
-		case ".zip":
-			fileInfo, _ := file.Stat()
-			zipReader, err := zip.NewReader(file, fileInfo.Size())
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			options = append(options, imports.WithImportZip(zipReader))
-			break
-		case ".tar":
-			tarReader := tar.NewReader(file)
-			options = append(options, imports.WithImportTar(tarReader))
-			break
-		case ".gz":
-			gzReader, err := gzip.NewReader(file)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			tarReader := tar.NewReader(gzReader)
-			options = append(options, imports.WithImportTar(tarReader))
-			break
-		default:
-			slog.Info("explorer unzip ", "filetype", path.Ext(file.Name()))
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerUnzipTargetUnsupportedType), 500)
-			return
-		}
-	}
-	params.Path = function.SystemPathFromSlash(params.Path)
-	importFile, err := imports.NewFileImport(params.Path, options...)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	tarReader := importFile.TarReader()
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			break
-		}
-		if header.FileInfo().IsDir() {
-			err = afs.MkdirAll(header.Name, os.ModePerm)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			continue
-		}
-		err = afs.WriteReader(header.Name, tarReader)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
 	}
 	self.JsonSuccessResponse(http)
-	return
 }
 
 func (self Explorer) Delete(http *gin.Context) {
 	type ParamsValidate struct {
-		Name     string   `json:"name" binding:"required"`
-		FileList []string `json:"fileList" binding:"required"`
+		MountPoint string   `json:"mountPoint" binding:"required"`
+		FileList   []string `json:"fileList" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	safePath := make([]string, 0)
-	for _, p := range params.FileList {
-		p = function.SystemPathFromSlash(p)
-		if p == "/" ||
-			p == "./" ||
-			p == "." ||
-			strings.Contains(p, "*") {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerEditDeleteUnsafe), 500)
+	if err := validateExplorerPaths(params.FileList, false); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	for _, filePath := range params.FileList {
+		if strings.Contains(filePath, "*") {
+			self.JsonResponseWithError(http, errors.New("unsafe delete path"), 500)
 			return
 		}
-		safePath = append(safePath, p)
 	}
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	sshClient, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		for _, filePath := range params.FileList {
+			if err = fileSystem.RemoveAll(filePath); err != nil {
+				break
+			}
+		}
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	defer func() {
-		if sshClient != nil {
-			sshClient.Close()
-		}
-	}()
-
-	for _, p := range safePath {
-		err = self.deleteAll(afs, p)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
 	self.JsonSuccessResponse(http)
-	return
 }
 
 func (self Explorer) GetPathList(http *gin.Context) {
 	type ParamsValidate struct {
-		Name string `json:"name" binding:"required"`
-		Path string `json:"path"`
+		MountPoint string `json:"mountPoint" binding:"required"`
+		Path       string `json:"path"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	params.Path = function.PathClean(params.Path)
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	sshClient, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	if params.Path != "" && !validExplorerPath(params.Path, true) {
+		self.JsonResponseWithError(http, errors.New("invalid explorer path"), 500)
 		return
 	}
-	if params.Path == "" || params.Path == "." {
-		params.Path = "/"
-		if sshClient != nil {
-			if defaultPath, err := remote.QuickRun(sshClient, "pwd"); err == nil {
-				params.Path = strings.TrimSpace(string(defaultPath))
-			}
+	fileSystem, err := self.afs(http, params.MountPoint)
+	currentPath := params.Path
+	if err == nil && currentPath == "" {
+		currentPath = fileSystem.WorkingDir()
+	}
+	var listErr error
+	var list any
+	if err == nil {
+		fileList, readErr := fileSystem.List(currentPath)
+		if readErr == nil {
+			sort.Slice(fileList, func(i, j int) bool {
+				if fileList[i].IsDir != fileList[j].IsDir {
+					return fileList[i].IsDir
+				}
+				return fileList[i].Name < fileList[j].Name
+			})
+			list = fileList
 		} else {
-			if v, err := os.UserHomeDir(); err == nil {
-				params.Path = v
-			}
+			listErr = readErr
 		}
 	}
+	var rootDirs []string
+	if err == nil && listErr == nil {
+		rootDirs, listErr = fileSystem.RootDirs()
+	}
+	if err == nil && listErr == nil {
+		self.JsonResponseWithoutError(http, gin.H{
+			"currentPath": currentPath,
+			"list":        list,
+			"rootDirs":    rootDirs,
+		})
+		return
+	}
+	if err == nil {
+		err = listErr
+	}
+	self.JsonResponseWithError(http, err, 500)
+}
 
-	list, err := afs.ReadDir(params.Path)
+func (self Explorer) GetPathSize(http *gin.Context) {
+	type ParamsValidate struct {
+		MountPoint string `json:"mountPoint" binding:"required"`
+		Path       string `json:"path" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if !validExplorerPath(params.Path, true) {
+		self.JsonResponseWithError(http, errors.New("invalid path"), 500)
+		return
+	}
+	fileSystem, err := self.afs(http, params.MountPoint)
+	var size int64
+	if err == nil {
+		size, err = fileSystem.PathSize(params.Path)
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	result := make([]*fsType.FileData, 0)
-	for _, item := range list {
-		fileData := &fsType.FileData{
-			Path:     path.Join(params.Path, item.Name()),
-			Name:     item.Name(),
-			Mod:      item.Mode(),
-			ModStr:   item.Mode().String(),
-			ModTime:  item.ModTime(),
-			Change:   fsType.ChangeDefault,
-			Size:     item.Size(),
-			User:     "",
-			Group:    "",
-			LinkName: "",
-			IsDir:    item.Mode().IsDir(),
-		}
-		if v, ok := item.Sys().(*sftp.FileStat); ok {
-			cacheKey := fmt.Sprintf(storage.CacheKeyExplorerUsername, params.Name, v.UID)
-			if username, ok := storage.Cache.Get(cacheKey); ok {
-				fileData.User = username.(string)
-			}
-			if fileData.User == "" && sshClient != nil {
-				if username, err := remote.QuickRun(sshClient, fmt.Sprintf("id -un %d", v.UID)); err == nil {
-					fileData.User = strings.TrimSpace(string(username))
-					_ = storage.Cache.Add(cacheKey, string(username), time.Hour)
-				} else {
-					slog.Warn("explorer GetPathList username", "err", err)
-					fileData.User = strconv.Itoa(int(v.UID))
-				}
-			}
-			fileData.Group = strconv.Itoa(int(v.GID))
-		}
-		if fileData.CheckIsSymlink() {
-			fileData.IsSymlink = true
-			if sshClient != nil {
-				if linkName, err := sshClient.SftpConn.ReadLink(path.Join(params.Path, item.Name())); err == nil {
-					fileData.LinkName = linkName
-				}
-			} else {
-				if linkName, err := os.Readlink(path.Join(params.Path, item.Name())); err == nil {
-					fileData.LinkName = linkName
-				}
-			}
-		}
-		result = append(result, fileData)
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].IsDir && !result[j].IsDir
-	})
-	sort.Slice(result, func(i, j int) bool {
-		if result[i].IsDir != result[j].IsDir {
-			return result[i].IsDir
-		}
-		return result[i].Name < result[j].Name
-	})
-	self.JsonResponseWithoutError(http, gin.H{
-		"currentPath": params.Path,
-		"list":        result,
-	})
-	return
+	self.JsonResponseWithoutError(http, gin.H{"size": size})
 }
 
 func (self Explorer) GetContent(http *gin.Context) {
 	type ParamsValidate struct {
-		Name string `json:"name" binding:"required"`
-		File string `json:"file" binding:"required"`
+		MountPoint string `json:"mountPoint" binding:"required"`
+		File       string `json:"file" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
+	if !validExplorerPath(params.File, false) {
+		self.JsonResponseWithError(http, errors.New("invalid file path"), 500)
+		return
+	}
+	fileSystem, err := self.afs(http, params.MountPoint)
+	var result logic.ExplorerContent
+	if err == nil {
+		result, err = (logic.Explorer{}).GetContent(fileSystem, params.File)
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	params.File = function.SystemPathFromSlash(params.File)
-	file, err := afs.OpenFile(params.File, os.O_RDONLY, 0o644)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-	fileInfo, err := file.Stat()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if fileInfo.Size() >= 1024*1024 {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerEditFileMaxSize), 500)
-		return
-	}
-	fileType, _ := filetype.MatchFile(file.Name())
-	if fileType == filetype.Unknown {
-		content, err := io.ReadAll(file)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		self.JsonResponseWithoutError(http, gin.H{
-			"content":  string(content),
-			"fileMode": fileInfo.Mode().String(),
-		})
-		return
-	} else {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerExplorerContentUnsupportedType), 500)
-		return
-	}
+	self.JsonResponseWithoutError(http, gin.H{"content": result.Content, "fileMode": result.FileMode})
 }
 
-func (self Explorer) Chmod(http *gin.Context) {
+func (self Explorer) Permission(http *gin.Context) {
 	type ParamsValidate struct {
-		Name        string   `json:"name" binding:"required"`
+		MountPoint  string   `json:"mountPoint" binding:"required"`
 		FileList    []string `json:"fileList" binding:"required"`
-		Mod         string   `json:"mod" binding:"required"`
-		User        string   `json:"user"`
-		Group       string   `json:"group"`
+		Mod         string   `json:"mod"`
+		UID         *int     `json:"uid"`
+		GID         *int     `json:"gid"`
 		HasChildren bool     `json:"hasChildren"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
+	if err := validateExplorerPaths(params.FileList, !params.HasChildren); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		err = (logic.Explorer{}).Permission(
+			fileSystem, params.FileList, params.Mod, params.UID, params.GID, params.HasChildren,
+		)
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	mode, err := strconv.ParseUint(params.Mod, 8, 32)
-	for _, p := range params.FileList {
-		p = function.SystemPathFromSlash(p)
-		err = afs.Chmod(p, os.FileMode(mode))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-
-		if params.User != "" && params.Group != "" {
-			//afs.Chown(path, params.User, params.Group)
-		}
-	}
-
 	self.JsonSuccessResponse(http)
-	return
 }
 
 func (self Explorer) GetFileStat(http *gin.Context) {
 	type ParamsValidate struct {
-		Name string `json:"name" binding:"required"`
-		Path string `json:"path" binding:"required"`
+		MountPoint string `json:"mountPoint" binding:"required"`
+		Path       string `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	if !validExplorerPath(params.Path, true) {
+		self.JsonResponseWithError(http, errors.New("invalid file path"), 500)
 		return
 	}
-	params.Path = function.SystemPathFromSlash(params.Path)
-	var fileInfo os.FileInfo
-	file, err := afs.OpenFile(params.Path, os.O_RDONLY, 0o644)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		result, statErr := fileSystem.Info(params.Path)
+		if statErr == nil {
+			self.JsonResponseWithoutError(http, gin.H{"info": gin.H{
+				"isDir":  result.IsDir,
+				"target": result.Path,
+				"name":   result.Name,
+			}})
+			return
+		}
+		err = statErr
 	}
-	defer func() {
-		_ = file.Close()
-	}()
-	fileInfo, err = file.Stat()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonResponseWithoutError(http, gin.H{
-		"info": gin.H{
-			"isDir":  fileInfo.Mode().IsDir(),
-			"target": params.Path,
-			"name":   path.Base(params.Path),
-		},
-	})
-	return
+	self.JsonResponseWithError(http, err, 500)
 }
 
 func (self Explorer) GetUserList(http *gin.Context) {
 	type ParamsValidate struct {
-		Name string `json:"name" binding:"required"`
+		MountPoint string `json:"mountPoint" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		identities, userErr := fileSystem.Users()
+		if userErr == nil {
+			self.JsonResponseWithoutError(http, identities)
+			return
+		}
+		err = userErr
 	}
-	groups := make([]map[string]any, 0)
-	users := make([]map[string]any, 0)
-
-	if passwd, err := afs.ReadFile("/etc/passwd"); err == nil && string(passwd) != "" {
-		users = function.PluckArrayWalk(strings.Split(string(passwd), "\n"), func(line string) (map[string]any, bool) {
-			items := strings.Split(line, ":")
-			if len(items) < 7 {
-				return nil, false
-			}
-			return map[string]any{
-				"name":        items[0],
-				"gid":         items[3],
-				"uid":         items[2],
-				"description": items[4],
-			}, true
-		})
-	} else {
-		slog.Warn("explorer get user list", "err", err)
-	}
-
-	if group, err := afs.ReadFile("/etc/group"); err == nil && string(group) != "" {
-		groups = function.PluckArrayWalk(strings.Split(string(group), "\n"), func(line string) (map[string]any, bool) {
-			items := strings.Split(line, ":")
-			if len(items) < 3 {
-				return nil, false
-			}
-			return map[string]any{
-				"name": items[0],
-				"gid":  items[2],
-			}, true
-		})
-	}
-
-	self.JsonResponseWithoutError(http, gin.H{
-		"group": groups,
-		"user":  users,
-	})
-	return
+	self.JsonResponseWithError(http, err, 500)
 }
 
 func (self Explorer) MkDir(http *gin.Context) {
 	type ParamsValidate struct {
-		Name    string `json:"name" binding:"required"`
-		DstPath string `json:"dstPath" binding:"required"`
+		MountPoint string `json:"mountPoint" binding:"required"`
+		DstPath    string `json:"dstPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+	if !validExplorerPath(params.DstPath, false) {
+		self.JsonResponseWithError(http, errors.New("invalid directory path"), 500)
 		return
 	}
-
-	params.DstPath = function.SystemPathFromSlash(params.DstPath)
-	err = afs.MkdirAll(params.DstPath, os.ModePerm)
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		err = fileSystem.MkdirAll(params.DstPath, os.ModePerm)
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -687,151 +420,82 @@ func (self Explorer) MkDir(http *gin.Context) {
 
 func (self Explorer) Copy(http *gin.Context) {
 	type ParamsValidate struct {
-		Name       string `json:"name" binding:"required"`
+		MountPoint string `json:"mountPoint" binding:"required"`
 		SourceFile string `json:"sourceFile" binding:"required"`
 		TargetFile string `json:"targetFile" binding:"required"`
 		IsMove     bool   `json:"isMove"`
+		Overwrite  bool   `json:"overwrite"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	params.SourceFile = function.SystemPathFromSlash(params.SourceFile)
-	params.TargetFile = function.SystemPathFromSlash(params.TargetFile)
-	if !path.IsAbs(params.TargetFile) {
-		params.TargetFile = path.Join(path.Dir(params.SourceFile), params.TargetFile)
+	if !validExplorerPath(params.SourceFile, false) || !validExplorerTransferTarget(params.TargetFile) {
+		self.JsonResponseWithError(http, errors.New("invalid copy or move path"), 500)
+		return
 	}
-
-	ctx, ctxCancel := context.WithCancel(http)
-	defer ctxCancel()
-	_, afs, err := logic.Explorer{}.Afs(ctx, logic.AfsCreateOption{
-		MountPoint: params.Name,
-	})
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		target := params.TargetFile
+		if !path.IsAbs(target) {
+			target = path.Join(path.Dir(params.SourceFile), target)
+		}
+		if params.IsMove {
+			err = fileSystem.Move(params.SourceFile, target, params.Overwrite)
+		} else {
+			err = fileSystem.Copy(params.SourceFile, target, params.Overwrite)
+		}
+	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
-	}
-
-	if ok, _ := afs.Exists(params.TargetFile); ok {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", path.Base(params.TargetFile)), 500)
-		return
-	}
-
-	sourceFile, err := afs.Open(params.SourceFile)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	defer func() {
-		_ = sourceFile.Close()
-	}()
-
-	sourceFileStat, _ := sourceFile.Stat()
-	if sourceFileStat.IsDir() {
-		targetFileRoot := params.TargetFile
-		err = afs.MkdirAll(targetFileRoot, sourceFileStat.Mode())
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		list, err := sourceFile.Readdir(-1)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		var errs []error
-		waitGroup := sync.WaitGroup{}
-		errLock := sync.Mutex{}
-		for _, info := range list {
-			waitGroup.Add(1)
-			go func(info os.FileInfo) {
-				defer func() {
-					waitGroup.Done()
-				}()
-				appendErr := func(err error) {
-					errLock.Lock()
-					defer errLock.Unlock()
-					errs = append(errs, err)
-				}
-				newFileName := path.Base(info.Name())
-				if info.IsDir() {
-					err := afs.Mkdir(path.Join(targetFileRoot, newFileName), info.Mode())
-					if err != nil {
-						appendErr(err)
-						return
-					}
-				} else {
-					tf, err := afs.OpenFile(path.Join(targetFileRoot, newFileName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, info.Mode())
-					if err != nil {
-						appendErr(err)
-						return
-					}
-					defer func() {
-						_ = tf.Close()
-					}()
-					sf, err := afs.Open(path.Join(params.SourceFile, info.Name()))
-					if err != nil {
-						appendErr(err)
-						return
-					}
-					defer func() {
-						_ = sf.Close()
-					}()
-					_, err = io.Copy(tf, sf)
-					if err != nil {
-						appendErr(err)
-						return
-					}
-				}
-			}(info)
-		}
-		waitGroup.Wait()
-		if errs != nil {
-			self.JsonResponseWithError(http, errors.Join(errs...), 500)
-			return
-		}
-	} else {
-		targetFile, err := afs.OpenFile(params.TargetFile, os.O_CREATE|os.O_RDWR, sourceFileStat.Mode())
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		_, err = io.Copy(targetFile, sourceFile)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
-	if params.IsMove {
-		err = self.deleteAll(afs, params.SourceFile)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
 	}
 	self.JsonSuccessResponse(http)
 }
 
-func (self Explorer) deleteAll(afs *afero.Afero, filepath string) error {
-	file, err := afs.Open(filepath)
+func (self Explorer) DestroyProxyContainer(http *gin.Context) {
+	type ParamsValidate struct {
+		MountPoint string `json:"mountPoint" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		err = fileSystem.Destroy()
+	}
 	if err != nil {
-		return err
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
-	fileInfo, _ := file.Stat()
-	// 删除文件之前需要先关闭，否则 windows 会报错文件被占用
-	_ = file.Close()
-	if fileInfo.IsDir() {
-		files, err := afs.ReadDir(filepath)
-		if err != nil {
-			return err
-		}
-		for _, item := range files {
-			err = self.deleteAll(afs, path.Join(filepath, item.Name()))
-			if err != nil {
-				return err
-			}
+	self.JsonSuccessResponse(http)
+}
+
+func validExplorerPath(value string, allowRoot bool) bool {
+	return value != "" && strings.IndexByte(value, 0) < 0 && path.IsAbs(value) && path.Clean(value) == value && (allowRoot || value != "/")
+}
+
+func validExplorerFileName(value string) bool {
+	return value != "" && value != "." && strings.IndexByte(value, 0) < 0 && !path.IsAbs(value) && path.Clean(value) == value && path.Base(value) == value
+}
+
+func validExplorerRelativePath(value string) bool {
+	return value != "" && value != "." && strings.IndexByte(value, 0) < 0 && !path.IsAbs(value) && path.Clean(value) == value && value != ".." && !strings.HasPrefix(value, "../")
+}
+
+func validExplorerTransferTarget(value string) bool {
+	if path.IsAbs(value) {
+		return validExplorerPath(value, false)
+	}
+	return validExplorerRelativePath(value)
+}
+
+func validateExplorerPaths(values []string, allowRoot bool) error {
+	for _, value := range values {
+		if !validExplorerPath(value, allowRoot) {
+			return errors.New("invalid explorer path")
 		}
 	}
-	return afs.Remove(filepath)
+	return nil
 }

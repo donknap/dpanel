@@ -3,6 +3,7 @@ package plugin
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -28,13 +29,17 @@ import (
 )
 
 const (
+	DockerRootMountPath   = "/mnt_docker"
 	ExplorerName          = "dpanel-plugin-explorer"
 	HostExplorerMountPath = "/mnt_host"
+	MonitorName           = "dpanel-plugin-monitor"
 )
 
 type CreateOption struct {
 	RandomProxyContainerName bool               `json:"-"`
+	ContainerName            string             `json:"containerName"`
 	HostPID                  bool               `json:"hostPid"`
+	MountDockerRoot          bool               `json:"mountDockerRoot"`
 	MountHostRoot            bool               `json:"mountHostRoot"`
 	Volumes                  []types.VolumeItem `json:"volumes"`
 	VolumesFrom              []string           `json:"volumesFrom"`
@@ -45,6 +50,21 @@ type CreateOption struct {
 }
 
 func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plugin, error) {
+	if option.MountDockerRoot {
+		info, err := dockerSdk.Client.Info(dockerSdk.Ctx)
+		if err != nil {
+			return nil, fmt.Errorf("get Docker root directory: %w", err)
+		}
+		if info.DockerRootDir == "" {
+			return nil, errors.New("Docker root directory is empty")
+		}
+		option.Volumes = append(option.Volumes, types.VolumeItem{
+			Host:       info.DockerRootDir,
+			Dest:       DockerRootMountPath,
+			Type:       "bind",
+			Permission: "readonly",
+		})
+	}
 	if option.MountHostRoot {
 		option.Volumes = append(option.Volumes, types.VolumeItem{
 			Host: "/",
@@ -58,8 +78,6 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 		containerName: name, // 默认与任务名称保持一致
 	}
 
-	option.Hash = function.Sha256Struct(option)
-
 	var asset embed.FS
 	if v, ok := storage.Cache.Get(storage.CacheKeyAsset); ok {
 		asset = v.(embed.FS)
@@ -68,6 +86,10 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 	}
 
 	yamlTpl, err := asset.ReadFile("asset/plugin/" + name + "/compose.yaml")
+	option.Hash = function.Sha256Struct(struct {
+		Option   CreateOption
+		Template string
+	}{Option: option, Template: string(yamlTpl)})
 	tpl := template.New(name)
 	tpl.Funcs(template.FuncMap{
 		"unescaped": func(s string) template.HTML {
@@ -102,6 +124,8 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 
 	if option.RandomProxyContainerName {
 		p.containerName = fmt.Sprintf("%s-%s", name, uuid.NewString())
+	} else if option.ContainerName != "" {
+		p.containerName = option.ContainerName
 	} else if service.ContainerName != "" {
 		p.containerName = service.ContainerName
 	} else {
@@ -183,7 +207,7 @@ func (self *Plugin) Create() error {
 	containerInfo, err := self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, self.containerName)
 	if err == nil {
 		self.containerID = containerInfo.ID
-		slog.Info("plugin", "create-explorer", containerInfo.ID)
+		slog.Info("plugin create", "name", self.Name, "id", containerInfo.ID)
 		if containerInfo.State.Restarting {
 			goto recreate
 		}
@@ -228,9 +252,16 @@ recreate:
 		builder.WithReadonlyRootfs(service.ReadOnly),
 		builder.WithCapDrop(service.CapDrop...),
 		builder.WithCap(service.CapAdd...),
+		builder.WithEnv(function.PluckMapWalkArray(service.Environment, func(name string, value *string) (types.EnvItem, bool) {
+			if value == nil {
+				return types.EnvItem{Name: name}, true
+			}
+			return types.EnvItem{Name: name, Value: *value}, true
+		})...),
 		builder.WithRestartPolicy(&types.RestartPolicy{
 			Name: service.Restart,
 		}),
+		builder.WithCgroupnsMode(container.CgroupnsMode(service.Cgroup)),
 		builder.WithPid(service.Pid),
 		builder.WithVolumesFromContainerName(serviceExt.External.VolumesFrom...),
 		builder.WithCommand(service.Command),
@@ -238,10 +269,14 @@ recreate:
 	}
 
 	for _, item := range service.Volumes {
+		permission := "write"
+		if item.ReadOnly {
+			permission = "readonly"
+		}
 		options = append(options, builder.WithVolume(types.VolumeItem{
 			Host:       item.Source,
 			Dest:       item.Target,
-			Permission: "write",
+			Permission: permission,
 		}))
 	}
 
@@ -309,7 +344,7 @@ func (self *Plugin) Close() error {
 
 		function.Wait(self.dockerSdk.Ctx, containerInfo.ID, func(v string) bool {
 			if _, err = self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, v); err != nil {
-				slog.Debug("plugin delete explorer", "id", containerInfo.Name)
+				slog.Debug("plugin delete", "name", self.Name, "id", containerInfo.Name)
 				return true
 			}
 			return false
@@ -319,7 +354,7 @@ func (self *Plugin) Close() error {
 			if err = self.dockerSdk.ImageRemove(self.dockerSdk.Ctx, filters.NewArgs(
 				filters.Arg(docker.ImageFilterReference, containerInfo.Config.Image),
 			)); err != nil {
-				slog.Debug("plugin delete explorer image", "id", containerInfo.Config.Image)
+				slog.Debug("plugin delete image", "name", self.Name, "id", containerInfo.Config.Image)
 			}
 		}
 	}
@@ -354,7 +389,7 @@ func importImage(sdk *docker.Client, imageName string, imageFile fs.File) error 
 			Force:         true,
 			PruneChildren: true,
 		}); err != nil {
-			slog.Warn("plugin create explorer", "delete old image", imageName, "error", err)
+			slog.Warn("plugin import image", "delete old image", imageName, "error", err)
 		}
 		err = sdk.ImageLoadFsFile(sdk.Ctx, imageFile)
 		if err != nil {

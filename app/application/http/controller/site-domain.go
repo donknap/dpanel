@@ -341,11 +341,21 @@ func (self SiteDomain) NginxLog(http *gin.Context) {
 		"/var/log/nginx/error.log",
 	}
 
-	wsBuffer := ws.NewProgressPip(ws.MessageTypeNginxLog)
-	defer wsBuffer.Close()
+	progress, err := ws.NewFdProgressPip(http, ws.MessageTypeNginxLog)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if progress.IsShadow() {
+		self.JsonSuccessResponse(http)
+		return
+	}
+	defer progress.Close()
 
-	ctx, cancel := context.WithCancel(wsBuffer.Context())
+	ctx, cancel := context.WithCancel(progress.Context())
 	defer cancel()
+	stopCancel := context.AfterFunc(http.Request.Context(), cancel)
+	defer stopCancel()
 
 	var wg sync.WaitGroup
 
@@ -357,7 +367,7 @@ func (self SiteDomain) NginxLog(http *gin.Context) {
 
 			file, err := os.Open(filename)
 			if err != nil {
-				wsBuffer.BroadcastMessage(function.ConsoleWriteError(fmt.Sprintf("Open file failed %s: %v", filename, err)))
+				progress.BroadcastMessage(function.ConsoleWriteError(fmt.Sprintf("Open file failed %s: %v", filename, err)))
 				return
 			}
 
@@ -365,7 +375,7 @@ func (self SiteDomain) NginxLog(http *gin.Context) {
 
 			err = function.FileSeekToLastNLines(file, params.LineTotal)
 			if err != nil {
-				wsBuffer.BroadcastMessage(function.ConsoleWriteError(err.Error()))
+				progress.BroadcastMessage(function.ConsoleWriteError(err.Error()))
 				return
 			}
 
@@ -387,21 +397,15 @@ func (self SiteDomain) NginxLog(http *gin.Context) {
 							continue
 						}
 					}
-					wsBuffer.BroadcastMessage(function.ConsoleWriteError(err.Error()))
+					progress.BroadcastMessage(function.ConsoleWriteError(err.Error()))
 					return
 				}
-				wsBuffer.BroadcastMessage(line)
+				progress.BroadcastMessage(line)
 			}
 		}(s)
 	}
 
-	go func() {
-		wg.Wait()
-		cancel()
-		wsBuffer.Close()
-	}()
-
-	<-wsBuffer.Done()
+	wg.Wait()
 
 	self.JsonSuccessResponse(http)
 	return

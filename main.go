@@ -30,7 +30,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/family"
-	fs2 "github.com/donknap/dpanel/common/service/fs"
+	"github.com/donknap/dpanel/common/service/fs/staticfs"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-contrib/gzip"
@@ -147,7 +147,7 @@ func main() {
 			func(engine *gin.Engine) {
 				subFs, _ := fs.Sub(Asset, "asset/static")
 				gzipMiddleware := engine.Use(gzip.Gzip(gzip.DefaultCompression))
-				gzipMiddleware.StaticFS(function.RouterUri("/dpanel/static/asset"), fs2.NewStaticFs(subFs))
+				gzipMiddleware.StaticFS(function.RouterUri("/dpanel/static/asset"), staticfs.NewStaticFs(subFs))
 
 				engine.StaticFileFS(function.RouterUri("/favicon.ico"), "/img/dpanel.ico", http2.FS(subFs))
 				engine.Static(function.RouterUri("/dpanel/static/image"), filepath.Join(storage.Local{}.GetSaveRootPath(), "image"))

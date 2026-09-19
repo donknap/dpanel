@@ -13,8 +13,10 @@ type Usage struct {
 	Memory         UsageIo                     `json:"memory"`
 	PrevBlockIO    *UsageIo                    `json:"-"`
 	BlockIO        UsageIo                     `json:"blockIO"`
+	BlockTotal     UsageIo                     `json:"blockTotal"`
 	PrevNetworkIO  *UsageIo                    `json:"-"`
 	NetworkIO      UsageIo                     `json:"networkIO"`
+	NetworkTotal   UsageIo                     `json:"networkTotal"`
 	Name           string                      `json:"name"`
 	Container      string                      `json:"container"`
 	CPUThrottled   *float64                    `json:"cpuThrottled,omitempty"`
@@ -72,6 +74,10 @@ func (self *Container) SetStatistics(v *container.StatsResponse, osType string, 
 		}
 		usage.Cpu = calculateCPUPercentUnix(v.PreCPUStats.CPUUsage.TotalUsage, v.PreCPUStats.SystemUsage, v)
 		blkRead, blkWrite = calculateBlockIO(v.BlkioStats)
+		usage.BlockTotal = UsageIo{
+			In:  float64(blkWrite),
+			Out: float64(blkRead),
+		}
 
 		// 写入值获取实时数据，减掉上一次的值
 		// 上次数据没有时，直接返回 0
@@ -91,10 +97,18 @@ func (self *Container) SetStatistics(v *container.StatsResponse, osType string, 
 		usage.Cpu = calculateCPUPercentWindows(v)
 		usage.BlockIO.Out = float64(v.StorageStats.ReadSizeBytes)
 		usage.BlockIO.In = float64(v.StorageStats.WriteSizeBytes)
+		usage.BlockTotal = UsageIo{
+			In:  usage.BlockIO.In,
+			Out: usage.BlockIO.Out,
+		}
 		usage.Memory.In = float64(v.MemoryStats.PrivateWorkingSet)
 	}
 
 	netRead, netWrite := calculateNetwork(v.Networks)
+	usage.NetworkTotal = UsageIo{
+		In:  netWrite,
+		Out: netRead,
+	}
 	if self.PrevNetworkIO != nil {
 		usage.NetworkIO.In = math.Max(netWrite-self.PrevNetworkIO.In, 0)
 		usage.NetworkIO.Out = math.Max(netRead-self.PrevNetworkIO.Out, 0)

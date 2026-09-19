@@ -1,14 +1,12 @@
 package docker
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -282,43 +280,6 @@ func (self Client) ContainerExec(ctx context.Context, containerName string, opti
 		Detach:      option.Detach,
 	}
 	return self.Client.ContainerExecAttach(ctx, exec.ID, execAttachOption)
-}
-
-// ContainerReadFile 读取容器内的一个文件内容，传入 targetFile 则写入文件 否则返回一个 reader
-func (self Client) ContainerReadFile(ctx context.Context, containerName string, inContainerPath string, targetFile *os.File) (io.ReadCloser, error) {
-	pathStat, err := self.Client.ContainerStatPath(ctx, containerName, inContainerPath)
-	if err != nil {
-		return nil, err
-	}
-	if !pathStat.Mode.IsRegular() {
-		return nil, function.ErrorMessage(define.ErrorMessageContainerExplorerContentUnsupportedType)
-	}
-	out, _, err := self.Client.CopyFromContainer(ctx, containerName, inContainerPath)
-	if err != nil {
-		return nil, err
-	}
-	// 返回的数据是外部是一个 tar 真正的文件 reader 需要先读一次
-	tarReader := tar.NewReader(out)
-	file, err := tarReader.Next()
-	if err != nil {
-		return nil, err
-	}
-
-	if targetFile == nil {
-		return out, nil
-	}
-
-	defer func() {
-		_ = out.Close()
-	}()
-
-	_, err = io.Copy(targetFile, tarReader)
-	if err != nil {
-		return nil, err
-	}
-
-	_ = targetFile.Chmod(file.FileInfo().Mode())
-	return nil, nil
 }
 
 func (self Client) ContainerLogs(ctx context.Context, containerId string, options container.LogsOptions) (io.ReadCloser, error) {

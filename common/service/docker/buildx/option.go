@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/archive"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 )
@@ -96,7 +97,7 @@ func WithZipFilePath(path string) Option {
 		if err != nil {
 			return err
 		}
-		err = function.Unzip(temp, path)
+		err = archive.UnArchive(path, temp)
 		if err != nil {
 			return err
 		}

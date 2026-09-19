@@ -38,16 +38,6 @@ func (self RunLog) Run(http *gin.Context) {
 	if params.LineTotal > 0 {
 		option.Tail = strconv.Itoa(params.LineTotal)
 	}
-	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerLog, params.Id))
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	slog.Debug("container run log progress", "detail", progress.String())
-	if progress.IsShadow() {
-		option.Follow = false
-	}
-
 	if params.Download {
 		response, err := docker.Sdk.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
 		if err != nil {
@@ -63,25 +53,36 @@ func (self RunLog) Run(http *gin.Context) {
 		return
 	}
 
+	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerLog, params.Id))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	slog.Debug("container run log progress", "detail", progress.String())
+	if progress.IsShadow() {
+		option.Follow = false
+	}
+
 	response, err := docker.Sdk.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	defer func() {
+		_ = response.Close()
+	}()
 	progress.OnWrite = func(p string) error {
 		progress.BroadcastMessage(p)
 		return nil
 	}
 
 	go func() {
-		if progress.IsShadow() {
-			return
-		}
 		select {
+		case <-http.Request.Context().Done():
 		case <-progress.Done():
-			slog.Debug("container", "run log response close", fmt.Sprintf(ws.MessageTypeContainerLog, params.Id))
-			_ = response.Close()
 		}
+		slog.Debug("container", "run log response close", fmt.Sprintf(ws.MessageTypeContainerLog, params.Id))
+		_ = response.Close()
 	}()
 
 	_, err = io.Copy(progress, response)

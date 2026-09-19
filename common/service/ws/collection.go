@@ -88,7 +88,7 @@ func (self *Collection) Leave(c *Client) {
 			return true
 		})
 		slog.Info("docker client cancel")
-		facade.Event.Publish(event.PluginDestroyExplorer, event.DockerDaemonPayload{
+		facade.Event.Publish(event.PluginDestroy, event.DockerDaemonPayload{
 			DockerEnvName: docker.Sdk.DockerEnv.Name,
 		})
 		//docker.Sdk.CtxCancelFunc()

@@ -86,6 +86,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/env/switch", controller.Env{}.Switch)
 		cors.POST("/common/env/delete", controller.Env{}.Delete)
 		cors.POST("/common/env/get-detail", controller.Env{}.GetDetail)
+		cors.POST("/common/env/system-stat", controller.Env{}.SystemStat)
 
 		// 应用商店
 		cors.POST("/common/store/create", controller.Store{}.Create)
@@ -113,6 +114,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 
 		// 文件相关
 		cors.POST("/common/explorer/get-path-list", controller.Explorer{}.GetPathList)
+		cors.POST("/common/explorer/get-path-size", controller.Explorer{}.GetPathSize)
 		cors.POST("/common/explorer/get-user-list", controller.Explorer{}.GetUserList)
 		cors.POST("/common/explorer/get-content", controller.Explorer{}.GetContent)
 		cors.POST("/common/explorer/get-file-stat", controller.Explorer{}.GetFileStat)
@@ -121,9 +123,10 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/explorer/import-file-content", controller.Explorer{}.ImportFileContent)
 		cors.POST("/common/explorer/unzip", controller.Explorer{}.Unzip)
 		cors.POST("/common/explorer/delete", controller.Explorer{}.Delete)
-		cors.POST("/common/explorer/chmod", controller.Explorer{}.Chmod)
+		cors.POST("/common/explorer/permission", controller.Explorer{}.Permission)
 		cors.POST("/common/explorer/mkdir", controller.Explorer{}.MkDir)
 		cors.POST("/common/explorer/copy", controller.Explorer{}.Copy)
+		cors.POST("/common/explorer/destroy-proxy-container", controller.Explorer{}.DestroyProxyContainer)
 
 		cors.POST("/common/panel/usage", controller.Panel{}.Usage)
 		cors.POST("/common/panel/backup", controller.Panel{}.Backup)
@@ -149,7 +152,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 	_ = facade.GetEvent().Subscribe(event.DockerDaemonEvent, events.Docker{}.Daemon)
 	_ = facade.GetEvent().Subscribe(event.DockerMessageEvent, events.Docker{}.Message)
 
-	_ = facade.Event.Subscribe(event.PluginDestroyExplorer, events.Plugin{}.DestroyExplorer)
+	_ = facade.Event.Subscribe(event.PluginDestroy, events.Plugin{}.Destroy)
 	// 启动时，初始化计划任务
 	crontab.Client.Start()
 

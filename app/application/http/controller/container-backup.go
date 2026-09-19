@@ -542,10 +542,11 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 							docker.Sdk.Ctx,
 							hostExplorer.ContainerName(),
 							container.ExecOptions{Cmd: []string{
-								"/agent", "fs", "mkdir-all",
+								"/agent", "fs", "mkdir",
 								"--root", plugin.HostExplorerMountPath,
 								"--path", p,
 								"--mode", "0755",
+								"--recursive",
 							}},
 						)
 						if err != nil {

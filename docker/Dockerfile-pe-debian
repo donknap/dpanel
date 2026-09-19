@@ -42,6 +42,7 @@ RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
 WORKDIR /src
 
 COPY --from=source /src/go.mod /src/go.sum ./
+COPY --from=source /src/app/agent/go.mod /src/app/agent/go.sum ./app/agent/
 RUN --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     go mod download

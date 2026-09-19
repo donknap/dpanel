@@ -14,6 +14,7 @@ require (
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
 	github.com/docker/go-units v0.5.0
+	github.com/donknap/dpanel/app/agent v0.0.0
 	github.com/gin-contrib/gzip v1.2.5
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -213,3 +214,5 @@ require (
 exclude github.com/mattn/go-sqlite3 v2.0.3+incompatible
 
 replace github.com/distribution/reference => github.com/distribution/reference v0.5.0
+
+replace github.com/donknap/dpanel/app/agent => ./app/agent
