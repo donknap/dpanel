@@ -202,8 +202,8 @@ func (self *Fs) fileData(name string, info os.FileInfo, users, groups map[uint32
 	switch stat := info.Sys().(type) {
 	case *sftp.FileStat:
 		data.UID, data.GID = stat.UID, stat.GID
-	case *syscall.Stat_t:
-		data.UID, data.GID = stat.Uid, stat.Gid
+	default:
+		data.UID, data.GID = serviceafs.FileOwner(info)
 	}
 	data.User, data.Group = users[data.UID], groups[data.GID]
 	if data.User == "" {
@@ -360,11 +360,7 @@ func (self *Fs) PathSize(name string) (int64, error) {
 		return info.Size(), nil
 	}
 
-	type fileID struct {
-		device uint64
-		inode  uint64
-	}
-	seen := make(map[fileID]struct{})
+	seen := make(map[serviceafs.FileID]struct{})
 	var size int64
 	var walk func(string) error
 	walk = func(filePath string) error {
@@ -376,8 +372,10 @@ func (self *Fs) PathSize(name string) (int64, error) {
 			return nil
 		}
 		if info.Mode().IsRegular() {
-			if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-				id := fileID{device: uint64(stat.Dev), inode: uint64(stat.Ino)}
+			if stat, err := self.fileStat(filePath, info); err != nil {
+				return err
+			} else if stat != nil {
+				id := stat.ID
 				if _, exists := seen[id]; exists {
 					return nil
 				}
@@ -688,13 +686,8 @@ func (self *Fs) unusedSibling(target, purpose string) (string, error) {
 	return "", errors.New("cannot allocate a temporary copy path")
 }
 
-type copyFileID struct {
-	device uint64
-	inode  uint64
-}
-
-func (self *Fs) preflightSource(source string) (map[copyFileID]struct{}, error) {
-	directories := make(map[copyFileID]struct{})
+func (self *Fs) preflightSource(source string) (map[serviceafs.FileID]struct{}, error) {
+	directories := make(map[serviceafs.FileID]struct{})
 	var walk func(string) error
 	walk = func(name string) error {
 		info, err := self.lstat(name)
@@ -715,11 +708,13 @@ func (self *Fs) preflightSource(source string) (map[copyFileID]struct{}, error) 
 		case info.Mode().IsRegular():
 			return nil
 		case info.IsDir():
-			if id, ok := fileIdentity(info); ok {
-				if _, exists := directories[id]; exists {
+			if stat, err := self.fileStat(name, info); err != nil {
+				return err
+			} else if stat != nil {
+				if _, exists := directories[stat.ID]; exists {
 					return errors.New("source directory contains a filesystem cycle")
 				}
-				directories[id] = struct{}{}
+				directories[stat.ID] = struct{}{}
 			}
 			entries, err := self.ReadDir(name)
 			if err != nil {
@@ -769,7 +764,7 @@ func (self *Fs) preflightCopyTargets(source, target string) error {
 	return nil
 }
 
-func (self *Fs) checkCopyAliases(source, target string, sourceInfo, targetInfo os.FileInfo, targetExists bool, parent os.FileInfo, directories map[copyFileID]struct{}) error {
+func (self *Fs) checkCopyAliases(source, target string, sourceInfo, targetInfo os.FileInfo, targetExists bool, parent os.FileInfo, directories map[serviceafs.FileID]struct{}) error {
 	if self.sftpClient != nil {
 		realSource, err := self.sftpClient.RealPath(source)
 		if err != nil && sourceInfo.IsDir() {
@@ -790,22 +785,34 @@ func (self *Fs) checkCopyAliases(source, target string, sourceInfo, targetInfo o
 		}
 		return nil
 	}
-	if sourceID, ok := fileIdentity(sourceInfo); ok && targetExists {
-		if targetID, targetOK := fileIdentity(targetInfo); targetOK && sourceID == targetID {
+	if targetExists {
+		sourceStat, err := self.fileStat(source, sourceInfo)
+		if err != nil {
+			return err
+		}
+		targetStat, err := self.fileStat(target, targetInfo)
+		if err != nil {
+			return err
+		}
+		if sourceStat != nil && targetStat != nil && sourceStat.ID == targetStat.ID {
 			return errors.New("source and target are the same file")
 		}
 	}
 	if sourceInfo.IsDir() {
-		if id, ok := fileIdentity(parent); ok {
-			if _, exists := directories[id]; exists {
+		if stat, err := self.fileStat(path.Dir(target), parent); err != nil {
+			return err
+		} else if stat != nil {
+			if _, exists := directories[stat.ID]; exists {
 				return errors.New("a directory cannot be copied or moved into itself")
 			}
 		}
 		if targetExists {
 			resolvedTarget, err := self.Stat(target)
 			if err == nil {
-				if id, ok := fileIdentity(resolvedTarget); ok {
-					if _, exists := directories[id]; exists {
+				if stat, err := self.fileStat(target, resolvedTarget); err != nil {
+					return err
+				} else if stat != nil {
+					if _, exists := directories[stat.ID]; exists {
 						return errors.New("a directory cannot be copied or moved into itself")
 					}
 				}
@@ -827,10 +834,16 @@ func (self *Fs) preflightTargetAliases(source, target string, targetExists bool)
 	if err != nil {
 		return err
 	}
-	if sourceID, ok := fileIdentity(sourceInfo); ok {
-		if targetID, targetOK := fileIdentity(targetInfo); targetOK && sourceID == targetID {
-			return errors.New("source and target are the same file")
-		}
+	sourceStat, err := self.fileStat(source, sourceInfo)
+	if err != nil {
+		return err
+	}
+	targetStat, err := self.fileStat(target, targetInfo)
+	if err != nil {
+		return err
+	}
+	if sourceStat != nil && targetStat != nil && sourceStat.ID == targetStat.ID {
+		return errors.New("source and target are the same file")
 	}
 	if !sourceInfo.IsDir() || !targetInfo.IsDir() {
 		return nil
@@ -855,12 +868,16 @@ func (self *Fs) preflightTargetAliases(source, target string, targetExists bool)
 	return nil
 }
 
-func fileIdentity(info os.FileInfo) (copyFileID, bool) {
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return copyFileID{}, false
+func (self *Fs) fileStat(name string, info os.FileInfo) (*serviceafs.FileStat, error) {
+	// SFTP metadata is supplied by the remote server, not the panel's OS.
+	if self.root == nil {
+		return nil, nil
 	}
-	return copyFileID{device: uint64(stat.Dev), inode: uint64(stat.Ino)}, true
+	name, err := self.localName(name)
+	if err != nil {
+		return nil, err
+	}
+	return serviceafs.ReadFileStat(self.root, name, info)
 }
 
 func (self *Fs) removeEntry(name string) error {
@@ -1067,7 +1084,9 @@ func (self *Fs) validateTransferSource(name string) error {
 		return errors.New("source is not a regular file or directory")
 	}
 	if info.Mode().IsRegular() {
-		if stat, ok := info.Sys().(*syscall.Stat_t); ok && stat.Nlink > 1 {
+		if stat, err := self.fileStat(name, info); err != nil {
+			return err
+		} else if stat != nil && stat.Links > 1 {
 			return errors.New("source is a hard link")
 		}
 		return nil
@@ -1113,7 +1132,9 @@ func (self *Fs) validateTransferTarget(name string) error {
 			return errors.New("target is not a regular file or directory")
 		}
 		if index == len(components)-1 && info.Mode().IsRegular() {
-			if stat, ok := info.Sys().(*syscall.Stat_t); ok && stat.Nlink > 1 {
+			if stat, err := self.fileStat(current, info); err != nil {
+				return err
+			} else if stat != nil && stat.Links > 1 {
 				return errors.New("target is a hard link")
 			}
 		}
@@ -1255,7 +1276,9 @@ func validateLocalTransferPath(name string, mustExist bool) error {
 		return errors.New("local path is not a regular file or directory")
 	}
 	if info.Mode().IsRegular() {
-		if stat, ok := info.Sys().(*syscall.Stat_t); ok && stat.Nlink > 1 {
+		if stat, err := serviceafs.ReadFileStat(nil, name, info); err != nil {
+			return err
+		} else if stat != nil && stat.Links > 1 {
 			return errors.New("local path is a hard link")
 		}
 	}

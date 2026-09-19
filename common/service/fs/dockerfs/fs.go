@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -1075,7 +1074,9 @@ func validateLocalTransferPath(name string, mustExist bool) error {
 		return errors.New("local path is not a regular file or directory")
 	}
 	if info.Mode().IsRegular() {
-		if stat, ok := info.Sys().(*syscall.Stat_t); ok && stat.Nlink > 1 {
+		if stat, err := serviceafs.ReadFileStat(nil, name, info); err != nil {
+			return err
+		} else if stat != nil && stat.Links > 1 {
 			return errors.New("local path is a hard link")
 		}
 	}
