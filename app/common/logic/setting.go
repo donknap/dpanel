@@ -25,6 +25,7 @@ var (
 	SettingGroupSetting                     = "setting"
 	SettingGroupSettingDocker               = "docker" // docker env
 	SettingGroupSettingTwoFa                = "twoFa"  // 双因素
+	SettingGroupSettingPasskey              = "passkey"
 	SettingGroupSettingDiskUsage            = "diskUsage"
 	SettingGroupSettingCheckContainerIgnore = "containerCheckIgnoreUpgrade"
 	SettingGroupSettingDPanelInfo           = "DPanelInfo"
@@ -238,6 +239,11 @@ func (self Setting) GetByKey(group, name string, value interface{}) (exists bool
 			if setting.Value.TwoFa != nil {
 				exists = true
 				*v = *setting.Value.TwoFa
+			}
+		case *accessor.Passkey:
+			if setting.Value.Passkey != nil {
+				exists = true
+				*v = *setting.Value.Passkey
 			}
 		case *accessor.ContainerCheckIgnoreUpgrade:
 			if setting.Value.ContainerCheckIgnoreUpgrade != nil {

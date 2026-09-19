@@ -210,6 +210,7 @@ func (self User) OauthCallback(http *gin.Context) {
 		State       string `json:"state"`
 		RedirectURI string `json:"redirect_uri"`
 		RedirectUri string `json:"redirectUri"`
+		AutoLogin   bool   `json:"autoLogin"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -232,6 +233,7 @@ func (self User) OauthCallback(http *gin.Context) {
 		Code:        params.Code,
 		State:       params.State,
 		RedirectURI: params.RedirectURI,
+		AutoLogin:   params.AutoLogin,
 	})
 	if err != nil {
 		slog.Debug("oauth callback failed", "provider", params.Provider, "error", err.Error())

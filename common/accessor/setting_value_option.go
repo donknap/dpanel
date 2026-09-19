@@ -6,19 +6,15 @@ import (
 	"github.com/docker/docker/api/types"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	types3 "github.com/donknap/dpanel/common/types"
+	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 type SettingValueOption struct {
-	Username                    string                       `json:"username,omitempty"`
-	Password                    string                       `json:"password,omitempty"`
-	Salt                        string                       `json:"salt,omitempty"`
-	Email                       string                       `json:"email,omitempty"`
-	UserStatus                  uint8                        `json:"userStatus,omitempty"`
-	UserRemark                  string                       `json:"userRemark,omitempty"`
-	RegisterAt                  *time.Time                   `json:"registerAt,omitempty"`
+	UserSetting
 	Docker                      map[string]*types2.DockerEnv `json:"docker,omitempty"`
 	DiskUsage                   *DiskUsage                   `json:"diskUsage,omitempty"`
 	TwoFa                       *TwoFa                       `json:"twoFa,omitempty"`
+	Passkey                     *Passkey                     `json:"passkey,omitempty"`
 	ContainerCheckIgnoreUpgrade ContainerCheckIgnoreUpgrade  `json:"containerCheckIgnoreUpgrade,omitempty"`
 	DPanelInfo                  *types3.DPanelInfo           `json:"DPanelInfo,omitempty"`
 	ThemeConfig                 *ThemeConfig                 `json:"themeConfig,omitempty"`
@@ -29,6 +25,33 @@ type SettingValueOption struct {
 	Tag                         []Tag                        `json:"tag,omitempty"`
 	Login                       *Login                       `json:"login,omitempty"`
 	ConsoleInstance             *ConsoleInstance             `json:"consoleInstance,omitempty"`
+}
+
+type UserSetting struct {
+	Username           string              `json:"username,omitempty"`
+	Password           string              `json:"password,omitempty"`
+	Salt               string              `json:"salt,omitempty"`
+	Email              string              `json:"email,omitempty"`
+	UserStatus         uint8               `json:"userStatus,omitempty"`
+	UserRemark         string              `json:"userRemark,omitempty"`
+	RegisterAt         *time.Time          `json:"registerAt,omitempty"`
+	PasskeyCredentials []PasskeyCredential `json:"passkeys,omitempty"`
+}
+
+type Passkey struct {
+	Enable    bool     `json:"enable"`
+	Name      string   `json:"name,omitempty"`
+	RPID      string   `json:"rpId,omitempty"`
+	Origins   []string `json:"origins,omitempty"`
+	AllowHTTP bool     `json:"allowHttp,omitempty"`
+}
+
+type PasskeyCredential struct {
+	ID         string              `json:"id"`
+	Name       string              `json:"name"`
+	Credential webauthn.Credential `json:"credential"`
+	CreatedAt  int64               `json:"createdAt"`
+	LastUsedAt int64               `json:"lastUsedAt,omitempty"`
 }
 
 type ContainerCheckIgnoreUpgrade []string

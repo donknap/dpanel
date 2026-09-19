@@ -127,9 +127,11 @@ func (self User) CreateFounderUser(username string, password string) (*entity.Se
 		GroupName: SettingGroupUser,
 		Name:      SettingGroupUserFounder,
 		Value: &accessor.SettingValueOption{
-			Username:   username,
-			UserStatus: SettingGroupUserStatusEnable,
-			RegisterAt: &registerAt,
+			UserSetting: accessor.UserSetting{
+				Username:   username,
+				UserStatus: SettingGroupUserStatusEnable,
+				RegisterAt: &registerAt,
+			},
 		},
 	}
 	if password != "" {

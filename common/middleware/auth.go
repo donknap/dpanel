@@ -20,16 +20,32 @@ type AuthMiddleware struct {
 }
 
 var (
-	ErrLogin = function.ErrorMessage(define.ErrorMessageUserLogin)
+	ErrLogin          = function.ErrorMessage(define.ErrorMessageUserLogin)
+	anonymousApiPaths = []string{
+		"/common/user/login",
+		"/common/user/create-founder",
+		"/common/user/login-info",
+		"/common/user/oauth/callback",
+		"/common/user/oauth/providers",
+		"/common/user/oauth/authorize",
+		"/pro/home/login-info",
+		"/pro/user/reset-info",
+		"/pro/passkey/auth",
+		"/pro/passkey/verify-code",
+	}
+	founderApiPaths = []string{
+		"/pro/passkey/save-setting",
+		"/pro/passkey/prepare",
+		"/pro/passkey/create",
+		"/pro/passkey/get-list",
+		"/pro/passkey/delete",
+	}
 )
 
 func (self AuthMiddleware) Process(http *gin.Context) {
 	currentUrlPath := http.Request.URL.Path
-	if strings.Contains(currentUrlPath, "/common/user/login") ||
-		strings.Contains(currentUrlPath, "/common/user/create-founder") ||
-		strings.Contains(currentUrlPath, "/common/user/oauth/") ||
-		strings.Contains(currentUrlPath, "/pro/home/login-info") ||
-		strings.Contains(currentUrlPath, "/pro/user/reset-info") ||
+	apiPath := strings.TrimPrefix(currentUrlPath, function.RouterRootApi())
+	if function.InArray(anonymousApiPaths, apiPath) ||
 		(!strings.HasPrefix(currentUrlPath, function.RouterRootApi()) && !strings.HasPrefix(currentUrlPath, function.RouterRootWs())) {
 		http.Next()
 		return
@@ -102,22 +118,22 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 			return
 		}
 
-		if myUserInfo.AutoLogin {
-			if currentUser != nil {
-				myUserInfo.Fd = http.GetHeader("AuthorizationFd")
-				http.Set("userInfo", myUserInfo)
-				http.Next()
+		authenticated := myUserInfo.AutoLogin
+		if !authenticated {
+			if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyCommonUserInfo, myUserInfo.UserId)); ok {
+				_, authenticated = v.(logic.UserInfo)
+			}
+		}
+		if authenticated {
+			if function.InArray(founderApiPaths, apiPath) && currentUser.Name != logic.SettingGroupUserFounder {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUserNoPermission), 403)
+				http.AbortWithStatus(403)
 				return
 			}
-		} else {
-			if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyCommonUserInfo, myUserInfo.UserId)); ok {
-				if _, ok := v.(logic.UserInfo); ok {
-					myUserInfo.Fd = http.GetHeader("AuthorizationFd")
-					http.Set("userInfo", myUserInfo)
-					http.Next()
-					return
-				}
-			}
+			myUserInfo.Fd = http.GetHeader("AuthorizationFd")
+			http.Set("userInfo", myUserInfo)
+			http.Next()
+			return
 		}
 		slog.Debug("auth middleware", "err", "user not found", "userInfo", myUserInfo)
 		self.JsonResponseWithError(http, ErrLogin, 401)

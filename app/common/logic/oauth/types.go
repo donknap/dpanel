@@ -5,7 +5,10 @@ import (
 	"net/http"
 )
 
-const ProviderFnnas = "fnnas"
+const (
+	ProviderFnnas   = "fnnas"
+	ProviderPasskey = "passkey"
+)
 
 type Provider interface {
 	Item() (Item, bool)
@@ -23,6 +26,7 @@ type ExchangeOption struct {
 	Code        string
 	State       string
 	RedirectURI string
+	AutoLogin   bool
 }
 
 func Authorize(provider string, request *http.Request) (string, error) {
@@ -45,6 +49,8 @@ func providerByName(provider string) (Provider, error) {
 	switch provider {
 	case ProviderFnnas:
 		return Fnnas{}, nil
+	case ProviderPasskey:
+		return Passkey{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported oauth provider: %s", provider)
 	}
