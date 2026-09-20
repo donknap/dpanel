@@ -23,21 +23,50 @@ import (
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
+	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	types2 "github.com/donknap/dpanel/common/types"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
-const maxEventCacheSize = 100
+const maxDockerMessageSize = 100
 
 var (
-	eventCache = make([]*event.DockerMessagePayload, 0, maxEventCacheSize)
-	mu         = sync.Mutex{}
+	dockerMessageFilterContainerList = []string{
+		plugin.ExplorerName,
+		plugin.MonitorName,
+	}
+	dockerMessageLevelMap = map[dockerEvents.Action]types2.LogLevel{
+		dockerEvents.ActionOOM:          types2.LogLevelError,
+		dockerEvents.ActionDie:          types2.LogLevelWarning,
+		dockerEvents.ActionDestroy:      types2.LogLevelWarning,
+		dockerEvents.ActionRemove:       types2.LogLevelWarning,
+		dockerEvents.ActionDelete:       types2.LogLevelWarning,
+		dockerEvents.ActionPrune:        types2.LogLevelWarning,
+		dockerEvents.ActionStop:         types2.LogLevelWarning,
+		dockerEvents.ActionRestart:      types2.LogLevelWarning,
+		dockerEvents.ActionKill:         types2.LogLevelWarning,
+		dockerEvents.ActionPause:        types2.LogLevelWarning,
+		dockerEvents.ActionUnmount:      types2.LogLevelWarning,
+		dockerEvents.ActionDisconnect:   types2.LogLevelWarning,
+		dockerEvents.ActionDisable:      types2.LogLevelWarning,
+		dockerEvents.ActionHealthStatus: types2.LogLevelDebug,
+		dockerEvents.ActionAttach:       types2.LogLevelDebug,
+		dockerEvents.ActionDetach:       types2.LogLevelDebug,
+		dockerEvents.ActionResize:       types2.LogLevelDebug,
+		dockerEvents.ActionTop:          types2.LogLevelDebug,
+		dockerEvents.ActionExecCreate:   types2.LogLevelDebug,
+		dockerEvents.ActionExecStart:    types2.LogLevelDebug,
+		dockerEvents.ActionExecDie:      types2.LogLevelDebug,
+		dockerEvents.ActionExecDetach:   types2.LogLevelDebug,
+	}
+	dockerMessageMu = sync.Mutex{}
 )
 
 type Docker struct {
@@ -194,23 +223,37 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 }
 
 func (self Docker) Message(e event.DockerMessagePayload) {
-	e.Level = dockerMessageLevel(e.Message)
-
 	if client, ok := notice.Monitor.Clients()[e.DockerEnvName]; ok {
 		client.ContainerRuntimeCollect(context.Background(), e.Message)
 	} else if docker.Sdk != nil && docker.Sdk.Name == e.DockerEnvName {
 		docker.Sdk.ContainerRuntimeCollect(context.Background(), e.Message)
 	}
 
-	mu.Lock()
-	eventCache = append(eventCache, &e)
-
-	if len(eventCache) > maxEventCacheSize {
-		eventCache = eventCache[len(eventCache)-maxEventCacheSize:]
+	containerName := e.Message.Actor.Attributes[define.DPanelLabelContainerName]
+	if containerName == "" {
+		containerName = e.Message.Actor.Attributes["name"]
 	}
-
-	storage.Cache.Set(storage.CacheKeyDockerEvents, eventCache, cache.DefaultExpiration)
-	mu.Unlock()
+	if !function.InArray(dockerMessageFilterContainerList, containerName) {
+		e.ID = uuid.NewString()
+		e.Level = types2.LogLevelInfo
+		action, _, _ := strings.Cut(string(e.Message.Action), ": ")
+		if level, ok := dockerMessageLevelMap[dockerEvents.Action(action)]; ok {
+			e.Level = level
+		}
+		dockerMessageMu.Lock()
+		dockerMessages := make([]*event.DockerMessagePayload, 0, maxDockerMessageSize)
+		if value, ok := storage.Cache.Get(storage.CacheKeyDockerEvents); ok {
+			if cached, ok := value.([]*event.DockerMessagePayload); ok {
+				dockerMessages = append(dockerMessages, cached...)
+			}
+		}
+		dockerMessages = append(dockerMessages, &e)
+		if len(dockerMessages) > maxDockerMessageSize {
+			dockerMessages = dockerMessages[len(dockerMessages)-maxDockerMessageSize:]
+		}
+		storage.Cache.Set(storage.CacheKeyDockerEvents, dockerMessages, cache.DefaultExpiration)
+		dockerMessageMu.Unlock()
+	}
 
 	msgType := string(e.Message.Type) + "/" + string(e.Message.Action)
 	if function.InArray([]string{
@@ -224,37 +267,5 @@ func (self Docker) Message(e event.DockerMessagePayload) {
 		for _, job := range crontab.Client.GetJobs(fmt.Sprintf(logic.CronEventJobSearch, msgType)) {
 			job.Run(crontab.WithEnvironment(environment))
 		}
-	}
-}
-
-func dockerMessageLevel(message dockerEvents.Message) event.DockerMessageLevel {
-	action := string(message.Action)
-	if index := strings.Index(action, ": "); index >= 0 {
-		action = action[:index]
-	}
-
-	switch dockerEvents.Action(action) {
-	case dockerEvents.ActionCreate,
-		dockerEvents.ActionUpdate,
-		dockerEvents.ActionDestroy,
-		dockerEvents.ActionRemove,
-		dockerEvents.ActionDelete,
-		dockerEvents.ActionPrune,
-		dockerEvents.ActionStop,
-		dockerEvents.ActionRestart,
-		dockerEvents.ActionKill,
-		dockerEvents.ActionPause,
-		dockerEvents.ActionOOM,
-		dockerEvents.ActionMount,
-		dockerEvents.ActionUnmount,
-		dockerEvents.ActionConnect,
-		dockerEvents.ActionDisconnect,
-		dockerEvents.ActionEnable,
-		dockerEvents.ActionDisable,
-		dockerEvents.ActionExecCreate,
-		dockerEvents.ActionExecStart:
-		return event.DockerMessageLevelHigh
-	default:
-		return event.DockerMessageLevelNormal
 	}
 }

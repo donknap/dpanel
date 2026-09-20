@@ -3,6 +3,7 @@ package event
 import (
 	"github.com/docker/docker/api/types/events"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	types2 "github.com/donknap/dpanel/common/types"
 )
 
 const (
@@ -18,15 +19,9 @@ const (
 	DockerMessageEvent = "docker_message"
 )
 
-type DockerMessageLevel string
-
-const (
-	DockerMessageLevelNormal DockerMessageLevel = "normal"
-	DockerMessageLevelHigh   DockerMessageLevel = "high"
-)
-
 type DockerMessagePayload struct {
-	DockerEnvName string             `json:"dockerEnvName"`
-	Level         DockerMessageLevel `json:"level"`
-	Message       events.Message     `json:"message"`
+	ID            string          `json:"id"`
+	DockerEnvName string          `json:"dockerEnvName"`
+	Level         types2.LogLevel `json:"level"`
+	Message       events.Message  `json:"message"`
 }
