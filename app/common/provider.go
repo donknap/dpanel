@@ -41,8 +41,9 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/registry/delete", controller.Registry{}.Delete)
 
 		// 全局
-		cors.POST("/common/event/get-list", controller.Event{}.GetList)
-		cors.POST("/common/event/prune", controller.Event{}.Prune)
+		cors.POST("/common/log/get-list", controller.Log{}.GetList)
+		cors.POST("/common/log/download", controller.Log{}.Download)
+		cors.POST("/common/log/prune", controller.Log{}.Prune)
 
 		cors.POST("/common/notice/unread", controller.Notice{}.Unread)
 		cors.POST("/common/notice/get-list", controller.Notice{}.GetList)
@@ -122,6 +123,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/explorer/export", controller.Explorer{}.Export)
 		cors.POST("/common/explorer/import-file-content", controller.Explorer{}.ImportFileContent)
 		cors.POST("/common/explorer/unzip", controller.Explorer{}.Unzip)
+		cors.POST("/common/explorer/archive", controller.Explorer{}.Archive)
 		cors.POST("/common/explorer/delete", controller.Explorer{}.Delete)
 		cors.POST("/common/explorer/permission", controller.Explorer{}.Permission)
 		cors.POST("/common/explorer/mkdir", controller.Explorer{}.MkDir)

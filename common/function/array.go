@@ -45,6 +45,20 @@ func InArrayWalk[T interface{}](v []T, walk func(i T) bool) bool {
 	return ok
 }
 
+func UniqueArrayWalk[T any, K comparable](v []T, walk func(item T) K) []T {
+	result := make([]T, 0, len(v))
+	keys := make(map[K]struct{}, len(v))
+	for _, item := range v {
+		key := walk(item)
+		if _, exists := keys[key]; exists {
+			continue
+		}
+		keys[key] = struct{}{}
+		result = append(result, item)
+	}
+	return result
+}
+
 func IndexArrayWalk[T interface{}](v []T, walk func(i T) bool) (index int, ok bool) {
 	if v == nil {
 		return 0, false

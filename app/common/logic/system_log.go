@@ -105,7 +105,7 @@ func (self SystemLog) Collect(query SystemLogQuery) ([]SystemLogItem, error) {
 	for _, id := range query.ID {
 		idFilter[id] = struct{}{}
 	}
-	keywordLevel, keyword := parseSystemLogKeyword(query.Keyword)
+	keywordLevel, keywordSource, keyword := parseSystemLogKeyword(query.Keyword)
 	lowerKeyword := strings.ToLower(keyword)
 
 	result := make([]SystemLogItem, 0, len(list))
@@ -121,6 +121,11 @@ func (self SystemLog) Collect(query SystemLogQuery) ([]SystemLogItem, error) {
 			}
 		}
 		if keywordLevel != "" && item.Level != keywordLevel {
+			continue
+		}
+		if keywordSource != "" &&
+			!strings.EqualFold(item.SourceName, keywordSource) &&
+			!strings.EqualFold(item.SourceType, keywordSource) {
 			continue
 		}
 		if len(sourceFilter) > 0 {
@@ -228,31 +233,39 @@ func parsePanelLogLevel(value string) (types.LogLevel, bool) {
 	}
 }
 
-func parseSystemLogKeyword(value string) (types.LogLevel, string) {
+func parseSystemLogKeyword(value string) (types.LogLevel, string, string) {
 	value = strings.TrimSpace(value)
-	prefix, keyword, exists := strings.Cut(value, ":")
-	if !exists {
-		return "", value
+	filter, keyword, hasKeyword := strings.Cut(value, ":")
+	if levelValue, source, exists := strings.Cut(filter, "@"); exists {
+		source = strings.TrimSpace(source)
+		if source == "" {
+			return "", "", value
+		}
+		level, ok := parsePanelLogLevel(levelValue)
+		if strings.TrimSpace(levelValue) != "" && !ok {
+			return "", "", value
+		}
+		if !hasKeyword {
+			keyword = ""
+		}
+		return level, source, strings.TrimSpace(keyword)
+	}
+	if !hasKeyword {
+		return "", "", value
 	}
 
-	var level types.LogLevel
-	switch strings.ToLower(strings.TrimSpace(prefix)) {
-	case string(types.LogLevelDebug):
-		level = types.LogLevelDebug
-	case string(types.LogLevelInfo):
-		level = types.LogLevelInfo
-	case string(types.LogLevelWarning):
-		level = types.LogLevelWarning
-	case string(types.LogLevelError):
-		level = types.LogLevelError
-	default:
-		return "", value
+	level, ok := parsePanelLogLevel(filter)
+	if !ok {
+		return "", "", value
 	}
-	return level, strings.TrimSpace(keyword)
+	return level, "", strings.TrimSpace(keyword)
 }
 
 func dockerMessageContent(message dockerEvents.Message) string {
 	target := message.Actor.Attributes["name"]
+	if target == "" {
+		target = message.Actor.ID
+	}
 	if target == "" {
 		target = message.From
 	}
@@ -260,7 +273,15 @@ func dockerMessageContent(message dockerEvents.Message) string {
 		target = message.ID
 	}
 	if target == "" {
-		target = message.Actor.ID
+		target = "-"
+	}
+	containerID := message.Actor.Attributes["container"]
+	if containerID != "" && (message.Type == dockerEvents.NetworkEventType || message.Type == dockerEvents.VolumeEventType) {
+		container := containerID
+		if containerName := message.Actor.Attributes["containerName"]; containerName != "" {
+			container = fmt.Sprintf("%s (%s)", containerName, containerID)
+		}
+		return fmt.Sprintf("%s %s container %s: %s", message.Type, target, container, message.Action)
 	}
 	return fmt.Sprintf("%s %s: %s", message.Type, target, message.Action)
 }

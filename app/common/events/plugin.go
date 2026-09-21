@@ -26,7 +26,7 @@ func (self Plugin) Destroy(e event.DockerDaemonPayload) {
 			defer dockerSdk.Close()
 			filter := filters.NewArgs()
 			filter.Add(docker.ContainerFilterLabel, fmt.Sprintf("%s=true", define.DPanelLabelContainerAutoRemove))
-			if list, err := dockerSdk.ContainerSearchList(dockerSdk.Ctx, container.ListOptions{
+			if list, err := dockerSdk.ContainerList(dockerSdk.Ctx, container.ListOptions{
 				All:     true,
 				Filters: filter,
 			}); err == nil {

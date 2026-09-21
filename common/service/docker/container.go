@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sort"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -35,7 +36,7 @@ const (
 	ContainerFilterCompose       = "x-compose"
 )
 
-func (self Client) ContainerSearchList(ctx context.Context, option container.ListOptions) ([]container.Summary, error) {
+func (self Client) ContainerList(ctx context.Context, option container.ListOptions) ([]container.Summary, error) {
 	filter := option.Filters.Clone()
 	extendFilters := make(map[string][]string)
 	for _, key := range filter.Keys() {
@@ -64,6 +65,27 @@ func (self Client) ContainerSearchList(ctx context.Context, option container.Lis
 	list, err := self.Client.ContainerList(ctx, option)
 	if err != nil {
 		return nil, err
+	}
+	for index := range list {
+		sort.Slice(list[index].Ports, func(i, j int) bool {
+			left, right := list[index].Ports[i], list[index].Ports[j]
+			if left.PublicPort != right.PublicPort {
+				if left.PublicPort == 0 {
+					return false
+				}
+				if right.PublicPort == 0 {
+					return true
+				}
+				return left.PublicPort < right.PublicPort
+			}
+			if left.PrivatePort != right.PrivatePort {
+				return left.PrivatePort < right.PrivatePort
+			}
+			if left.Type != right.Type {
+				return left.Type < right.Type
+			}
+			return left.IP < right.IP
+		})
 	}
 	if len(extendFilters) == 0 {
 		return list, nil
@@ -128,7 +150,7 @@ func (self Client) ContainerByField(ctx context.Context, field string, name ...s
 	filtersArgs.Add(ContainerFilterStatus, string(container.StateExited))
 	filtersArgs.Add(ContainerFilterStatus, string(container.StateDead))
 
-	containerList, err := self.ContainerSearchList(ctx, container.ListOptions{
+	containerList, err := self.ContainerList(ctx, container.ListOptions{
 		Filters: filtersArgs,
 	})
 	if err != nil {

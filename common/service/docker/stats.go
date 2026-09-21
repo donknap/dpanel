@@ -19,13 +19,7 @@ func (self Client) ContainerStats(ctx context.Context, option types.ContainerSta
 		Filters: option.Filters,
 		All:     true,
 	}
-	var containerList []container.Summary
-	var err error
-	if option.Filters.Len() == 0 {
-		containerList, err = self.Client.ContainerList(ctx, listOption)
-	} else {
-		containerList, err = self.ContainerSearchList(ctx, listOption)
-	}
+	containerList, err := self.ContainerList(ctx, listOption)
 	if err != nil {
 		return nil, err
 	}

@@ -1,8 +1,10 @@
 package plugin
 
 import (
+	"archive/tar"
 	"bytes"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -10,9 +12,11 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"path"
 	"strings"
 	"sync"
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -35,7 +39,10 @@ const (
 	MonitorName           = "dpanel-plugin-monitor"
 )
 
+var imageArchiveIDCache sync.Map
+
 type CreateOption struct {
+	Init                     bool               `json:"-"`
 	RandomProxyContainerName bool               `json:"-"`
 	ContainerName            string             `json:"containerName"`
 	HostPID                  bool               `json:"hostPid"`
@@ -50,7 +57,16 @@ type CreateOption struct {
 }
 
 func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plugin, error) {
-	if option.MountDockerRoot {
+	p := &Plugin{
+		dockerSdk:     dockerSdk,
+		Name:          name,
+		containerName: name,
+		initialized:   option.Init,
+	}
+	if option.ContainerName != "" {
+		p.containerName = option.ContainerName
+	}
+	if option.Init && option.MountDockerRoot {
 		info, err := dockerSdk.Client.Info(dockerSdk.Ctx)
 		if err != nil {
 			return nil, fmt.Errorf("get Docker root directory: %w", err)
@@ -65,25 +81,20 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 			Permission: "readonly",
 		})
 	}
-	if option.MountHostRoot {
+	if option.Init && option.MountHostRoot {
 		option.Volumes = append(option.Volumes, types.VolumeItem{
 			Host: "/",
 			Dest: HostExplorerMountPath,
 			Type: "bind",
 		})
 	}
-	p := &Plugin{
-		dockerSdk:     dockerSdk,
-		Name:          name,
-		containerName: name, // 默认与任务名称保持一致
-	}
-
 	var asset embed.FS
 	if v, ok := storage.Cache.Get(storage.CacheKeyAsset); ok {
 		asset = v.(embed.FS)
 	} else {
 		return nil, define.ErrorAssetEmpty
 	}
+	p.asset = asset
 
 	yamlTpl, err := asset.ReadFile("asset/plugin/" + name + "/compose.yaml")
 	option.Hash = function.Sha256Struct(struct {
@@ -122,7 +133,7 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 		return nil, err
 	}
 
-	if option.RandomProxyContainerName {
+	if option.Init && option.RandomProxyContainerName {
 		p.containerName = fmt.Sprintf("%s-%s", name, uuid.NewString())
 	} else if option.ContainerName != "" {
 		p.containerName = option.ContainerName
@@ -131,21 +142,14 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 	} else {
 		p.containerName = name
 	}
+	if !option.Init {
+		return p, nil
+	}
 
 	dockerVersion, _ := dockerSdk.Client.ServerVersion(dockerSdk.Ctx)
 	if imageTarUrl, ok := serviceExt.ImageTar[dockerVersion.Arch]; ok {
 		if imageTarUrl != "" && strings.HasPrefix(imageTarUrl, "asset/plugin") {
-			imageFile, err := asset.Open(imageTarUrl)
-			if os.IsNotExist(err) {
-				return nil, err
-			}
-			defer func() {
-				_ = imageFile.Close()
-			}()
-			err = importImage(dockerSdk, service.Image, imageFile)
-			if err != nil {
-				return nil, err
-			}
+			p.imagePath = imageTarUrl
 		}
 	}
 
@@ -179,6 +183,12 @@ func NewPlugin(dockerSdk *docker.Client, name string, option CreateOption) (*Plu
 		if err != nil {
 			return nil, err
 		}
+		imageInfo, err := dockerSdk.Client.ImageInspect(dockerSdk.Ctx, service.Image)
+		if err != nil {
+			return nil, err
+		}
+		p.imageID = imageInfo.ID
+		p.imagePath = ""
 
 	}
 
@@ -189,14 +199,32 @@ type Plugin struct {
 	Name          string
 	containerName string
 	containerID   string
+	imageID       string
+	imagePath     string
+	initialized   bool
 	mu            sync.Mutex
 	dockerSdk     *docker.Client
 	composeTask   *compose.Task
+	asset         embed.FS
 }
 
 func (self *Plugin) Create() error {
+	if !self.initialized {
+		return errors.New("plugin is not initialized")
+	}
+	mutex := storage.NewMutex(fmt.Sprintf(storage.CacheKeyPluginLifecycleLock, self.dockerSdk.Name, self.containerName))
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	return self.create()
+}
+
+func (self *Plugin) create() error {
 	service, serviceExt, err := self.composeTask.GetService(self.Name)
 	if err != nil {
+		return err
+	}
+	if err = self.prepareImage(service.Image); err != nil {
 		return err
 	}
 	networkMode := container.NetworkMode(service.NetworkMode)
@@ -208,22 +236,20 @@ func (self *Plugin) Create() error {
 	if err == nil {
 		self.containerID = containerInfo.ID
 		slog.Info("plugin create", "name", self.Name, "id", containerInfo.ID)
-		if containerInfo.State.Restarting {
-			goto recreate
-		}
-		if !containerInfo.State.Running {
+		hashMatched := containerInfo.Config != nil &&
+			containerInfo.Config.Labels[define.DPanelLabelContainerHash] == service.Labels[define.DPanelLabelContainerHash]
+		imageMatched := self.imageID == "" || containerInfo.Image == self.imageID
+		if containerInfo.State != nil && !containerInfo.State.Restarting && hashMatched && imageMatched {
+			if containerInfo.State.Running {
+				return nil
+			}
 			if err = self.dockerSdk.Client.ContainerStart(self.dockerSdk.Ctx, containerInfo.ID, container.StartOptions{}); err == nil {
 				return nil
 			}
-			goto recreate
-		}
-		if v, ok := containerInfo.Config.Labels[define.DPanelLabelContainerHash]; ok && v == service.Labels[define.DPanelLabelContainerHash] {
-			return nil
 		}
 	}
 
-recreate:
-	err = self.Close()
+	err = self.close(false)
 	if err != nil {
 		return err
 	}
@@ -316,8 +342,37 @@ recreate:
 	return nil
 }
 
+func (self *Plugin) prepareImage(imageName string) error {
+	if self.imagePath == "" {
+		return nil
+	}
+	imageFile, err := self.asset.Open(self.imagePath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = imageFile.Close()
+	}()
+	self.imageID, err = importImage(self.dockerSdk, imageName, self.imagePath, imageFile)
+	return err
+}
+
 // Close 外部调用（或看门人调用）的销毁入口
 func (self *Plugin) Close() error {
+	if self == nil || self.dockerSdk == nil || self.dockerSdk.Client == nil {
+		return errors.New("docker client is required for plugin close")
+	}
+	if self.containerName == "" {
+		return errors.New("plugin container name is required")
+	}
+	mutex := storage.NewMutex(fmt.Sprintf(storage.CacheKeyPluginLifecycleLock, self.dockerSdk.Name, self.containerName))
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	return self.close(true)
+}
+
+func (self *Plugin) close(removeImage bool) error {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
@@ -325,37 +380,44 @@ func (self *Plugin) Close() error {
 	if err != nil {
 		return err
 	}
-
 	containerTarget := self.containerID
 	if containerTarget == "" {
 		containerTarget = self.containerName
 	}
-	if containerInfo, err := self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, containerTarget); err == nil {
-		if containerInfo.State.Running {
-			if err = self.dockerSdk.Client.ContainerStop(self.dockerSdk.Ctx, containerInfo.ID, container.StopOptions{}); err != nil {
-				return err
-			}
-		}
-		if err = self.dockerSdk.Client.ContainerRemove(self.dockerSdk.Ctx, containerInfo.ID, container.RemoveOptions{
-			Force: true,
-		}); err != nil {
+	containerInfo, err := self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, containerTarget)
+	if errdefs.IsNotFound(err) {
+		self.containerID = ""
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if containerInfo.State != nil && containerInfo.State.Running {
+		if err = self.dockerSdk.Client.ContainerStop(self.dockerSdk.Ctx, containerInfo.ID, container.StopOptions{}); err != nil && !errdefs.IsNotFound(err) {
 			return err
 		}
+	}
+	if err = self.dockerSdk.Client.ContainerRemove(self.dockerSdk.Ctx, containerInfo.ID, container.RemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
+		return err
+	}
+	if errdefs.IsNotFound(err) {
+		self.containerID = ""
+		return nil
+	}
 
-		function.Wait(self.dockerSdk.Ctx, containerInfo.ID, func(v string) bool {
-			if _, err = self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, v); err != nil {
-				slog.Debug("plugin delete", "name", self.Name, "id", containerInfo.Name)
-				return true
-			}
-			return false
-		})
+	function.Wait(self.dockerSdk.Ctx, containerInfo.ID, func(v string) bool {
+		if _, inspectErr := self.dockerSdk.Client.ContainerInspect(self.dockerSdk.Ctx, v); inspectErr != nil {
+			slog.Debug("plugin delete", "name", self.Name, "id", containerInfo.Name)
+			return true
+		}
+		return false
+	})
 
-		if serviceExt.ImageAutoRemove {
-			if err = self.dockerSdk.ImageRemove(self.dockerSdk.Ctx, filters.NewArgs(
-				filters.Arg(docker.ImageFilterReference, containerInfo.Config.Image),
-			)); err != nil {
-				slog.Debug("plugin delete image", "name", self.Name, "id", containerInfo.Config.Image)
-			}
+	if removeImage && serviceExt.ImageAutoRemove && containerInfo.Config != nil {
+		if err = self.dockerSdk.ImageRemove(self.dockerSdk.Ctx, filters.NewArgs(
+			filters.Arg(docker.ImageFilterReference, containerInfo.Config.Image),
+		)); err != nil {
+			slog.Debug("plugin delete image", "name", self.Name, "id", containerInfo.Config.Image)
 		}
 	}
 	self.containerID = ""
@@ -383,18 +445,83 @@ func (self *Plugin) ContainerName() string {
 	return self.containerName
 }
 
-func importImage(sdk *docker.Client, imageName string, imageFile fs.File) error {
-	if _, err := sdk.Client.ImageInspect(sdk.Ctx, imageName); err != nil {
-		if _, err = sdk.Client.ImageRemove(sdk.Ctx, imageName, image.RemoveOptions{
-			Force:         true,
-			PruneChildren: true,
-		}); err != nil {
-			slog.Warn("plugin import image", "delete old image", imageName, "error", err)
-		}
-		err = sdk.ImageLoadFsFile(sdk.Ctx, imageFile)
-		if err != nil {
-			return err
-		}
+func importImage(sdk *docker.Client, imageName, imagePath string, imageFile fs.File) (string, error) {
+	imageID, err := imageArchiveID(imageName, imagePath, imageFile)
+	if err != nil {
+		return "", err
 	}
-	return nil
+	if imageInfo, err := sdk.Client.ImageInspect(sdk.Ctx, imageName); err == nil && imageInfo.ID == imageID {
+		return imageID, nil
+	} else if err != nil && !errdefs.IsNotFound(err) {
+		return "", err
+	}
+
+	seeker, ok := imageFile.(io.Seeker)
+	if !ok {
+		return "", fmt.Errorf("plugin image archive %s is not seekable", imagePath)
+	}
+	if _, err = seeker.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("seek plugin image archive %s: %w", imagePath, err)
+	}
+	if err = sdk.ImageLoadFsFile(sdk.Ctx, imageFile); err != nil {
+		return "", fmt.Errorf("load plugin image %s: %w", imageName, err)
+	}
+	imageInfo, err := sdk.Client.ImageInspect(sdk.Ctx, imageName)
+	if err != nil {
+		return "", fmt.Errorf("inspect loaded plugin image %s: %w", imageName, err)
+	}
+	if imageInfo.ID != imageID {
+		return "", fmt.Errorf("loaded plugin image %s ID mismatch: expected %s, got %s", imageName, imageID, imageInfo.ID)
+	}
+	return imageID, nil
+}
+
+func imageArchiveID(imageName, imagePath string, imageFile fs.File) (string, error) {
+	cacheKey := imagePath + "\x00" + function.ImageTag(imageName).Name
+	if value, ok := imageArchiveIDCache.Load(cacheKey); ok {
+		return value.(string), nil
+	}
+
+	tarReader := tar.NewReader(imageFile)
+	for {
+		header, err := tarReader.Next()
+		if errors.Is(err, io.EOF) {
+			return "", fmt.Errorf("plugin image archive %s does not contain manifest.json", imagePath)
+		}
+		if err != nil {
+			return "", fmt.Errorf("read plugin image archive %s: %w", imagePath, err)
+		}
+		if path.Clean(header.Name) != "manifest.json" {
+			continue
+		}
+
+		manifest := make([]struct {
+			Config   string   `json:"Config"`
+			RepoTags []string `json:"RepoTags"`
+		}, 0)
+		if err = json.NewDecoder(tarReader).Decode(&manifest); err != nil {
+			return "", fmt.Errorf("decode plugin image manifest %s: %w", imagePath, err)
+		}
+		expectedTag := function.ImageTag(imageName).Name
+		for _, item := range manifest {
+			matched := len(manifest) == 1
+			for _, repoTag := range item.RepoTags {
+				if function.ImageTag(repoTag).Name == expectedTag {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+			digest := strings.TrimSuffix(path.Base(item.Config), ".json")
+			if len(digest) != 64 || !function.IsDockerObjectID(digest) {
+				return "", fmt.Errorf("plugin image archive %s contains invalid config digest %q", imagePath, digest)
+			}
+			imageID := "sha256:" + digest
+			imageArchiveIDCache.Store(cacheKey, imageID)
+			return imageID, nil
+		}
+		return "", fmt.Errorf("plugin image archive %s does not contain image %s", imagePath, imageName)
+	}
 }

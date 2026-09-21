@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/docker/docker/errdefs"
@@ -38,8 +37,6 @@ const (
 	ExplorerMountHost          = "host"
 	ExplorerMountDPanel        = "dpanel"
 )
-
-var explorerSessionLocks sync.Map
 
 type Explorer struct{}
 
@@ -112,15 +109,14 @@ func (self Explorer) Afs(ctx context.Context, mountType, mountName string, docke
 		}
 		mountPointValue := mountType + ":" + mountName
 		key := fmt.Sprintf(storage.CacheKeyExplorerAfs, dockerSdk.Name, plugin.ExplorerName)
-		lockValue, _ := explorerSessionLocks.LoadOrStore(dockerSdk.Name, &sync.Mutex{})
-		lock := lockValue.(*sync.Mutex)
+		lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, plugin.ExplorerName))
 		lock.Lock()
 		defer lock.Unlock()
 		if session, ok := storage.LoadCache[*explorerSession](key); ok && session.mountPoint == mountPointValue {
 			return session.fileSystem, nil
 		}
 
-		pluginOption := plugin.CreateOption{Hash: mountPointValue}
+		pluginOption := plugin.CreateOption{Init: true, Hash: mountPointValue}
 		dockerFsOptions := []dockerfs.Option{
 			dockerfs.WithName(mountName),
 			dockerfs.WithDockerSdk(dockerSdk),

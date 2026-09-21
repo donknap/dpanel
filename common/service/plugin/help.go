@@ -8,6 +8,7 @@ import (
 
 func NewHostExplorer(ctx context.Context, dockerSkd *docker.Client) (*Plugin, error) {
 	explorerPlugin, err := NewPlugin(dockerSkd, ExplorerName, CreateOption{
+		Init:                     true,
 		RandomProxyContainerName: true,
 		MountHostRoot:            true,
 	})

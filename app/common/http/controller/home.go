@@ -13,8 +13,6 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
-	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,7 +31,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/stats"
-	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
@@ -692,12 +689,6 @@ func (self Home) Usage(http *gin.Context) {
 		diskUsage = accessor.DiskUsage{}
 	}
 
-	type portItem struct {
-		Port types2.PortItem `json:"port"`
-		Name string          `json:"name"`
-	}
-	ports := make([]*portItem, 0)
-
 	containerRunningTotal := struct {
 		Stop      int `json:"stop"`
 		Pause     int `json:"pause"`
@@ -732,11 +723,9 @@ func (self Home) Usage(http *gin.Context) {
 			}
 			var containerInfo container.InspectResponse
 			var inspectInfo *container.InspectResponse
-			containerInspectOK := false
 			if info, err := sdk.Client.ContainerInspect(sdk.Ctx, item.ID); err == nil {
 				containerInfo = info
 				inspectInfo = &containerInfo
-				containerInspectOK = true
 			}
 			if !unhealthy && containerLogic.RuntimeStatus(applicationLogic.ContainerRuntimeItem{
 				Summary: item,
@@ -744,47 +733,7 @@ func (self Home) Usage(http *gin.Context) {
 			}).Unhealthy {
 				containerRunningTotal.Unhealthy += 1
 			}
-			usePort := make([]*portItem, 0)
-			if function.IsEmptyArray(item.Ports) {
-				if containerInspectOK && containerInfo.HostConfig != nil && !function.IsEmptyMap(containerInfo.HostConfig.PortBindings) {
-					for port, bindings := range containerInfo.HostConfig.PortBindings {
-						for _, binding := range bindings {
-							hostPort, _ := strconv.Atoi(binding.HostPort)
-							if binding.HostIP == "" {
-								binding.HostIP = "0.0.0.0"
-							}
-							usePort = append(usePort, &portItem{
-								Name: item.Names[0],
-								Port: types2.PortItem{
-									Host:     strconv.Itoa(hostPort),
-									Dest:     strconv.Itoa(port.Int()),
-									HostIp:   binding.HostIP,
-									Protocol: port.Proto(),
-								},
-							})
-						}
-					}
-				}
-			} else {
-				for _, port := range item.Ports {
-					if port.PublicPort == 0 {
-						continue
-					}
-					usePort = append(usePort, &portItem{
-						Name: item.Names[0],
-						Port: types2.PortItem{
-							Host:   strconv.Itoa(int(port.PublicPort)),
-							Dest:   strconv.Itoa(int(port.PrivatePort)),
-							HostIp: port.IP,
-						},
-					})
-				}
-			}
-			ports = append(ports, usePort...)
 		}
-		sort.Slice(ports, func(i, j int) bool {
-			return ports[i].Port.Host < ports[j].Port.Host
-		})
 	}
 
 	networkRow, _ := sdk.Client.NetworkList(sdk.Ctx, network.ListOptions{})
@@ -812,9 +761,7 @@ func (self Home) Usage(http *gin.Context) {
 			"containerRunning": containerRunningTotal,
 			"imageTask":        int(imageTask),
 			"backup":           int(backupData),
-			"port":             len(ports),
 		},
-		"port": ports,
 	})
 }
 

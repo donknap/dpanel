@@ -11,16 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
 	agentTypes "github.com/donknap/dpanel/app/agent/types"
-	commonLogic "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/stats"
 	"github.com/donknap/dpanel/common/service/plugin"
-	"github.com/donknap/dpanel/common/types/define"
 )
 
 func (self Stat) ReadSystemStat(ctx context.Context, dockerSdk *docker.Client) <-chan SystemStatFrame {
@@ -477,15 +474,12 @@ func (self Stat) ReconcileSystemStat(dockerSdk *docker.Client) error {
 	if !dockerSdk.DockerEnv.EnableSystemStat {
 		return nil
 	}
-	containerInfo, err := dockerSdk.Client.ContainerInspect(dockerSdk.Ctx, plugin.MonitorName)
-	if err == nil && containerInfo.State != nil && containerInfo.State.Running &&
-		containerInfo.Config != nil && containerInfo.Config.Labels[define.DPanelLabelContainerName] == plugin.MonitorName {
-		return nil
-	}
-	if err != nil && !errdefs.IsNotFound(err) {
+	monitor, err := plugin.NewPlugin(dockerSdk, plugin.MonitorName, plugin.CreateOption{
+		Init:            true,
+		MountDockerRoot: true,
+	})
+	if err != nil {
 		return err
 	}
-	dockerSdk.DockerEnv.EnableSystemStat = false
-	commonLogic.Env{}.UpdateEnv(dockerSdk.DockerEnv)
-	return nil
+	return monitor.Create()
 }

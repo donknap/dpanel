@@ -26,6 +26,15 @@ var ssrfBlockedPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("100.64.0.0/10"),
 }
 
+func CheckTCP(ctx context.Context, address string) error {
+	connection, err := (&net.Dialer{}).DialContext(ctx, "tcp", address)
+	if err != nil {
+		return err
+	}
+	_ = connection.Close()
+	return nil
+}
+
 // ParseURL parses URLs and registry addresses without a scheme.
 func ParseURL(rawURL string) (*url.URL, error) {
 	rawURL = strings.TrimSpace(rawURL)

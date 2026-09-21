@@ -197,8 +197,9 @@ func (self *monitor) listen(c *client) {
 					if _, _, ok := function.PluckArrayItemWalk(skipActionLog, func(item string) bool {
 						return strings.HasPrefix(string(message.Action), item)
 					}); !ok {
-						message.Actor.Attributes = function.PluckMapWithKeys(message.Actor.Attributes, keepAttribute)
-						slog.Debug("monitor message", "name", c.dockerEnv.Name, "message", message)
+						logMessage := message
+						logMessage.Actor.Attributes = function.PluckMapWithKeys(message.Actor.Attributes, keepAttribute)
+						slog.Debug("monitor message", "name", c.dockerEnv.Name, "message", logMessage)
 					}
 				}
 				self.processor(c.dockerEnv.Name, message)

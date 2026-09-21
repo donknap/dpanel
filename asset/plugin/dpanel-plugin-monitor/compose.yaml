@@ -11,13 +11,16 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - SYS_PTRACE
     environment:
-      DP_AGENT_CAPS: "usage,stat"
+      DP_AGENT_CAPS: "usage,stat,port"
     labels:
       - "com.dpanel.container.title=DPanel-主机资源监控"
       - "com.dpanel.container.auto_remove=false"
       - "com.dpanel.container.hash={{.hash}}"
       - "com.dpanel.container.name=dpanel-plugin-monitor"
+      - "com.dpanel.container.hidden=false"
     volumes:
       - /proc:/mnt_host_proc:ro
       - /sys:/mnt_host_sys:ro

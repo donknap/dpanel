@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"regexp"
@@ -9,8 +10,11 @@ import (
 	"strings"
 
 	"github.com/donknap/dpanel/app/common/logic"
+	archiveservice "github.com/donknap/dpanel/common/service/archive"
 	"github.com/donknap/dpanel/common/service/docker"
 	serviceafs "github.com/donknap/dpanel/common/service/fs/afs"
+	"github.com/donknap/dpanel/common/service/plugin"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
@@ -171,6 +175,45 @@ func (self Explorer) Unzip(http *gin.Context) {
 	fileSystem, err := self.afs(http, params.MountPoint)
 	if err == nil {
 		err = (logic.Explorer{}).UnArchive(fileSystem, params.File, params.Path)
+	}
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
+}
+
+func (self Explorer) Archive(http *gin.Context) {
+	type ParamsValidate struct {
+		MountPoint string                `json:"mountPoint" binding:"required"`
+		FileList   []string              `json:"fileList" binding:"required"`
+		Target     string                `json:"target" binding:"required"`
+		Format     archiveservice.Format `json:"format" binding:"required"`
+		Overwrite  bool                  `json:"overwrite"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	if err := validateExplorerPaths(params.FileList, false); err != nil || !validExplorerPath(params.Target, false) {
+		self.JsonResponseWithError(http, errors.New("invalid archive path"), 500)
+		return
+	}
+	switch params.Format {
+	case archiveservice.FormatZip, archiveservice.FormatTar, archiveservice.FormatTarGz:
+	default:
+		self.JsonResponseWithError(http, archiveservice.ErrUnsupportedFormat, 500)
+		return
+	}
+	for _, source := range params.FileList {
+		if source == params.Target {
+			self.JsonResponseWithError(http, errors.New("archive target cannot be one of its sources"), 500)
+			return
+		}
+	}
+	fileSystem, err := self.afs(http, params.MountPoint)
+	if err == nil {
+		err = (logic.Explorer{}).Archive(fileSystem, params.FileList, params.Target, params.Format, params.Overwrite)
 	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -454,16 +497,17 @@ func (self Explorer) Copy(http *gin.Context) {
 }
 
 func (self Explorer) DestroyProxyContainer(http *gin.Context) {
-	type ParamsValidate struct {
-		MountPoint string `json:"mountPoint" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	dockerSdk, err := docker.NewClientWithUser(http)
 	if err == nil {
-		err = fileSystem.Destroy()
+		var explorerPlugin *plugin.Plugin
+		explorerPlugin, err = plugin.NewPlugin(dockerSdk, plugin.ExplorerName, plugin.CreateOption{Init: false})
+		if err == nil {
+			lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, plugin.ExplorerName))
+			lock.Lock()
+			defer lock.Unlock()
+			storage.Cache.Delete(fmt.Sprintf(storage.CacheKeyExplorerAfs, dockerSdk.Name, plugin.ExplorerName))
+			err = explorerPlugin.Close()
+		}
 	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

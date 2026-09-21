@@ -434,6 +434,7 @@ func (self Env) SystemStat(http *gin.Context) {
 		return
 	}
 	monitor, err := plugin.NewPlugin(dockerSdk, plugin.MonitorName, plugin.CreateOption{
+		Init:            params.Enable,
 		MountDockerRoot: true,
 	})
 	if err != nil {

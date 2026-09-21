@@ -89,8 +89,13 @@ func (self Container) GetList(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	sdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	list := make([]container.Summary, 0)
-	list, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
+	list, err = sdk.ContainerList(sdk.Ctx, container.ListOptions{
 		All:    true,
 		Latest: true,
 	})
@@ -101,7 +106,9 @@ func (self Container) GetList(http *gin.Context) {
 
 	if function.IsEmptyArray(list) {
 		self.JsonResponseWithoutError(http, gin.H{
-			"list": make([]container.Port, 0),
+			"list":       make([]container.Summary, 0),
+			"siteList":   make([]*entity.Site, 0),
+			"domainList": make([]*entity.SiteDomain, 0),
 		})
 		return
 	}
@@ -158,10 +165,10 @@ func (self Container) GetList(http *gin.Context) {
 		return item, false
 	})
 
-	var containerName []string
+	containerName := make([]string, 0)
 	for index, item := range list {
 		containerName = append(containerName, item.Names...)
-		containerInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, item.ID)
+		containerInfo, err := sdk.Client.ContainerInspect(sdk.Ctx, item.ID)
 		var inspectInfo *container.InspectResponse
 		if err == nil {
 			inspectInfo = &containerInfo
@@ -176,20 +183,35 @@ func (self Container) GetList(http *gin.Context) {
 		if status.Message != "" {
 			list[index].Status = status.Message
 		}
-		// 如果是直接绑定到宿主机网络或是 Macvlan，端口号不会显示到容器详情中
-		// 需要通过获取镜像详情数据获取一下
-		if item.HostConfig.NetworkMode == network.NetworkHost {
-			if err == nil && containerInfo.Config != nil && !function.IsEmptyMap(containerInfo.Config.ExposedPorts) {
-				ports := make([]container.Port, 0)
-				for port, _ := range containerInfo.Config.ExposedPorts {
-					ports = append(ports, container.Port{
-						IP:          "0.0.0.0",
-						PublicPort:  uint16(port.Int()),
-						PrivatePort: uint16(port.Int()),
-						Type:        port.Proto(),
-					})
+		if inspectInfo != nil &&
+			containerInfo.State != nil && containerInfo.State.Running &&
+			containerInfo.HostConfig != nil && containerInfo.HostConfig.NetworkMode == network.NetworkHost &&
+			containerInfo.Config != nil {
+			for exposedPort := range containerInfo.Config.ExposedPorts {
+				privatePort := uint16(exposedPort.Int())
+				protocol := exposedPort.Proto()
+				found := false
+				for portIndex := range list[index].Ports {
+					port := &list[index].Ports[portIndex]
+					if port.PrivatePort != privatePort || !strings.EqualFold(port.Type, protocol) {
+						continue
+					}
+					found = true
+					if port.PublicPort == 0 {
+						port.IP = "0.0.0.0"
+						port.PublicPort = privatePort
+					}
 				}
-				list[index].Ports = ports
+				if found {
+					continue
+				}
+				port := container.Port{
+					IP:          "0.0.0.0",
+					PrivatePort: privatePort,
+					PublicPort:  privatePort,
+					Type:        protocol,
+				}
+				list[index].Ports = append(list[index].Ports, port)
 			}
 		}
 		sort.Slice(list[index].Ports, func(i, j int) bool {

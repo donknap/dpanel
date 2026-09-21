@@ -223,10 +223,25 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 }
 
 func (self Docker) Message(e event.DockerMessagePayload) {
+	var eventDockerClient *docker.Client
 	if client, ok := notice.Monitor.Clients()[e.DockerEnvName]; ok {
-		client.ContainerRuntimeCollect(context.Background(), e.Message)
+		eventDockerClient = client
 	} else if docker.Sdk != nil && docker.Sdk.Name == e.DockerEnvName {
-		docker.Sdk.ContainerRuntimeCollect(context.Background(), e.Message)
+		eventDockerClient = docker.Sdk
+	}
+	if eventDockerClient != nil {
+		ctx := context.Background()
+		eventDockerClient.ContainerRuntimeCollect(ctx, e.Message)
+		if containerID := e.Message.Actor.Attributes["container"]; containerID != "" {
+			if runtime, ok := eventDockerClient.ContainerRuntime(ctx, containerID); ok && runtime.ContainerName != "" {
+				attributes := make(map[string]string, len(e.Message.Actor.Attributes)+1)
+				for key, value := range e.Message.Actor.Attributes {
+					attributes[key] = value
+				}
+				attributes["containerName"] = runtime.ContainerName
+				e.Message.Actor.Attributes = attributes
+			}
+		}
 	}
 
 	containerName := e.Message.Actor.Attributes[define.DPanelLabelContainerName]

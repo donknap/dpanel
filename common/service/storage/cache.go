@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 var (
 	CacheKeyExplorerUsername              = "explorer:%s:uid:%d"
 	CacheKeyExplorerAfs                   = "explorer:%s:%s"
+	CacheKeyExplorerAfsLock               = "explorer:lock:%s:%s"
 	CacheKeyCommonUserInfo                = "user:%d"
 	CacheKeyCommonServerStartTime         = "server:startTime"
 	CacheKeyXkStorageInfo                 = "xk:storageInfo"
@@ -27,7 +29,9 @@ var (
 	CacheKeyImageRootFs                   = "image:rootfs:%s"
 	CacheKeyDockerStatus                  = "docker:status:%s"
 	CacheKeyDockerEvents                  = "docker:events"
+	CacheKeyDockerContainerPort           = "docker:container:port:%s:%s"
 	CacheKeyDockerContainerRuntime        = "docker:container:runtime:%s:%s"
+	CacheKeyPluginLifecycleLock           = "plugin:lifecycle:lock:%s:%s"
 	CacheKeyConsoleData                   = "console:data:%s" // 用于脚本存储一些自定义数据
 	CacheKeyDockerEventJob                = "docker:event:%s:%s"
 	CacheKeyRsaKey                        = "rsa:key"
@@ -37,7 +41,8 @@ var (
 )
 
 var (
-	Cache = cache.New(cache.DefaultExpiration, 5*time.Minute)
+	Cache     = cache.New(cache.DefaultExpiration, 5*time.Minute)
+	mutexWait = sync.NewCond(&sync.Mutex{})
 )
 
 func LoadCache[T any](key string) (value T, ok bool) {
@@ -81,9 +86,23 @@ func (self *Mutex) TryLock() bool {
 	return true
 }
 
+func (self *Mutex) Lock() {
+	if self == nil || self.key == "" {
+		panic("storage: invalid cache mutex")
+	}
+	mutexWait.L.Lock()
+	defer mutexWait.L.Unlock()
+	for !self.TryLock() {
+		mutexWait.Wait()
+	}
+}
+
 func (self *Mutex) Unlock() {
+	mutexWait.L.Lock()
+	defer mutexWait.L.Unlock()
 	if self == nil || !self.locked.CompareAndSwap(true, false) {
 		return
 	}
 	Cache.Delete(self.key)
+	mutexWait.Broadcast()
 }
