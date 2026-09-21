@@ -148,10 +148,11 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	}
 	var err error
 	var shell types.HijackedResponse
-	var out container.ExecCreateResponse
+	var execID string
+	var client *ws.Client
 
 	messageType := fmt.Sprintf(ws.MessageTypeConsole, params.Id)
-	client, err := ws.NewClient(http,
+	client, err = ws.NewClient(http,
 		ws.WithMessageRecvHandler(messageType, func(recvMessage *ws.RecvMessage) {
 			var cmd command
 			err = json.Unmarshal(recvMessage.Message, &cmd)
@@ -169,7 +170,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 				}
 			}
 			if cmd.Size.Height > 0 && cmd.Size.Width > 0 {
-				err = docker.Sdk.Client.ContainerExecResize(docker.Sdk.Ctx, out.ID, container.ResizeOptions{
+				err = docker.Sdk.Client.ContainerExecResize(client.CtxContext, execID, container.ResizeOptions{
 					Height: uint(cmd.Size.Height),
 					Width:  uint(cmd.Size.Width),
 				})
@@ -200,7 +201,7 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 		}
 	}()
 
-	out, err = docker.Sdk.Client.ContainerExecCreate(client.CtxContext, containerName, container.ExecOptions{
+	execID, shell, err = docker.Sdk.ContainerExec(client.CtxContext, containerName, container.ExecOptions{
 		Privileged:   true,
 		Tty:          true,
 		AttachStdin:  true,
@@ -217,14 +218,6 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	})
 	if err != nil {
 		_ = notice.Message{}.Error(".consoleError", err.Error())
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	shell, err = docker.Sdk.Client.ContainerExecAttach(client.CtxContext, out.ID, container.ExecStartOptions{
-		Tty: true,
-	})
-
-	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}

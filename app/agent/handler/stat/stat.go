@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -41,6 +42,12 @@ func (*Handler) HandleStream(ctx context.Context, args []string, write func(any)
 	if err != nil {
 		return err
 	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		_, _ = io.Copy(io.Discard, os.Stdin)
+		cancel()
+	}()
 	containerReader := newContainerReader(option.containers)
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()

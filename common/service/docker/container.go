@@ -259,15 +259,16 @@ func (self Client) ContainerExecResult(ctx context.Context, containerName string
 	option.Detach = false
 	option.AttachStdout = true
 	option.AttachStderr = true
-	slog.Info("command", "exec", option.Cmd)
-	execResponse, err := self.Client.ContainerExecCreate(ctx, containerName, option)
+	execID, response, err := self.ContainerExec(ctx, containerName, option)
 	if err != nil {
 		return "", err
 	}
-	response, err := self.Client.ContainerExecAttach(ctx, execResponse.ID, container.ExecStartOptions{})
-	if err != nil {
-		return "", err
-	}
+	defer response.Close()
+	stopClose := context.AfterFunc(ctx, func() {
+		_ = response.CloseWrite()
+		response.Close()
+	})
+	defer stopClose()
 
 	var stdout, stderr bytes.Buffer
 	_, err = stdcopy.StdCopy(&stdout, &stderr, response.Reader)
@@ -275,7 +276,7 @@ func (self Client) ContainerExecResult(ctx context.Context, containerName string
 	if err != nil {
 		return stdout.String(), err
 	}
-	execInspect, err := self.Client.ContainerExecInspect(ctx, execResponse.ID)
+	execInspect, err := self.Client.ContainerExecInspect(ctx, execID)
 	if err != nil {
 		return stdout.String(), err
 	}
@@ -289,19 +290,20 @@ func (self Client) ContainerExecResult(ctx context.Context, containerName string
 	return stdout.String(), nil
 }
 
-// ContainerExec 在容器内执行一条 shell 命令
-func (self Client) ContainerExec(ctx context.Context, containerName string, option container.ExecOptions) (types.HijackedResponse, error) {
+// ContainerExec 在容器内创建并附加命令，调用方必须关闭返回的连接。
+func (self Client) ContainerExec(ctx context.Context, containerName string, option container.ExecOptions) (string, types.HijackedResponse, error) {
 	slog.Info("docker exec", "command", option)
 	exec, err := self.Client.ContainerExecCreate(ctx, containerName, option)
 	if err != nil {
-		return types.HijackedResponse{}, err
+		return "", types.HijackedResponse{}, err
 	}
 	execAttachOption := container.ExecStartOptions{
 		Tty:         option.Tty,
 		ConsoleSize: option.ConsoleSize,
 		Detach:      option.Detach,
 	}
-	return self.Client.ContainerExecAttach(ctx, exec.ID, execAttachOption)
+	response, err := self.Client.ContainerExecAttach(ctx, exec.ID, execAttachOption)
+	return exec.ID, response, err
 }
 
 func (self Client) ContainerLogs(ctx context.Context, containerId string, options container.LogsOptions) (io.ReadCloser, error) {
