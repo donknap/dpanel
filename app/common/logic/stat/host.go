@@ -64,7 +64,8 @@ func streamSystem(ctx context.Context, dockerSdk *docker.Client, handle func(sys
 			command = append(command, "--container-id", fmt.Sprintf("%s:%d", containerInfo.ID, containerInfo.State.Pid))
 		}
 	}
-	execResponse, err := dockerSdk.Client.ContainerExecCreate(ctx, plugin.MonitorName, container.ExecOptions{
+	_, response, err := dockerSdk.ContainerExec(ctx, plugin.MonitorName, container.ExecOptions{
+		AttachStdin:  true,
 		AttachStdout: true,
 		AttachStderr: true,
 		Cmd:          command,
@@ -72,11 +73,12 @@ func streamSystem(ctx context.Context, dockerSdk *docker.Client, handle func(sys
 	if err != nil {
 		return err
 	}
-	response, err := dockerSdk.Client.ContainerExecAttach(ctx, execResponse.ID, container.ExecStartOptions{})
-	if err != nil {
-		return err
-	}
 	defer response.Close()
+	stopClose := context.AfterFunc(ctx, func() {
+		_ = response.CloseWrite()
+		response.Close()
+	})
+	defer stopClose()
 
 	stdoutReader, stdoutWriter := io.Pipe()
 	copyDone := make(chan error, 1)
@@ -85,16 +87,6 @@ func streamSystem(ctx context.Context, dockerSdk *docker.Client, handle func(sys
 		_ = stdoutWriter.CloseWithError(copyErr)
 		copyDone <- copyErr
 	}()
-	stopClose := make(chan struct{})
-	go func() {
-		select {
-		case <-ctx.Done():
-			response.Close()
-		case <-stopClose:
-		}
-	}()
-	defer close(stopClose)
-
 	scanner := bufio.NewScanner(stdoutReader)
 	scanner.Buffer(make([]byte, 64*1024), 64*1024*1024)
 	systemCollector := &agentSystemCollector{}

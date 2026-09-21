@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -221,7 +222,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			return item.Name == "PHP_EXTENSIONS"
 		}); ok {
 			_, _ = progress.Write([]byte("Install PHP_EXTENSIONS " + phpExt.String() + "\n"))
-			out, err := docker.Sdk.ContainerExec(progress.Context(), runCompose.ContainerList[0].Container.ID, container.ExecOptions{
+			_, out, err := docker.Sdk.ContainerExec(progress.Context(), runCompose.ContainerList[0].Container.ID, container.ExecOptions{
 				Privileged:   true,
 				Tty:          false,
 				AttachStdin:  false,
@@ -239,6 +240,10 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			defer func() {
 				out.Close()
 			}()
+			stopClose := context.AfterFunc(progress.Context(), func() {
+				out.Close()
+			})
+			defer stopClose()
 			_, err = io.Copy(progress, out.Reader)
 			if err != nil {
 				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
