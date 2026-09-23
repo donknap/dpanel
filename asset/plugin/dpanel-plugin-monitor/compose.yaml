@@ -5,19 +5,16 @@ services:
     restart: unless-stopped
     privileged: false
     cgroup: host
-    network_mode: none
+    network_mode: host
     read_only: true
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    cap_add:
-      - SYS_PTRACE
     environment:
-      DP_AGENT_CAPS: "usage,stat,port"
+      DP_AGENT_CAPS: "usage,stat,check-port"
     labels:
       - "com.dpanel.container.title=DPanel-主机资源监控"
-      - "com.dpanel.container.auto_remove=false"
       - "com.dpanel.container.hash={{.hash}}"
       - "com.dpanel.container.name=dpanel-plugin-monitor"
       - "com.dpanel.container.hidden=false"
@@ -32,4 +29,3 @@ services:
         amd64: asset/plugin/dpanel-plugin-explorer/image-amd64.tar
         arm64: asset/plugin/dpanel-plugin-explorer/image-arm64.tar
         arm: asset/plugin/dpanel-plugin-explorer/image-arm.tar
-      image_auto_remove: true

@@ -32,6 +32,7 @@ var (
 	CacheKeyDockerContainerPort           = "docker:container:port:%s:%s"
 	CacheKeyDockerContainerRuntime        = "docker:container:runtime:%s:%s"
 	CacheKeyPluginLifecycleLock           = "plugin:lifecycle:lock:%s:%s"
+	CacheKeyPluginImageLock               = "plugin:image:lock:%s:%s"
 	CacheKeyConsoleData                   = "console:data:%s" // 用于脚本存储一些自定义数据
 	CacheKeyDockerEventJob                = "docker:event:%s:%s"
 	CacheKeyRsaKey                        = "rsa:key"

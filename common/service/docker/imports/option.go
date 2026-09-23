@@ -5,8 +5,8 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"errors"
+	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -179,8 +179,7 @@ func WithImportTar(reader *tar.Reader) ImportFileOption {
 				break
 			}
 			if err != nil {
-				slog.Warn("docker import file", "error", err)
-				break
+				return err
 			}
 			header.Name = getTarName(self.targetRootPath, header.Name)
 			err = self.tarWrite.WriteHeader(header)
@@ -232,8 +231,9 @@ func WithImportTarGzFile(tarPath string) ImportFileOption {
 func WithImportFileInTar(reader *tar.Reader, newFileName string, match func(header *tar.Header) bool) ImportFileOption {
 	return func(self *ImportFile) (err error) {
 		if match == nil {
-			return nil
+			return errors.New("tar entry matcher is nil")
 		}
+		matched := false
 		for {
 			header, err := reader.Next()
 			if err == io.EOF {
@@ -243,6 +243,7 @@ func WithImportFileInTar(reader *tar.Reader, newFileName string, match func(head
 				return err
 			}
 			if match(header) {
+				matched = true
 				header.Name = getTarName(self.targetRootPath, newFileName)
 				if err := self.tarWrite.WriteHeader(header); err != nil {
 					return err
@@ -252,6 +253,9 @@ func WithImportFileInTar(reader *tar.Reader, newFileName string, match func(head
 				}
 				break
 			}
+		}
+		if !matched {
+			return fmt.Errorf("file %s not found in tar archive", newFileName)
 		}
 		return nil
 	}

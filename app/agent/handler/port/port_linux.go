@@ -3,202 +3,302 @@
 package port
 
 import (
-	"bufio"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strconv"
+	"sort"
 	"strings"
+	"syscall"
 
 	agentTypes "github.com/donknap/dpanel/app/agent/types"
+	"golang.org/x/sys/unix"
 )
 
 const (
-	hostProcPath   = "/mnt_host_proc"
-	hostCgroupPath = "/mnt_host_sys/fs/cgroup"
+	hostCgroupPath       = "/mnt_host_sys/fs/cgroup"
+	inetDiagRequestSize  = 56
+	inetDiagResponseSize = 72
+	inetDiagCgroupID     = 21
+	rtAttrHeaderSize     = 4
+	tcpListenState       = 10
 )
 
-func readPorts(ctx context.Context, target containerTarget) ([]agentTypes.Port, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	pids, err := targetPIDs(target)
-	if err != nil {
-		return nil, fmt.Errorf("locate container %s processes: %w", target.id, err)
-	}
-	ports := make(map[string]agentTypes.Port)
-	for _, pid := range pids {
-		if err = readProcessPorts(pid, ports); err != nil {
-			return nil, fmt.Errorf("read container %s process %d sockets: %w", target.id, pid, err)
-		}
-	}
-	result := make([]agentTypes.Port, 0, len(ports))
-	for _, item := range ports {
-		result = append(result, item)
-	}
-	return result, nil
+type socketInfo struct {
+	cgroupID       uint64
+	port           uint16
+	protocol       string
+	containerIndex int
 }
 
-func targetPIDs(target containerTarget) ([]int, error) {
-	data, err := os.ReadFile(filepath.Join(hostProcPath, strconv.Itoa(target.pid), "cgroup"))
+func discoverPorts(ctx context.Context, result []agentTypes.PortCheckResult) error {
+	targets := make([]int, 0, len(result))
+	for index := range result {
+		if len(result[index].Ports) == 0 {
+			targets = append(targets, index)
+		}
+	}
+	if len(targets) == 0 {
+		return nil
+	}
+
+	if _, err := os.Stat(filepath.Join(hostCgroupPath, "cgroup.controllers")); err != nil {
+		if os.IsNotExist(err) {
+			setUnsupported(result, targets)
+			return nil
+		}
+		return fmt.Errorf("inspect host cgroup: %w", err)
+	}
+
+	sockets, cgroupAttributeSeen, err := readHostSockets(ctx)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("query host sockets: %w", err)
 	}
-	legacy := make([]struct{ controllers, path string }, 0)
-	unified := ""
-	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
-		fields := strings.SplitN(line, ":", 3)
-		if len(fields) != 3 || !filepath.IsAbs(fields[2]) || filepath.Clean(fields[2]) != fields[2] {
-			return nil, fmt.Errorf("invalid cgroup entry %q", line)
+	if len(sockets) > 0 && !cgroupAttributeSeen {
+		setUnsupported(result, targets)
+		return nil
+	}
+	sort.Slice(sockets, func(i, j int) bool {
+		if sockets[i].protocol != sockets[j].protocol {
+			return sockets[i].protocol < sockets[j].protocol
 		}
-		if fields[2] == "/" {
-			return nil, errors.New("refusing to scan the host cgroup")
+		if sockets[i].port != sockets[j].port {
+			return sockets[i].port < sockets[j].port
 		}
-		if fields[1] == "" {
-			unified = fields[2]
-		} else {
-			legacy = append(legacy, struct{ controllers, path string }{fields[1], fields[2]})
-		}
-	}
-	directory := ""
-	if unified != "" {
-		directory = filepath.Join(hostCgroupPath, unified)
-	} else {
-		directory = legacyCgroupDirectory(legacy)
-	}
-	if directory == "" {
-		return nil, errors.New("container cgroup directory was not found")
-	}
-	pids := make(map[int]struct{})
-	err = filepath.WalkDir(directory, func(path string, entry fs.DirEntry, walkErr error) error {
+		return sockets[i].cgroupID < sockets[j].cgroupID
+	})
+
+	supported := make([]bool, len(result))
+	err = filepath.WalkDir(hostCgroupPath, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.IsDir() || entry.Name() != "cgroup.procs" {
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+		if !entry.IsDir() {
 			return nil
 		}
-		value, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return readErr
+
+		containerIndex := -1
+		for _, targetIndex := range targets {
+			if containsContainerID(path, result[targetIndex].ContainerID) {
+				containerIndex = targetIndex
+				break
+			}
 		}
-		for _, field := range strings.Fields(string(value)) {
-			pid, parseErr := strconv.Atoi(field)
-			if parseErr != nil || pid < 0 || pid == 1 {
-				return fmt.Errorf("invalid pid %q in %s", field, path)
+		if containerIndex == -1 {
+			return nil
+		}
+
+		handle, _, handleErr := unix.NameToHandleAt(unix.AT_FDCWD, path, 0)
+		if errors.Is(handleErr, unix.ENOSYS) || errors.Is(handleErr, unix.EOPNOTSUPP) {
+			setUnsupported(result, targets)
+			return fs.SkipAll
+		}
+		if handleErr != nil {
+			return fmt.Errorf("read cgroup handle %s: %w", path, handleErr)
+		}
+		if len(handle.Bytes()) != 8 {
+			return fmt.Errorf("cgroup handle %s has unexpected size %d", path, len(handle.Bytes()))
+		}
+
+		supported[containerIndex] = true
+		cgroupID := binary.NativeEndian.Uint64(handle.Bytes())
+		for index := range sockets {
+			if sockets[index].cgroupID == cgroupID {
+				sockets[index].containerIndex = containerIndex
 			}
-			if pid == 0 {
-				continue
-			}
-			pids[pid] = struct{}{}
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("resolve container cgroups: %w", err)
 	}
-	if _, exists := pids[target.pid]; !exists {
-		return nil, errors.New("target pid is no longer in its cgroup")
-	}
-	result := make([]int, 0, len(pids))
-	for pid := range pids {
-		result = append(result, pid)
-	}
-	return result, nil
-}
-
-func legacyCgroupDirectory(entries []struct{ controllers, path string }) string {
-	preferred := []string{"pids", "memory", "cpuacct", "cpu"}
-	for _, controller := range preferred {
-		for _, entry := range entries {
-			if !containsController(entry.controllers, controller) {
-				continue
-			}
-			for _, mount := range []string{controller, entry.controllers} {
-				directory := filepath.Join(hostCgroupPath, mount, entry.path)
-				if info, err := os.Stat(directory); err == nil && info.IsDir() {
-					return directory
-				}
-			}
-		}
-	}
-	return ""
-}
-
-func containsController(value, target string) bool {
-	for _, item := range strings.Split(value, ",") {
-		if item == target {
-			return true
-		}
-	}
-	return false
-}
-
-func readProcessPorts(pid int, result map[string]agentTypes.Port) error {
-	fds, err := os.ReadDir(filepath.Join(hostProcPath, strconv.Itoa(pid), "fd"))
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	inodes := make(map[string]struct{})
-	for _, fd := range fds {
-		target, readErr := os.Readlink(filepath.Join(hostProcPath, strconv.Itoa(pid), "fd", fd.Name()))
-		if os.IsNotExist(readErr) {
+	for _, socket := range sockets {
+		if socket.containerIndex == -1 || !supported[socket.containerIndex] {
 			continue
 		}
-		if readErr != nil {
-			return readErr
+		value := fmt.Sprintf("%d/%s", socket.port, socket.protocol)
+		found := false
+		for _, item := range result[socket.containerIndex].Ports {
+			if item.Port == value {
+				found = true
+				break
+			}
 		}
-		if strings.HasPrefix(target, "socket:[") && strings.HasSuffix(target, "]") {
-			inodes[strings.TrimSuffix(strings.TrimPrefix(target, "socket:["), "]")] = struct{}{}
+		if !found {
+			result[socket.containerIndex].Ports = append(
+				result[socket.containerIndex].Ports,
+				agentTypes.PortCheckItem{Port: value},
+			)
 		}
 	}
-	if len(inodes) == 0 {
-		return nil
-	}
-	for _, table := range []string{"tcp", "tcp6"} {
-		if err = readSocketTable(filepath.Join(hostProcPath, strconv.Itoa(pid), "net", table), inodes, result); err != nil {
-			return err
+	for _, targetIndex := range targets {
+		if len(result[targetIndex].Ports) != 0 {
+			continue
 		}
+		status := portCheckNone
+		if !supported[targetIndex] {
+			status = portCheckUnsupported
+		}
+		result[targetIndex].Ports = append(result[targetIndex].Ports, agentTypes.PortCheckItem{
+			Port:   "0",
+			Status: status,
+		})
 	}
 	return nil
 }
 
-func readSocketTable(name string, inodes map[string]struct{}, result map[string]agentTypes.Port) error {
-	file, err := os.Open(name)
-	if os.IsNotExist(err) {
-		return nil
+func setUnsupported(result []agentTypes.PortCheckResult, targets []int) {
+	for _, index := range targets {
+		result[index].Ports = append(result[index].Ports, agentTypes.PortCheckItem{
+			Port:   "0",
+			Status: portCheckUnsupported,
+		})
 	}
+}
+
+func containsContainerID(cgroup, containerID string) bool {
+	for offset := 0; offset < len(cgroup); {
+		index := strings.Index(cgroup[offset:], containerID)
+		if index == -1 {
+			return false
+		}
+		index += offset
+		beforeValid := index == 0 || !isLowerHex(cgroup[index-1])
+		after := index + len(containerID)
+		afterValid := after == len(cgroup) || !isLowerHex(cgroup[after])
+		if beforeValid && afterValid {
+			return true
+		}
+		offset = index + 1
+	}
+	return false
+}
+
+func isLowerHex(value byte) bool {
+	return value >= '0' && value <= '9' || value >= 'a' && value <= 'f'
+}
+
+func readHostSockets(ctx context.Context) ([]socketInfo, bool, error) {
+	fd, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, unix.NETLINK_SOCK_DIAG)
 	if err != nil {
-		return err
+		return nil, false, err
 	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 10 || fields[0] == "sl" || fields[3] != "0A" {
-			continue
-		}
-		if _, exists := inodes[fields[9]]; !exists {
-			continue
-		}
-		_, rawPort, found := strings.Cut(fields[1], ":")
-		if !found {
-			return fmt.Errorf("invalid local address %q", fields[1])
-		}
-		port, parseErr := strconv.ParseUint(rawPort, 16, 16)
-		if parseErr != nil {
-			return fmt.Errorf("parse local port %q: %w", rawPort, parseErr)
-		}
-		if port == 0 {
-			continue
-		}
-		key := fmt.Sprintf("tcp:%d", port)
-		result[key] = agentTypes.Port{Port: uint16(port), Protocol: "tcp"}
+	defer unix.Close(fd)
+	if err = unix.Bind(fd, &unix.SockaddrNetlink{Family: unix.AF_NETLINK}); err != nil {
+		return nil, false, err
 	}
-	return scanner.Err()
+
+	result := make([]socketInfo, 0)
+	cgroupAttributeSeen := false
+	sequence := uint32(0)
+	for _, protocol := range []struct {
+		family   uint8
+		protocol uint8
+		states   uint32
+		name     string
+	}{
+		{family: unix.AF_INET, protocol: unix.IPPROTO_TCP, states: 1 << tcpListenState, name: "tcp4"},
+		{family: unix.AF_INET6, protocol: unix.IPPROTO_TCP, states: 1 << tcpListenState, name: "tcp6"},
+		{family: unix.AF_INET, protocol: unix.IPPROTO_UDP, states: ^uint32(0), name: "udp4"},
+		{family: unix.AF_INET6, protocol: unix.IPPROTO_UDP, states: ^uint32(0), name: "udp6"},
+	} {
+		if err = ctx.Err(); err != nil {
+			return nil, false, err
+		}
+		sequence++
+		request := make([]byte, unix.NLMSG_HDRLEN+inetDiagRequestSize)
+		binary.NativeEndian.PutUint32(request[0:4], uint32(len(request)))
+		binary.NativeEndian.PutUint16(request[4:6], unix.SOCK_DIAG_BY_FAMILY)
+		binary.NativeEndian.PutUint16(request[6:8], unix.NLM_F_REQUEST|unix.NLM_F_DUMP)
+		binary.NativeEndian.PutUint32(request[8:12], sequence)
+		request[unix.NLMSG_HDRLEN] = protocol.family
+		request[unix.NLMSG_HDRLEN+1] = protocol.protocol
+		binary.NativeEndian.PutUint32(request[unix.NLMSG_HDRLEN+4:unix.NLMSG_HDRLEN+8], protocol.states)
+		if err = unix.Sendto(fd, request, 0, &unix.SockaddrNetlink{Family: unix.AF_NETLINK}); err != nil {
+			return nil, false, err
+		}
+
+		complete := false
+		for !complete {
+			buffer := make([]byte, 64*1024)
+			length, _, receiveErr := unix.Recvfrom(fd, buffer, 0)
+			if receiveErr != nil {
+				return nil, false, receiveErr
+			}
+			messages, parseErr := syscall.ParseNetlinkMessage(buffer[:length])
+			if parseErr != nil {
+				return nil, false, parseErr
+			}
+			for _, message := range messages {
+				if message.Header.Seq != sequence {
+					continue
+				}
+				switch message.Header.Type {
+				case unix.NLMSG_DONE:
+					complete = true
+				case unix.NLMSG_ERROR:
+					if len(message.Data) < 4 {
+						return nil, false, errors.New("short netlink error response")
+					}
+					errno := int32(binary.NativeEndian.Uint32(message.Data[:4]))
+					if errno != 0 {
+						return nil, false, syscall.Errno(-errno)
+					}
+				case unix.SOCK_DIAG_BY_FAMILY:
+					if len(message.Data) < inetDiagResponseSize {
+						return nil, false, errors.New("short socket diagnostic response")
+					}
+					cgroupID, found, parseErr := parseCgroupID(message.Data[inetDiagResponseSize:])
+					if parseErr != nil {
+						return nil, false, parseErr
+					}
+					cgroupAttributeSeen = cgroupAttributeSeen || found
+					port := binary.BigEndian.Uint16(message.Data[4:6])
+					if port == 0 ||
+						protocol.protocol == unix.IPPROTO_TCP && message.Data[1] != tcpListenState ||
+						protocol.protocol == unix.IPPROTO_UDP && binary.BigEndian.Uint16(message.Data[6:8]) != 0 {
+						continue
+					}
+					result = append(result, socketInfo{
+						cgroupID:       cgroupID,
+						port:           port,
+						protocol:       protocol.name,
+						containerIndex: -1,
+					})
+				}
+			}
+		}
+	}
+	return result, cgroupAttributeSeen, nil
+}
+
+func parseCgroupID(attributes []byte) (uint64, bool, error) {
+	for len(attributes) > 0 {
+		if len(attributes) < rtAttrHeaderSize {
+			return 0, false, errors.New("short socket diagnostic attribute")
+		}
+		length := int(binary.NativeEndian.Uint16(attributes[0:2]))
+		if length < rtAttrHeaderSize || length > len(attributes) {
+			return 0, false, errors.New("invalid socket diagnostic attribute length")
+		}
+		attributeType := binary.NativeEndian.Uint16(attributes[2:4]) & 0x3fff
+		if attributeType == inetDiagCgroupID {
+			if length < rtAttrHeaderSize+8 {
+				return 0, false, errors.New("short socket cgroup id attribute")
+			}
+			return binary.NativeEndian.Uint64(attributes[rtAttrHeaderSize : rtAttrHeaderSize+8]), true, nil
+		}
+		alignedLength := (length + 3) &^ 3
+		if alignedLength > len(attributes) {
+			return 0, false, errors.New("invalid aligned socket diagnostic attribute length")
+		}
+		attributes = attributes[alignedLength:]
+	}
+	return 0, false, nil
 }

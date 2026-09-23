@@ -598,9 +598,12 @@ func (self Home) Usage(http *gin.Context) {
 	}
 	// 有些设备的docker获取磁盘占用比较耗时，跑一下后台协程去获取数据
 	go func() {
-		progress, err := ws.NewFdProgressPip(http, ws.MessageTypeDiskUsage)
+		progress, owner, err := ws.NewFdProgressPip(http, sdk.Name, ws.MessageTypeDiskUsage)
 		if err != nil {
 			slog.Warn("create disk usage progress", "dockerEnvName", sdk.Name, "error", err)
+			return
+		}
+		if !owner {
 			return
 		}
 		defer progress.Close()
@@ -780,12 +783,13 @@ func (self Home) GetStatList(http *gin.Context) {
 	var progress *ws.ProgressPip
 	var progressDone <-chan struct{}
 	if params.Follow {
-		progress, err = ws.NewFdProgressPip(http, ws.MessageTypeContainerAllStat)
+		var owner bool
+		progress, owner, err = ws.NewFdProgressPip(http, sdk.Name, ws.MessageTypeContainerAllStat)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		if progress.IsShadow() {
+		if !owner {
 			self.JsonResponseWithoutError(http, runtimeStat{
 				DockerEnvName: sdk.Name,
 				Docker:        make([]*stats.Usage, 0),
@@ -804,6 +808,7 @@ func (self Home) GetStatList(http *gin.Context) {
 	dockerData := (statLogic.Stat{}).ReadDockerStat(readerCtx, sdk)
 
 	var systemData <-chan statLogic.SystemStatFrame
+	var systemRetry <-chan time.Time
 	if sdk.DockerEnv.EnableSystemStat {
 		systemData = (statLogic.Stat{}).ReadSystemStat(readerCtx, sdk)
 	}
@@ -831,9 +836,19 @@ func (self Home) GetStatList(http *gin.Context) {
 		case value, ok := <-systemData:
 			if !ok {
 				systemData = nil
+				latestSystem = nil
+				if params.Follow {
+					systemRetry = time.After(3 * time.Second)
+				}
 				continue
 			}
 			latestSystem = &value
+		case <-systemRetry:
+			systemRetry = nil
+			if progress.Context().Err() != nil {
+				return
+			}
+			systemData = (statLogic.Stat{}).ReadSystemStat(readerCtx, sdk)
 		case <-ticker.C:
 			result := runtimeStat{
 				DockerEnvName: sdk.Name,
@@ -920,6 +935,7 @@ func (self Home) Reset(http *gin.Context) {
 			storage.CacheKeyContainerUpgradeLogs,
 			storage.CacheKeyImageRootFs,
 			storage.CacheKeyDockerEvents,
+			storage.CacheKeyDockerContainerPort,
 			storage.CacheKeyDockerContainerRuntime,
 			storage.CacheKeyAttach,
 			storage.CacheKeyAsset,

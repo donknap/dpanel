@@ -3,7 +3,7 @@ package hostfs
 import (
 	"errors"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/sftp"
@@ -21,18 +21,25 @@ func WithName(name string) Option {
 
 func WithRoot(root string) Option {
 	return func(fileSystem *Fs) error {
-		if root == "" || strings.IndexByte(root, 0) >= 0 || !path.IsAbs(root) || path.Clean(root) != root {
+		if root == "" || strings.IndexByte(root, 0) >= 0 || (root != "/" && (!filepath.IsAbs(root) || filepath.Clean(root) != root)) {
 			return errors.New("invalid filesystem root")
+		}
+		if len(fileSystem.roots) != 0 || fileSystem.remoteFs != nil {
+			return errors.New("filesystem backend is already configured")
+		}
+		if root == "/" {
+			roots, err := openSystemRoots()
+			if err != nil {
+				return err
+			}
+			fileSystem.roots = roots
+			return nil
 		}
 		localRoot, err := os.OpenRoot(root)
 		if err != nil {
 			return err
 		}
-		if fileSystem.root != nil || fileSystem.remoteFs != nil {
-			_ = localRoot.Close()
-			return errors.New("filesystem backend is already configured")
-		}
-		fileSystem.root = localRoot
+		fileSystem.roots = map[string]*os.Root{"/": localRoot}
 		return nil
 	}
 }
@@ -42,7 +49,7 @@ func WithSftpClient(client *sftp.Client) Option {
 		if client == nil {
 			return errors.New("invalid sftp client")
 		}
-		if fileSystem.root != nil || fileSystem.remoteFs != nil {
+		if len(fileSystem.roots) != 0 || fileSystem.remoteFs != nil {
 			return errors.New("filesystem backend is already configured")
 		}
 		fileSystem.sftpClient = client

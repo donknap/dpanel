@@ -30,8 +30,11 @@ func (self *reader) Info() (*Info, error) {
 	info := &Info{}
 	for {
 		header, err := tarReader.Next()
-		if err != nil {
+		if err == io.EOF {
 			break
+		}
+		if err != nil {
+			return nil, err
 		}
 		headerName := strings.TrimLeft(header.Name, "/")
 		if strings.HasSuffix(headerName, "info.json") {
@@ -59,8 +62,11 @@ func (self *reader) Manifest() ([]Manifest, error) {
 	m := make([]Manifest, 0)
 	for {
 		header, err := tarReader.Next()
-		if err != nil {
+		if err == io.EOF {
 			break
+		}
+		if err != nil {
+			return nil, err
 		}
 		if strings.HasSuffix(header.Name, "manifest.json") {
 			content, err := io.ReadAll(tarReader)

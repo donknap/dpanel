@@ -183,37 +183,6 @@ func (self Container) GetList(http *gin.Context) {
 		if status.Message != "" {
 			list[index].Status = status.Message
 		}
-		if inspectInfo != nil &&
-			containerInfo.State != nil && containerInfo.State.Running &&
-			containerInfo.HostConfig != nil && containerInfo.HostConfig.NetworkMode == network.NetworkHost &&
-			containerInfo.Config != nil {
-			for exposedPort := range containerInfo.Config.ExposedPorts {
-				privatePort := uint16(exposedPort.Int())
-				protocol := exposedPort.Proto()
-				found := false
-				for portIndex := range list[index].Ports {
-					port := &list[index].Ports[portIndex]
-					if port.PrivatePort != privatePort || !strings.EqualFold(port.Type, protocol) {
-						continue
-					}
-					found = true
-					if port.PublicPort == 0 {
-						port.IP = "0.0.0.0"
-						port.PublicPort = privatePort
-					}
-				}
-				if found {
-					continue
-				}
-				port := container.Port{
-					IP:          "0.0.0.0",
-					PrivatePort: privatePort,
-					PublicPort:  privatePort,
-					Type:        protocol,
-				}
-				list[index].Ports = append(list[index].Ports, port)
-			}
-		}
 		sort.Slice(list[index].Ports, func(i, j int) bool {
 			left, right := list[index].Ports[i], list[index].Ports[j]
 			if left.PublicPort != right.PublicPort {

@@ -53,18 +53,21 @@ func (self RunLog) Run(http *gin.Context) {
 		return
 	}
 
-	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerLog, params.Id))
+	progress, owner, err := ws.NewFdProgressPip(http, docker.Sdk.Name, fmt.Sprintf(ws.MessageTypeContainerLog, params.Id))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	slog.Debug("container run log progress", "detail", progress.String())
-	if progress.IsShadow() {
+	if !owner {
 		option.Follow = false
 	}
 
 	response, err := docker.Sdk.ContainerLogs(docker.Sdk.Ctx, params.Id, option)
 	if err != nil {
+		if owner {
+			progress.Close()
+		}
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}

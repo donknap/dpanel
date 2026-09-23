@@ -45,7 +45,6 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			// 容器相关
 			cors.POST("/app/container/status", controller.Container{}.Status)
 			cors.POST("/app/container/get-list", controller.Container{}.GetList)
-			cors.POST("/app/container/find-port", controller.Container{}.FindPort)
 			cors.POST("/app/container/check-port", controller.Container{}.CheckPort)
 			cors.POST("/app/container/get-detail", controller.Container{}.GetDetail)
 			cors.POST("/app/container/update", controller.Container{}.Update)

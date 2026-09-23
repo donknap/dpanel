@@ -28,6 +28,7 @@ const (
 	ErrorMessageContainerExplorerContentUnsupportedType     = ".containerExplorerContentUnsupportedType"
 	ErrorMessageContainerCronExpressionInCorrect            = ".containerCronExpressionInCorrect"
 	ErrorMessageContainerCronTaskEmpty                      = ".containerCronTaskEmpty"
+	ErrorMessageContainerPortRequiresSystemStat             = ".containerPortRequiresSystemStat"
 	ErrorMessageContainerBackupImportFileFailed             = ".containerBackupImportFileFailed"
 	ErrorMessageContainerBackupImportFileInCorrect          = ".containerBackupImportFileInCorrect"
 	ErrorMessageContainerBackupRestoreImportImageFailed     = ".containerBackupRestoreImportImageFailed"

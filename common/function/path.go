@@ -11,8 +11,8 @@ import (
 	"github.com/compose-spec/compose-go/v2/paths"
 )
 
-// PathConvertWinPath2Unix 转换 windows 路径 c:\\my\\path\\shiny 为 /c/my/path/shiny
-func PathConvertWinPath2Unix(p string) (string, bool) {
+// WindowsPathToSlash converts a Windows drive path such as c:\my\path to /c/my/path.
+func WindowsPathToSlash(p string) (string, bool) {
 	if !paths.IsWindowsAbs(p) {
 		return p, false
 	}
@@ -28,28 +28,21 @@ func PathConvertWinPath2Unix(p string) (string, bool) {
 	return path.Clean(convertedSource), true
 }
 
-// SystemPathFromSlash 传入类 linux 风格路径，返回当前系统可用路径。
-func SystemPathFromSlash(p string) string {
+// SlashPathToSystem converts a slash path to a path usable by the current system.
+func SlashPathToSystem(p string) string {
 	if p == "" {
 		return "."
 	}
-	if len(p) < 2 {
-		return filepath.Clean(p)
-	}
 	p = filepath.ToSlash(p)
-	if runtime.GOOS == "windows" && p[0] == '/' {
-		// 无论 /d/abc 还是 /d，统一处理
-		// 核心逻辑：取第2位作为盘符，拼接冒号，再接剩下的部分
+	if runtime.GOOS == "windows" && len(p) >= 2 && p[0] == '/' &&
+		((p[1] >= 'a' && p[1] <= 'z') || (p[1] >= 'A' && p[1] <= 'Z')) {
 		if len(p) == 2 {
 			p = string(p[1]) + ":/"
-		} else if p[2] == '/' {
+		} else if len(p) > 2 && p[2] == '/' {
 			p = string(p[1]) + ":" + p[2:]
 		}
-		// Windows 没办法清除路径
-		return p
-	} else {
-		return PathClean(filepath.FromSlash(p))
 	}
+	return filepath.Clean(filepath.FromSlash(p))
 }
 
 func PathClean(p string) string {

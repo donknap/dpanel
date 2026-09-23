@@ -7,22 +7,18 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/app/application/logic"
-	commonLogic "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -104,38 +100,12 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
 
-	// 如果是远程连接，尝试将本地的 compose 目录数据同步到端
+	// 远程部署前同步面板数据目录内的当前 Compose 项目。
 	if function.InArray([]string{
 		define.DockerRemoteTypeSSH,
 		define.DockerRemoteTypeTcp,
 	}, docker.Sdk.DockerEnv.RemoteType) {
-		_, err := (commonLogic.Explorer{}).Afs(
-			http,
-			commonLogic.ExplorerMountTypeContainer,
-			plugin.ExplorerName,
-			docker.Sdk,
-		)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		rel, err := filepath.Rel(storage.Local{}.GetStorageLocalPath(), tasker.Project.WorkingDir)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		importRootPath := path.Join("/dpanel", filepath.ToSlash(rel))
-		slog.Debug("compose container sync path", "path", importRootPath)
-
-		importFileList, err := imports.NewFileImport(importRootPath, imports.WithImportPath(tasker.Project.WorkingDir))
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer func() {
-			importFileList.Close()
-		}()
-		err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, plugin.ExplorerName, "/", importFileList.Reader())
+		err = (logic.Compose{}).SyncProjectToRemote(http, docker.Sdk, tasker.Project.WorkingDir)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -422,13 +392,16 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		http.Data(200, "text/plain", buffer)
 		return
 	}
-	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeComposeLog, params.Id))
+	progress, owner, err := ws.NewFdProgressPip(http, docker.Sdk.Name, fmt.Sprintf(ws.MessageTypeComposeLog, params.Id))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	response, err := tasker.Logs(params.LineTotal, params.ShowTime, !progress.IsShadow())
+	response, err := tasker.Logs(params.LineTotal, params.ShowTime, owner)
 	if err != nil {
+		if owner {
+			progress.Close()
+		}
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}

@@ -17,6 +17,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -26,6 +27,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/backup"
 	"github.com/donknap/dpanel/common/service/docker/imports"
+	"github.com/donknap/dpanel/common/service/fs/dockerfs"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -266,7 +268,11 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	var err error
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	backupRow, err := dao.Backup.Where(dao.Backup.ID.Eq(params.Id)).First()
 	if err != nil {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
@@ -308,6 +314,26 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 	})
 
 	var hostExplorer *plugin.Plugin
+	var hostExplorerFs *dockerfs.Fs
+	getHostExplorerFs := func() (*dockerfs.Fs, error) {
+		if hostExplorerFs != nil {
+			return hostExplorerFs, nil
+		}
+		if hostExplorer == nil {
+			var err error
+			hostExplorer, err = plugin.NewHostExplorer(dockerSdk)
+			if err != nil {
+				return nil, err
+			}
+		}
+		var err error
+		hostExplorerFs, err = dockerfs.New(
+			dockerfs.WithDockerSdk(dockerSdk),
+			dockerfs.WithProxyContainer(hostExplorer.ContainerName()),
+			dockerfs.WithRoot(plugin.HostExplorerMountPath),
+		)
+		return hostExplorerFs, err
+	}
 	defer func() {
 		if hostExplorer != nil {
 			_ = hostExplorer.Close()
@@ -326,43 +352,101 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			self.JsonResponseWithError(http, errors.Join(errors.New("failed to parse container configuration"), err), 500)
 			return
 		}
+		// 兼容旧的数据
+		if !function.IsEmptyArray(item.Volume) && function.IsEmptyArray(item.VolumeList) {
+			item.VolumeList = function.PluckArrayWalk(item.Volume, func(volume string) (backup.ManifestVolumeInfo, bool) {
+				mount, _, ok := function.PluckArrayItemWalk(containerInfo.Mounts, func(item container.MountPoint) bool {
+					return strings.HasSuffix(function.Sha256([]byte(item.Destination)), path.Base(volume))
+				})
+				if !ok {
+					return backup.ManifestVolumeInfo{}, false
+				}
+				return backup.ManifestVolumeInfo{
+					Destination: mount.Destination,
+					Source:      mount.Source,
+					SavePath:    volume,
+					Mode:        os.ModeDir,
+				}, true
+			})
+		}
+		bindMountList := make(map[string]container.MountPoint)
+		for _, item := range containerInfo.Mounts {
+			if item.Type == mount.TypeBind {
+				bindMountList[item.Destination] = item
+			}
+		}
 		progressCurrent++
 		progress.BroadcastMessage(containerBackupProgress{
 			Steps:   progressSteps,
 			Current: progressCurrent,
 			Total:   len(progressSteps),
 		})
-		if _, err = docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, containerInfo.Config.Image); err != nil {
+		if _, err = dockerSdk.Client.ImageInspect(dockerSdk.Ctx, containerInfo.Config.Image); err != nil {
 			if item.Image != "" {
 				imageOut, err := b.Reader.ReadBlobs(item.Image)
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return
 				}
-				imageLoadResponse, err := docker.Sdk.Client.ImageLoad(docker.Sdk.Ctx, imageOut)
+				imageLoadResponse, err := dockerSdk.Client.ImageLoad(dockerSdk.Ctx, imageOut)
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return
 				}
 				_, err = io.Copy(io.Discard, imageLoadResponse.Body)
+				closeErr := imageLoadResponse.Body.Close()
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return
 				}
-				if _, err = docker.Sdk.Client.ImageInspect(docker.Sdk.Ctx, containerInfo.Config.Image); err != nil {
+				if closeErr != nil {
+					self.JsonResponseWithError(http, closeErr, 500)
+					return
+				}
+				if _, err = dockerSdk.Client.ImageInspect(dockerSdk.Ctx, containerInfo.Config.Image); err != nil {
 					self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageContainerBackupRestoreImportImageFailed), 500)
 					return
 				}
 			} else {
 				imageNameDetail := function.ImageTag(containerInfo.Config.Image)
 				registryConfig := logic.Image{}.GetRegistryConfig(imageNameDetail.Registry)
-				_, err = docker.Sdk.ImagePull(docker.Sdk.Ctx, containerInfo.Config.Image, docker.ImagePullOption{
+				_, err = dockerSdk.ImagePull(dockerSdk.Ctx, containerInfo.Config.Image, docker.ImagePullOption{
 					Registry: *registryConfig,
 				})
 				if err != nil {
 					self.JsonResponseWithError(http, err, 500)
 					return
 				}
+			}
+		}
+
+		for _, volume := range item.VolumeList {
+			bindMount, ok := bindMountList[volume.Destination]
+			if !ok {
+				continue
+			}
+			if !volume.Mode.IsDir() && !volume.Mode.IsRegular() {
+				continue
+			}
+			hostFs, err := getHostExplorerFs()
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			if volume.Mode.IsDir() {
+				err = hostFs.MkdirAll(bindMount.Source, 0o755)
+			} else if volume.Mode.IsRegular() {
+				if err = hostFs.MkdirAll(path.Dir(bindMount.Source), 0o755); err == nil {
+					var file io.Closer
+					file, err = hostFs.OpenFile(bindMount.Source, os.O_WRONLY|os.O_CREATE, 0o644)
+					if err == nil {
+						err = file.Close()
+					}
+				}
+			}
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
 			}
 		}
 
@@ -376,7 +460,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			Current: progressCurrent,
 			Total:   len(progressSteps),
 		})
-		if _, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, newContainerName); err != nil {
+		if _, err := dockerSdk.Client.ContainerInspect(dockerSdk.Ctx, newContainerName); err != nil {
 			if !function.IsEmptyArray(item.Network) {
 				for _, s := range item.Network {
 					networkConfigContent, err := b.Reader.ReadBlobsContent(s)
@@ -390,7 +474,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 						self.JsonResponseWithError(http, err, 500)
 						return
 					}
-					if _, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, networkInfo.Name, network.InspectOptions{}); err != nil {
+					if _, err := dockerSdk.Client.NetworkInspect(dockerSdk.Ctx, networkInfo.Name, network.InspectOptions{}); err != nil {
 						networkCreate = append(networkCreate, networkInfo)
 						if networkInfo.IPAM.Config != nil {
 							for i, ipamConfig := range networkInfo.IPAM.Config {
@@ -414,7 +498,7 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 								}
 							}
 						}
-						_, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, networkInfo.Name, network.CreateOptions{
+						_, err = dockerSdk.Client.NetworkCreate(dockerSdk.Ctx, networkInfo.Name, network.CreateOptions{
 							Driver:     networkInfo.Driver,
 							Scope:      networkInfo.Scope,
 							EnableIPv4: &networkInfo.EnableIPv4,
@@ -470,12 +554,12 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 				}
 			}
 
-			compatContainerInfo, err := docker.Sdk.ContainerInspectCompat(containerInfo)
+			compatContainerInfo, err := dockerSdk.ContainerInspectCompat(containerInfo)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-			_, err = docker.Sdk.Client.ContainerCreate(docker.Sdk.Ctx, compatContainerInfo.Config, compatContainerInfo.HostConfig, networkingConfig, &v1.Platform{}, newContainerName)
+			_, err = dockerSdk.Client.ContainerCreate(dockerSdk.Ctx, compatContainerInfo.Config, compatContainerInfo.HostConfig, networkingConfig, &v1.Platform{}, newContainerName)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
@@ -484,88 +568,73 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			runContainer = true
 		}
 
-		// 兼容旧的数据
 		progressCurrent++
 		progress.BroadcastMessage(containerBackupProgress{
 			Steps:   progressSteps,
 			Current: progressCurrent,
 			Total:   len(progressSteps),
 		})
-		if !function.IsEmptyArray(item.Volume) && function.IsEmptyArray(item.VolumeList) {
-			item.VolumeList = function.PluckArrayWalk(item.Volume, func(volume string) (backup.ManifestVolumeInfo, bool) {
-				mount, _, ok := function.PluckArrayItemWalk(containerInfo.Mounts, func(item container.MountPoint) bool {
-					return strings.HasSuffix(function.Sha256([]byte(item.Destination)), path.Base(volume))
-				})
-				if !ok {
-					return backup.ManifestVolumeInfo{}, false
-				}
-				return backup.ManifestVolumeInfo{
-					Destination: mount.Destination,
-					Source:      mount.Source,
-					SavePath:    volume,
-					Mode:        os.ModeDir,
-				}, true
-			})
-		}
-
 		if !function.IsEmptyArray(item.VolumeList) {
 			err = func() error {
-				// 仅当有挂载文件的时候才新建文件管理助手
-				if _, _, ok := function.PluckArrayItemWalk(item.VolumeList, func(item backup.ManifestVolumeInfo) bool {
-					return item.Mode.IsRegular()
-				}); ok && hostExplorer == nil {
-					hostExplorer, err = plugin.NewHostExplorer(docker.Sdk.Ctx, docker.Sdk)
+				for _, volume := range item.VolumeList {
+					err = func() (err error) {
+						targetImportContainerName := newContainerName
+						targetImportPath := "/"
+
+						reader, err := b.Reader.ReadBlobs(volume.SavePath)
+						if err != nil {
+							return err
+						}
+						gzReader, err := gzip.NewReader(reader)
+						if err != nil {
+							return err
+						}
+						defer func() {
+							err = errors.Join(err, gzReader.Close())
+						}()
+						tarReader := tar.NewReader(gzReader)
+
+						// 因为从 docker 导出目录的时候，不会存储一级目录，而是从二级目录开始。
+						// 例如 docker cp caddy:/etc/caddy/ . 只会保存 caddy 目录，那么这里恢复的时候，也需要脱去一层目录
+						importOption := make([]imports.ImportFileOption, 0, 1)
+						if volume.Mode.IsRegular() {
+							bindMount, ok := bindMountList[volume.Destination]
+							if !ok {
+								return fmt.Errorf("regular file mount %s is not a bind mount", volume.Destination)
+							}
+							if _, err = getHostExplorerFs(); err != nil {
+								return err
+							}
+							p := path.Dir(bindMount.Source)
+							targetImportPath = path.Join(plugin.HostExplorerMountPath, p)
+							targetImportContainerName = hostExplorer.ContainerName()
+							importOption = append(importOption, imports.WithImportFileInTar(tarReader, path.Base(bindMount.Source), func(header *tar.Header) bool {
+								return strings.HasSuffix(volume.Destination, header.Name)
+							}))
+						} else {
+							targetImportPath = path.Dir(volume.Destination)
+							importOption = append(importOption, imports.WithImportTar(tarReader))
+						}
+
+						importFiles, err := imports.NewFileImport("/", importOption...)
+						if err != nil {
+							return err
+						}
+						defer importFiles.Close()
+						importReader := importFiles.Reader()
+						if closer, ok := importReader.(io.Closer); ok {
+							defer func() {
+								closeErr := closer.Close()
+								if closeErr != nil && !errors.Is(closeErr, os.ErrClosed) {
+									err = errors.Join(err, closeErr)
+								}
+							}()
+						}
+						return dockerSdk.ContainerImport(dockerSdk.Ctx, targetImportContainerName, targetImportPath, importReader)
+					}()
 					if err != nil {
 						return err
 					}
-				}
-
-				for _, volume := range item.VolumeList {
-					targetImportContainerName := newContainerName
-					targetImportPath := "/"
-
-					reader, _ := b.Reader.ReadBlobs(volume.SavePath)
-					gzReader, _ := gzip.NewReader(reader)
-					tarReader := tar.NewReader(gzReader)
-
-					// 因为从 docker 导出目录的时候，不会存储一级目录，而是从二级目录开始。
-					// 例如 docker cp caddy:/etc/caddy/ . 只会保存 caddy 目录，那么这里恢复的时候，也需要脱去一层目录
-					importOption := make([]imports.ImportFileOption, 0)
-					if volume.Mode.IsRegular() {
-						p := path.Dir(volume.Source)
-						targetImportPath = path.Join(plugin.HostExplorerMountPath, p)
-						targetImportContainerName = hostExplorer.ContainerName()
-						importOption = append(importOption, imports.WithImportFileInTar(tarReader, path.Base(volume.Source), func(header *tar.Header) bool {
-							return strings.HasSuffix(volume.Destination, header.Name)
-						}))
-						_, err = docker.Sdk.ContainerExecResult(
-							docker.Sdk.Ctx,
-							hostExplorer.ContainerName(),
-							container.ExecOptions{Cmd: []string{
-								"/agent", "fs", "mkdir",
-								"--root", plugin.HostExplorerMountPath,
-								"--path", p,
-								"--mode", "0755",
-								"--recursive",
-							}},
-						)
-						if err != nil {
-							return err
-						}
-					} else {
-						targetImportPath = path.Dir(volume.Destination)
-						targetImportContainerName = newContainerName
-						importOption = append(importOption, imports.WithImportTar(tarReader))
-					}
-
-					if importFiles, err := imports.NewFileImport("/", importOption...); err == nil {
-						err = docker.Sdk.ContainerImport(docker.Sdk.Ctx, targetImportContainerName, targetImportPath, importFiles.Reader())
-						importFiles.Close()
-						if err != nil {
-							return err
-						}
-					}
-					_ = gzReader.Close()
 				}
 				return nil
 			}()
@@ -585,12 +654,12 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 			})
 		}
 		if runContainer && !params.NoStart {
-			err = docker.Sdk.Client.ContainerStart(docker.Sdk.Ctx, newContainerName, container.StartOptions{})
+			err = dockerSdk.Client.ContainerStart(dockerSdk.Ctx, newContainerName, container.StartOptions{})
 			if err != nil {
 				for _, inspect := range networkCreate {
-					_ = docker.Sdk.Client.NetworkRemove(docker.Sdk.Ctx, inspect.Name)
+					_ = dockerSdk.Client.NetworkRemove(dockerSdk.Ctx, inspect.Name)
 				}
-				_ = docker.Sdk.Client.ContainerRemove(docker.Sdk.Ctx, newContainerName, container.RemoveOptions{})
+				_ = dockerSdk.Client.ContainerRemove(dockerSdk.Ctx, newContainerName, container.RemoveOptions{})
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}

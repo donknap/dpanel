@@ -57,19 +57,23 @@ type progressNamespace struct {
 	messageType   string
 }
 
-// NewFdProgressPip 同一用户的多个 fd 共用一个推送管道，直到所有 fd 都退出。
-func NewFdProgressPip(http *gin.Context, messageType string) (*ProgressPip, error) {
+// NewFdProgressPip 同一用户、同一 Docker 环境的多个 fd 共用一个推送管道，直到所有 fd 都退出。
+// owner 仅在本次请求创建管道时为 true，调用方只能由 owner 启动生产任务。
+func NewFdProgressPip(http *gin.Context, dockerEnvName, messageType string) (*ProgressPip, bool, error) {
 	fd := ""
-	namespace := progressNamespace{messageType: messageType}
+	namespace := progressNamespace{
+		dockerEnvName: dockerEnvName,
+		messageType:   messageType,
+	}
 	if data, exists := http.Get("userInfo"); exists {
 		userInfo := data.(logic.UserInfo)
 		fd = userInfo.Fd
 		namespace.userID = userInfo.UserId
 	} else {
-		return nil, errors.New("fd not found")
+		return nil, false, errors.New("fd not found")
 	}
 	if fd == "" {
-		return nil, errors.New("fd not found")
+		return nil, false, errors.New("fd not found")
 	}
 
 	collect.progressMu.Lock()
@@ -80,14 +84,12 @@ func NewFdProgressPip(http *gin.Context, messageType string) (*ProgressPip, erro
 		// 当管道的上下文已经关闭过了，就不能再次使用，需要重新创建
 		if v, ok := p.(*ProgressPip); ok && v.ctx.Err() == nil {
 			v.addFd(fd)
-			process = v
+			return v, false, nil
 		}
 	}
-	if process == nil {
-		process = newProgressPip(namespace)
-		process.addFd(fd)
-	}
-	return process, nil
+	process = newProgressPip(namespace)
+	process.addFd(fd)
+	return process, true, nil
 }
 
 type ProgressPip struct {
@@ -157,12 +159,6 @@ func (self *ProgressPip) CloseFd(fd string) {
 	if empty {
 		self.close()
 	}
-}
-
-func (self *ProgressPip) IsShadow() bool {
-	self.fdLock.RLock()
-	defer self.fdLock.RUnlock()
-	return len(self.fd) > 1
 }
 
 func (self *ProgressPip) addFd(fd string) {

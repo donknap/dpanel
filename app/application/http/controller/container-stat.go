@@ -24,9 +24,13 @@ func (self Container) GetStatInfo(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	progress, err := ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeContainerStat, params.Id))
+	progress, owner, err := ws.NewFdProgressPip(http, docker.Sdk.Name, fmt.Sprintf(ws.MessageTypeContainerStat, params.Id))
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if !owner {
+		self.JsonSuccessResponse(http)
 		return
 	}
 	defer progress.Close()

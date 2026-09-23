@@ -1,6 +1,7 @@
 package stat
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -17,8 +18,9 @@ import (
 )
 
 const (
-	hostProcPath = "/mnt_host_proc"
-	hostSysPath  = "/mnt_host_sys"
+	hostProcPath     = "/mnt_host_proc"
+	hostSysPath      = "/mnt_host_sys"
+	heartbeatTimeout = 6 * time.Second
 )
 
 type Handler struct{}
@@ -44,16 +46,18 @@ func (*Handler) HandleStream(ctx context.Context, args []string, write func(any)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	go func() {
-		_, _ = io.Copy(io.Discard, os.Stdin)
-		cancel()
-	}()
+	watchHeartbeat(ctx, cancel, os.Stdin)
 	containerReader := newContainerReader(option.containers)
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	sampledAt := time.Now()
 
 	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
 		currentCPU, readErr := readCPU()
 		if readErr != nil {
 			return readErr
@@ -79,6 +83,11 @@ func (*Handler) HandleStream(ctx context.Context, args []string, write func(any)
 		if result.Disk, readErr = readDisk(ctx); readErr != nil {
 			result.Disk = nil
 		}
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
 		if err = write(result); err != nil {
 			return fmt.Errorf("write stat sample: %w", err)
 		}
@@ -88,6 +97,52 @@ func (*Handler) HandleStream(ctx context.Context, args []string, write func(any)
 		case sampledAt = <-ticker.C:
 		}
 	}
+}
+
+func watchHeartbeat(ctx context.Context, cancel context.CancelFunc, input io.Reader) {
+	commands := make(chan string)
+	inputDone := make(chan struct{})
+	go func() {
+		defer close(inputDone)
+		scanner := bufio.NewScanner(input)
+		for scanner.Scan() {
+			select {
+			case commands <- strings.TrimSpace(scanner.Text()):
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	go func() {
+		timer := time.NewTimer(heartbeatTimeout)
+		defer timer.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-inputDone:
+				cancel()
+				return
+			case <-timer.C:
+				cancel()
+				return
+			case command := <-commands:
+				switch command {
+				case "ping":
+					if !timer.Stop() {
+						select {
+						case <-timer.C:
+						default:
+						}
+					}
+					timer.Reset(heartbeatTimeout)
+				case "close":
+					cancel()
+					return
+				}
+			}
+		}
+	}()
 }
 
 func readNetwork() (*agentTypes.NetworkStat, error) {

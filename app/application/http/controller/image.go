@@ -448,6 +448,9 @@ func (self Image) Prune(http *gin.Context) {
 			useImageList = function.PluckArrayWalk(containerList, func(item container.Summary) (string, bool) {
 				return item.ImageID, true
 			})
+		} else {
+			self.JsonResponseWithError(http, err, 500)
+			return
 		}
 		if imageList, err := docker.Sdk.Client.ImageList(docker.Sdk.Ctx, image.ListOptions{
 			All: true,
@@ -470,10 +473,6 @@ func (self Image) Prune(http *gin.Context) {
 				if isDependImage && !params.EnableDependImage {
 					continue
 				}
-				if !isDependImage && !params.EnableUnuseTag && (len(item.RepoTags) > 0 || len(item.RepoDigests) > 0) {
-					continue
-				}
-
 				deleteImageSpaceReclaimed += item.Size
 				deleteImageTotal += 1
 				// 删除镜像的 tag、digest 后，再尝试删除镜像本身

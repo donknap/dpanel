@@ -21,7 +21,7 @@ func (self Backup) GetDescription() string {
 }
 
 func (self Backup) Configure(cmd *cobra.Command) {
-	cmd.Flags().StringArray("backup-path", []string{}, "Directory to back up; leave empty to back up all panel data")
+	cmd.Flags().StringArray("backup-path", []string{}, "Panel data path to back up; use an exact panel path value such as ./dpanel.db; leave empty to back up all panel data")
 	cmd.Flags().StringArray("ignore-path-prefix", []string{}, "Directory prefix to exclude from the backup")
 }
 

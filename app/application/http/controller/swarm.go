@@ -204,14 +204,15 @@ func (self Swarm) Log(http *gin.Context) {
 		option.Tail = strconv.Itoa(params.LineTotal)
 	}
 	var progress *ws.ProgressPip
+	var owner bool
 	var err error
 	if !params.Download {
-		progress, err = ws.NewFdProgressPip(http, fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id))
+		progress, owner, err = ws.NewFdProgressPip(http, docker.Sdk.Name, fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		if progress.IsShadow() {
+		if !owner {
 			option.Follow = false
 		}
 	}
@@ -222,6 +223,9 @@ func (self Swarm) Log(http *gin.Context) {
 		response, err = docker.Sdk.TaskLogs(docker.Sdk.Ctx, params.Id, option)
 	}
 	if err != nil {
+		if owner {
+			progress.Close()
+		}
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}

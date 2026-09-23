@@ -47,7 +47,7 @@ func UnArchive(sourcePath, targetPath string) error {
 	return unarchiveFiles(source, sourceInfo, targetPath, format.extractor)
 }
 
-func detectFormat(source *os.File) (detectedFormat, error) {
+func detectFormat(source io.ReadSeeker) (detectedFormat, error) {
 	header := make([]byte, 8)
 	readCount, err := io.ReadFull(source, header)
 	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {

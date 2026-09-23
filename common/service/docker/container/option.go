@@ -193,6 +193,8 @@ func WithTmpfs(items ...types.VolumeItem) Option {
 
 func WithVolume(item ...types.VolumeItem) Option {
 	return func(self *Builder) error {
+		self.hostConfig.Binds = make([]string, 0)
+
 		for _, volumeItem := range item {
 			if volumeItem.Dest == "" || volumeItem.Host == "" {
 				return errors.New("volume host path or dest path is empty")

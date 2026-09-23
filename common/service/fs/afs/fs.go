@@ -32,4 +32,5 @@ type Fs interface {
 	ChownAll(string, *int, *int, bool) error
 	Import([]TransferFile) error
 	Export([]TransferFile) error
+	UnArchive([]string, string) error
 }

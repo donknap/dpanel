@@ -2,21 +2,18 @@ package dockerfs
 
 import (
 	"archive/tar"
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/errdefs"
-	agentTypes "github.com/donknap/dpanel/app/agent/types"
+	serviceAgent "github.com/donknap/dpanel/common/service/agent"
 	archiveservice "github.com/donknap/dpanel/common/service/archive"
 	"github.com/donknap/dpanel/common/service/docker"
 	serviceafs "github.com/donknap/dpanel/common/service/fs/afs"
@@ -32,6 +29,7 @@ const maxSymlinkDepth = 40
 type Fs struct {
 	name                string
 	sdk                 *docker.Client
+	agent               *serviceAgent.Agent
 	targetContainerName string
 	proxyContainerName  string
 	rootPath            string
@@ -63,6 +61,11 @@ func New(opts ...Option) (*Fs, error) {
 	if o.proxyContainerName == "" || o.targetContainerName == "" || o.targetType == 0 {
 		return nil, fmt.Errorf("the %s container does not exist or is not running", o.targetContainerName)
 	}
+	agentClient, err := serviceAgent.NewDockerAgent(o.sdk, o.proxyContainerName)
+	if err != nil {
+		return nil, err
+	}
+	o.agent = agentClient
 	if o.rootPath == "" || strings.IndexByte(o.rootPath, 0) >= 0 || !path.IsAbs(o.rootPath) || path.Clean(o.rootPath) != o.rootPath {
 		return nil, errors.New("invalid backend root")
 	}
@@ -95,7 +98,11 @@ func (self *Fs) Mkdir(name string, perm os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	return self.execAgent(nil, "fs", "mkdir", "--path", p, "--mode", formatMode(perm))
+	target, err := self.agentTarget()
+	if err != nil {
+		return err
+	}
+	return self.agent.Fs.Mkdir(self.sdk.Ctx, target, p, perm, false)
 }
 
 func (self *Fs) MkdirAll(name string, perm os.FileMode) error {
@@ -103,7 +110,11 @@ func (self *Fs) MkdirAll(name string, perm os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	return self.execAgent(nil, "fs", "mkdir", "--path", p, "--mode", formatMode(perm), "--recursive")
+	target, err := self.agentTarget()
+	if err != nil {
+		return err
+	}
+	return self.agent.Fs.Mkdir(self.sdk.Ctx, target, p, perm, true)
 }
 
 func (self *Fs) Open(name string) (afero.File, error) {
@@ -180,7 +191,11 @@ func (self *Fs) Remove(name string) error {
 	if err != nil {
 		return err
 	}
-	return self.execAgent(nil, "fs", "rm", "--path", p)
+	target, err := self.agentTarget()
+	if err != nil {
+		return err
+	}
+	return self.agent.Fs.Remove(self.sdk.Ctx, target, p, false)
 }
 
 func (self *Fs) RemoveAll(name string) error {
@@ -191,7 +206,11 @@ func (self *Fs) RemoveAll(name string) error {
 	if p == "/" {
 		return &os.PathError{Op: "remove_all", Path: p, Err: errors.New("refusing to remove root directory")}
 	}
-	return self.execAgent(nil, "fs", "rm", "--path", p, "--recursive")
+	target, err := self.agentTarget()
+	if err != nil {
+		return err
+	}
+	return self.agent.Fs.Remove(self.sdk.Ctx, target, p, true)
 }
 
 func (self *Fs) Rename(oldname, newname string) error {
@@ -265,11 +284,11 @@ func (self *Fs) chmod(name string, mode os.FileMode, recursive bool) error {
 	if recursive && p == "/" {
 		return &os.PathError{Op: "chmod", Path: p, Err: errors.New("refusing to recursively chmod root directory")}
 	}
-	args := []string{"fs", "chmod", "--path", p, "--mode", formatMode(mode)}
-	if recursive {
-		args = append(args, "--recursive")
+	target, err := self.agentTarget()
+	if err != nil {
+		return err
 	}
-	return self.execAgent(nil, args...)
+	return self.agent.Fs.Chmod(self.sdk.Ctx, target, p, mode, recursive)
 }
 
 func (self *Fs) Chown(name string, uid, gid int) error {
@@ -288,20 +307,11 @@ func (self *Fs) chown(name string, uid, gid *int, recursive bool) error {
 	if recursive && p == "/" {
 		return &os.PathError{Op: "chown", Path: p, Err: errors.New("refusing to recursively chown root directory")}
 	}
-	args := []string{"fs", "chown", "--path", p}
-	if uid != nil && *uid >= 0 {
-		args = append(args, "--uid", strconv.Itoa(*uid))
+	target, err := self.agentTarget()
+	if err != nil {
+		return err
 	}
-	if gid != nil && *gid >= 0 {
-		args = append(args, "--gid", strconv.Itoa(*gid))
-	}
-	if len(args) == 4 {
-		return errors.New("chown requires uid or gid")
-	}
-	if recursive {
-		args = append(args, "--recursive")
-	}
-	return self.execAgent(nil, args...)
+	return self.agent.Fs.Chown(self.sdk.Ctx, target, p, uid, gid, recursive)
 }
 
 func (self *Fs) Chtimes(name string, atime, mtime time.Time) error {
@@ -309,11 +319,11 @@ func (self *Fs) Chtimes(name string, atime, mtime time.Time) error {
 	if err != nil {
 		return err
 	}
-	return self.execAgent(nil,
-		"fs", "chtimes", "--path", p,
-		"--atime", atime.Format(time.RFC3339Nano),
-		"--mtime", mtime.Format(time.RFC3339Nano),
-	)
+	target, err := self.agentTarget()
+	if err != nil {
+		return err
+	}
+	return self.agent.Fs.Chtimes(self.sdk.Ctx, target, p, atime, mtime)
 }
 
 func (self *Fs) readDirFromContainer(rootPath string) ([]os.FileInfo, error) {
@@ -321,8 +331,12 @@ func (self *Fs) readDirFromContainer(rootPath string) ([]os.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := make([]agentTypes.FileData, 0)
-	if err = self.execAgent(&result, "fs", "ls", "--path", agentPath); err != nil {
+	target, err := self.agentTarget()
+	if err != nil {
+		return nil, err
+	}
+	result, err := self.agent.Fs.List(self.sdk.Ctx, target, agentPath)
+	if err != nil {
 		return nil, err
 	}
 	fileList := make([]os.FileInfo, 0, len(result))
@@ -455,14 +469,21 @@ func (self *Fs) PathSize(name string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	result := agentTypes.SizeData{}
-	err = self.execAgent(&result, "fs", "du", "--path", p)
+	target, err := self.agentTarget()
+	if err != nil {
+		return 0, err
+	}
+	result, err := self.agent.Fs.Size(self.sdk.Ctx, target, p)
 	return result.Size, err
 }
 
 func (self *Fs) Users() (fsdata.IdentityList, error) {
-	value := agentTypes.IdentityList{}
-	if err := self.execAgent(&value, "fs", "users"); err != nil {
+	target, err := self.agentTarget()
+	if err != nil {
+		return fsdata.IdentityList{}, err
+	}
+	value, err := self.agent.Fs.Users(self.sdk.Ctx, target)
+	if err != nil {
 		return fsdata.IdentityList{}, err
 	}
 	result := fsdata.IdentityList{
@@ -481,27 +502,35 @@ func (self *Fs) Users() (fsdata.IdentityList, error) {
 }
 
 func (self *Fs) Copy(sourceName, targetName string, overwrite bool) error {
-	return self.transfer("cp", sourceName, targetName, overwrite)
+	source, target, agentTarget, err := self.transferTarget(sourceName, targetName)
+	if err != nil {
+		return err
+	}
+	return self.agent.Fs.Copy(self.sdk.Ctx, agentTarget, source, target, overwrite)
 }
 
 func (self *Fs) Move(sourceName, targetName string, overwrite bool) error {
-	return self.transfer("mv", sourceName, targetName, overwrite)
-}
-
-func (self *Fs) transfer(command, sourceName, targetName string, overwrite bool) error {
-	source, err := self.pathName(sourceName)
+	source, target, agentTarget, err := self.transferTarget(sourceName, targetName)
 	if err != nil {
 		return err
+	}
+	return self.agent.Fs.Move(self.sdk.Ctx, agentTarget, source, target, overwrite)
+}
+
+func (self *Fs) transferTarget(sourceName, targetName string) (string, string, serviceAgent.FsTarget, error) {
+	source, err := self.pathName(sourceName)
+	if err != nil {
+		return "", "", serviceAgent.FsTarget{}, err
 	}
 	target, err := self.pathName(targetName)
 	if err != nil {
-		return err
+		return "", "", serviceAgent.FsTarget{}, err
 	}
-	args := []string{"fs", command, "--source", source, "--target", target}
-	if overwrite {
-		args = append(args, "--overwrite")
+	agentTarget, err := self.agentTarget()
+	if err != nil {
+		return "", "", serviceAgent.FsTarget{}, err
 	}
-	return self.execAgent(nil, args...)
+	return source, target, agentTarget, nil
 }
 
 func (self *Fs) readFile(name string, target io.Writer) (err error) {
@@ -689,79 +718,21 @@ func (self *Fs) fileInfo(name string, pathStat container.PathStat) os.FileInfo {
 	})
 }
 
-func (self *Fs) execAgent(result any, args ...string) error {
-	if len(args) == 0 {
-		return errors.New("agent command is empty")
-	}
-	targetArgs, err := self.agentTargetArgs()
-	if err != nil {
-		return err
-	}
-	cmd := append([]string{"/agent"}, args...)
-	cmd = append(cmd, targetArgs...)
-	output, execErr := self.sdk.ContainerExecResult(
-		self.sdk.Ctx,
-		self.proxyContainerName,
-		container.ExecOptions{Cmd: cmd},
-	)
-	if output == "" && execErr != nil {
-		return execErr
-	}
-
-	message := agentTypes.Message[json.RawMessage]{}
-	decoder := json.NewDecoder(strings.NewReader(output))
-	decoder.DisallowUnknownFields()
-	if err = decoder.Decode(&message); err != nil {
-		return errors.Join(execErr, fmt.Errorf("decode agent response: %w", err))
-	}
-	var trailing any
-	if err = decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return errors.Join(execErr, errors.New("agent response contains trailing data"))
-	}
-	if message.Code != 200 {
-		if message.Error != "" {
-			return errors.New(message.Error)
-		}
-		return fmt.Errorf("agent returned code %d", message.Code)
-	}
-	if message.Error != "" {
-		return fmt.Errorf("agent returned an error with success code: %s", message.Error)
-	}
-	if execErr != nil {
-		return execErr
-	}
-	if result == nil {
-		return nil
-	}
-	if len(message.Data) == 0 || bytes.Equal(message.Data, []byte("null")) {
-		return errors.New("agent response data is empty")
-	}
-	dataDecoder := json.NewDecoder(bytes.NewReader(message.Data))
-	dataDecoder.DisallowUnknownFields()
-	if err = dataDecoder.Decode(result); err != nil {
-		return fmt.Errorf("decode agent response data: %w", err)
-	}
-	if err = dataDecoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return errors.New("agent response data contains trailing data")
-	}
-	return nil
-}
-
-func (self *Fs) agentTargetArgs() ([]string, error) {
+func (self *Fs) agentTarget() (serviceAgent.FsTarget, error) {
 	if self.targetType == targetTypeMount {
-		return []string{"--root", self.rootPath}, nil
+		return serviceAgent.FsTarget{Root: self.rootPath}, nil
 	}
 	info, err := self.sdk.Client.ContainerInspect(self.sdk.Ctx, self.targetContainerName)
 	if err != nil {
-		return nil, err
+		return serviceAgent.FsTarget{}, err
 	}
 	if info.State == nil || info.State.Pid <= 1 {
-		return nil, fmt.Errorf("the %s container does not exist or is not running", self.targetContainerName)
+		return serviceAgent.FsTarget{}, fmt.Errorf("the %s container does not exist or is not running", self.targetContainerName)
 	}
-	return []string{"--container-pid", strconv.Itoa(info.State.Pid)}, nil
+	return serviceAgent.FsTarget{ContainerPID: info.State.Pid}, nil
 }
 
-func formatMode(mode os.FileMode) string {
+func formatTarMode(mode os.FileMode) uint32 {
 	value := uint32(mode.Perm())
 	if mode&os.ModeSetuid != 0 {
 		value |= 0o4000
@@ -772,12 +743,7 @@ func formatMode(mode os.FileMode) string {
 	if mode&os.ModeSticky != 0 {
 		value |= 0o1000
 	}
-	return fmt.Sprintf("%04o", value)
-}
-
-func formatTarMode(mode os.FileMode) uint32 {
-	value, _ := strconv.ParseUint(formatMode(mode), 8, 32)
-	return uint32(value)
+	return value
 }
 
 func isNotExist(err error) bool {
@@ -846,7 +812,8 @@ func (self *Fs) Import(fileList []serviceafs.TransferFile) (err error) {
 		return err
 	}
 	copyErr := self.sdk.ContainerImport(self.sdk.Ctx, self.targetContainerName, "/", archiveFile)
-	return errors.Join(copyErr, archiveFile.Close())
+	_ = archiveFile.Close()
+	return copyErr
 }
 
 func (self *Fs) Export(fileList []serviceafs.TransferFile) error {

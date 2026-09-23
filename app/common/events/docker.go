@@ -144,16 +144,32 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 			if info, err := sdk.Client.ContainerInspect(sdk.Ctx, dpanelContainerName); err == nil {
 				info.ExecIDs = make([]string, 0)
 				result.ContainerInfo = info
+				result.Mount = types.VolumeItem{}
 				if v, _, ok := function.PluckArrayItemWalk(info.Mounts, func(item container.MountPoint) bool {
 					return item.Destination == "/dpanel"
 				}); ok {
-					result.Mount = types.VolumeItem{
-						Host: v.Source,
-						Dest: v.Destination,
-						Type: string(v.Type),
-					}
+					result.Mount = types.VolumeItem{Host: v.Source, Dest: v.Destination, Type: string(v.Type)}
 					if v.Type == types3.VolumeTypeVolume {
 						result.Mount.Host = v.Name
+					}
+				}
+				result.DataMounts = nil
+				if result.Mount.Host != "" && (result.Mount.Type == "bind" || result.Mount.Type == "volume") {
+					result.DataMounts = []types.VolumeItem{result.Mount}
+					for _, mount := range info.Mounts {
+						if !strings.HasPrefix(mount.Destination, "/dpanel/") {
+							continue
+						}
+						item := types.VolumeItem{Host: mount.Source, Dest: mount.Destination, Type: string(mount.Type)}
+						if mount.Type == types3.VolumeTypeVolume {
+							item.Host = mount.Name
+						}
+						if item.Host == "" || mount.Type != types3.VolumeTypeBind && mount.Type != types3.VolumeTypeVolume {
+							slog.Warn("dpanel data mount is unavailable", "destination", mount.Destination, "type", mount.Type)
+							result.DataMounts = nil
+							break
+						}
+						result.DataMounts = append(result.DataMounts, item)
 					}
 				}
 				// 只有在容器才会包含 nginx 功能，如果有网络就自动中入，并重启 nginx
@@ -191,6 +207,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 				dockerEnv.DockerInfo.InDPanel = false
 				result.ContainerInfo = container.InspectResponse{}
 				result.Mount = types.VolumeItem{}
+				result.DataMounts = nil
 			}
 		} else {
 			result.RunIn = types2.DPanelRunInHost
@@ -205,10 +222,11 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 				Type: types3.VolumeTypeBind,
 			}
 			if !dockerEnv.IsLocal() && runtime.GOOS == "windows" {
-				if v, ok := function.PathConvertWinPath2Unix(storage.Local{}.GetStorageLocalPath()); ok {
+				if v, ok := function.WindowsPathToSlash(storage.Local{}.GetStorageLocalPath()); ok {
 					result.Mount.Host = v
 				}
 			}
+			result.DataMounts = []types.VolumeItem{result.Mount}
 		}
 		slog.Debug("docker daemon/event init dpanel info", "info", result)
 		_ = logic.Setting{}.Save(&entity.Setting{

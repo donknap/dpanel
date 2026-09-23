@@ -1,10 +1,8 @@
 package plugin
 
 import (
-	"archive/tar"
 	"bytes"
 	"embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -12,7 +10,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"path"
 	"strings"
 	"sync"
 
@@ -38,8 +35,6 @@ const (
 	HostExplorerMountPath = "/mnt_host"
 	MonitorName           = "dpanel-plugin-monitor"
 )
-
-var imageArchiveIDCache sync.Map
 
 type CreateOption struct {
 	Init                     bool               `json:"-"`
@@ -294,25 +289,38 @@ func (self *Plugin) create() error {
 		builder.WithWorkDir(service.WorkingDir),
 	}
 
+	volumes := make([]types.VolumeItem, 0, len(service.Volumes)+len(serviceExt.External.Volumes))
+	volumeIndex := make(map[string]int, cap(volumes))
+	appendVolume := func(item types.VolumeItem) {
+		if index, ok := volumeIndex[item.Dest]; ok {
+			volumes[index] = item
+			return
+		}
+		volumeIndex[item.Dest] = len(volumes)
+		volumes = append(volumes, item)
+	}
 	for _, item := range service.Volumes {
 		permission := "write"
 		if item.ReadOnly {
 			permission = "readonly"
 		}
-		options = append(options, builder.WithVolume(types.VolumeItem{
+		appendVolume(types.VolumeItem{
 			Host:       item.Source,
 			Dest:       item.Target,
 			Permission: permission,
-		}))
+		})
 	}
 
 	for _, item := range serviceExt.External.Volumes {
 		path := strings.Split(item, ":")
-		options = append(options, builder.WithVolume(types.VolumeItem{
+		appendVolume(types.VolumeItem{
 			Host:       path[0],
 			Dest:       path[1],
 			Permission: "write",
-		}))
+		})
+	}
+	if len(volumes) > 0 {
+		options = append(options, builder.WithVolume(volumes...))
 	}
 
 	b, err := builder.New(self.dockerSdk, options...)
@@ -346,15 +354,42 @@ func (self *Plugin) prepareImage(imageName string) error {
 	if self.imagePath == "" {
 		return nil
 	}
+	imageLock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyPluginImageLock, self.dockerSdk.Name, self.Name))
+	resetImage := imageLock.TryLock()
+	_, err := self.dockerSdk.Client.ImageInspect(self.dockerSdk.Ctx, imageName)
+	if err == nil && !resetImage {
+		return nil
+	}
+	if err != nil && !errdefs.IsNotFound(err) {
+		if resetImage {
+			imageLock.Unlock()
+		}
+		return err
+	}
+	if err == nil {
+		if err = self.close(true); err != nil {
+			imageLock.Unlock()
+			return err
+		}
+	}
+
 	imageFile, err := self.asset.Open(self.imagePath)
 	if err != nil {
+		if resetImage {
+			imageLock.Unlock()
+		}
 		return err
 	}
 	defer func() {
 		_ = imageFile.Close()
 	}()
-	self.imageID, err = importImage(self.dockerSdk, imageName, self.imagePath, imageFile)
-	return err
+	if err = importImage(self.dockerSdk, imageName, imageFile); err != nil {
+		if resetImage {
+			imageLock.Unlock()
+		}
+		return err
+	}
+	return nil
 }
 
 // Close 外部调用（或看门人调用）的销毁入口
@@ -369,17 +404,13 @@ func (self *Plugin) Close() error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	return self.close(true)
+	return self.close(false)
 }
 
 func (self *Plugin) close(removeImage bool) error {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
-	_, serviceExt, err := self.composeTask.GetService(self.Name)
-	if err != nil {
-		return err
-	}
 	containerTarget := self.containerID
 	if containerTarget == "" {
 		containerTarget = self.containerName
@@ -413,7 +444,7 @@ func (self *Plugin) close(removeImage bool) error {
 		return false
 	})
 
-	if removeImage && serviceExt.ImageAutoRemove && containerInfo.Config != nil {
+	if removeImage && containerInfo.Config != nil {
 		if err = self.dockerSdk.ImageRemove(self.dockerSdk.Ctx, filters.NewArgs(
 			filters.Arg(docker.ImageFilterReference, containerInfo.Config.Image),
 		)); err != nil {
@@ -445,83 +476,9 @@ func (self *Plugin) ContainerName() string {
 	return self.containerName
 }
 
-func importImage(sdk *docker.Client, imageName, imagePath string, imageFile fs.File) (string, error) {
-	imageID, err := imageArchiveID(imageName, imagePath, imageFile)
-	if err != nil {
-		return "", err
+func importImage(sdk *docker.Client, imageName string, imageFile fs.File) error {
+	if err := sdk.ImageLoadFsFile(sdk.Ctx, imageFile); err != nil {
+		return fmt.Errorf("load plugin image %s: %w", imageName, err)
 	}
-	if imageInfo, err := sdk.Client.ImageInspect(sdk.Ctx, imageName); err == nil && imageInfo.ID == imageID {
-		return imageID, nil
-	} else if err != nil && !errdefs.IsNotFound(err) {
-		return "", err
-	}
-
-	seeker, ok := imageFile.(io.Seeker)
-	if !ok {
-		return "", fmt.Errorf("plugin image archive %s is not seekable", imagePath)
-	}
-	if _, err = seeker.Seek(0, io.SeekStart); err != nil {
-		return "", fmt.Errorf("seek plugin image archive %s: %w", imagePath, err)
-	}
-	if err = sdk.ImageLoadFsFile(sdk.Ctx, imageFile); err != nil {
-		return "", fmt.Errorf("load plugin image %s: %w", imageName, err)
-	}
-	imageInfo, err := sdk.Client.ImageInspect(sdk.Ctx, imageName)
-	if err != nil {
-		return "", fmt.Errorf("inspect loaded plugin image %s: %w", imageName, err)
-	}
-	if imageInfo.ID != imageID {
-		return "", fmt.Errorf("loaded plugin image %s ID mismatch: expected %s, got %s", imageName, imageID, imageInfo.ID)
-	}
-	return imageID, nil
-}
-
-func imageArchiveID(imageName, imagePath string, imageFile fs.File) (string, error) {
-	cacheKey := imagePath + "\x00" + function.ImageTag(imageName).Name
-	if value, ok := imageArchiveIDCache.Load(cacheKey); ok {
-		return value.(string), nil
-	}
-
-	tarReader := tar.NewReader(imageFile)
-	for {
-		header, err := tarReader.Next()
-		if errors.Is(err, io.EOF) {
-			return "", fmt.Errorf("plugin image archive %s does not contain manifest.json", imagePath)
-		}
-		if err != nil {
-			return "", fmt.Errorf("read plugin image archive %s: %w", imagePath, err)
-		}
-		if path.Clean(header.Name) != "manifest.json" {
-			continue
-		}
-
-		manifest := make([]struct {
-			Config   string   `json:"Config"`
-			RepoTags []string `json:"RepoTags"`
-		}, 0)
-		if err = json.NewDecoder(tarReader).Decode(&manifest); err != nil {
-			return "", fmt.Errorf("decode plugin image manifest %s: %w", imagePath, err)
-		}
-		expectedTag := function.ImageTag(imageName).Name
-		for _, item := range manifest {
-			matched := len(manifest) == 1
-			for _, repoTag := range item.RepoTags {
-				if function.ImageTag(repoTag).Name == expectedTag {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
-			digest := strings.TrimSuffix(path.Base(item.Config), ".json")
-			if len(digest) != 64 || !function.IsDockerObjectID(digest) {
-				return "", fmt.Errorf("plugin image archive %s contains invalid config digest %q", imagePath, digest)
-			}
-			imageID := "sha256:" + digest
-			imageArchiveIDCache.Store(cacheKey, imageID)
-			return imageID, nil
-		}
-		return "", fmt.Errorf("plugin image archive %s does not contain image %s", imagePath, imageName)
-	}
+	return nil
 }

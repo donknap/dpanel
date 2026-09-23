@@ -1,12 +1,8 @@
 package plugin
 
-import (
-	"context"
+import "github.com/donknap/dpanel/common/service/docker"
 
-	"github.com/donknap/dpanel/common/service/docker"
-)
-
-func NewHostExplorer(ctx context.Context, dockerSkd *docker.Client) (*Plugin, error) {
+func NewHostExplorer(dockerSkd *docker.Client) (*Plugin, error) {
 	explorerPlugin, err := NewPlugin(dockerSkd, ExplorerName, CreateOption{
 		Init:                     true,
 		RandomProxyContainerName: true,
@@ -20,9 +16,5 @@ func NewHostExplorer(ctx context.Context, dockerSkd *docker.Client) (*Plugin, er
 		_ = explorerPlugin.Close()
 		return nil, err
 	}
-	go func() {
-		<-ctx.Done()
-		_ = explorerPlugin.Close()
-	}()
 	return explorerPlugin, nil
 }

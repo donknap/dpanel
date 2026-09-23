@@ -26,10 +26,9 @@ services:
       - SYS_PTRACE
 #{{- end }}
     environment:
-      DP_AGENT_CAPS: "fs"
+      DP_AGENT_CAPS: "fs,import"
     labels:
       - "com.dpanel.container.title=DPanel-文件管理助手"
-      - "com.dpanel.container.auto_remove=true"
       - "com.dpanel.container.hash={{.hash}}"
       - "com.dpanel.container.name=dpanel-plugin-explorer"
 #{{- if .volumes }}
@@ -46,7 +45,6 @@ services:
         amd64: asset/plugin/dpanel-plugin-explorer/image-amd64.tar
         arm64: asset/plugin/dpanel-plugin-explorer/image-arm64.tar
         arm: asset/plugin/dpanel-plugin-explorer/image-arm.tar
-      image_auto_remove: true
       external:
 #{{- if .external.volumes }}
         volumes:

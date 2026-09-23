@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -24,7 +25,7 @@ var _ serviceafs.Fs = (*Fs)(nil)
 
 type Fs struct {
 	name       string
-	root       *os.Root
+	roots      map[string]*os.Root
 	workingDir string
 	remoteFs   afero.Fs
 	sftpClient *sftp.Client
@@ -38,7 +39,7 @@ func New(options ...Option) (*Fs, error) {
 			return nil, err
 		}
 	}
-	if fileSystem.root == nil && fileSystem.remoteFs == nil {
+	if len(fileSystem.roots) == 0 && fileSystem.remoteFs == nil {
 		if err := WithRoot("/")(fileSystem); err != nil {
 			return nil, err
 		}
@@ -55,10 +56,11 @@ func (self *Fs) Name() string {
 }
 
 func (self *Fs) Close() error {
-	if self.root == nil {
-		return nil
+	var err error
+	for _, root := range self.roots {
+		err = errors.Join(err, root.Close())
 	}
-	return self.root.Close()
+	return err
 }
 
 func (self *Fs) Destroy() error {
@@ -66,78 +68,78 @@ func (self *Fs) Destroy() error {
 }
 
 func (self *Fs) Create(name string) (afero.File, error) {
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
 			return nil, pathError("create", name, err)
 		}
 		return self.remoteFs.Create(name)
 	}
-	name, err := self.localName(name)
+	root, name, err := self.resolveLocalPath(name)
 	if err != nil {
 		return nil, pathError("create", name, err)
 	}
-	return self.root.Create(name)
+	return root.Create(name)
 }
 
 func (self *Fs) Mkdir(name string, perm os.FileMode) error {
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
 			return pathError("mkdir", name, err)
 		}
 		return self.remoteFs.Mkdir(name, perm)
 	}
-	name, err := self.localName(name)
+	root, name, err := self.resolveLocalPath(name)
 	if err != nil {
 		return pathError("mkdir", name, err)
 	}
-	return self.root.Mkdir(name, perm)
+	return root.Mkdir(name, perm)
 }
 
 func (self *Fs) MkdirAll(name string, perm os.FileMode) error {
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
 			return pathError("mkdir", name, err)
 		}
 		return self.remoteFs.MkdirAll(name, perm)
 	}
-	name, err := self.localName(name)
+	root, name, err := self.resolveLocalPath(name)
 	if err != nil {
 		return pathError("mkdir", name, err)
 	}
-	return self.root.MkdirAll(name, perm)
+	return root.MkdirAll(name, perm)
 }
 
 func (self *Fs) Open(name string) (afero.File, error) {
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
 			return nil, pathError("open", name, err)
 		}
 		return self.remoteFs.Open(name)
 	}
-	name, err := self.localName(name)
+	root, name, err := self.resolveLocalPath(name)
 	if err != nil {
 		return nil, pathError("open", name, err)
 	}
-	return self.root.Open(name)
+	return root.Open(name)
 }
 
 func (self *Fs) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
 			return nil, pathError("openfile", name, err)
 		}
 		return self.remoteFs.OpenFile(name, flag, perm)
 	}
-	name, err := self.localName(name)
+	root, name, err := self.resolveLocalPath(name)
 	if err != nil {
 		return nil, pathError("openfile", name, err)
 	}
-	return self.root.OpenFile(name, flag, perm.Perm())
+	return root.OpenFile(name, flag, perm.Perm())
 }
 
 func (self *Fs) ReadDir(name string) ([]os.FileInfo, error) {
@@ -148,10 +150,33 @@ func (self *Fs) ReadDir(name string) ([]os.FileInfo, error) {
 		}
 		return self.sftpClient.ReadDir(name)
 	}
-	return afero.ReadDir(self, name)
+	virtualName, err := self.pathName(name)
+	if err != nil {
+		return nil, pathError("readdir", name, err)
+	}
+	if self.hasRootDirs() && virtualName == "/" {
+		rootDirs, err := self.RootDirs()
+		if err != nil {
+			return nil, err
+		}
+		result := make([]os.FileInfo, 0, len(rootDirs))
+		for _, rootDir := range rootDirs {
+			info, err := self.roots[rootDir].Stat(".")
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, namedFileInfo{FileInfo: info, name: strings.TrimPrefix(rootDir, "/")})
+		}
+		return result, nil
+	}
+	return afero.ReadDir(self, virtualName)
 }
 
 func (self *Fs) List(name string) ([]*fs.FileData, error) {
+	name, err := self.pathName(name)
+	if err != nil {
+		return nil, pathError("list", name, err)
+	}
 	entries, err := self.ReadDir(name)
 	if err != nil {
 		return nil, err
@@ -178,8 +203,34 @@ func (self *Fs) WorkingDir() string {
 }
 
 func (self *Fs) RootDirs() ([]string, error) {
-	return nil, nil
+	if !self.hasRootDirs() {
+		return nil, nil
+	}
+	result := make([]string, 0, len(self.roots))
+	for rootDir := range self.roots {
+		result = append(result, rootDir)
+	}
+	sort.Strings(result)
+	return result, nil
 }
+
+type namedFileInfo struct {
+	os.FileInfo
+	name string
+}
+
+func (self namedFileInfo) Name() string {
+	return self.name
+}
+
+type slashRootFileInfo struct{}
+
+func (slashRootFileInfo) Name() string       { return "/" }
+func (slashRootFileInfo) Size() int64        { return 0 }
+func (slashRootFileInfo) Mode() os.FileMode  { return os.ModeDir | 0o555 }
+func (slashRootFileInfo) ModTime() time.Time { return time.Time{} }
+func (slashRootFileInfo) IsDir() bool        { return true }
+func (slashRootFileInfo) Sys() any           { return nil }
 
 func (self *Fs) identityNames() (map[uint32]string, map[uint32]string) {
 	identities, _ := self.Users()
@@ -219,48 +270,58 @@ func (self *Fs) fileData(name string, info os.FileInfo, users, groups map[uint32
 }
 
 func (self *Fs) Remove(name string) error {
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
 			return pathError("remove", name, err)
 		}
 		return self.remoteFs.Remove(name)
 	}
-	name, err := self.localName(name)
+	if self.isRootDir(name) {
+		return pathError("remove", name, errors.New("refusing to remove root directory"))
+	}
+	root, name, err := self.resolveLocalPath(name)
 	if err != nil {
 		return pathError("remove", name, err)
 	}
-	return self.root.Remove(name)
+	return root.Remove(name)
 }
 
 func (self *Fs) Stat(name string) (os.FileInfo, error) {
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
 			return nil, pathError("stat", name, err)
 		}
 		return self.remoteFs.Stat(name)
 	}
-	name, err := self.localName(name)
+	virtualName, err := self.pathName(name)
 	if err != nil {
 		return nil, pathError("stat", name, err)
 	}
-	return self.root.Stat(name)
+	if self.hasRootDirs() && virtualName == "/" {
+		return slashRootFileInfo{}, nil
+	}
+	root, name, err := self.resolveLocalPath(virtualName)
+	if err != nil {
+		return nil, pathError("stat", name, err)
+	}
+	return root.Stat(name)
 }
 
 func (self *Fs) Chmod(name string, mode os.FileMode) error {
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
 			return pathError("chmod", name, err)
 		}
 		return self.remoteFs.Chmod(name, mode)
 	}
-	name, err := self.localName(name)
+	root, name, err := self.resolveLocalPath(name)
 	if err != nil {
 		return pathError("chmod", name, err)
 	}
-	return self.root.Chmod(name, mode)
+	return root.Chmod(name, mode)
 }
 
 func (self *Fs) ChmodAll(name string, mode os.FileMode, recursive bool) error {
@@ -268,7 +329,7 @@ func (self *Fs) ChmodAll(name string, mode os.FileMode, recursive bool) error {
 	if err != nil {
 		return pathError("chmod", name, err)
 	}
-	if recursive && name == "/" {
+	if recursive && self.isRootDir(name) {
 		return pathError("chmod", name, errors.New("refusing to recursively chmod root directory"))
 	}
 	return self.changeAll(name, recursive, func(filePath string) error {
@@ -277,18 +338,18 @@ func (self *Fs) ChmodAll(name string, mode os.FileMode, recursive bool) error {
 }
 
 func (self *Fs) Chown(name string, uid, gid int) error {
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
 			return pathError("chown", name, err)
 		}
 		return self.remoteFs.Chown(name, uid, gid)
 	}
-	name, err := self.localName(name)
+	root, name, err := self.resolveLocalPath(name)
 	if err != nil {
 		return pathError("chown", name, err)
 	}
-	return self.root.Chown(name, uid, gid)
+	return root.Chown(name, uid, gid)
 }
 
 func (self *Fs) ChownAll(name string, uid, gid *int, recursive bool) error {
@@ -299,7 +360,7 @@ func (self *Fs) ChownAll(name string, uid, gid *int, recursive bool) error {
 	if err != nil {
 		return pathError("chown", name, err)
 	}
-	if recursive && name == "/" {
+	if recursive && self.isRootDir(name) {
 		return pathError("chown", name, errors.New("refusing to recursively chown root directory"))
 	}
 	ownerUID, ownerGID := -1, -1
@@ -337,18 +398,18 @@ func (self *Fs) changeAll(name string, recursive bool, change func(string) error
 }
 
 func (self *Fs) Chtimes(name string, atime, mtime time.Time) error {
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
 			return pathError("chtimes", name, err)
 		}
 		return self.remoteFs.Chtimes(name, atime, mtime)
 	}
-	name, err := self.localName(name)
+	root, name, err := self.resolveLocalPath(name)
 	if err != nil {
 		return pathError("chtimes", name, err)
 	}
-	return self.root.Chtimes(name, atime, mtime)
+	return root.Chtimes(name, atime, mtime)
 }
 
 func (self *Fs) PathSize(name string) (int64, error) {
@@ -469,6 +530,9 @@ func (self *Fs) prepareTransfer(source, target string, overwrite bool) (string, 
 	if source == target {
 		return "", "", false, errors.New("source and target are the same")
 	}
+	if self.isRootDir(source) || self.isRootDir(target) {
+		return "", "", false, errors.New("filesystem root cannot be copied or moved")
+	}
 	sourceInfo, err := self.lstat(source)
 	if err != nil {
 		return "", "", false, err
@@ -508,30 +572,36 @@ func (self *Fs) RemoveAll(name string) error {
 	if err != nil {
 		return pathError("remove_all", name, err)
 	}
-	if virtualName == "/" {
+	if self.isRootDir(virtualName) {
 		return pathError("remove_all", virtualName, errors.New("refusing to remove root directory"))
 	}
-	if self.root != nil {
-		name, err = self.localName(virtualName)
+	if len(self.roots) != 0 {
+		root, localName, err := self.resolveLocalPath(virtualName)
 		if err != nil {
 			return pathError("remove_all", name, err)
 		}
-		return self.root.RemoveAll(name)
+		return root.RemoveAll(localName)
 	}
 	return self.removeEntry(virtualName)
 }
 
 func (self *Fs) Rename(oldname, newname string) error {
-	if self.root != nil {
-		oldname, err := self.localName(oldname)
+	if len(self.roots) != 0 {
+		if self.isRootDir(oldname) || self.isRootDir(newname) {
+			return &os.LinkError{Op: "rename", Old: oldname, New: newname, Err: errors.New("filesystem root cannot be renamed")}
+		}
+		oldRoot, localOldName, err := self.resolveLocalPath(oldname)
 		if err != nil {
 			return pathError("rename", oldname, err)
 		}
-		newname, err = self.localName(newname)
+		newRoot, localNewName, err := self.resolveLocalPath(newname)
 		if err != nil {
 			return pathError("rename", newname, err)
 		}
-		return self.root.Rename(oldname, newname)
+		if oldRoot != newRoot {
+			return &os.LinkError{Op: "rename", Old: oldname, New: newname, Err: syscall.EXDEV}
+		}
+		return oldRoot.Rename(localOldName, localNewName)
 	}
 	oldname, err := self.pathName(oldname)
 	if err != nil {
@@ -700,7 +770,7 @@ func (self *Fs) preflightSource(source string) (map[serviceafs.FileID]struct{}, 
 			if err != nil {
 				return err
 			}
-			if self.root != nil && filepath.IsAbs(linkName) {
+			if len(self.roots) != 0 && filepath.IsAbs(linkName) {
 				return errors.New("absolute symbolic link cannot be copied")
 			}
 			_, err = self.symlinkTarget(linkName, name)
@@ -743,7 +813,7 @@ func (self *Fs) preflightCopyTargets(source, target string) error {
 		if err != nil {
 			return err
 		}
-		if self.root != nil && filepath.IsAbs(linkName) {
+		if len(self.roots) != 0 && filepath.IsAbs(linkName) {
 			return errors.New("absolute symbolic link cannot be copied")
 		}
 		_, err = self.symlinkTarget(linkName, target)
@@ -823,7 +893,7 @@ func (self *Fs) checkCopyAliases(source, target string, sourceInfo, targetInfo o
 }
 
 func (self *Fs) preflightTargetAliases(source, target string, targetExists bool) error {
-	if !targetExists || self.root == nil {
+	if !targetExists || len(self.roots) == 0 {
 		return nil
 	}
 	sourceInfo, err := self.lstat(source)
@@ -870,17 +940,20 @@ func (self *Fs) preflightTargetAliases(source, target string, targetExists bool)
 
 func (self *Fs) fileStat(name string, info os.FileInfo) (*serviceafs.FileStat, error) {
 	// SFTP metadata is supplied by the remote server, not the panel's OS.
-	if self.root == nil {
+	if len(self.roots) == 0 {
 		return nil, nil
 	}
-	name, err := self.localName(name)
+	root, name, err := self.resolveLocalPath(name)
 	if err != nil {
 		return nil, err
 	}
-	return serviceafs.ReadFileStat(self.root, name, info)
+	return serviceafs.ReadFileStat(root, name, info)
 }
 
 func (self *Fs) removeEntry(name string) error {
+	if self.isRootDir(name) {
+		return pathError("remove", name, errors.New("refusing to remove root directory"))
+	}
 	info, exists, err := self.pathInfo(name)
 	if err != nil || !exists {
 		return err
@@ -913,12 +986,19 @@ func (self *Fs) lstat(name string) (os.FileInfo, error) {
 }
 
 func (self *Fs) LstatIfPossible(name string) (os.FileInfo, bool, error) {
-	if self.root != nil {
-		name, err := self.localName(name)
+	if len(self.roots) != 0 {
+		virtualName, err := self.pathName(name)
 		if err != nil {
 			return nil, true, pathError("lstat", name, err)
 		}
-		info, err := self.root.Lstat(name)
+		if self.hasRootDirs() && virtualName == "/" {
+			return slashRootFileInfo{}, true, nil
+		}
+		root, localName, err := self.resolveLocalPath(virtualName)
+		if err != nil {
+			return nil, true, pathError("lstat", name, err)
+		}
+		info, err := root.Lstat(localName)
 		return info, true, err
 	}
 	if self.sftpClient != nil {
@@ -941,12 +1021,12 @@ func (self *Fs) SymlinkIfPossible(oldname, newname string) error {
 	if err != nil {
 		return &os.LinkError{Op: "symlink", Old: oldname, New: newname, Err: err}
 	}
-	if self.root != nil {
-		newname, err = self.localName(virtualNewName)
+	if len(self.roots) != 0 {
+		root, localNewName, err := self.resolveLocalPath(virtualNewName)
 		if err != nil {
 			return pathError("symlink", newname, err)
 		}
-		return self.root.Symlink(filepath.FromSlash(oldname), newname)
+		return root.Symlink(filepath.FromSlash(oldname), localNewName)
 	}
 	if self.sftpClient != nil {
 		return self.sftpClient.Symlink(oldname, virtualNewName)
@@ -955,12 +1035,13 @@ func (self *Fs) SymlinkIfPossible(oldname, newname string) error {
 }
 
 func (self *Fs) ReadlinkIfPossible(name string) (string, error) {
-	if self.root != nil {
-		name, err := self.localName(name)
+	if len(self.roots) != 0 {
+		root, name, err := self.resolveLocalPath(name)
 		if err != nil {
 			return "", pathError("readlink", name, err)
 		}
-		return self.root.Readlink(name)
+		linkName, err := root.Readlink(name)
+		return filepath.ToSlash(linkName), err
 	}
 	if self.sftpClient != nil {
 		name, err := self.pathName(name)
@@ -970,18 +1051,6 @@ func (self *Fs) ReadlinkIfPossible(name string) (string, error) {
 		return self.sftpClient.ReadLink(name)
 	}
 	return "", afero.ErrNoReadlink
-}
-
-func (self *Fs) localName(name string) (string, error) {
-	name, err := self.pathName(name)
-	if err != nil {
-		return name, err
-	}
-	name = strings.TrimPrefix(name, "/")
-	if name == "" {
-		return ".", nil
-	}
-	return filepath.FromSlash(name), nil
 }
 
 func (self *Fs) pathName(name string) (string, error) {
@@ -994,7 +1063,61 @@ func (self *Fs) pathName(name string) (string, error) {
 	return name, nil
 }
 
+func (self *Fs) hasRootDirs() bool {
+	if len(self.roots) == 0 {
+		return false
+	}
+	_, singleRoot := self.roots["/"]
+	return !singleRoot
+}
+
+func (self *Fs) isRootDir(name string) bool {
+	name, err := self.pathName(name)
+	if err != nil {
+		return false
+	}
+	if name == "/" {
+		return true
+	}
+	if !self.hasRootDirs() {
+		return false
+	}
+	_, exists := self.roots[strings.ToLower(name)]
+	return exists
+}
+
+func (self *Fs) resolveLocalPath(name string) (*os.Root, string, error) {
+	virtualName, err := self.pathName(name)
+	if err != nil {
+		return nil, name, err
+	}
+	if root := self.roots["/"]; root != nil {
+		localName := strings.TrimPrefix(virtualName, "/")
+		if localName == "" {
+			localName = "."
+		}
+		return root, filepath.FromSlash(localName), nil
+	}
+	components := strings.SplitN(strings.TrimPrefix(virtualName, "/"), "/", 2)
+	rootName := "/" + strings.ToLower(components[0])
+	root := self.roots[rootName]
+	if root == nil {
+		return nil, virtualName, fmt.Errorf("%w: filesystem root %s", os.ErrNotExist, rootName)
+	}
+	localName := "."
+	if len(components) == 2 {
+		localName = filepath.FromSlash(components[1])
+	}
+	return root, localName, nil
+}
+
 func (self *Fs) symlinkTarget(oldname, newname string) (string, error) {
+	if len(self.roots) != 0 {
+		if filepath.VolumeName(oldname) != "" {
+			return oldname, errors.New("system absolute symlink target is not allowed")
+		}
+		oldname = filepath.ToSlash(oldname)
+	}
 	if oldname == "" || strings.IndexByte(oldname, 0) >= 0 || path.Clean(oldname) != oldname {
 		return oldname, errors.New("invalid symlink target")
 	}
@@ -1023,6 +1146,19 @@ func (self *Fs) symlinkTarget(oldname, newname string) (string, error) {
 			}
 		}
 		target = "/" + strings.Join(components, "/")
+	}
+	if self.hasRootDirs() {
+		targetRoot, _, err := self.resolveLocalPath(target)
+		if err != nil {
+			return oldname, err
+		}
+		newRoot, _, err := self.resolveLocalPath(newname)
+		if err != nil {
+			return oldname, err
+		}
+		if targetRoot != newRoot {
+			return oldname, errors.New("symbolic link target crosses filesystem roots")
+		}
 	}
 	relativeTarget, err := filepath.Rel(filepath.FromSlash(path.Dir(newname)), filepath.FromSlash(target))
 	if err != nil {
@@ -1172,7 +1308,7 @@ func (self *Fs) importEntry(source, target string) error {
 				return err
 			}
 		}
-		if self.root == nil {
+		if len(self.roots) == 0 {
 			return nil
 		}
 		if err = self.Chmod(target, info.Mode()); err != nil {

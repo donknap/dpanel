@@ -2,6 +2,7 @@ package logic
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -33,6 +34,28 @@ var ComposeFileNameSuffix = []string{
 }
 
 type Compose struct {
+}
+
+func (self Compose) SyncProjectToRemote(ctx context.Context, dockerSdk *docker.Client, workingDir string) error {
+	panelRoot, err := filepath.EvalSymlinks(storage.Local{}.GetStorageLocalPath())
+	if err != nil {
+		return fmt.Errorf("find dpanel data directory: %w", err)
+	}
+	projectDir, err := filepath.EvalSymlinks(workingDir)
+	if err != nil {
+		return fmt.Errorf("find compose project directory: %w", err)
+	}
+	relativePath, err := filepath.Rel(panelRoot, projectDir)
+	if err != nil {
+		return err
+	}
+	if relativePath == "." || relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("compose project directory %q is outside dpanel data directory", workingDir)
+	}
+	if err = (logic.Explorer{}).SyncDPanelDirectory(ctx, dockerSdk, projectDir, filepath.ToSlash(relativePath)); err != nil {
+		return fmt.Errorf("sync compose project files: %w", err)
+	}
+	return nil
 }
 
 func (self Compose) Get(key string) (*entity.Compose, error) {
@@ -317,7 +340,7 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 			if mount.Type != types.VolumeTypeBind {
 				continue
 			}
-			if v, ok := function.PathConvertWinPath2Unix(mount.Source); ok {
+			if v, ok := function.WindowsPathToSlash(mount.Source); ok {
 				dpanelInfo.ContainerInfo.Mounts[i].Source = filepath.Join("/", "mnt", "host", v)
 			}
 		}

@@ -1,7 +1,6 @@
 package stat
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,9 +11,9 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
 	agentTypes "github.com/donknap/dpanel/app/agent/types"
 	"github.com/donknap/dpanel/common/accessor"
+	serviceAgent "github.com/donknap/dpanel/common/service/agent"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/stats"
 	"github.com/donknap/dpanel/common/service/plugin"
@@ -42,7 +41,7 @@ func (self Stat) ReadSystemStat(ctx context.Context, dockerSdk *docker.Client) <
 }
 
 func streamSystem(ctx context.Context, dockerSdk *docker.Client, handle func(systemStatSample) error) error {
-	command := []string{"/agent", "stat"}
+	targets := make([]serviceAgent.ContainerTarget, 0)
 	containerList, err := dockerSdk.Client.ContainerList(ctx, container.ListOptions{})
 	if err != nil {
 		slog.Warn("list containers for agent stat", "dockerEnvName", dockerSdk.Name, "error", err)
@@ -58,56 +57,31 @@ func streamSystem(ctx context.Context, dockerSdk *docker.Client, handle func(sys
 				!strings.Contains(strings.ToLower(containerInfo.HostConfig.Runtime), "sysbox") {
 				continue
 			}
-			command = append(command, "--container-id", fmt.Sprintf("%s:%d", containerInfo.ID, containerInfo.State.Pid))
+			targets = append(targets, serviceAgent.ContainerTarget{
+				ContainerID: containerInfo.ID,
+				PID:         containerInfo.State.Pid,
+			})
 		}
 	}
-	_, response, err := dockerSdk.ContainerExec(ctx, plugin.MonitorName, container.ExecOptions{
-		AttachStdin:  true,
-		AttachStdout: true,
-		AttachStderr: true,
-		Cmd:          command,
-	})
+	if err := (Stat{}).ReconcileSystemStat(dockerSdk); err != nil {
+		return err
+	}
+	agent, err := serviceAgent.NewDockerAgent(dockerSdk, plugin.MonitorName)
 	if err != nil {
 		return err
 	}
-	defer response.Close()
-	stopClose := context.AfterFunc(ctx, func() {
-		_ = response.CloseWrite()
-		response.Close()
-	})
-	defer stopClose()
-
-	stdoutReader, stdoutWriter := io.Pipe()
-	copyDone := make(chan error, 1)
-	go func() {
-		_, copyErr := stdcopy.StdCopy(stdoutWriter, io.Discard, response.Reader)
-		_ = stdoutWriter.CloseWithError(copyErr)
-		copyDone <- copyErr
-	}()
-	scanner := bufio.NewScanner(stdoutReader)
-	scanner.Buffer(make([]byte, 64*1024), 64*1024*1024)
 	systemCollector := &agentSystemCollector{}
 	containerCollectors := make(map[string]*stats.Container)
-	for scanner.Scan() {
-		system, containers, ready, decodeErr := systemCollector.Decode(scanner.Bytes(), containerCollectors)
+	return agent.StreamStat(ctx, targets, func(data []byte) error {
+		system, containers, ready, decodeErr := systemCollector.Decode(data, containerCollectors)
 		if decodeErr != nil {
 			return decodeErr
 		}
 		if !ready {
-			continue
+			return nil
 		}
-		if err = handle(systemStatSample{system: system, containers: containers}); err != nil {
-			return err
-		}
-	}
-	if err = scanner.Err(); err != nil && ctx.Err() == nil {
-		return fmt.Errorf("read agent stat: %w", err)
-	}
-	copyErr := <-copyDone
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	return copyErr
+		return handle(systemStatSample{system: system, containers: containers})
+	})
 }
 
 func (collector *agentSystemCollector) Decode(
@@ -439,26 +413,21 @@ func collectAgentContainerStats(
 }
 
 func (self Stat) HostDiskUsage(ctx context.Context, dockerSdk *docker.Client) (accessor.SystemDiskUsage, error) {
-	output, err := dockerSdk.ContainerExecResult(ctx, plugin.MonitorName, container.ExecOptions{
-		Cmd: []string{"/agent", "usage"},
-	})
+	if err := self.ReconcileSystemStat(dockerSdk); err != nil {
+		return accessor.SystemDiskUsage{}, err
+	}
+	agent, err := serviceAgent.NewDockerAgent(dockerSdk, plugin.MonitorName)
 	if err != nil {
-		return accessor.SystemDiskUsage{}, fmt.Errorf("execute agent usage: %w", err)
+		return accessor.SystemDiskUsage{}, err
 	}
-	message := agentTypes.Message[*agentTypes.FilesystemUsage]{}
-	if err = decodeAgentJSON([]byte(output), &message); err != nil {
-		return accessor.SystemDiskUsage{}, fmt.Errorf("decode agent response: %w", err)
-	}
-	if message.Code != 200 || message.Error != "" || message.Data == nil {
-		if message.Error == "" {
-			message.Error = fmt.Sprintf("agent returned code %d", message.Code)
-		}
-		return accessor.SystemDiskUsage{}, errors.New(message.Error)
+	usage, err := agent.Usage(ctx)
+	if err != nil {
+		return accessor.SystemDiskUsage{}, err
 	}
 	return accessor.SystemDiskUsage{
-		Used: message.Data.Used, Available: message.Data.Available, Total: message.Data.Total,
-		InodeUsed: message.Data.InodeUsed, InodeAvailable: message.Data.InodeAvailable,
-		InodeTotal: message.Data.InodeTotal,
+		Used: usage.Used, Available: usage.Available, Total: usage.Total,
+		InodeUsed: usage.InodeUsed, InodeAvailable: usage.InodeAvailable,
+		InodeTotal: usage.InodeTotal,
 	}, nil
 }
 

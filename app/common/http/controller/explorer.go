@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"mime"
 	"os"
 	"path"
 	"regexp"
@@ -81,8 +82,8 @@ func (self Explorer) Export(http *gin.Context) {
 		return
 	}
 	defer download.Close()
-	http.Header("Content-Type", "application/zip")
-	http.Header("Content-Disposition", "attachment; filename=export.zip")
+	http.Header("Content-Type", download.ContentType)
+	http.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": download.FileName}))
 	http.File(download.Name())
 }
 

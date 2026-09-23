@@ -1,12 +1,12 @@
 package types
 
-type Port struct {
-	Port     uint16 `json:"port"`
-	Protocol string `json:"protocol"`
+type PortCheckItem struct {
+	Port          string   `json:"port"`
+	Status        string   `json:"status"`
+	LatencyMillis *float64 `json:"latencyMillis,omitempty"`
 }
 
-type PortResult struct {
-	ContainerID string `json:"containerId"`
-	Ports       []Port `json:"ports"`
-	Error       string `json:"error,omitempty"`
+type PortCheckResult struct {
+	ContainerID string          `json:"containerId"`
+	Ports       []PortCheckItem `json:"ports"`
 }

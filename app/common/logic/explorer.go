@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/docker/errdefs"
 	"github.com/donknap/dpanel/common/function"
+	serviceagent "github.com/donknap/dpanel/common/service/agent"
 	archiveservice "github.com/donknap/dpanel/common/service/archive"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -107,16 +108,27 @@ func (self Explorer) Afs(ctx context.Context, mountType, mountName string, docke
 		if dockerSdk == nil || dockerSdk.Client == nil {
 			return nil, errors.New("docker client is required for this explorer mount point")
 		}
-		mountPointValue := mountType + ":" + mountName
+		mounts := (Setting{}).GetDPanelInfo().DataMounts
+		if len(mounts) == 0 || mounts[0].Host == "" || mounts[0].Dest != "/dpanel" {
+			return nil, errors.New("dpanel data mount is unavailable")
+		}
+		mountPointValue := mountType + ":" + mountName + ":" + function.Sha256Struct(mounts)
 		key := fmt.Sprintf(storage.CacheKeyExplorerAfs, dockerSdk.Name, plugin.ExplorerName)
 		lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, plugin.ExplorerName))
 		lock.Lock()
 		defer lock.Unlock()
 		if session, ok := storage.LoadCache[*explorerSession](key); ok && session.mountPoint == mountPointValue {
-			return session.fileSystem, nil
+			containerInfo, err := dockerSdk.Client.ContainerInspect(dockerSdk.Ctx, plugin.ExplorerName)
+			if err == nil && containerInfo.State != nil && containerInfo.State.Running {
+				return session.fileSystem, nil
+			}
+			if err != nil && !errdefs.IsNotFound(err) {
+				return nil, err
+			}
+			storage.Cache.Delete(key)
 		}
 
-		pluginOption := plugin.CreateOption{Init: true, Hash: mountPointValue}
+		pluginOption := plugin.CreateOption{Init: true, Hash: mountPointValue, Volumes: mounts}
 		dockerFsOptions := []dockerfs.Option{
 			dockerfs.WithName(mountName),
 			dockerfs.WithDockerSdk(dockerSdk),
@@ -177,6 +189,44 @@ func (self Explorer) Afs(ctx context.Context, mountType, mountName string, docke
 	}
 }
 
+func (self Explorer) SyncDPanelDirectory(ctx context.Context, dockerSdk *docker.Client, sourcePath, targetPath string) error {
+	temporary, err := storage.Local{}.CreateTempFile("")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	if err = temporary.Close(); err != nil {
+		_ = os.Remove(temporaryPath)
+		return err
+	}
+	defer os.Remove(temporaryPath)
+	if err = archiveservice.CreateTar(temporaryPath, archiveservice.WithFile(sourcePath, targetPath)); err != nil {
+		return fmt.Errorf("archive dpanel directory: %w", err)
+	}
+	archive, err := os.Open(temporaryPath)
+	if err != nil {
+		return err
+	}
+	defer archive.Close()
+	if _, err = self.Afs(ctx, ExplorerMountTypeContainer, plugin.ExplorerName, dockerSdk); err != nil {
+		return fmt.Errorf("prepare explorer for dpanel sync: %w", err)
+	}
+	agent, err := serviceagent.NewDockerAgent(dockerSdk, plugin.ExplorerName)
+	if err != nil {
+		return err
+	}
+	if err = agent.ImportDPanel(ctx, archive); !errdefs.IsNotFound(err) {
+		return err
+	}
+	if _, retryErr := self.Afs(ctx, ExplorerMountTypeContainer, plugin.ExplorerName, dockerSdk); retryErr != nil {
+		return errors.Join(err, fmt.Errorf("recreate explorer for dpanel sync: %w", retryErr))
+	}
+	if _, retryErr := archive.Seek(0, io.SeekStart); retryErr != nil {
+		return errors.Join(err, fmt.Errorf("rewind dpanel archive: %w", retryErr))
+	}
+	return agent.ImportDPanel(ctx, archive)
+}
+
 type ExplorerImportFile struct {
 	Name string
 	Path string
@@ -189,7 +239,9 @@ type ExplorerContent struct {
 
 type ExplorerDownload struct {
 	*os.File
-	path string
+	path        string
+	FileName    string
+	ContentType string
 }
 
 func (self *ExplorerDownload) Close() error {
@@ -197,6 +249,36 @@ func (self *ExplorerDownload) Close() error {
 }
 
 func (self Explorer) Export(fileSystem serviceafs.Fs, fileList []string, exportToPanelPath bool) (*ExplorerDownload, error) {
+	if len(fileList) == 0 {
+		return nil, errors.New("export file list is empty")
+	}
+	if !exportToPanelPath && len(fileList) == 1 {
+		info, _, err := fileSystem.LstatIfPossible(fileList[0])
+		if err != nil {
+			return nil, err
+		}
+		if info.Mode().IsRegular() {
+			target, err := storage.Local{}.CreateTempFile("")
+			if err != nil {
+				return nil, err
+			}
+			targetPath := target.Name()
+			if err = target.Close(); err != nil {
+				_ = os.Remove(targetPath)
+				return nil, err
+			}
+			if err = fileSystem.Export([]serviceafs.TransferFile{{Source: fileList[0], Target: targetPath}}); err != nil {
+				_ = os.Remove(targetPath)
+				return nil, err
+			}
+			target, err = os.Open(targetPath)
+			if err != nil {
+				_ = os.Remove(targetPath)
+				return nil, err
+			}
+			return &ExplorerDownload{File: target, path: targetPath, FileName: info.Name(), ContentType: "application/octet-stream"}, nil
+		}
+	}
 	temporaryFileSystem, err := tempfs.New()
 	if err != nil {
 		return nil, err
@@ -245,7 +327,11 @@ func (self Explorer) Export(fileSystem serviceafs.Fs, fileList []string, exportT
 		_ = os.Remove(targetPath)
 		return nil, err
 	}
-	return &ExplorerDownload{File: target, path: targetPath}, nil
+	return &ExplorerDownload{
+		File: target, path: targetPath,
+		FileName:    "export-" + fileSystem.Name() + "-" + time.Now().Format("20060102-150405") + ".zip",
+		ContentType: "application/zip",
+	}, nil
 }
 
 func (self Explorer) ImportFileContent(fileSystem serviceafs.Fs, fileName, content, destination string, fileMode uint32) error {
@@ -282,13 +368,16 @@ func (self Explorer) ImportFileContent(fileSystem serviceafs.Fs, fileName, conte
 func (self Explorer) Import(fileSystem serviceafs.Fs, destination string, fileList []ExplorerImportFile) (err error) {
 	files := make([]serviceafs.TransferFile, 0, len(fileList))
 	for _, item := range fileList {
-		realPath := storage.Local{}.GetSaveRealPath(function.SystemPathFromSlash(item.Path))
+		realPath := function.SafePathJoin(storage.Local{}.GetLocalTempDir(), function.SlashPathToSystem(item.Path))
 		files = append(files, serviceafs.TransferFile{Source: realPath, Target: path.Join(destination, item.Name)})
-		defer func(filePath string) {
-			err = errors.Join(err, os.Remove(filePath))
-		}(realPath)
 	}
-	return fileSystem.Import(files)
+	if err = fileSystem.Import(files); err != nil {
+		return err
+	}
+	for _, item := range files {
+		err = errors.Join(err, os.Remove(item.Source))
+	}
+	return err
 }
 
 func (self Explorer) UnArchive(fileSystem serviceafs.Fs, archives []string, destination string) error {
@@ -302,54 +391,11 @@ func (self Explorer) UnArchive(fileSystem serviceafs.Fs, archives []string, dest
 	if !destinationInfo.IsDir() {
 		return errors.New("archive destination is not a directory")
 	}
-	temporaryFileSystem, err := tempfs.New()
-	if err != nil {
-		return err
-	}
-	defer temporaryFileSystem.Close()
-	if err = temporaryFileSystem.MkdirAll("/archives", 0o700); err != nil {
-		return err
-	}
-	extractDirectory, err := temporaryFileSystem.LocalPath("/files")
-	if err != nil {
-		return err
-	}
-	transferList := make([]serviceafs.TransferFile, 0, len(archives))
-	localArchives := make([]string, 0, len(archives))
-	for index, archivePath := range archives {
-		localPath, pathErr := temporaryFileSystem.LocalPath(path.Join("/archives", strconv.Itoa(index), path.Base(archivePath)))
-		if pathErr != nil {
-			return pathErr
-		}
-		transferList = append(transferList, serviceafs.TransferFile{Source: archivePath, Target: localPath})
-		localArchives = append(localArchives, localPath)
-	}
-	if err = fileSystem.Export(transferList); err == nil {
-		for _, archivePath := range localArchives {
-			if err = archiveservice.UnArchive(archivePath, extractDirectory); err != nil {
-				break
-			}
-		}
-	}
+	err = fileSystem.UnArchive(archives, destination)
 	if errors.Is(err, archiveservice.ErrUnsupportedFormat) {
 		return function.ErrorMessage(define.ErrorMessageContainerExplorerUnzipTargetUnsupportedType)
 	}
-	if err != nil {
-		return err
-	}
-	entries, err := temporaryFileSystem.ReadDir("/files")
-	if err != nil {
-		return fmt.Errorf("read extracted archive files: %w", err)
-	}
-	transferList = make([]serviceafs.TransferFile, 0, len(entries))
-	for _, entry := range entries {
-		localPath, pathErr := temporaryFileSystem.LocalPath(path.Join("/files", entry.Name()))
-		if pathErr != nil {
-			return pathErr
-		}
-		transferList = append(transferList, serviceafs.TransferFile{Source: localPath, Target: path.Join(destination, entry.Name())})
-	}
-	return fileSystem.Import(transferList)
+	return err
 }
 
 func (self Explorer) GetContent(fileSystem serviceafs.Fs, filePath string) (ExplorerContent, error) {

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -111,6 +112,18 @@ func (self Panel) Backup(http *gin.Context) {
 	if function.IsEmptyArray(params.BackupVolumePathList) {
 		params.BackupVolumePathList = panelAllPath
 	}
+	panelPathByName := make(map[string]string, len(panelAllPath))
+	for _, item := range panelAllPath {
+		panelPathByName[path.Clean(item)] = item
+	}
+	for i, item := range params.BackupVolumePathList {
+		canonicalPath, ok := panelPathByName[path.Clean(strings.TrimPrefix(item, "/"))]
+		if !ok {
+			self.JsonResponseWithError(http, fmt.Errorf("invalid backup path: %s", item), 500)
+			return
+		}
+		params.BackupVolumePathList[i] = canonicalPath
+	}
 
 	backupTime := time.Now().Format(define.DateYmdHis)
 	suffix := fmt.Sprintf("dpanel-main-%s", backupTime)
@@ -152,12 +165,9 @@ func (self Panel) Backup(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	params.BackupVolumePathList = append(params.BackupVolumePathList, "dpanel.lic")
+	params.BackupVolumePathList = append(params.BackupVolumePathList, "./dpanel.lic")
 	manifest := make([]backup.Manifest, 0)
 	backupPathMap := function.PluckArrayMapWalk(params.BackupVolumePathList, func(item string) (string, string, bool) {
-		if !function.InArray(panelAllPath, item) {
-			return "", "", false
-		}
 		realPath := filepath.Join(storage.Local{}.GetStorageLocalPath(), item)
 		if _, statErr := os.Lstat(realPath); errors.Is(statErr, os.ErrNotExist) {
 			return "", "", false

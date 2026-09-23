@@ -341,12 +341,12 @@ func (self SiteDomain) NginxLog(http *gin.Context) {
 		"/var/log/nginx/error.log",
 	}
 
-	progress, err := ws.NewFdProgressPip(http, ws.MessageTypeNginxLog)
+	progress, owner, err := ws.NewFdProgressPip(http, "", ws.MessageTypeNginxLog)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if progress.IsShadow() {
+	if !owner {
 		self.JsonSuccessResponse(http)
 		return
 	}

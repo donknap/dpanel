@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -25,14 +26,19 @@ func (self Plugin) Destroy(e event.DockerDaemonPayload) {
 		if dockerSdk, err := docker.NewClientWithDockerEnv(dockerEnv); err == nil {
 			defer dockerSdk.Close()
 			filter := filters.NewArgs()
-			filter.Add(docker.ContainerFilterLabel, fmt.Sprintf("%s=true", define.DPanelLabelContainerAutoRemove))
+			filter.Add(docker.ContainerFilterLabel, define.DPanelLabelContainerName)
 			if list, err := dockerSdk.ContainerList(dockerSdk.Ctx, container.ListOptions{
 				All:     true,
 				Filters: filter,
 			}); err == nil {
 				var removeErr error
 				images := make(map[string]struct{})
+				plugins := make([]container.Summary, 0, len(list))
 				for _, containerInfo := range list {
+					if !strings.HasPrefix(containerInfo.Labels[define.DPanelLabelContainerName], "dpanel-plugin-") {
+						continue
+					}
+					plugins = append(plugins, containerInfo)
 					images[containerInfo.Image] = struct{}{}
 					err = dockerSdk.Client.ContainerStop(dockerSdk.Ctx, containerInfo.ID, container.StopOptions{})
 					if err != nil {
@@ -52,7 +58,7 @@ func (self Plugin) Destroy(e event.DockerDaemonPayload) {
 						removeErr = errors.Join(removeErr, err)
 					}
 				}
-				slog.Debug("plugin destroy", "name", function.PluckArrayWalk(list, func(item container.Summary) ([]string, bool) {
+				slog.Debug("plugin destroy", "name", function.PluckArrayWalk(plugins, func(item container.Summary) ([]string, bool) {
 					return item.Names, true
 				}), "error", removeErr)
 			}

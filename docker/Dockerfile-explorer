@@ -23,6 +23,5 @@ COPY --from=builder /agent /agent
 WORKDIR /
 
 LABEL com.dpanel.container.title=DPanel-文件管理助手
-LABEL com.dpanel.container.auto_remove=true
 
 ENTRYPOINT ["/agent"]
