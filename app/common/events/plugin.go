@@ -2,7 +2,6 @@ package events
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 
@@ -11,8 +10,6 @@ import (
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/plugin"
-	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 )
@@ -21,7 +18,6 @@ type Plugin struct {
 }
 
 func (self Plugin) Destroy(e event.DockerDaemonPayload) {
-	storage.Cache.Delete(fmt.Sprintf(storage.CacheKeyExplorerAfs, e.DockerEnvName, plugin.ExplorerName))
 	if dockerEnv, err := (logic.Env{}).GetEnvByName(e.DockerEnvName); err == nil {
 		if dockerSdk, err := docker.NewClientWithDockerEnv(dockerEnv); err == nil {
 			defer dockerSdk.Close()

@@ -23,7 +23,6 @@ const (
 	MessageTypeContainerCommandCreate = "container:command:create:%s"
 	MessageTypeContainerAllStat       = "container:stat"
 	MessageTypeContainerStat          = "container:stat:%s"
-	MessageTypeContainerExplorer      = "container:explorer"
 	MessageTypeDiskUsage              = "stat:diskUsage"
 	MessageTypeContainerBackup        = "container:backup:%d"
 	MessageTypeImagePull              = "image:pull:%s"
@@ -34,6 +33,12 @@ const (
 	MessageTypeUserPermission         = "user:permission:%s"
 	MessageTypeSwarmLog               = "swarm:log:%s:%s"
 	MessageTypeNginxLog               = "nginx:log"
+)
+
+const (
+	MessageTypeContainerExplorerOpen    = "container:explorer:open"
+	MessageTypeContainerExplorerCancel  = "container:explorer:cancel"
+	MessageTypeContainerExplorerDestroy = "container:explorer:destroy"
 )
 
 type RespMessage struct {

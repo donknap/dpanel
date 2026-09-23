@@ -27,7 +27,6 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/h2non/filetype"
-	cache "github.com/patrickmn/go-cache"
 )
 
 const (
@@ -40,11 +39,6 @@ const (
 )
 
 type Explorer struct{}
-
-type explorerSession struct {
-	mountPoint string
-	fileSystem serviceafs.Fs
-}
 
 func (self Explorer) Afs(ctx context.Context, mountType, mountName string, dockerSdk *docker.Client) (serviceafs.Fs, error) {
 	switch mountType {
@@ -113,20 +107,9 @@ func (self Explorer) Afs(ctx context.Context, mountType, mountName string, docke
 			return nil, errors.New("dpanel data mount is unavailable")
 		}
 		mountPointValue := mountType + ":" + mountName + ":" + function.Sha256Struct(mounts)
-		key := fmt.Sprintf(storage.CacheKeyExplorerAfs, dockerSdk.Name, plugin.ExplorerName)
 		lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, plugin.ExplorerName))
 		lock.Lock()
 		defer lock.Unlock()
-		if session, ok := storage.LoadCache[*explorerSession](key); ok && session.mountPoint == mountPointValue {
-			containerInfo, err := dockerSdk.Client.ContainerInspect(dockerSdk.Ctx, plugin.ExplorerName)
-			if err == nil && containerInfo.State != nil && containerInfo.State.Running {
-				return session.fileSystem, nil
-			}
-			if err != nil && !errdefs.IsNotFound(err) {
-				return nil, err
-			}
-			storage.Cache.Delete(key)
-		}
 
 		pluginOption := plugin.CreateOption{Init: true, Hash: mountPointValue, Volumes: mounts}
 		dockerFsOptions := []dockerfs.Option{
@@ -157,12 +140,6 @@ func (self Explorer) Afs(ctx context.Context, mountType, mountName string, docke
 		if err = explorerPlugin.Create(); err != nil {
 			return nil, err
 		}
-		dockerFsOptions = append(dockerFsOptions, dockerfs.WithDestroy(func() error {
-			lock.Lock()
-			defer lock.Unlock()
-			storage.Cache.Delete(key)
-			return explorerPlugin.Close()
-		}))
 		if mountType == ExplorerMountTypeContainer {
 			containerInfo, err := dockerSdk.Client.ContainerInspect(dockerSdk.Ctx, mountName)
 			if err != nil {
@@ -178,15 +155,24 @@ func (self Explorer) Afs(ctx context.Context, mountType, mountName string, docke
 			dockerFsOptions = append(dockerFsOptions, dockerfs.WithWorkingDir(workingDir))
 		}
 
-		fileSystem, err := servicefs.NewFs(servicefs.WithDockerDriver(dockerFsOptions...))
-		if err != nil {
-			return nil, err
-		}
-		storage.Cache.Set(key, &explorerSession{mountPoint: mountPointValue, fileSystem: fileSystem}, cache.NoExpiration)
-		return fileSystem, nil
+		return servicefs.NewFs(servicefs.WithDockerDriver(dockerFsOptions...))
 	default:
 		return nil, errors.New("unknown explorer mount point type")
 	}
+}
+
+func (self Explorer) DestroyProxyContainer(dockerSdk *docker.Client) error {
+	if dockerSdk == nil || dockerSdk.Client == nil {
+		return errors.New("docker client is required to destroy explorer proxy")
+	}
+	lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, plugin.ExplorerName))
+	lock.Lock()
+	defer lock.Unlock()
+	explorerPlugin, err := plugin.NewPlugin(dockerSdk, plugin.ExplorerName, plugin.CreateOption{Init: false})
+	if err != nil {
+		return err
+	}
+	return explorerPlugin.Close()
 }
 
 func (self Explorer) SyncDPanelDirectory(ctx context.Context, dockerSdk *docker.Client, sourcePath, targetPath string) error {

@@ -2,7 +2,6 @@ package controller
 
 import (
 	"errors"
-	"fmt"
 	"mime"
 	"os"
 	"path"
@@ -14,8 +13,6 @@ import (
 	archiveservice "github.com/donknap/dpanel/common/service/archive"
 	"github.com/donknap/dpanel/common/service/docker"
 	serviceafs "github.com/donknap/dpanel/common/service/fs/afs"
-	"github.com/donknap/dpanel/common/service/plugin"
-	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
@@ -500,15 +497,7 @@ func (self Explorer) Copy(http *gin.Context) {
 func (self Explorer) DestroyProxyContainer(http *gin.Context) {
 	dockerSdk, err := docker.NewClientWithUser(http)
 	if err == nil {
-		var explorerPlugin *plugin.Plugin
-		explorerPlugin, err = plugin.NewPlugin(dockerSdk, plugin.ExplorerName, plugin.CreateOption{Init: false})
-		if err == nil {
-			lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, plugin.ExplorerName))
-			lock.Lock()
-			defer lock.Unlock()
-			storage.Cache.Delete(fmt.Sprintf(storage.CacheKeyExplorerAfs, dockerSdk.Name, plugin.ExplorerName))
-			err = explorerPlugin.Close()
-		}
+		err = (logic.Explorer{}).DestroyProxyContainer(dockerSdk)
 	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

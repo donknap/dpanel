@@ -48,10 +48,3 @@ func WithWorkingDir(workingDir string) Option {
 		return nil
 	}
 }
-
-func WithDestroy(destroy func() error) Option {
-	return func(self *Fs) error {
-		self.destroy = destroy
-		return nil
-	}
-}

@@ -79,6 +79,7 @@ type Client struct {
 	closeOnce          sync.Once
 	closeErr           error
 	recvMessageHandler map[string]RecvMessageHandlerFn
+	onClose            func()
 }
 
 func (self *Client) ReadMessage() {
@@ -135,6 +136,9 @@ func (self *Client) Close() error {
 	self.closeOnce.Do(func() {
 		self.CtxCancelFunc()
 		collect.Leave(self)
+		if self.onClose != nil {
+			self.onClose()
+		}
 		if self.Conn != nil {
 			self.closeErr = self.Conn.Close()
 		}

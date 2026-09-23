@@ -35,7 +35,6 @@ type Fs struct {
 	rootPath            string
 	workingDir          string
 	targetType          targetType
-	destroy             func() error
 }
 
 type targetType uint8
@@ -83,10 +82,7 @@ func (self *Fs) Name() string {
 }
 
 func (self *Fs) Destroy() error {
-	if self.destroy == nil {
-		return nil
-	}
-	return self.destroy()
+	return nil
 }
 
 func (self *Fs) Create(name string) (afero.File, error) {

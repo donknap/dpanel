@@ -8,11 +8,8 @@ import (
 	"time"
 
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/donknap/dpanel/common/types/event"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 var (
@@ -78,7 +75,7 @@ func (self *Collection) Leave(c *Client) {
 		}
 	})
 
-	// 所有客户端都退出时，销毁所有通道
+	// 所有客户端都退出时，销毁非保活的进度通道
 	if self.Total() == 0 {
 		self.progressPip.Range(func(key, value any) bool {
 			if p, success := value.(*ProgressPip); success && !p.IsKeepAlive {
@@ -86,10 +83,6 @@ func (self *Collection) Leave(c *Client) {
 				self.progressPip.CompareAndDelete(key, p)
 			}
 			return true
-		})
-		slog.Info("docker client cancel")
-		facade.Event.Publish(event.PluginDestroy, event.DockerDaemonPayload{
-			DockerEnvName: docker.Sdk.DockerEnv.Name,
 		})
 		//docker.Sdk.CtxCancelFunc()
 		//docker.Sdk.Client.Close()

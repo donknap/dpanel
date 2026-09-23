@@ -1,4 +1,4 @@
-package port
+package check
 
 import (
 	"context"
@@ -13,8 +13,6 @@ import (
 
 	agentTypes "github.com/donknap/dpanel/app/agent/types"
 )
-
-type Handler struct{}
 
 type portCheckJob struct {
 	containerIndex int
@@ -32,11 +30,7 @@ const (
 	portCheckUnsupported = "unsupported"
 )
 
-func New() *Handler {
-	return &Handler{}
-}
-
-func (*Handler) Handle(ctx context.Context, args []string) (any, error) {
+func checkPorts(ctx context.Context, args []string) (any, error) {
 	result, err := parseTargets(args)
 	if err != nil {
 		return nil, err

@@ -11,3 +11,10 @@ func WithMessageRecvHandler(messageType string, call RecvMessageHandlerFn) Optio
 		return nil
 	}
 }
+
+func WithCloseHandler(call func()) Option {
+	return func(self *Client) error {
+		self.onClose = call
+		return nil
+	}
+}

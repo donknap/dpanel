@@ -83,7 +83,7 @@ func (self *Agent) CheckPorts(ctx context.Context, targets []PortCheckTarget) ([
 	if len(targets) == 0 {
 		return result, nil
 	}
-	args := []string{"check-port"}
+	args := []string{"check", "--port"}
 	for targetIndex, target := range targets {
 		if target.ContainerID == "" {
 			return nil, errors.New("invalid agent port target")

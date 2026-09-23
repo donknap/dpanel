@@ -13,7 +13,7 @@ func ParseCapabilities(value string) (map[string]struct{}, error) {
 	for _, item := range strings.Split(value, ",") {
 		capability := strings.TrimSpace(item)
 		switch capability {
-		case "fs", "import", "usage", "stat", "check-port":
+		case "fs", "import", "usage", "stat", "check":
 			result[capability] = struct{}{}
 		case "":
 			return nil, fmt.Errorf("invalid DP_AGENT_CAPS: empty capability")

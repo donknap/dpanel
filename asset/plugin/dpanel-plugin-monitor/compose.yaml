@@ -12,7 +12,7 @@ services:
     cap_drop:
       - ALL
     environment:
-      DP_AGENT_CAPS: "usage,stat,check-port"
+      DP_AGENT_CAPS: "usage,stat,check"
     labels:
       - "com.dpanel.container.title=DPanel-主机资源监控"
       - "com.dpanel.container.hash={{.hash}}"

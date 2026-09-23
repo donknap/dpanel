@@ -15,6 +15,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/creack/pty"
@@ -98,7 +99,38 @@ func (self Home) WsNotice(http *gin.Context) {
 		return
 	}
 
-	client, err := ws.NewClient(http)
+	request := http.Copy()
+	var explorerOpen atomic.Bool
+	destroyExplorer := func() {
+		dockerSdk, err := docker.NewClientWithUser(request)
+		if err != nil {
+			slog.Warn("get Docker client for explorer cleanup", "error", err)
+			return
+		}
+		go func() {
+			if err := (logic.Explorer{}).DestroyProxyContainer(dockerSdk); err != nil {
+				slog.Warn("destroy explorer from notice websocket", "dockerEnv", dockerSdk.Name, "error", err)
+			}
+		}()
+	}
+	// Explorer 复用 notice 连接；断线时依据连接上的打开标记清理，不再维持独立 WebSocket。
+	client, err := ws.NewClient(http,
+		ws.WithMessageRecvHandler(ws.MessageTypeContainerExplorerOpen, func(*ws.RecvMessage) {
+			explorerOpen.Store(true)
+		}),
+		ws.WithMessageRecvHandler(ws.MessageTypeContainerExplorerCancel, func(*ws.RecvMessage) {
+			explorerOpen.Store(false)
+		}),
+		ws.WithMessageRecvHandler(ws.MessageTypeContainerExplorerDestroy, func(*ws.RecvMessage) {
+			explorerOpen.Store(false)
+			destroyExplorer()
+		}),
+		ws.WithCloseHandler(func() {
+			if explorerOpen.Swap(false) {
+				destroyExplorer()
+			}
+		}),
+	)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
