@@ -67,7 +67,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: '1.25'
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -144,7 +144,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: '1.25'
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -224,7 +224,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: '1.25'
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -285,12 +285,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: '1.25'
       - name: Install dependencies
         run: go get .
       - name: Install garble
         if: matrix.family == 'pe'
-        run: go install mvdan.cc/garble@v0.17.0
+        run: go install mvdan.cc/garble@v0.15.0
       - name: Build Darwin Binaries
         env:
           GARBLE_SEED: ${{ secrets.GARBLE_SEED }}
@@ -378,7 +378,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: '1.25'
       - name: Install dependencies
         run: go get .
       - name: Build
