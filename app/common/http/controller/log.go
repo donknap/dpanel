@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/donknap/dpanel/app/common/events"
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -117,6 +117,14 @@ func (self Log) Prune(httpContext *gin.Context) {
 			path = filepath.Join("runtime", "logs", path)
 		}
 		path = filepath.Clean(path)
+		if _, err := facade.GetLoggerFactory().Channel("file"); err != nil {
+			self.JsonResponseWithError(httpContext, err, http.StatusInternalServerError)
+			return
+		}
+		if err := facade.GetLoggerFactory().Rotate("file"); err != nil {
+			self.JsonResponseWithError(httpContext, err, http.StatusInternalServerError)
+			return
+		}
 		directory := filepath.Dir(path)
 		entries, err := os.ReadDir(directory)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -147,7 +155,7 @@ func (self Log) Prune(httpContext *gin.Context) {
 			}
 		}
 	}
-	storage.Cache.Delete(storage.CacheKeyDockerEvents)
+	(events.Docker{}).ClearMessages()
 	self.JsonSuccessResponse(httpContext)
 	return
 }

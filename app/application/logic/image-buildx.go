@@ -93,6 +93,17 @@ func (self ImageBuildx) ResolveConfig(dockerEnvName string) (BuildxConfig, error
 }
 
 func (self ImageBuildx) WriteConfig(option BuildxConfig) error {
+	content, err := self.ConfigContent(option)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(option.ConfigPath), os.ModePerm); err != nil {
+		return err
+	}
+	return os.WriteFile(option.ConfigPath, []byte(content), 0644)
+}
+
+func (self ImageBuildx) ConfigContent(option BuildxConfig) (string, error) {
 	var config bytes.Buffer
 	if option.ConfigContent != nil {
 		config.WriteString(*option.ConfigContent)
@@ -101,14 +112,11 @@ func (self ImageBuildx) WriteConfig(option BuildxConfig) error {
 			"quote": strconv.Quote,
 		}).Parse(buildxConfigTmpl)
 		if err != nil {
-			return err
+			return "", err
 		}
 		if err := configTemplate.Execute(&config, option); err != nil {
-			return err
+			return "", err
 		}
 	}
-	if err := os.MkdirAll(filepath.Dir(option.ConfigPath), os.ModePerm); err != nil {
-		return err
-	}
-	return os.WriteFile(option.ConfigPath, config.Bytes(), 0644)
+	return config.String(), nil
 }

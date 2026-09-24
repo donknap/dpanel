@@ -45,7 +45,7 @@ CC_PATH_DARWIN_MUSL_ARMV7 := arm-linux-musleabihf-gcc
 
 PROJECT_NAME       := dpanel
 PROJECT_GO_DIR     := $(shell pwd)
-PROJECT_JS_DIR     := $(abspath $(PROJECT_GO_DIR)/../../js/d-panel)
+PROJECT_JS_DIR     := $(abspath $(PROJECT_GO_DIR)/../app)
 PROJECT_GO_TARGET := $(PROJECT_GO_DIR)/runtime
 
 PLUGIN_EXPLORER_IMAGE_TARGET := dpanel/explorer

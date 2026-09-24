@@ -2,8 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"log/slog"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -22,34 +20,47 @@ type ImageBuildx struct {
 }
 
 func (self ImageBuildx) GetDetail(http *gin.Context) {
-	buildxConfig, err := (logic.ImageBuildx{}).ResolveConfig(docker.Sdk.Name)
+	sdk, err := docker.NewClientWithUser(http)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-
-	builderName := fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)
+	buildx := logic.ImageBuildx{}
+	target, err := buildx.GetTarget(sdk)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	builderName := fmt.Sprintf(define.DockerBuilderName, sdk.Name)
 	var detail string
-	if v, err := docker.Sdk.RunResult("buildx", "inspect", builderName); err == nil {
-		detail = string(v)
-	} else {
-		slog.Info("buildx get inspect", "error", err)
+	if target.Exists {
+		if v, err := sdk.RunResult("buildx", "inspect", builderName); err == nil {
+			detail = string(v)
+		} else {
+			status := "stopped"
+			if target.Running {
+				status = "running"
+			}
+			detail = fmt.Sprintf("Name: %s\nDriver: docker-container\nStatus: %s", builderName, status)
+		}
 	}
 	var config string
-	if v, err := os.ReadFile(buildxConfig.ConfigPath); err == nil {
-		config = string(v)
-	} else if !os.IsNotExist(err) {
-		slog.Info("buildx get config", "error", err)
-	}
-	proxyPath := filepath.Join(filepath.Dir(buildxConfig.ConfigPath), "proxy")
-	var proxy string
-	proxyBytes, err := os.ReadFile(proxyPath)
-	if err == nil {
-		proxy = string(proxyBytes)
+	if target.Exists {
+		config, err = buildx.ReadTargetConfig(sdk, target)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	} else {
-		proxy = os.Getenv("HTTP_PROXY")
-		if proxy == "" {
-			proxy = os.Getenv("HTTPS_PROXY")
+		buildxConfig, err := buildx.ResolveConfig(sdk.Name)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		config, err = buildx.ConfigContent(buildxConfig)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
 		}
 	}
 
@@ -57,7 +68,8 @@ func (self ImageBuildx) GetDetail(http *gin.Context) {
 		"name":   builderName,
 		"detail": detail,
 		"config": config,
-		"proxy":  proxy,
+		"proxy":  target.Proxy,
+		"exists": target.Exists,
 	})
 }
 
@@ -70,46 +82,37 @@ func (self ImageBuildx) Create(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	buildxConfig, err := (logic.ImageBuildx{}).ResolveConfig(docker.Sdk.Name)
+	sdk, err := docker.NewClientWithUser(http)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.Config != nil {
-		buildxConfig.ConfigContent = params.Config
-		if err := (logic.ImageBuildx{}).WriteConfig(buildxConfig); err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	} else if _, err := os.Stat(buildxConfig.ConfigPath); os.IsNotExist(err) {
-		if err := (logic.ImageBuildx{}).WriteConfig(buildxConfig); err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	} else if err != nil {
+
+	buildx := logic.ImageBuildx{}
+	buildxConfig, err := buildx.ResolveConfig(sdk.Name)
+	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	proxyPath := filepath.Join(filepath.Dir(buildxConfig.ConfigPath), "proxy")
-	if err := os.WriteFile(proxyPath, []byte(params.Proxy), 0600); err != nil {
+	buildxConfig.ConfigContent = params.Config
+	if err := buildx.WriteConfig(buildxConfig); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
-	builderName := fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)
-	contextName := fmt.Sprintf(define.DockerContextName, docker.Sdk.Name)
-	description := fmt.Sprintf("Created by DPanel DO NOT DELETE!!! %s", function.Sha256Struct(docker.Sdk.DockerEnv))
+	builderName := fmt.Sprintf(define.DockerBuilderName, sdk.Name)
+	contextName := fmt.Sprintf(define.DockerContextName, sdk.Name)
+	description := fmt.Sprintf("Created by DPanel DO NOT DELETE!!! %s", function.Sha256Struct(sdk.DockerEnv))
 	if result, err := local.QuickRun("docker context inspect", contextName); err == nil {
 		if !strings.Contains(string(result), description) {
-			if _, err := docker.Sdk.RunResult("context", "rm", contextName, "--force"); err != nil {
+			if _, err := sdk.RunResult("context", "rm", contextName, "--force"); err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
 		}
 	}
 	if _, err := local.QuickRun("docker context inspect", contextName); err != nil {
-		cmd, err := docker.Sdk.Run("context", "create", contextName, "--description", description)
+		cmd, err := sdk.Run("context", "create", contextName, "--description", description)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -120,8 +123,15 @@ func (self ImageBuildx) Create(http *gin.Context) {
 		}
 	}
 
-	if _, err := docker.Sdk.RunResult("buildx", "rm", builderName, "--force"); err != nil {
-		slog.Debug("image build rm buildx", "error", err)
+	if err := buildx.RemoveTarget(sdk, true); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if _, err := sdk.RunResult("buildx", "inspect", builderName); err == nil {
+		if _, err := sdk.RunResult("buildx", "rm", builderName, "--force", "--keep-daemon", "--keep-state"); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 	createArgs := []string{
 		"buildx", "create",
@@ -137,11 +147,8 @@ func (self ImageBuildx) Create(http *gin.Context) {
 			"--driver-opt", "env.HTTPS_PROXY="+proxy,
 		)
 	}
-	if noProxy := os.Getenv("NO_PROXY"); noProxy != "" {
-		createArgs = append(createArgs, "--driver-opt", "env.NO_PROXY="+noProxy)
-	}
 	createArgs = append(createArgs, "--bootstrap", contextName)
-	if _, err = docker.Sdk.RunResult(createArgs...); err != nil {
+	if _, err = sdk.RunResult(createArgs...); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -159,11 +166,17 @@ func (self ImageBuildx) Prune(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	sdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	buildx := logic.ImageBuildx{}
 
-	builderName := fmt.Sprintf(define.DockerBuilderName, docker.Sdk.Name)
-	contextName := fmt.Sprintf(define.DockerContextName, docker.Sdk.Name)
+	builderName := fmt.Sprintf(define.DockerBuilderName, sdk.Name)
+	contextName := fmt.Sprintf(define.DockerContextName, sdk.Name)
 	if params.EnablePrune {
-		if _, err := docker.Sdk.RunResult("buildx", "prune", "--builder", builderName, "--all", "--force"); err != nil {
+		if err := buildx.PruneTarget(sdk); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
@@ -171,28 +184,22 @@ func (self ImageBuildx) Prune(http *gin.Context) {
 	if params.EnableRemove {
 		// 旧版请求没有 enableForceRemove 字段，默认保持原有的强制删除行为。
 		forceRemove := params.EnableForceRemove == nil || *params.EnableForceRemove
-		removeBuilderArgs := []string{"buildx", "rm", builderName}
-		if _, err := docker.Sdk.RunResult("buildx", "inspect", builderName); err == nil {
-			_, removeErr := docker.Sdk.RunResult(removeBuilderArgs...)
-			if removeErr != nil && forceRemove {
-				removeBuilderArgs = append(removeBuilderArgs, "--force")
-				_, removeErr = docker.Sdk.RunResult(removeBuilderArgs...)
-			}
-			if removeErr != nil {
-				self.JsonResponseWithError(http, removeErr, 500)
-				return
-			}
-			if _, err := docker.Sdk.RunResult("buildx", "inspect", builderName); err == nil {
-				self.JsonResponseWithError(http, fmt.Errorf("buildx builder %s still exists after removal", builderName), 500)
+		if err := buildx.RemoveTarget(sdk, forceRemove); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if _, err := sdk.RunResult("buildx", "inspect", builderName); err == nil {
+			if _, err := sdk.RunResult("buildx", "rm", builderName, "--force", "--keep-daemon", "--keep-state"); err != nil {
+				self.JsonResponseWithError(http, err, 500)
 				return
 			}
 		}
 		if _, err := local.QuickRun("docker context inspect", contextName); err == nil {
 			removeContextArgs := []string{"context", "rm", contextName}
-			_, removeErr := docker.Sdk.RunResult(removeContextArgs...)
+			_, removeErr := sdk.RunResult(removeContextArgs...)
 			if removeErr != nil && forceRemove {
 				removeContextArgs = append(removeContextArgs, "--force")
-				_, removeErr = docker.Sdk.RunResult(removeContextArgs...)
+				_, removeErr = sdk.RunResult(removeContextArgs...)
 			}
 			if removeErr != nil {
 				self.JsonResponseWithError(http, removeErr, 500)
@@ -204,7 +211,7 @@ func (self ImageBuildx) Prune(http *gin.Context) {
 			}
 		}
 		buildxConfigRoot := filepath.Join(storage.Local{}.GetStorageLocalPath(), "buildx")
-		if err := function.SafeDeleteAll(buildxConfigRoot, docker.Sdk.Name); err != nil {
+		if err := function.SafeDeleteAll(buildxConfigRoot, sdk.Name); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}

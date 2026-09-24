@@ -451,8 +451,8 @@ github.com/we7coreteam/gorm-gen-yaml v1.0.10 h1:K3QfHfv5uEZOfg/Z/x4eZpuReyLw50Fe
 github.com/we7coreteam/gorm-gen-yaml v1.0.10/go.mod h1:tNGeJOZuMo3sNFW24WMRXm6Eydx1wRlA8Z5PCT2Gd8c=
 github.com/we7coreteam/registry-go-sdk v0.0.0-20260817090014-4d4d678c1af4 h1:O7sQB/6zOGSyjUoFDuLI9MqdoeIdgv6y/KaWUW6/Yl8=
 github.com/we7coreteam/registry-go-sdk v0.0.0-20260817090014-4d4d678c1af4/go.mod h1:v70iUbwPLL1rcnAvd1EXvV2IqQHrWyJShn+MSO8BEvE=
-github.com/we7coreteam/w7-rangine-go/v2 v2.0.8 h1:WMrHZc0eIXO6ZPmG8RSjeuKmHV8epqWCCSRnxP2/LCg=
-github.com/we7coreteam/w7-rangine-go/v2 v2.0.8/go.mod h1:6mn//NGgKZclbQqGgH5hT3aH7qnGGoIVUsT+OCvjJDw=
+github.com/we7coreteam/w7-rangine-go/v2 v2.0.12 h1:tXvtqA18704vyE8ry9vVUK/txTE75kYsfzWPD4jJ5y4=
+github.com/we7coreteam/w7-rangine-go/v2 v2.0.12/go.mod h1:6mn//NGgKZclbQqGgH5hT3aH7qnGGoIVUsT+OCvjJDw=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/xhit/go-str2duration/v2 v2.1.0 h1:lxklc02Drh6ynqX+DdPyp5pCKLUQpRT8bp8Ydu2Bstc=

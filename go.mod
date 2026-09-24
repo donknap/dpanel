@@ -42,7 +42,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/we7coreteam/registry-go-sdk v0.0.0-20260817090014-4d4d678c1af4
-	github.com/we7coreteam/w7-rangine-go/v2 v2.0.8
+	github.com/we7coreteam/w7-rangine-go/v2 v2.0.12
 	go.uber.org/zap v1.27.1
 	go.uber.org/zap/exp v0.3.0
 	golang.org/x/crypto v0.52.0

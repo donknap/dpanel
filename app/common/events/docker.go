@@ -72,6 +72,12 @@ var (
 type Docker struct {
 }
 
+func (self Docker) ClearMessages() {
+	dockerMessageMu.Lock()
+	storage.Cache.Delete(storage.CacheKeyDockerEvents)
+	dockerMessageMu.Unlock()
+}
+
 func (self Docker) Daemon(e event.DockerDaemonPayload) {
 	slog.Debug("docker daemon/event start", "info", e)
 
