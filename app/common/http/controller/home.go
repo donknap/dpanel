@@ -32,9 +32,10 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/stats"
+	serviceexec "github.com/donknap/dpanel/common/service/exec"
+	containerexec "github.com/donknap/dpanel/common/service/exec/container"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
@@ -180,8 +181,10 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 		params.WorkDir = "/"
 	}
 	var err error
-	var shell types.HijackedResponse
-	var execID string
+	var terminalRead io.Reader
+	var terminalWrite io.WriteCloser
+	var terminalExec serviceexec.Executor
+	var resizeTerminal func(*pty.Winsize) error
 	var client *ws.Client
 
 	messageType := fmt.Sprintf(ws.MessageTypeConsole, params.Id)
@@ -192,21 +195,18 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 			if err != nil {
 				slog.Warn("console", "json unmarshal", err.Error())
 			}
-			if shell.Conn == nil {
+			if terminalWrite == nil {
 				slog.Warn("console", "shell is nil", err.Error())
 				return
 			}
 			if cmd.Content.Command != "" {
-				_, err = shell.Conn.Write([]byte(cmd.Content.Command))
+				_, err = terminalWrite.Write([]byte(cmd.Content.Command))
 				if err != nil {
 					slog.Warn("console", "shell read", err.Error())
 				}
 			}
-			if cmd.Size.Height > 0 && cmd.Size.Width > 0 {
-				err = docker.Sdk.Client.ContainerExecResize(client.CtxContext, execID, container.ResizeOptions{
-					Height: uint(cmd.Size.Height),
-					Width:  uint(cmd.Size.Width),
-				})
+			if cmd.Size.Height > 0 && cmd.Size.Width > 0 && resizeTerminal != nil {
+				err = resizeTerminal(&pty.Winsize{Rows: uint16(cmd.Size.Height), Cols: uint16(cmd.Size.Width)})
 				if err != nil {
 					slog.Warn("console container tty", "resize", cmd.Size, "error", err)
 				}
@@ -226,41 +226,42 @@ func (self Home) WsContainerConsole(http *gin.Context) {
 	go func() {
 		select {
 		case <-client.CtxContext.Done():
-			if shell.Conn != nil {
-				_ = shell.CloseWrite()
-				shell.Close()
+			if terminalWrite != nil {
+				_ = terminalWrite.Close()
+			}
+			if terminalExec != nil {
+				_ = terminalExec.Close()
 			}
 			return
 		}
 	}()
 
-	execID, shell, err = docker.Sdk.ContainerExec(client.CtxContext, containerName, container.ExecOptions{
-		Privileged:   true,
-		Tty:          true,
-		AttachStdin:  true,
-		AttachStdout: true,
-		AttachStderr: true,
-		Cmd: []string{
-			params.Cmd,
-		},
-		User: params.User,
-		ConsoleSize: &[2]uint{
-			params.Height, params.Width,
-		},
-		WorkingDir: params.WorkDir,
-	})
+	terminalExec, err = containerexec.New(
+		containerexec.WithDockerClient(docker.Sdk.Client),
+		containerexec.WithContainerName(containerName),
+		containerexec.WithCommandName(params.Cmd),
+		containerexec.WithCtx(client.CtxContext),
+		containerexec.WithExecOptions(container.ExecOptions{Privileged: true, User: params.User, WorkingDir: params.WorkDir}),
+	)
 	if err != nil {
 		_ = notice.Message{}.Error(".consoleError", err.Error())
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	terminalRead, terminalWrite, err = terminalExec.RunInTerminal(&pty.Winsize{Rows: uint16(params.Height), Cols: uint16(params.Width)})
+	if err != nil {
+		_ = terminalExec.Close()
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	resizeTerminal = terminalExec.ResizeTerminal
 
 	clientReady = true
 	go client.ReadMessage()
 	go func() {
 		out := make([]byte, 2028)
 		for {
-			n, err := shell.Conn.Read(out)
+			n, err := terminalRead.Read(out)
 			if err != nil {
 				return
 			}
@@ -473,11 +474,7 @@ func (self Home) WsShellConsole(http *gin.Context) {
 		})
 		return
 	}
-	if resizer, ok := localCmd.(interface {
-		ResizeTerminal(size *pty.Winsize) error
-	}); ok {
-		resizeTerminal = resizer.ResizeTerminal
-	}
+	resizeTerminal = localCmd.ResizeTerminal
 
 	closeTerminal := func() {
 		closeTerminalOnce.Do(func() {
@@ -612,7 +609,6 @@ func (self Home) Info(http *gin.Context) {
 		"sdkVersion":    api.DefaultVersion,
 		"dpanel":        dpanelInfoResult,
 		"dockerEnv":     dockerEnv,
-		"plugin":        plugin.Wrapper{}.GetPluginList(),
 		"rsa": gin.H{
 			"public": public,
 		},

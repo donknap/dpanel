@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	containerexec "github.com/donknap/dpanel/common/service/exec/container"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
@@ -193,29 +193,27 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			return item.Name == "PHP_EXTENSIONS"
 		}); ok {
 			_, _ = progress.Write([]byte("Install PHP_EXTENSIONS " + phpExt.String() + "\n"))
-			_, out, err := docker.Sdk.ContainerExec(progress.Context(), runCompose.ContainerList[0].Container.ID, container.ExecOptions{
-				Privileged:   true,
-				Tty:          false,
-				AttachStdin:  false,
-				AttachStdout: true,
-				AttachStderr: false,
-				Cmd: []string{
-					"install-ext",
-					phpExt.Value,
-				},
-			})
+			cmd, err := containerexec.New(
+				containerexec.WithDockerClient(docker.Sdk.Client),
+				containerexec.WithContainerName(runCompose.ContainerList[0].Container.ID),
+				containerexec.WithCommandName("install-ext"),
+				containerexec.WithArgs(phpExt.Value),
+				containerexec.WithCtx(progress.Context()),
+				containerexec.WithExecOptions(container.ExecOptions{Privileged: true}),
+			)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
-			defer func() {
-				out.Close()
-			}()
-			stopClose := context.AfterFunc(progress.Context(), func() {
-				out.Close()
-			})
-			defer stopClose()
-			_, err = io.Copy(progress, out.Reader)
+			defer cmd.Close()
+			out, err := cmd.RunInPip()
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			defer out.Close()
+			_ = out.CloseWrite()
+			_, err = io.Copy(progress, out)
 			if err != nil {
 				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
 				return

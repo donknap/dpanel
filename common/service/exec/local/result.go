@@ -66,3 +66,10 @@ func (self readCloser) Write(p []byte) (n int, err error) {
 	}
 	return self.stdin.Write(p)
 }
+
+func (self readCloser) CloseWrite() error {
+	if self.stdin == nil {
+		return io.ErrClosedPipe
+	}
+	return self.stdin.Close()
+}

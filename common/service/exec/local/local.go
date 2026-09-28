@@ -132,14 +132,20 @@ func (self *Local) RunWithResult() ([]byte, error) {
 	return out, nil
 }
 
-func (self *Local) RunInPip() (io.ReadCloser, error) {
+func (self *Local) RunInPip() (exec.Pipe, error) {
 	self.debug()
 	pr, pw := io.Pipe()
+	stdinReader, stdinWriter := io.Pipe()
 	stderrBuf := &bytes.Buffer{}
+	self.cmd.Stdin = stdinReader
 	self.cmd.Stdout = pw
 	self.cmd.Stderr = io.MultiWriter(pw, stderrBuf)
 
 	if err := self.cmd.Start(); err != nil {
+		_ = pr.Close()
+		_ = pw.Close()
+		_ = stdinReader.Close()
+		_ = stdinWriter.Close()
 		return nil, err
 	}
 
@@ -152,11 +158,13 @@ func (self *Local) RunInPip() (io.ReadCloser, error) {
 		} else {
 			pw.Close()
 		}
+		_ = stdinReader.Close()
 	}()
 
 	return readCloser{
-		cmd:  self,
-		Conn: pr,
+		cmd:   self,
+		Conn:  pr,
+		stdin: stdinWriter,
 	}, nil
 }
 

@@ -1,21 +1,17 @@
 package docker
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"sort"
 	"strings"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/versions"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/types/define"
 )
@@ -248,62 +244,6 @@ func (self Client) ContainerInspectCompat(info container.InspectResponse) (conta
 		}
 	}
 	return info, nil
-}
-
-// ContainerExecResult 在容器中执行命令并完整收集输出。
-func (self Client) ContainerExecResult(ctx context.Context, containerName string, option container.ExecOptions) (string, error) {
-	if len(option.Cmd) == 0 {
-		return "", errors.New("container exec command is empty")
-	}
-	option.Tty = false
-	option.Detach = false
-	option.AttachStdout = true
-	option.AttachStderr = true
-	execID, response, err := self.ContainerExec(ctx, containerName, option)
-	if err != nil {
-		return "", err
-	}
-	defer response.Close()
-	stopClose := context.AfterFunc(ctx, func() {
-		_ = response.CloseWrite()
-		response.Close()
-	})
-	defer stopClose()
-
-	var stdout, stderr bytes.Buffer
-	_, err = stdcopy.StdCopy(&stdout, &stderr, response.Reader)
-	response.Close()
-	if err != nil {
-		return stdout.String(), err
-	}
-	execInspect, err := self.Client.ContainerExecInspect(ctx, execID)
-	if err != nil {
-		return stdout.String(), err
-	}
-	if execInspect.ExitCode != 0 || stderr.Len() > 0 {
-		return stdout.String(), fmt.Errorf(
-			"container command exited with code %d, stderr: %s",
-			execInspect.ExitCode,
-			stderr.String(),
-		)
-	}
-	return stdout.String(), nil
-}
-
-// ContainerExec 在容器内创建并附加命令，调用方必须关闭返回的连接。
-func (self Client) ContainerExec(ctx context.Context, containerName string, option container.ExecOptions) (string, types.HijackedResponse, error) {
-	slog.Info("docker exec", "command", option)
-	exec, err := self.Client.ContainerExecCreate(ctx, containerName, option)
-	if err != nil {
-		return "", types.HijackedResponse{}, err
-	}
-	execAttachOption := container.ExecStartOptions{
-		Tty:         option.Tty,
-		ConsoleSize: option.ConsoleSize,
-		Detach:      option.Detach,
-	}
-	response, err := self.Client.ContainerExecAttach(ctx, exec.ID, execAttachOption)
-	return exec.ID, response, err
 }
 
 func (self Client) ContainerLogs(ctx context.Context, containerId string, options container.LogsOptions) (io.ReadCloser, error) {

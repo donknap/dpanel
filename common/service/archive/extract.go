@@ -23,6 +23,14 @@ type detectedFormat struct {
 
 // UnArchive extracts a supported local archive into targetPath.
 func UnArchive(sourcePath, targetPath string) error {
+	return UnArchiveWithContext(context.Background(), sourcePath, targetPath)
+}
+
+// UnArchiveWithContext stops validation and extraction when ctx is canceled.
+func UnArchiveWithContext(ctx context.Context, sourcePath, targetPath string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	sourceInfo, err := os.Lstat(sourcePath)
 	if err != nil {
 		return fmt.Errorf("inspect archive source: %w", err)
@@ -44,7 +52,7 @@ func UnArchive(sourcePath, targetPath string) error {
 	if err != nil {
 		return fmt.Errorf("identify archive format: %w", err)
 	}
-	return unarchiveFiles(source, sourceInfo, targetPath, format.extractor)
+	return unarchiveFiles(ctx, source, sourceInfo, targetPath, format.extractor)
 }
 
 func detectFormat(source io.ReadSeeker) (detectedFormat, error) {
@@ -137,9 +145,12 @@ func hasPrefix(value, prefix []byte) bool {
 	return len(value) >= len(prefix) && bytes.Equal(value[:len(prefix)], prefix)
 }
 
-func unarchiveFiles(source *os.File, sourceInfo fs.FileInfo, targetPath string, extractor archives.Extractor) error {
+func unarchiveFiles(ctx context.Context, source *os.File, sourceInfo fs.FileInfo, targetPath string, extractor archives.Extractor) error {
 	manifest := make(map[string]bool)
-	err := extractor.Extract(context.Background(), source, func(_ context.Context, info archives.FileInfo) error {
+	err := extractor.Extract(ctx, source, func(_ context.Context, info archives.FileInfo) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		name, err := validateArchiveEntry(info)
 		if err != nil {
 			return err
@@ -156,7 +167,7 @@ func unarchiveFiles(source *os.File, sourceInfo fs.FileInfo, targetPath string, 
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(io.Discard, reader)
+		_, err = io.Copy(io.Discard, contextReader{ctx: ctx, reader: reader})
 		if err != nil {
 			_ = reader.Close()
 			return err
@@ -175,7 +186,10 @@ func unarchiveFiles(source *os.File, sourceInfo fs.FileInfo, targetPath string, 
 		return err
 	}
 	directories := make([]directoryMetadata, 0)
-	err = extractor.Extract(context.Background(), source, func(_ context.Context, info archives.FileInfo) error {
+	err = extractor.Extract(ctx, source, func(_ context.Context, info archives.FileInfo) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		name, err := validateArchiveEntry(info)
 		if err != nil {
 			return err
@@ -195,17 +209,32 @@ func unarchiveFiles(source *os.File, sourceInfo fs.FileInfo, targetPath string, 
 			})
 			return nil
 		}
-		return extractRegularFile(rootPath, name, info, sourceInfo)
+		return extractRegularFile(ctx, rootPath, name, info, sourceInfo)
 	})
 	if err != nil {
 		return fmt.Errorf("extract archive: %w", err)
 	}
 	for index := len(directories) - 1; index >= 0; index-- {
+		if err = ctx.Err(); err != nil {
+			return err
+		}
 		if err = applyDirectoryMetadata(directories[index]); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+type contextReader struct {
+	ctx    context.Context
+	reader io.Reader
+}
+
+func (self contextReader) Read(p []byte) (int, error) {
+	if err := self.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return self.reader.Read(p)
 }
 
 func validateArchiveEntry(info archives.FileInfo) (string, error) {
@@ -318,12 +347,12 @@ func ensureDirectoryPath(rootPath, archivePath string) (string, error) {
 	return currentPath, nil
 }
 
-func extractRegularFile(rootPath, name string, info archives.FileInfo, sourceInfo fs.FileInfo) error {
+func extractRegularFile(ctx context.Context, rootPath, name string, info archives.FileInfo, sourceInfo fs.FileInfo) error {
 	reader, err := info.Open()
 	if err != nil {
 		return err
 	}
-	err = writeRegularFile(rootPath, name, info, reader, sourceInfo)
+	err = writeRegularFile(ctx, rootPath, name, info, reader, sourceInfo)
 	if err != nil {
 		_ = reader.Close()
 		return err
@@ -336,7 +365,7 @@ type regularFileInfo interface {
 	ModTime() time.Time
 }
 
-func writeRegularFile(rootPath, name string, info regularFileInfo, reader io.Reader, sourceInfo fs.FileInfo) error {
+func writeRegularFile(ctx context.Context, rootPath, name string, info regularFileInfo, reader io.Reader, sourceInfo fs.FileInfo) error {
 	parentPath := path.Dir(name)
 	if parentPath != "." {
 		if _, err := ensureDirectoryPath(rootPath, parentPath); err != nil {
@@ -357,7 +386,10 @@ func writeRegularFile(rootPath, name string, info regularFileInfo, reader io.Rea
 		_ = temporaryFile.Close()
 		_ = os.Remove(temporaryPath)
 	}()
-	if _, err = io.Copy(temporaryFile, reader); err != nil {
+	if _, err = io.Copy(temporaryFile, contextReader{ctx: ctx, reader: reader}); err != nil {
+		return err
+	}
+	if err = ctx.Err(); err != nil {
 		return err
 	}
 	if err = temporaryFile.Chmod(info.Mode().Perm()); err != nil {
@@ -372,6 +404,9 @@ func writeRegularFile(rootPath, name string, info regularFileInfo, reader io.Rea
 		return err
 	}
 	if err = validateRegularTarget(targetPath, sourceInfo); err != nil {
+		return err
+	}
+	if err = ctx.Err(); err != nil {
 		return err
 	}
 	return os.Rename(temporaryPath, targetPath)

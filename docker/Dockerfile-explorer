@@ -4,11 +4,12 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 ARG APP_VERSION
+ARG HTTP_PROXY
 
 WORKDIR /src
 
 COPY app/agent/go.mod app/agent/go.sum ./
-RUN go mod download
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && go mod download
 
 COPY app/agent ./
 

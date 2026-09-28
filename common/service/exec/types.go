@@ -10,12 +10,18 @@ type Executor interface {
 	// Run 执行一条命令，不关心输出信息，只关心执行是否成功
 	Run() error
 	RunWithResult() ([]byte, error)
-	RunInPip() (io.ReadCloser, error)
+	RunInPip() (Pipe, error)
 	RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser, error)
+	ResizeTerminal(size *pty.Winsize) error
 	Kill() error
 	Close() error
 	String() string
 	AppendEnv(env []string)
 	AppendSystemEnv()
 	WorkDir(path string)
+}
+
+type Pipe interface {
+	io.ReadWriteCloser
+	CloseWrite() error
 }

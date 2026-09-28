@@ -33,3 +33,11 @@ func (self *readCloser) Write(p []byte) (n int, err error) {
 	}
 	return self.writer.Write(p)
 }
+
+func (self *readCloser) CloseWrite() error {
+	writer, ok := self.writer.(io.WriteCloser)
+	if !ok {
+		return io.ErrClosedPipe
+	}
+	return writer.Close()
+}

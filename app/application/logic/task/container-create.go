@@ -10,6 +10,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	containerexec "github.com/donknap/dpanel/common/service/exec/container"
 	"github.com/donknap/dpanel/common/service/notice"
 )
 
@@ -208,9 +209,7 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (containerID str
 			return containerID, err
 		}
 		if task.BuildParams.Hook != nil && task.BuildParams.Hook.ContainerCreate != "" {
-			_, err := docker.Sdk.ContainerExecResult(docker.Sdk.Ctx, containerID, container.ExecOptions{
-				Cmd: []string{"/bin/sh", "-c", task.BuildParams.Hook.ContainerCreate},
-			})
+			_, err := containerexec.QuickRun(docker.Sdk.Ctx, docker.Sdk.Client, containerID, "/bin/sh", "-c", task.BuildParams.Hook.ContainerCreate)
 			if err != nil {
 				slog.Debug("container create run hook", "hook", "container create", "error", err.Error())
 			}

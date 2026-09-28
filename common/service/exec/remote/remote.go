@@ -53,13 +53,14 @@ func QuickRun(client *ssh.Client, command string) ([]byte, error) {
 }
 
 type Remote struct {
-	client    *ssh.Client
-	Path      string
-	Args      []string
-	Env       []string
-	Dir       string
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+	client          *ssh.Client
+	Path            string
+	Args            []string
+	Env             []string
+	Dir             string
+	ctx             context.Context
+	ctxCancel       context.CancelFunc
+	terminalSession *ssh2.Session
 }
 
 func (self *Remote) WorkDir(path string) {
@@ -153,7 +154,7 @@ func (self *Remote) RunWithResult() ([]byte, error) {
 	return bytes.TrimSpace(result), nil
 }
 
-func (self *Remote) RunInPip() (io.ReadCloser, error) {
+func (self *Remote) RunInPip() (exec.Pipe, error) {
 	session, err := self.client.NewSession()
 	if err != nil {
 		return nil, err
@@ -166,6 +167,13 @@ func (self *Remote) RunInPip() (io.ReadCloser, error) {
 		}
 	}
 	pipeReader, pipeWriter := io.Pipe()
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		_ = session.Close()
+		_ = pipeReader.Close()
+		_ = pipeWriter.Close()
+		return nil, err
+	}
 	waitDone := make(chan struct{})
 
 	go func() {
@@ -182,6 +190,7 @@ func (self *Remote) RunInPip() (io.ReadCloser, error) {
 
 	r := &readCloser{
 		buffer:  pipeReader,
+		writer:  stdin,
 		closer:  pipeReader,
 		session: session,
 	}
@@ -218,6 +227,7 @@ func (self *Remote) RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser,
 		}
 		return nil, nil, err
 	}
+	self.terminalSession = session
 	go func() {
 		_, err = write.Write([]byte(self.String() + "\n"))
 	}()
@@ -225,6 +235,13 @@ func (self *Remote) RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser,
 		writer:  write,
 		session: session,
 	}, nil
+}
+
+func (self *Remote) ResizeTerminal(size *pty.Winsize) error {
+	if size == nil || self.terminalSession == nil {
+		return nil
+	}
+	return self.terminalSession.WindowChange(int(size.Rows), int(size.Cols))
 }
 
 func (self *Remote) Kill() error {
