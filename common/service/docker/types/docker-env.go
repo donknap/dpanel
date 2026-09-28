@@ -28,7 +28,7 @@ type DockerEnv struct {
 	ComposePath       string          `json:"composePath,omitempty"`
 	EnableSSH         bool            `json:"enableSSH,omitempty"`
 	SshServerInfo     *ssh.ServerInfo `json:"sshServerInfo,omitempty"`
-	RemoteType        string          `json:"remoteType"`           // 连接客户端类型，支持 sock ssh tcp
+	RemoteType        string          `json:"remoteType"`           // 连接客户端类型，支持 sock ssh tcp wsl
 	DockerType        string          `json:"dockerType,omitempty"` // 远程客户端类型，docker podman
 	DockerInfo        *DockerInfo     `json:"dockerInfo,omitempty"`
 	DockerStatus      *DockerStatus   `json:"dockerStatus,omitempty"`
@@ -50,10 +50,14 @@ func (self DockerEnv) CommandEnv() []string {
 	if runtime.GOOS == "windows" {
 		result = append(result, "COMPOSE_CONVERT_WINDOWS_PATHS=1")
 	}
-	if self.RemoteType == define.DockerRemoteTypeSSH {
+	if self.RemoteType == define.DockerRemoteTypeSSH || self.RemoteType == define.DockerRemoteTypeWSL {
+		proxyName := self.Name
+		if self.RemoteType == define.DockerRemoteTypeWSL {
+			proxyName = "wsl_" + self.Name
+		}
 		// 还需要将系统的 PATH 环境变量传递进去，否则可能会报找不到 ssh 命令
 		if runtime.GOOS == "windows" {
-			result = append(result, fmt.Sprintf("DOCKER_HOST=npipe:////./pipe/dp_%s", self.Name))
+			result = append(result, fmt.Sprintf("DOCKER_HOST=npipe:////./pipe/dp_%s", proxyName))
 		} else {
 			result = append(result, fmt.Sprintf("DOCKER_HOST=unix://%s/%s.sock", storage.Local{}.GetLocalProxySockPath(), self.Name))
 		}
@@ -106,9 +110,13 @@ func (self DockerEnv) CommandEnv() []string {
 
 func (self DockerEnv) CommandParams() []string {
 	result := make([]string, 0)
-	if self.RemoteType == define.DockerRemoteTypeSSH {
+	if self.RemoteType == define.DockerRemoteTypeSSH || self.RemoteType == define.DockerRemoteTypeWSL {
+		proxyName := self.Name
+		if self.RemoteType == define.DockerRemoteTypeWSL {
+			proxyName = "wsl_" + self.Name
+		}
 		if runtime.GOOS == "windows" {
-			result = append(result, "-H", fmt.Sprintf("npipe:////./pipe/dp_%s", self.Name))
+			result = append(result, "-H", fmt.Sprintf("npipe:////./pipe/dp_%s", proxyName))
 		} else {
 			result = append(result, "-H", fmt.Sprintf("unix://%s/%s.sock", storage.Local{}.GetLocalProxySockPath(), self.Name))
 		}

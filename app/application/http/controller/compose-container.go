@@ -104,6 +104,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	if function.InArray([]string{
 		define.DockerRemoteTypeSSH,
 		define.DockerRemoteTypeTcp,
+		define.DockerRemoteTypeWSL,
 	}, docker.Sdk.DockerEnv.RemoteType) {
 		err = (logic.Compose{}).SyncProjectToRemote(http, docker.Sdk, tasker.Project.WorkingDir)
 		if err != nil {

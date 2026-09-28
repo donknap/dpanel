@@ -38,6 +38,7 @@ const (
 	DockerRemoteTypeSSH  = "ssh"
 	DockerRemoteTypeSock = "sock"
 	DockerRemoteTypeTcp  = "tcp"
+	DockerRemoteTypeWSL  = "wsl"
 )
 
 const (

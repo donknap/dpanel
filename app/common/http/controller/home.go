@@ -45,6 +45,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	ssh2 "golang.org/x/crypto/ssh"
+	"golang.org/x/text/encoding/unicode"
 	"gorm.io/datatypes"
 	"gorm.io/gen"
 	"gorm.io/gorm"
@@ -449,6 +450,7 @@ func (self Home) WsShellConsole(http *gin.Context) {
 		local.WithDefaultShell(),
 		local.WithDefaultShellDir(),
 		local.WithInteractiveTerminalEnv(),
+		local.WithWindowsCodePage(),
 		local.WithCtx(client.CtxContext),
 		// pty.StartWithSize already sets Setsid and Setctty; adding Setpgid can make fork/exec fail with EPERM.
 		local.WithKillProcessGroupOnCancel(),
@@ -614,6 +616,33 @@ func (self Home) Info(http *gin.Context) {
 		"rsa": gin.H{
 			"public": public,
 		},
+	}
+	if runtime.GOOS == "windows" {
+		wslList := make([]string, 0)
+		ctx, cancel := context.WithTimeout(http.Request.Context(), 10*time.Second)
+		command, err := local.New(
+			local.WithCommandName("wsl.exe"),
+			local.WithArgs("--list", "--quiet"),
+			local.WithCtx(ctx),
+		)
+		var output []byte
+		if err == nil {
+			output, err = command.RunWithResult()
+		}
+		cancel()
+		if err == nil {
+			if bytes.IndexByte(output, 0) >= 0 {
+				output, err = unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder().Bytes(output)
+			}
+			if err == nil {
+				for _, name := range strings.FieldsFunc(string(output), func(r rune) bool { return r == '\r' || r == '\n' || r == 0 }) {
+					if name = strings.TrimSpace(name); name != "" {
+						wslList = append(wslList, name)
+					}
+				}
+			}
+		}
+		result["wslDistributions"] = wslList
 	}
 	if founder != nil {
 		result["founder"] = founder

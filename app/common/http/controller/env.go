@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -106,6 +107,13 @@ func (self Env) Create(http *gin.Context) {
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
+	}
+	if params.RemoteType == define.DockerRemoteTypeWSL {
+		distribution := strings.TrimPrefix(params.Address, "wsl://")
+		if runtime.GOOS != "windows" || !strings.HasPrefix(params.Address, "wsl://") || distribution == "" || strings.ContainsAny(distribution, "\\/\r\n\x00") || params.EnableTLS || params.EnableSSH || params.DockerType != "docker" {
+			self.JsonResponseWithError(http, fmt.Errorf("invalid WSL Docker environment"), 500)
+			return
+		}
 	}
 	if !function.IsSafeName(params.Name) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvNameInvalid), 500)
@@ -236,7 +244,7 @@ func (self Env) Create(http *gin.Context) {
 			}()
 		}
 
-		client, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithSockProxy())
+		client, err := docker.NewClientWithDockerEnv(dockerEnv)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -265,6 +273,30 @@ func (self Env) Create(http *gin.Context) {
 		}
 	}
 
+	if dockerClient != nil {
+		if docker.Sdk.Name == params.Name {
+			oldDockerClient := docker.Sdk
+			oldDockerClient.Close()
+			if err := docker.WithSockProxy()(dockerClient); err != nil {
+				restored, restoreErr := docker.NewClientWithDockerEnv(oldDockerClient.DockerEnv, docker.WithSockProxy())
+				if restoreErr == nil {
+					docker.Sdk = restored
+					dockerClient.Close()
+				} else {
+					docker.Sdk = dockerClient
+					logic.Env{}.UpdateEnv(dockerEnv)
+					self.JsonResponseWithError(http, fmt.Errorf("start Docker command proxy: %w; restore previous connection: %v", err, restoreErr), 500)
+					return
+				}
+				self.JsonResponseWithError(http, fmt.Errorf("start Docker command proxy: %w", err), 500)
+				return
+			}
+			docker.Sdk = dockerClient
+		} else {
+			dockerClient.Close()
+		}
+	}
+
 	logic.Env{}.UpdateEnv(dockerEnv)
 
 	if *dockerEnv.Enable {
@@ -275,15 +307,6 @@ func (self Env) Create(http *gin.Context) {
 		})
 	} else {
 		event2.Monitor.Leave(dockerEnv.Name)
-	}
-	if dockerClient != nil {
-		// 如果修改的是当前客户端的连接地址，则更新 docker sdk
-		if docker.Sdk.Name == params.Name {
-			docker.Sdk.Close()
-			docker.Sdk = dockerClient
-		} else {
-			dockerClient.Close()
-		}
 	}
 	self.JsonSuccessResponse(http)
 	return
@@ -304,7 +327,7 @@ func (self Env) Switch(http *gin.Context) {
 		return
 	}
 	oldDockerClient := docker.Sdk
-	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithSockProxy())
+	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -319,6 +342,19 @@ func (self Env) Switch(http *gin.Context) {
 		DockerEnvName: oldDockerClient.DockerEnv.Name,
 	})
 	oldDockerClient.Close()
+	if err = docker.WithSockProxy()(dockerClient); err != nil {
+		restored, restoreErr := docker.NewClientWithDockerEnv(oldDockerClient.DockerEnv, docker.WithSockProxy())
+		if restoreErr == nil {
+			docker.Sdk = restored
+			dockerClient.Close()
+		} else {
+			docker.Sdk = dockerClient
+			self.JsonResponseWithError(http, fmt.Errorf("start Docker command proxy: %w; restore previous connection: %v", err, restoreErr), 500)
+			return
+		}
+		self.JsonResponseWithError(http, fmt.Errorf("start Docker command proxy: %w", err), 500)
+		return
+	}
 	docker.Sdk = dockerClient
 	self.JsonSuccessResponse(http)
 	return

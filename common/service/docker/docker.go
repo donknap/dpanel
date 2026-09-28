@@ -45,6 +45,8 @@ func NewClientWithDockerEnv(dockerEnv *types.DockerEnv, opts ...Option) (*Client
 	}
 	if dockerEnv.RemoteType == define.DockerRemoteTypeSSH {
 		options = append(options, WithSSH(dockerEnv.SshServerInfo, define.DockerConnectServerTimeout))
+	} else if dockerEnv.RemoteType == define.DockerRemoteTypeWSL {
+		options = append(options, WithWSL(dockerEnv.Address))
 	} else {
 		options = append(options, WithAddress(dockerEnv.Address))
 	}
@@ -103,9 +105,17 @@ type Client struct {
 	Ctx           context.Context
 	CtxCancelFunc context.CancelFunc
 	DockerEnv     *types.DockerEnv
+	proxyListener net.Listener
+	proxyServer   *http.Server
 }
 
 func (self *Client) Close() {
+	if self.proxyServer != nil {
+		_ = self.proxyServer.Close()
+	}
+	if self.proxyListener != nil {
+		_ = self.proxyListener.Close()
+	}
 	if self.CtxCancelFunc != nil {
 		self.CtxCancelFunc()
 	}
@@ -230,6 +240,34 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 	}
 }
 
+func WithWSL(address string) Option {
+	return func(self *Client) error {
+		if runtime.GOOS != "windows" {
+			return errors.New("WSL Docker connection requires Windows")
+		}
+		if !strings.HasPrefix(address, "wsl://") {
+			return errors.New("invalid WSL Docker address")
+		}
+		distribution := strings.TrimPrefix(address, "wsl://")
+		if distribution == "" || strings.ContainsAny(distribution, "\\/\r\n\x00") {
+			return errors.New("invalid WSL distribution")
+		}
+		transport := &http.Transport{
+			IdleConnTimeout:     time.Minute,
+			MaxIdleConnsPerHost: 5,
+			MaxIdleConns:        100,
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				if err := ctx.Err(); err != nil {
+					return nil, err
+				}
+				return sshconn.NewWSL(distribution, "docker")
+			},
+		}
+		self.Option = append(self.Option, dockerclient.WithHTTPClient(&http.Client{Transport: transport}))
+		return nil
+	}
+}
+
 // 【新增结构体】：延迟加载底层的 Transport
 // 避免在 Client 尚未完全构建完成时发生 HTTPClient() 的空指针异常
 type lazyProxyTransport struct {
@@ -249,15 +287,16 @@ func (t *lazyProxyTransport) RoundTrip(req *http.Request) (*http.Response, error
 
 func WithSockProxy() Option {
 	return func(self *Client) error {
-		if self.DockerEnv.RemoteType != define.DockerRemoteTypeSSH {
+		if self.DockerEnv.RemoteType != define.DockerRemoteTypeSSH && self.DockerEnv.RemoteType != define.DockerRemoteTypeWSL {
 			return nil
 		}
-		// 这里稍微延迟一下，防止 ssh 还没有连接完成
-		time.Sleep(time.Second * 2)
 		// 创建代理 sock
 		sockPath := ""
 		if runtime.GOOS == "windows" {
 			sockPath = self.Name
+			if self.DockerEnv.RemoteType == define.DockerRemoteTypeWSL {
+				sockPath = "wsl_" + self.Name
+			}
 		} else {
 			localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
 			slog.Info("local sock path remove", "path", localProxySock)
@@ -268,6 +307,7 @@ func WithSockProxy() Option {
 		if err != nil {
 			return err
 		}
+		self.proxyListener = localSock
 
 		go func() {
 			<-self.Ctx.Done()
@@ -294,11 +334,9 @@ func WithSockProxy() Option {
 			},
 		}
 
+		self.proxyServer = &http.Server{Handler: proxy}
 		go func() {
-			server := &http.Server{
-				Handler: proxy,
-			}
-			err := server.Serve(localSock)
+			err := self.proxyServer.Serve(localSock)
 			// 过滤掉因为正常关闭而产生的日志噪音
 			if err != nil && err != http.ErrServerClosed && !strings.Contains(err.Error(), "use of closed network connection") {
 				slog.Warn("local sock proxy exited", "err", err)

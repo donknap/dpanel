@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	exec2 "os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/shirou/gopsutil/v4/process"
+	"golang.org/x/text/encoding"
 )
 
 func New(opts ...Option) (exec.Executor, error) {
@@ -88,6 +90,8 @@ type Local struct {
 	ctx          context.Context
 	ctxCancel    context.CancelFunc
 	terminalFile *os.File
+
+	windowsEncoding encoding.Encoding
 }
 
 func (self *Local) AppendEnv(env []string) {
@@ -162,6 +166,18 @@ func (self *Local) RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser, 
 
 	if runtime.GOOS == "windows" {
 		self.debug()
+		if strings.EqualFold(filepath.Base(self.cmd.Path), "cmd.exe") {
+			quiet := false
+			for _, arg := range self.cmd.Args[1:] {
+				if strings.EqualFold(arg, "/Q") {
+					quiet = true
+					break
+				}
+			}
+			if !quiet {
+				self.cmd.Args = append(self.cmd.Args[:1], append([]string{"/Q"}, self.cmd.Args[1:]...)...)
+			}
+		}
 		stdoutReader, stdoutWriter := io.Pipe()
 		stdinReader, stdinWriter := io.Pipe()
 		stderrBuf := &bytes.Buffer{}
@@ -185,10 +201,11 @@ func (self *Local) RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser, 
 			}
 			_ = stdinReader.Close()
 		}()
-		return stdoutReader, readCloser{
+		terminalOutput, terminalInput := self.windowsTerminalStreams(stdoutReader, stdinWriter)
+		return terminalOutput, readCloser{
 			cmd:   self,
 			Conn:  stdoutReader,
-			stdin: stdinWriter,
+			stdin: terminalInput,
 		}, nil
 	}
 

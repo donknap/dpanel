@@ -4,9 +4,20 @@ package local
 
 import (
 	"errors"
+	"io"
 	"syscall"
 	"time"
 )
+
+func WithWindowsCodePage() Option {
+	return func(self *Local) error {
+		return nil
+	}
+}
+
+func (self *Local) windowsTerminalStreams(output *io.PipeReader, input *io.PipeWriter) (io.Reader, io.WriteCloser) {
+	return output, input
+}
 
 func WithIndependentProcessGroup() Option {
 	return func(self *Local) error {
