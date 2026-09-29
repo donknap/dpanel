@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/donknap/dpanel/app/application/logic/task"
@@ -13,6 +14,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/buildx"
 	buildxcontext "github.com/donknap/dpanel/common/service/docker/buildx/context"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
@@ -86,6 +88,10 @@ func (self ImageBuildx) Build(http *gin.Context) {
 		return
 	}
 
+	buildSetting := *imageRow.Setting
+	if buildSetting.BuildZip != "" && !filepath.IsAbs(buildSetting.BuildZip) {
+		buildSetting.BuildZip = storage.Local{}.GetSaveRealPath(buildSetting.BuildZip)
+	}
 	startTime := time.Now()
 	log, imageID, err := func() (string, string, error) {
 		state, err := buildxcontext.Get(sdk)
@@ -100,7 +106,7 @@ func (self ImageBuildx) Build(http *gin.Context) {
 		if err := progress.Context().Err(); err != nil {
 			return "", "", err
 		}
-		options, err := (task.Docker{}).BuildxOptions(*imageRow.Setting)
+		options, err := (task.Docker{}).BuildxOptions(buildSetting)
 		if err != nil {
 			return "", "", err
 		}

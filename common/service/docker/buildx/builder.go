@@ -111,12 +111,11 @@ func (self *Builder) Run(output io.Writer) (string, string, error) {
 		return "", "", err
 	}
 	defer cmd.Close()
-	pipe, err := cmd.RunInPip()
+	pipe, err := cmd.RunInReadPip()
 	if err != nil {
 		return "", "", err
 	}
 	defer pipe.Close()
-	_ = pipe.CloseWrite()
 	var log bytes.Buffer
 	if output == nil {
 		output = io.Discard

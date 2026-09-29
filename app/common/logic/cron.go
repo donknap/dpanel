@@ -197,11 +197,12 @@ func (self Cron) AddCronJob(task *entity.Cron) error {
 			}()
 		}
 		buffer := new(bytes.Buffer)
-		out, err := cmd.RunInPip()
+		out, err := cmd.RunInReadPip()
 		if err != nil {
 			ctx.Err = err
 			return
 		}
+		defer out.Close()
 		w := io.MultiWriter(buffer, os.Stdout)
 		_, err = io.Copy(w, out)
 		if err != nil {

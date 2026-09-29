@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -121,7 +122,7 @@ func (self Site) CreateByCommand(http *gin.Context) {
 	}
 	_, _ = progress.Write([]byte("$ " + cmd.String() + "\n"))
 
-	out, err := cmd.RunInPip()
+	out, err := cmd.RunInReadPip()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -389,6 +390,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			Ctx:            http,
 		})
 	} else {
+		slog.Info("container create event publish", "dockerEnv", docker.Sdk.Name, "containerId", detail.ID)
 		facade.GetEvent().Publish(event.ContainerCreateEvent, event.ContainerPayload{
 			InspectInfo: &detail,
 			Ctx:         http,

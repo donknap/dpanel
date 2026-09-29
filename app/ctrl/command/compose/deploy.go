@@ -7,6 +7,7 @@ import (
 	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/app"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
+	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/gin-gonic/gin"
@@ -65,6 +66,13 @@ func (self Deploy) Handle(cmd *cobra.Command, args []string) {
 	if err != nil {
 		utils.Result{}.Error(err)
 		return
+	}
+	if composeTask.Detail.Setting.Type != accessor.ComposeTypeOutPath {
+		err = proxyClient.CommonExplorerSyncDPanel(composeTask.Detail.Name)
+		if err != nil {
+			utils.Result{}.Error(err)
+			return
+		}
 	}
 	if pullImage == "dpanel" {
 		for _, item := range composeTask.Project.Services {

@@ -107,13 +107,21 @@ func (self *Container) RunWithResult() ([]byte, error) {
 }
 
 func (self *Container) RunInPip() (exec.Pipe, error) {
+	return self.runInPip(true)
+}
+
+func (self *Container) RunInReadPip() (io.ReadCloser, error) {
+	return self.runInPip(false)
+}
+
+func (self *Container) runInPip(withInput bool) (*pipeReader, error) {
 	option := self.option
 	option.Cmd = self.command
 	option.Env = append(option.Env, self.env...)
 	if self.dir != "" {
 		option.WorkingDir = self.dir
 	}
-	option.Tty, option.AttachStdin, option.AttachStdout, option.AttachStderr = false, true, true, true
+	option.Tty, option.AttachStdin, option.AttachStdout, option.AttachStderr = false, withInput, true, true
 	created, err := self.client.ContainerExecCreate(self.ctx, self.containerName, option)
 	if err != nil {
 		return nil, err
@@ -141,7 +149,12 @@ func (self *Container) RunInPip() (exec.Pipe, error) {
 		}
 		_ = writer.CloseWithError(err)
 	}()
-	return &pipeReader{PipeReader: reader, write: response.Conn, closeWrite: response.CloseWrite, close: self.Close}, nil
+	result := &pipeReader{PipeReader: reader, close: self.Close}
+	if withInput {
+		result.write = response.Conn
+		result.closeWrite = response.CloseWrite
+	}
+	return result, nil
 }
 
 func (self *Container) RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser, error) {
@@ -212,8 +225,18 @@ func (self *pipeReader) Close() error {
 	return errors.Join(err, self.close())
 }
 
-func (self *pipeReader) Write(p []byte) (int, error) { return self.write.Write(p) }
-func (self *pipeReader) CloseWrite() error           { return self.closeWrite() }
+func (self *pipeReader) Write(p []byte) (int, error) {
+	if self.write == nil {
+		return 0, io.ErrClosedPipe
+	}
+	return self.write.Write(p)
+}
+func (self *pipeReader) CloseWrite() error {
+	if self.closeWrite == nil {
+		return io.ErrClosedPipe
+	}
+	return self.closeWrite()
+}
 
 type terminalWriter struct {
 	io.Writer

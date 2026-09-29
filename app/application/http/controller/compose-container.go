@@ -198,13 +198,12 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 				return
 			}
 			defer cmd.Close()
-			out, err := cmd.RunInPip()
+			out, err := cmd.RunInReadPip()
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
 			defer out.Close()
-			_ = out.CloseWrite()
 			_, err = io.Copy(progress, out)
 			if err != nil {
 				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)

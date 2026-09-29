@@ -91,7 +91,6 @@ func WithZipFilePath(trimPath string, path string) Option {
 		if path == "" {
 			return nil
 		}
-		defer func() { _ = os.Remove(path) }()
 		tempDir, err := storage.Local{}.CreateTempDir("")
 		if err != nil {
 			return err

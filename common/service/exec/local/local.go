@@ -169,6 +169,36 @@ func (self *Local) RunInPip() (exec.Pipe, error) {
 	}, nil
 }
 
+func (self *Local) RunInReadPip() (io.ReadCloser, error) {
+	self.debug()
+	pr, pw := io.Pipe()
+	stderrBuf := &bytes.Buffer{}
+	self.cmd.Stdout = pw
+	self.cmd.Stderr = io.MultiWriter(pw, stderrBuf)
+
+	if err := self.cmd.Start(); err != nil {
+		_ = pr.Close()
+		_ = pw.Close()
+		return nil, err
+	}
+
+	go func() {
+		err := self.cmd.Wait()
+		if err != nil {
+			err = fmt.Errorf("%s: %s", err.Error(), stderrBuf.String())
+			slog.Debug("run command wait", "err", err)
+			_ = pw.CloseWithError(err)
+		} else {
+			_ = pw.Close()
+		}
+	}()
+
+	return readCloser{
+		cmd:  self,
+		Conn: pr,
+	}, nil
+}
+
 func (self *Local) RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser, error) {
 	var out *os.File
 	var err error

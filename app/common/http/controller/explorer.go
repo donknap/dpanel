@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/agent/factor"
 	archiveservice "github.com/donknap/dpanel/common/service/archive"
@@ -20,6 +21,8 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"gorm.io/datatypes"
+	"gorm.io/gen"
 )
 
 type Explorer struct {
@@ -50,6 +53,18 @@ func (self Explorer) SyncDPanel(http *gin.Context) {
 	dockerEnvName := define.DockerDefaultClientName
 	if dockerSdk.DockerEnv.EnableComposePath {
 		dockerEnvName = dockerSdk.Name
+	}
+	composeRow, err := dao.Compose.Where(dao.Compose.Name.Eq(params.ComposeName)).Where(gen.Cond(
+		datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
+	)...).First()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if composeRow == nil || params.ComposeName == "." || params.ComposeName == ".." ||
+		filepath.Base(params.ComposeName) != params.ComposeName {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		return
 	}
 	sourceDir := storage.Local{}.GetComposeProjectPath(dockerEnvName, params.ComposeName)
 	relativeDir, err := filepath.Rel(storage.Local{}.GetStorageLocalPath(), sourceDir)

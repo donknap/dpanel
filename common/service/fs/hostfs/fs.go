@@ -270,6 +270,9 @@ func (self *Fs) fileData(name string, info os.FileInfo, users, groups map[uint32
 }
 
 func (self *Fs) Remove(name string) error {
+	if name == "" {
+		return pathError("remove", name, errors.New("refusing to remove empty path"))
+	}
 	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
@@ -310,6 +313,9 @@ func (self *Fs) Stat(name string) (os.FileInfo, error) {
 }
 
 func (self *Fs) Chmod(name string, mode os.FileMode) error {
+	if name == "" {
+		return pathError("chmod", name, errors.New("refusing to chmod empty path"))
+	}
 	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {
@@ -341,6 +347,9 @@ func (self *Fs) ChmodAll(name string, mode os.FileMode, recursive bool) error {
 }
 
 func (self *Fs) Chown(name string, uid, gid int) error {
+	if name == "" {
+		return pathError("chown", name, errors.New("refusing to chown empty path"))
+	}
 	if len(self.roots) == 0 {
 		name, err := self.pathName(name)
 		if err != nil {

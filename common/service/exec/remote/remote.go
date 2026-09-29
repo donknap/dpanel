@@ -136,7 +136,7 @@ func (self *Remote) Run() error {
 }
 
 func (self *Remote) RunWithResult() ([]byte, error) {
-	reader, err := self.RunInPip()
+	reader, err := self.RunInReadPip()
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +155,14 @@ func (self *Remote) RunWithResult() ([]byte, error) {
 }
 
 func (self *Remote) RunInPip() (exec.Pipe, error) {
+	return self.runInPip(true)
+}
+
+func (self *Remote) RunInReadPip() (io.ReadCloser, error) {
+	return self.runInPip(false)
+}
+
+func (self *Remote) runInPip(withInput bool) (*readCloser, error) {
 	session, err := self.client.NewSession()
 	if err != nil {
 		return nil, err
@@ -167,12 +175,15 @@ func (self *Remote) RunInPip() (exec.Pipe, error) {
 		}
 	}
 	pipeReader, pipeWriter := io.Pipe()
-	stdin, err := session.StdinPipe()
-	if err != nil {
-		_ = session.Close()
-		_ = pipeReader.Close()
-		_ = pipeWriter.Close()
-		return nil, err
+	var stdin io.WriteCloser
+	if withInput {
+		stdin, err = session.StdinPipe()
+		if err != nil {
+			_ = session.Close()
+			_ = pipeReader.Close()
+			_ = pipeWriter.Close()
+			return nil, err
+		}
 	}
 	waitDone := make(chan struct{})
 
@@ -190,9 +201,11 @@ func (self *Remote) RunInPip() (exec.Pipe, error) {
 
 	r := &readCloser{
 		buffer:  pipeReader,
-		writer:  stdin,
 		closer:  pipeReader,
 		session: session,
+	}
+	if withInput {
+		r.writer = stdin
 	}
 
 	session.Stdout = pipeWriter

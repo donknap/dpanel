@@ -226,7 +226,7 @@ func (self SiteCert) Apply(http *gin.Context) {
 		}
 	}
 
-	out, err := cmd.RunInPip()
+	out, err := cmd.RunInReadPip()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

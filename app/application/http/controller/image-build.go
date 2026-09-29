@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/docker/docker/api/types/build"
@@ -48,12 +49,24 @@ func (self ImageBuild) Create(http *gin.Context) {
 	}
 
 	if params.BuildZip != "" {
+		if filepath.Dir(params.BuildZip) == "temp" {
+			zipPath := filepath.Join("image-build", filepath.Base(params.BuildZip))
+			path := storage.Local{}.GetSaveRealPath(zipPath)
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			if err := os.Rename(storage.Local{}.GetSaveRealPath(params.BuildZip), path); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			params.BuildZip = zipPath
+		}
 		path := storage.Local{}.GetSaveRealPath(params.BuildZip)
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonUploadFileEmpty), 500)
 			return
 		}
-		params.BuildZip = path
 	}
 
 	if params.BuildPath != "" {
@@ -168,7 +181,11 @@ func (self ImageBuild) Build(http *gin.Context) {
 	}
 
 	startTime := time.Now()
-	log, imageID, err := (task.Docker{}).Build(sdk, progress, *imageRow.Setting)
+	buildSetting := *imageRow.Setting
+	if buildSetting.BuildZip != "" && !filepath.IsAbs(buildSetting.BuildZip) {
+		buildSetting.BuildZip = storage.Local{}.GetSaveRealPath(buildSetting.BuildZip)
+	}
+	log, imageID, err := (task.Docker{}).Build(sdk, progress, buildSetting)
 	if ctxErr := progress.Context().Err(); ctxErr != nil {
 		err = ctxErr
 		imageRow.Status = define.DockerImageBuildStatusStop

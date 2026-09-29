@@ -11,6 +11,7 @@ type Executor interface {
 	Run() error
 	RunWithResult() ([]byte, error)
 	RunInPip() (Pipe, error)
+	RunInReadPip() (io.ReadCloser, error)
 	RunInTerminal(size *pty.Winsize) (io.Reader, io.WriteCloser, error)
 	ResizeTerminal(size *pty.Winsize) error
 	Kill() error

@@ -1,7 +1,6 @@
 package task
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -9,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"regexp"
-	"strings"
 
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -66,41 +64,49 @@ func (self Docker) Build(sdk *docker.Client, wsBuffer *ws.ProgressPip, task acce
 	}()
 
 	log := new(bytes.Buffer)
-	wsBuffer.OnWrite = func(p string) error {
-		log.WriteString(p)
-		newReader := bufio.NewReader(bytes.NewReader([]byte(p)))
-		for {
-			line, _, err := newReader.ReadLine()
-			if err == io.EOF {
-				break
-			}
-			msg := types.ImageProgress{}
-			if err = json.Unmarshal(line, &msg); err == nil {
-				if msg.ErrorDetail.Message != "" {
-					wsBuffer.BroadcastMessage(msg.ErrorDetail.Message)
-				} else if msg.Id != "" {
-					wsBuffer.BroadcastMessage(fmt.Sprintf("\r%s: %s", msg.Id, msg.Progress))
-				} else {
-					wsBuffer.BroadcastMessage(msg.Stream)
-				}
-			} else {
-				slog.Error("docker", "image build task", err, "data", p)
-				return err
-			}
+	decoder := json.NewDecoder(io.TeeReader(response.Body, log))
+	legacyID := ""
+	imageID := ""
+	legacySuccess := regexp.MustCompile(`(?m)^Successfully built\s+([a-f0-9]+)\s*$`)
+	for {
+		msg := struct {
+			types.ImageProgress
+			Error string `json:"error"`
+			Aux   struct {
+				ID string `json:"ID"`
+			} `json:"aux"`
+		}{}
+		if err = decoder.Decode(&msg); err == io.EOF {
+			break
+		} else if err != nil {
+			return log.String(), "", fmt.Errorf("read image build response: %w", err)
 		}
-		return nil
+		buildErr := msg.ErrorDetail.Message
+		if buildErr == "" {
+			buildErr = msg.Error
+		}
+		if buildErr != "" {
+			wsBuffer.BroadcastMessage(buildErr)
+			return log.String(), "", function.ErrorMessage(define.ErrorMessageImageBuildError, "message", buildErr)
+		}
+		if msg.Aux.ID != "" {
+			imageID = msg.Aux.ID
+		}
+		if matches := legacySuccess.FindStringSubmatch(msg.Stream); len(matches) > 1 {
+			legacyID = matches[1]
+		}
+		if msg.Id != "" {
+			wsBuffer.BroadcastMessage(fmt.Sprintf("\r%s: %s", msg.Id, msg.Progress))
+		} else if msg.Stream != "" {
+			wsBuffer.BroadcastMessage(msg.Stream)
+		}
 	}
-	_, err = io.Copy(wsBuffer, response.Body)
-	if err != nil {
-		return log.String(), "", function.ErrorMessage(define.ErrorMessageCommonCancelOperator, "message", err.Error())
+	if imageID == "" {
+		imageID = legacyID
 	}
-	if !strings.Contains(log.String(), "Successfully built") {
+	if imageID == "" {
 		return log.String(), "", function.ErrorMessage(define.ErrorMessageImageBuildError, "message", "")
 	}
-	matches := regexp.MustCompile(`Successfully built\s*([a-f0-9]+)`).FindAllStringSubmatch(log.String(), -1)
-	imageID := strings.Join(function.PluckArrayWalk(matches, func(item []string) (string, bool) {
-		return item[1], true
-	}), "-")
 	if task.BuildEnablePush {
 		for _, tag := range task.Tags {
 			if err = wsBuffer.Context().Err(); err != nil {

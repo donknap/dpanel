@@ -329,7 +329,7 @@ func (self Panel) Update(http *gin.Context) {
 	}
 
 	commandExecutor.WorkDir(storage.Local{}.GetStorageLocalPath())
-	commandOutput, err := commandExecutor.RunInPip()
+	commandOutput, err := commandExecutor.RunInReadPip()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

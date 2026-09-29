@@ -136,7 +136,7 @@ func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 		}))
 	}
 	exec.WorkDir(self.Project.WorkingDir)
-	return exec.RunInPip()
+	return exec.RunInReadPip()
 }
 
 // GetService 区别于 Project.GetService 方法，此方法会将扩展信息一起返回

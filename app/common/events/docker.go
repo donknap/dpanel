@@ -247,8 +247,6 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 }
 
 func (self Docker) Message(e event.DockerMessagePayload) {
-	slog.Info("docker event triggered", "dockerEnv", e.DockerEnvName, "event", string(e.Message.Type)+"/"+string(e.Message.Action), "containerId", e.Message.Actor.ID)
-
 	var eventDockerClient *docker.Client
 	if client, ok := notice.Monitor.Clients()[e.DockerEnvName]; ok {
 		eventDockerClient = client

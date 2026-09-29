@@ -183,6 +183,9 @@ func (self *Fs) OpenFile(name string, flag int, perm os.FileMode) (afero.File, e
 }
 
 func (self *Fs) Remove(name string) error {
+	if name == "" {
+		return &os.PathError{Op: "remove", Path: name, Err: errors.New("refusing to remove empty path")}
+	}
 	p, err := self.pathName(name)
 	if err != nil {
 		return err
