@@ -29,8 +29,6 @@ func newSiteUpgrade(db *gorm.DB, opts ...gen.DOOption) siteUpgrade {
 	tableName := _siteUpgrade.siteUpgradeDo.TableName()
 	_siteUpgrade.ALL = field.NewAsterisk(tableName)
 	_siteUpgrade.ID = field.NewInt32(tableName, "id")
-	_siteUpgrade.Title = field.NewString(tableName, "title")
-	_siteUpgrade.Status = field.NewInt32(tableName, "status")
 	_siteUpgrade.Setting = field.NewField(tableName, "setting")
 	_siteUpgrade.Logs = field.NewField(tableName, "logs")
 
@@ -44,8 +42,6 @@ type siteUpgrade struct {
 
 	ALL     field.Asterisk
 	ID      field.Int32
-	Title   field.String
-	Status  field.Int32
 	Setting field.Field
 	Logs    field.Field
 
@@ -65,8 +61,6 @@ func (s siteUpgrade) As(alias string) *siteUpgrade {
 func (s *siteUpgrade) updateTableName(table string) *siteUpgrade {
 	s.ALL = field.NewAsterisk(table)
 	s.ID = field.NewInt32(table, "id")
-	s.Title = field.NewString(table, "title")
-	s.Status = field.NewInt32(table, "status")
 	s.Setting = field.NewField(table, "setting")
 	s.Logs = field.NewField(table, "logs")
 
@@ -85,10 +79,8 @@ func (s *siteUpgrade) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (s *siteUpgrade) fillFieldMap() {
-	s.fieldMap = make(map[string]field.Expr, 5)
+	s.fieldMap = make(map[string]field.Expr, 3)
 	s.fieldMap["id"] = s.ID
-	s.fieldMap["title"] = s.Title
-	s.fieldMap["status"] = s.Status
 	s.fieldMap["setting"] = s.Setting
 	s.fieldMap["logs"] = s.Logs
 }
