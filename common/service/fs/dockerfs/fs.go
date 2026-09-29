@@ -29,7 +29,7 @@ const maxSymlinkDepth = 40
 type Fs struct {
 	name                string
 	sdk                 *docker.Client
-	agent               *serviceAgent.Agent
+	client              *serviceAgent.Client
 	targetContainerName string
 	proxyContainerName  string
 	rootPath            string
@@ -60,11 +60,6 @@ func New(opts ...Option) (*Fs, error) {
 	if o.proxyContainerName == "" || o.targetContainerName == "" || o.targetType == 0 {
 		return nil, fmt.Errorf("the %s container does not exist or is not running", o.targetContainerName)
 	}
-	agentClient, err := serviceAgent.NewDockerAgent(o.sdk, o.proxyContainerName)
-	if err != nil {
-		return nil, err
-	}
-	o.agent = agentClient
 	if o.rootPath == "" || strings.IndexByte(o.rootPath, 0) >= 0 || !path.IsAbs(o.rootPath) || path.Clean(o.rootPath) != o.rootPath {
 		return nil, errors.New("invalid backend root")
 	}
@@ -74,6 +69,11 @@ func New(opts ...Option) (*Fs, error) {
 	if _, err := o.pathName(o.workingDir); err != nil {
 		return nil, fmt.Errorf("invalid working directory: %w", err)
 	}
+	client, err := serviceAgent.NewClient(o.sdk, o.proxyContainerName)
+	if err != nil {
+		return nil, err
+	}
+	o.client = client
 	return o, nil
 }
 
@@ -98,7 +98,7 @@ func (self *Fs) Mkdir(name string, perm os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	return self.agent.Fs.Mkdir(self.sdk.Ctx, target, p, perm, false)
+	return self.client.Fs.Mkdir(self.sdk.Ctx, target, p, perm, false)
 }
 
 func (self *Fs) MkdirAll(name string, perm os.FileMode) error {
@@ -110,7 +110,7 @@ func (self *Fs) MkdirAll(name string, perm os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	return self.agent.Fs.Mkdir(self.sdk.Ctx, target, p, perm, true)
+	return self.client.Fs.Mkdir(self.sdk.Ctx, target, p, perm, true)
 }
 
 func (self *Fs) Open(name string) (afero.File, error) {
@@ -191,10 +191,13 @@ func (self *Fs) Remove(name string) error {
 	if err != nil {
 		return err
 	}
-	return self.agent.Fs.Remove(self.sdk.Ctx, target, p, false)
+	return self.client.Fs.Remove(self.sdk.Ctx, target, p, false)
 }
 
 func (self *Fs) RemoveAll(name string) error {
+	if name == "" {
+		return &os.PathError{Op: "remove_all", Path: name, Err: errors.New("refusing to remove empty path")}
+	}
 	p, err := self.pathName(name)
 	if err != nil {
 		return err
@@ -206,7 +209,7 @@ func (self *Fs) RemoveAll(name string) error {
 	if err != nil {
 		return err
 	}
-	return self.agent.Fs.Remove(self.sdk.Ctx, target, p, true)
+	return self.client.Fs.Remove(self.sdk.Ctx, target, p, true)
 }
 
 func (self *Fs) Rename(oldname, newname string) error {
@@ -273,6 +276,9 @@ func (self *Fs) ChmodAll(name string, mode os.FileMode, recursive bool) error {
 }
 
 func (self *Fs) chmod(name string, mode os.FileMode, recursive bool) error {
+	if name == "" {
+		return &os.PathError{Op: "chmod", Path: name, Err: errors.New("refusing to chmod empty path")}
+	}
 	p, err := self.pathName(name)
 	if err != nil {
 		return err
@@ -284,7 +290,7 @@ func (self *Fs) chmod(name string, mode os.FileMode, recursive bool) error {
 	if err != nil {
 		return err
 	}
-	return self.agent.Fs.Chmod(self.sdk.Ctx, target, p, mode, recursive)
+	return self.client.Fs.Chmod(self.sdk.Ctx, target, p, mode, recursive)
 }
 
 func (self *Fs) Chown(name string, uid, gid int) error {
@@ -296,6 +302,9 @@ func (self *Fs) ChownAll(name string, uid, gid *int, recursive bool) error {
 }
 
 func (self *Fs) chown(name string, uid, gid *int, recursive bool) error {
+	if name == "" {
+		return &os.PathError{Op: "chown", Path: name, Err: errors.New("refusing to chown empty path")}
+	}
 	p, err := self.pathName(name)
 	if err != nil {
 		return err
@@ -307,7 +316,7 @@ func (self *Fs) chown(name string, uid, gid *int, recursive bool) error {
 	if err != nil {
 		return err
 	}
-	return self.agent.Fs.Chown(self.sdk.Ctx, target, p, uid, gid, recursive)
+	return self.client.Fs.Chown(self.sdk.Ctx, target, p, uid, gid, recursive)
 }
 
 func (self *Fs) Chtimes(name string, atime, mtime time.Time) error {
@@ -319,7 +328,7 @@ func (self *Fs) Chtimes(name string, atime, mtime time.Time) error {
 	if err != nil {
 		return err
 	}
-	return self.agent.Fs.Chtimes(self.sdk.Ctx, target, p, atime, mtime)
+	return self.client.Fs.Chtimes(self.sdk.Ctx, target, p, atime, mtime)
 }
 
 func (self *Fs) readDirFromContainer(rootPath string) ([]os.FileInfo, error) {
@@ -331,7 +340,7 @@ func (self *Fs) readDirFromContainer(rootPath string) ([]os.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	result, err := self.agent.Fs.List(self.sdk.Ctx, target, agentPath)
+	result, err := self.client.Fs.List(self.sdk.Ctx, target, agentPath)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +478,7 @@ func (self *Fs) PathSize(name string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	result, err := self.agent.Fs.Size(self.sdk.Ctx, target, p)
+	result, err := self.client.Fs.Size(self.sdk.Ctx, target, p)
 	return result.Size, err
 }
 
@@ -478,7 +487,7 @@ func (self *Fs) Users() (fsdata.IdentityList, error) {
 	if err != nil {
 		return fsdata.IdentityList{}, err
 	}
-	value, err := self.agent.Fs.Users(self.sdk.Ctx, target)
+	value, err := self.client.Fs.Users(self.sdk.Ctx, target)
 	if err != nil {
 		return fsdata.IdentityList{}, err
 	}
@@ -502,7 +511,7 @@ func (self *Fs) Copy(sourceName, targetName string, overwrite bool) error {
 	if err != nil {
 		return err
 	}
-	return self.agent.Fs.Copy(self.sdk.Ctx, agentTarget, source, target, overwrite)
+	return self.client.Fs.Copy(self.sdk.Ctx, agentTarget, source, target, overwrite)
 }
 
 func (self *Fs) Move(sourceName, targetName string, overwrite bool) error {
@@ -510,7 +519,7 @@ func (self *Fs) Move(sourceName, targetName string, overwrite bool) error {
 	if err != nil {
 		return err
 	}
-	return self.agent.Fs.Move(self.sdk.Ctx, agentTarget, source, target, overwrite)
+	return self.client.Fs.Move(self.sdk.Ctx, agentTarget, source, target, overwrite)
 }
 
 func (self *Fs) transferTarget(sourceName, targetName string) (string, string, serviceAgent.FsTarget, error) {

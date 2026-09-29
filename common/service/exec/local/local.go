@@ -92,6 +92,7 @@ type Local struct {
 	terminalFile *os.File
 
 	windowsEncoding encoding.Encoding
+	quiet           bool
 }
 
 func (self *Local) AppendEnv(env []string) {
@@ -241,7 +242,9 @@ func (self *Local) Kill() error {
 }
 
 func (self *Local) Close() error {
-	slog.Debug("run command kill cmd", "cmd", self.cmd, "process", self.cmd.Process)
+	if !self.quiet {
+		slog.Debug("run command kill cmd", "cmd", self.cmd, "process", self.cmd.Process)
+	}
 	self.ctxCancel()
 	return nil
 }
@@ -251,5 +254,8 @@ func (self *Local) WorkDir(path string) {
 }
 
 func (self *Local) debug() {
+	if self.quiet {
+		return
+	}
 	slog.Debug("run local command", "cmd", self.cmd.String(), "env", self.cmd.Env)
 }

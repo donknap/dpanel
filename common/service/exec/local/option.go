@@ -13,6 +13,13 @@ import (
 
 type Option func(command *Local) error
 
+func WithQuiet() Option {
+	return func(self *Local) error {
+		self.quiet = true
+		return nil
+	}
+}
+
 func WithArgs(args ...string) Option {
 	return func(self *Local) error {
 		var commandName string

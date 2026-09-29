@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -39,7 +40,12 @@ func (self Image) TagSync(http *gin.Context) {
 		return
 	}
 
-	slog.Debug("image remote", "type", params.Type, "tag", imageNameDetail.Uri())
+	pullStarted := time.Now()
+	if params.Type == "pull" {
+		slog.Info("image pull started", "image", imageNameDetail.Uri(), "dockerEnv", dockerClient.Name)
+	} else {
+		slog.Debug("image remote", "type", params.Type, "tag", imageNameDetail.Uri())
+	}
 
 	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, params.Tag))
 	defer wsBuffer.Close()
@@ -67,6 +73,18 @@ func (self Image) TagSync(http *gin.Context) {
 			},
 		})
 	}
+	if params.Type == "pull" {
+		status := "success"
+		if err != nil {
+			status = "failed"
+		}
+		slog.Info("image pull finished",
+			"image", imageNameDetail.Uri(),
+			"dockerEnv", dockerClient.Name,
+			"status", status,
+			"durationSeconds", time.Since(pullStarted).Seconds(),
+		)
+	}
 
 	if err != nil {
 		if function.ErrorHasKeyword(err, "not found:", "repository does not exist") {
@@ -76,6 +94,9 @@ func (self Image) TagSync(http *gin.Context) {
 		if function.ErrorHasKeyword(err, "server gave HTTP response to HTTPS client") {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImagePullServerHttp, "name", imageNameDetail.Registry), 500)
 			return
+		}
+		if params.Type == "pull" {
+			err = fmt.Errorf("image %s in Docker environment %s: %w", imageNameDetail.Uri(), dockerClient.Name, err)
 		}
 		self.JsonResponseWithError(http, err, 500)
 		return

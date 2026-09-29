@@ -205,18 +205,19 @@ func initDb() error {
 	}
 	// 同步数据库
 	err = db.Migrator().AutoMigrate(
+		&entity.Backup{},
+		&entity.Compose{},
+		&entity.Cron{},
+		&entity.CronLog{},
 		&entity.Image{},
 		&entity.Notice{},
 		&entity.Registry{},
 		&entity.Setting{},
 		&entity.Site{},
-		&entity.SiteUpgrade{},
 		&entity.SiteDomain{},
-		&entity.Compose{},
-		&entity.Backup{},
+		&entity.SiteUpgrade{},
 		&entity.Store{},
-		&entity.Cron{},
-		&entity.CronLog{},
+		&entity.UserPermission{},
 	)
 	if err != nil {
 		return err

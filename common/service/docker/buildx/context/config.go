@@ -1,9 +1,7 @@
-package logic
+package context
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
@@ -11,7 +9,6 @@ import (
 	dockerregistry "github.com/docker/docker/registry"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/storage"
 )
 
 const buildxConfigTmpl = `
@@ -32,30 +29,25 @@ const buildxConfigTmpl = `
 {{- end }}
 `
 
-type ImageBuildx struct{}
-
-type BuildxConfig struct {
-	ConfigPath        string
-	ConfigContent     *string
+type buildxConfig struct {
 	WorkerNetworkMode string
-	Registry          []BuildxConfigRegistry
+	Registry          []buildxConfigRegistry
 }
 
-type BuildxConfigRegistry struct {
+type buildxConfigRegistry struct {
 	ServerAddress string
 	Mirrors       []string
 	EnableHttp    bool
 }
 
-func (self ImageBuildx) ResolveConfig(dockerEnvName string) (BuildxConfig, error) {
-	result := BuildxConfig{
-		ConfigPath:        filepath.Join(storage.Local{}.GetStorageLocalPath(), "buildx", dockerEnvName, "config.toml"),
+func (self *contextService) defaultConfig() (string, error) {
+	result := buildxConfig{
 		WorkerNetworkMode: "host",
-		Registry:          make([]BuildxConfigRegistry, 0),
+		Registry:          make([]buildxConfigRegistry, 0),
 	}
 	registryRows, err := dao.Registry.Order(dao.Registry.ServerAddress.Asc()).Find()
 	if err != nil {
-		return result, err
+		return "", err
 	}
 	for _, row := range registryRows {
 		if row == nil || row.Setting == nil || row.ServerAddress == "" {
@@ -83,40 +75,21 @@ func (self ImageBuildx) ResolveConfig(dockerEnvName string) (BuildxConfig, error
 		if function.IsEmptyArray(mirrors) && !row.Setting.EnableHttp {
 			continue
 		}
-		result.Registry = append(result.Registry, BuildxConfigRegistry{
+		result.Registry = append(result.Registry, buildxConfigRegistry{
 			ServerAddress: row.ServerAddress,
 			Mirrors:       mirrors,
 			EnableHttp:    row.Setting.EnableHttp,
 		})
 	}
-	return result, nil
-}
-
-func (self ImageBuildx) WriteConfig(option BuildxConfig) error {
-	content, err := self.ConfigContent(option)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(option.ConfigPath), os.ModePerm); err != nil {
-		return err
-	}
-	return os.WriteFile(option.ConfigPath, []byte(content), 0644)
-}
-
-func (self ImageBuildx) ConfigContent(option BuildxConfig) (string, error) {
 	var config bytes.Buffer
-	if option.ConfigContent != nil {
-		config.WriteString(*option.ConfigContent)
-	} else {
-		configTemplate, err := template.New("buildkitd").Funcs(template.FuncMap{
-			"quote": strconv.Quote,
-		}).Parse(buildxConfigTmpl)
-		if err != nil {
-			return "", err
-		}
-		if err := configTemplate.Execute(&config, option); err != nil {
-			return "", err
-		}
+	configTemplate, err := template.New("buildkitd").Funcs(template.FuncMap{
+		"quote": strconv.Quote,
+	}).Parse(buildxConfigTmpl)
+	if err != nil {
+		return "", err
+	}
+	if err := configTemplate.Execute(&config, result); err != nil {
+		return "", err
 	}
 	return config.String(), nil
 }

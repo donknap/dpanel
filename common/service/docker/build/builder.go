@@ -2,8 +2,10 @@ package build
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
+	"sync"
 
 	"github.com/docker/docker/api/types/build"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -15,6 +17,8 @@ import (
 func New(opts ...Option) (*Builder, error) {
 	var err error
 	c := &Builder{
+		ctx:    context.Background(),
+		closed: make(chan struct{}),
 		imageBuildOption: build.ImageBuildOptions{
 			BuildID:     uuid.New().String(),
 			Dockerfile:  "Dockerfile", // 默认在根目录
@@ -31,10 +35,18 @@ func New(opts ...Option) (*Builder, error) {
 		},
 	}
 	for _, opt := range opts {
-		err = opt(c)
-		if err != nil {
+		if err = c.ctx.Err(); err != nil {
+			_ = c.Close()
 			return nil, err
 		}
+		if err = opt(c); err != nil {
+			_ = c.Close()
+			return nil, err
+		}
+	}
+	if err = c.ctx.Err(); err != nil {
+		_ = c.Close()
+		return nil, err
 	}
 	return c, nil
 }
@@ -42,8 +54,22 @@ func New(opts ...Option) (*Builder, error) {
 type Builder struct {
 	imageBuildOption build.ImageBuildOptions
 	buildContext     io.Reader
+	closeOnce        sync.Once
+	closeErr         error
+	cleanupResults   []<-chan error
+	closed           chan struct{}
 	ctx              context.Context
 	sdk              *docker.Client
+}
+
+func (self *Builder) Close() error {
+	self.closeOnce.Do(func() {
+		close(self.closed)
+		for _, result := range self.cleanupResults {
+			self.closeErr = errors.Join(self.closeErr, <-result)
+		}
+	})
+	return self.closeErr
 }
 
 func (self Builder) GetBuildId() string {

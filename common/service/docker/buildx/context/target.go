@@ -1,19 +1,20 @@
-package logic
+package context
 
 import (
 	"archive/tar"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/errdefs"
-	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/types/define"
+	containerexec "github.com/donknap/dpanel/common/service/exec/container"
 )
 
-type BuildxTarget struct {
+type target struct {
 	Exists  bool
 	Proxy   string
 	Name    string
@@ -21,12 +22,11 @@ type BuildxTarget struct {
 	Running bool
 }
 
-func (self ImageBuildx) GetTarget(sdk *docker.Client) (BuildxTarget, error) {
-	builderName := fmt.Sprintf(define.DockerBuilderName, sdk.Name)
-	containerName := "buildx_buildkit_" + builderName + "0"
-	result := BuildxTarget{Name: containerName}
-	info, err := sdk.Client.ContainerInspect(sdk.Ctx, containerName)
-	if errdefs.IsNotFound(err) {
+func (self *contextService) getTarget() (target, error) {
+	containerName := "buildx_buildkit_" + self.builderName + "0"
+	result := target{Name: containerName}
+	info, err := self.sdk.Client.ContainerInspect(self.sdk.Ctx, containerName)
+	if errors.Is(err, os.ErrNotExist) || errdefs.IsNotFound(err) {
 		return result, nil
 	}
 	if err != nil {
@@ -52,8 +52,8 @@ func (self ImageBuildx) GetTarget(sdk *docker.Client) (BuildxTarget, error) {
 	return result, nil
 }
 
-func (self ImageBuildx) ReadTargetConfig(sdk *docker.Client, target BuildxTarget) (string, error) {
-	archive, _, err := sdk.Client.CopyFromContainer(sdk.Ctx, target.ID, "/etc/buildkit/buildkitd.toml")
+func (self *contextService) readTargetConfig(target target) (string, error) {
+	archive, _, err := self.sdk.Client.CopyFromContainer(self.sdk.Ctx, target.ID, "/etc/buildkit/buildkitd.toml")
 	if err != nil {
 		return "", fmt.Errorf("read buildkit config from %s: %w", target.Name, err)
 	}
@@ -76,39 +76,47 @@ func (self ImageBuildx) ReadTargetConfig(sdk *docker.Client, target BuildxTarget
 	return string(content), nil
 }
 
-func (self ImageBuildx) RemoveTarget(sdk *docker.Client, force bool) error {
-	target, err := self.GetTarget(sdk)
+func (self *contextService) removeTarget(force bool) error {
+	target, err := self.getTarget()
 	if err != nil {
 		return err
 	}
-	if target.Exists {
-		if err := sdk.Client.ContainerRemove(sdk.Ctx, target.ID, container.RemoveOptions{Force: force}); err != nil && !errdefs.IsNotFound(err) {
-			return err
-		}
+	if err := self.removeContainer(target, force); err != nil {
+		return err
 	}
 	volumeName := target.Name + "_state"
-	if err := sdk.Client.VolumeRemove(sdk.Ctx, volumeName, false); err != nil && !errdefs.IsNotFound(err) {
+	if err := self.sdk.Client.VolumeRemove(self.sdk.Ctx, volumeName, false); err != nil && !errdefs.IsNotFound(err) {
 		return err
 	}
 	return nil
 }
 
-func (self ImageBuildx) PruneTarget(sdk *docker.Client) error {
-	target, err := self.GetTarget(sdk)
+func (self *contextService) removeContainer(target target, force bool) error {
+	if !target.Exists {
+		return nil
+	}
+	if err := self.sdk.Client.ContainerRemove(self.sdk.Ctx, target.ID, container.RemoveOptions{Force: force}); err != nil && !errdefs.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (self *contextService) pruneTarget() error {
+	target, err := self.getTarget()
 	if err != nil {
 		return err
 	}
 	if !target.Exists {
-		return fmt.Errorf("buildkit container %s does not exist", target.Name)
+		return nil
 	}
 	if !target.Running {
-		if err := sdk.Client.ContainerStart(sdk.Ctx, target.ID, container.StartOptions{}); err != nil {
+		if err := self.sdk.Client.ContainerStart(self.sdk.Ctx, target.ID, container.StartOptions{}); err != nil {
 			return err
 		}
 	}
 	var pruneErr error
 	for attempt := 0; attempt < 5; attempt++ {
-		_, pruneErr = sdk.ContainerExecResult(sdk.Ctx, target.ID, container.ExecOptions{Cmd: []string{"buildctl", "prune", "--all"}})
+		_, pruneErr = containerexec.QuickRun(self.sdk.Ctx, self.sdk.Client, target.ID, "buildctl", "prune", "--all")
 		if pruneErr == nil {
 			break
 		}
@@ -119,7 +127,7 @@ func (self ImageBuildx) PruneTarget(sdk *docker.Client) error {
 		}
 	}
 	if !target.Running {
-		if err := sdk.Client.ContainerStop(sdk.Ctx, target.ID, container.StopOptions{}); err != nil {
+		if err := self.sdk.Client.ContainerStop(self.sdk.Ctx, target.ID, container.StopOptions{}); err != nil {
 			return fmt.Errorf("stop buildkit after pruning: %w (prune: %v)", err, pruneErr)
 		}
 	}

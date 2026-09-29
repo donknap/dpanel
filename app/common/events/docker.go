@@ -17,13 +17,13 @@ import (
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/agent/factor"
 	"github.com/donknap/dpanel/common/service/crontab"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	types2 "github.com/donknap/dpanel/common/types"
@@ -39,8 +39,8 @@ const maxDockerMessageSize = 100
 
 var (
 	dockerMessageFilterContainerList = []string{
-		plugin.ExplorerName,
-		plugin.MonitorName,
+		factor.ExplorerName,
+		factor.MonitorName,
 	}
 	dockerMessageLevelMap = map[dockerEvents.Action]types2.LogLevel{
 		dockerEvents.ActionOOM:          types2.LogLevelError,
@@ -150,18 +150,19 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 			if info, err := sdk.Client.ContainerInspect(sdk.Ctx, dpanelContainerName); err == nil {
 				info.ExecIDs = make([]string, 0)
 				result.ContainerInfo = info
-				result.Mount = types.VolumeItem{}
+				result.DataMounts = nil
 				if v, _, ok := function.PluckArrayItemWalk(info.Mounts, func(item container.MountPoint) bool {
 					return item.Destination == "/dpanel"
 				}); ok {
-					result.Mount = types.VolumeItem{Host: v.Source, Dest: v.Destination, Type: string(v.Type)}
+					item := types.VolumeItem{Host: v.Source, Dest: v.Destination, Type: string(v.Type)}
 					if v.Type == types3.VolumeTypeVolume {
-						result.Mount.Host = v.Name
+						item.Host = v.Name
+					}
+					if item.Host != "" && (item.Type == "bind" || item.Type == "volume") {
+						result.DataMounts = []types.VolumeItem{item}
 					}
 				}
-				result.DataMounts = nil
-				if result.Mount.Host != "" && (result.Mount.Type == "bind" || result.Mount.Type == "volume") {
-					result.DataMounts = []types.VolumeItem{result.Mount}
+				if len(result.DataMounts) != 0 {
 					for _, mount := range info.Mounts {
 						if !strings.HasPrefix(mount.Destination, "/dpanel/") {
 							continue
@@ -212,7 +213,6 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 				// 如果在容器中找不到 dpanel 容器则后续不会挂载 dpanel 目录
 				dockerEnv.DockerInfo.InDPanel = false
 				result.ContainerInfo = container.InspectResponse{}
-				result.Mount = types.VolumeItem{}
 				result.DataMounts = nil
 			}
 		} else {
@@ -222,17 +222,17 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 			// 如果是二进制运行，则挂载数据存储目录
 			// 如果在 windows 默认是远程 docker 那么需要转换一个安全路径
 			// 否则保持原样就可以了
-			result.Mount = types.VolumeItem{
+			item := types.VolumeItem{
 				Host: storage.Local{}.GetStorageLocalPath(),
 				Dest: "/dpanel",
 				Type: types3.VolumeTypeBind,
 			}
 			if !dockerEnv.IsLocal() && runtime.GOOS == "windows" {
 				if v, ok := function.WindowsPathToSlash(storage.Local{}.GetStorageLocalPath()); ok {
-					result.Mount.Host = v
+					item.Host = v
 				}
 			}
-			result.DataMounts = []types.VolumeItem{result.Mount}
+			result.DataMounts = []types.VolumeItem{item}
 		}
 		slog.Debug("docker daemon/event init dpanel info", "info", result)
 		_ = logic.Setting{}.Save(&entity.Setting{
@@ -247,6 +247,8 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 }
 
 func (self Docker) Message(e event.DockerMessagePayload) {
+	slog.Info("docker event triggered", "dockerEnv", e.DockerEnvName, "event", string(e.Message.Type)+"/"+string(e.Message.Action), "containerId", e.Message.Actor.ID)
+
 	var eventDockerClient *docker.Client
 	if client, ok := notice.Monitor.Clients()[e.DockerEnvName]; ok {
 		eventDockerClient = client

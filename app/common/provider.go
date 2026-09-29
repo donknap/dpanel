@@ -120,6 +120,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/explorer/get-content", controller.Explorer{}.GetContent)
 		cors.POST("/common/explorer/get-file-stat", controller.Explorer{}.GetFileStat)
 		cors.POST("/common/explorer/import", controller.Explorer{}.Import)
+		cors.POST("/common/explorer/sync-dpanel", controller.Explorer{}.SyncDPanel)
 		cors.POST("/common/explorer/export", controller.Explorer{}.Export)
 		cors.POST("/common/explorer/import-file-content", controller.Explorer{}.ImportFileContent)
 		cors.POST("/common/explorer/unzip", controller.Explorer{}.Unzip)

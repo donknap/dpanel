@@ -42,6 +42,11 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 	var err error
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 
 	composeRow, _ := logic.Compose{}.Get(params.Id)
 	if composeRow == nil {
@@ -99,19 +104,6 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		}
 	}
 	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
-
-	// 远程部署前同步面板数据目录内的当前 Compose 项目。
-	if function.InArray([]string{
-		define.DockerRemoteTypeSSH,
-		define.DockerRemoteTypeTcp,
-		define.DockerRemoteTypeWSL,
-	}, docker.Sdk.DockerEnv.RemoteType) {
-		err = (logic.Compose{}).SyncProjectToRemote(http, docker.Sdk, tasker.Project.WorkingDir)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-	}
 
 	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer progress.Close()
@@ -175,7 +167,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	// 如果当前容器配置过转发，则加入 dpanel-local 网络
 	for _, item := range runCompose.ContainerList {
 		if row, err := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(item.Container.Names...)).First(); err == nil {
-			_ = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, types.NetworkItem{
+			_ = dockerSdk.NetworkConnect(dockerSdk.Ctx, types.NetworkItem{
 				Name: define.DPanelProxyNetworkName,
 			}, row.ContainerID)
 		}
@@ -184,7 +176,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	// 这里需要单独适配一下 php 环境的相关扩展安装
 	// 目前只有 php 需要这样处理，暂时先直接进行判断
 	if strings.HasPrefix(composeRow.Setting.Store, define.StoreTypeOnePanel) && strings.HasSuffix(composeRow.Setting.Store, "@php") {
-		_ = docker.Sdk.NetworkConnect(docker.Sdk.Ctx, types.NetworkItem{
+		_ = dockerSdk.NetworkConnect(dockerSdk.Ctx, types.NetworkItem{
 			Name: define.DPanelProxyNetworkName,
 		}, runCompose.ContainerList[0].Container.Names[0])
 
@@ -194,7 +186,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		}); ok {
 			_, _ = progress.Write([]byte("Install PHP_EXTENSIONS " + phpExt.String() + "\n"))
 			cmd, err := containerexec.New(
-				containerexec.WithDockerClient(docker.Sdk.Client),
+				containerexec.WithDockerClient(dockerSdk.Client),
 				containerexec.WithContainerName(runCompose.ContainerList[0].Container.ID),
 				containerexec.WithCommandName("install-ext"),
 				containerexec.WithArgs(phpExt.Value),

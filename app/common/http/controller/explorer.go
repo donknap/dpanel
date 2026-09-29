@@ -2,17 +2,22 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"mime"
 	"os"
 	"path"
-	"regexp"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/donknap/dpanel/app/common/logic"
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/agent/factor"
 	archiveservice "github.com/donknap/dpanel/common/service/archive"
 	"github.com/donknap/dpanel/common/service/docker"
 	serviceafs "github.com/donknap/dpanel/common/service/fs/afs"
+	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
@@ -21,51 +26,75 @@ type Explorer struct {
 	controller.Abstract
 }
 
-var explorerMountNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
-
-func (self Explorer) afs(http *gin.Context, mountPointValue string) (serviceafs.Fs, error) {
-	mountType, mountName, ok := strings.Cut(mountPointValue, ":")
-	if !ok || mountType == "" || mountName == "" || strings.Contains(mountName, ":") {
-		return nil, errors.New("invalid explorer mount point")
-	}
-	switch mountType {
-	case logic.ExplorerMountTypeLocal:
-		if mountName != logic.ExplorerMountHost && mountName != logic.ExplorerMountDPanel {
-			return nil, errors.New("invalid local explorer mount point")
-		}
-	case logic.ExplorerMountTypeContainer, logic.ExplorerMountTypeVolume, logic.ExplorerMountTypeDocker:
-		if !explorerMountNamePattern.MatchString(mountName) {
-			return nil, errors.New("invalid explorer mount point name")
-		}
-	default:
-		return nil, errors.New("unknown explorer mount point type")
-	}
-	var dockerSdk *docker.Client
-	var err error
-	if mountType == logic.ExplorerMountTypeContainer || mountType == logic.ExplorerMountTypeVolume {
-		dockerSdk, err = docker.NewClientWithUser(http)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return (logic.Explorer{}).Afs(http, mountType, mountName, dockerSdk)
-}
-
-func (self Explorer) Export(http *gin.Context) {
+func (self Explorer) SyncDPanel(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint        string   `json:"mountPoint" binding:"required"`
-		FileList          []string `json:"fileList" binding:"required"`
-		ExportToPanelPath bool     `json:"enableExportToPath"`
+		ComposeName string `json:"composeName" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if err := validateExplorerPaths(params.FileList, false); err != nil {
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	if dockerSdk == nil || dockerSdk.Client == nil || dockerSdk.Ctx == nil || dockerSdk.DockerEnv == nil {
+		self.JsonResponseWithError(http, errors.New("docker client is required for dpanel sync"), 500)
+		return
+	}
+	if dockerSdk.Name == define.DockerDefaultClientName {
+		self.JsonSuccessResponse(http)
+		return
+	}
+	dockerEnvName := define.DockerDefaultClientName
+	if dockerSdk.DockerEnv.EnableComposePath {
+		dockerEnvName = dockerSdk.Name
+	}
+	sourceDir := storage.Local{}.GetComposeProjectPath(dockerEnvName, params.ComposeName)
+	relativeDir, err := filepath.Rel(storage.Local{}.GetStorageLocalPath(), sourceDir)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileSystem, err := (logic.Explorer{}).Afs(http,
+		logic.ExplorerMountPoint(logic.ExplorerMountTypeContainer+":"+factor.ExplorerName), dockerSdk,
+	)
+	if err == nil {
+		err = fileSystem.Import([]serviceafs.TransferFile{{
+			Source: sourceDir,
+			Target: path.Join("/", filepath.ToSlash(relativeDir)),
+		}})
+	}
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonSuccessResponse(http)
+}
+
+func (self Explorer) Export(http *gin.Context) {
+	type ParamsValidate struct {
+		MountPoint        logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		FileList          []string                 `json:"fileList" binding:"required"`
+		ExportToPanelPath bool                     `json:"enableExportToPath"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	for _, filePath := range params.FileList {
+		if filePath == "/" {
+			self.JsonResponseWithError(http, errors.New("cannot export filesystem root"), 500)
+			return
+		}
+	}
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	var download *logic.ExplorerDownload
 	if err == nil {
 		download, err = (logic.Explorer{}).Export(fileSystem, params.FileList, params.ExportToPanelPath)
@@ -86,24 +115,29 @@ func (self Explorer) Export(http *gin.Context) {
 
 func (self Explorer) ImportFileContent(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string `json:"mountPoint" binding:"required"`
-		File       string `json:"file" binding:"required"`
-		Content    string `json:"content"`
-		DstPath    string `json:"dstPath" binding:"required"`
-		FileMode   uint32 `json:"fileMode"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		File       string                   `json:"file" binding:"required"`
+		Content    string                   `json:"content"`
+		DstPath    string                   `json:"dstPath" binding:"required"`
+		FileMode   uint32                   `json:"fileMode"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if !validExplorerFileName(params.File) || !validExplorerPath(params.DstPath, true) || params.FileMode > 0o777 {
+	if params.FileMode > 0o777 {
 		self.JsonResponseWithError(http, errors.New("invalid file content import parameters"), 500)
 		return
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	if err == nil {
 		err = (logic.Explorer{}).ImportFileContent(
-			fileSystem, params.File, params.Content, params.DstPath, params.FileMode,
+			fileSystem, function.SafeFileName(params.File), params.Content, params.DstPath, params.FileMode,
 		)
 	}
 	if err != nil {
@@ -119,27 +153,28 @@ func (self Explorer) Import(http *gin.Context) {
 		Path string `json:"path"`
 	}
 	type ParamsValidate struct {
-		MountPoint string         `json:"mountPoint" binding:"required"`
-		FileList   []fileListItem `json:"fileList" binding:"required"`
-		DstPath    string         `json:"dstPath" binding:"required"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		FileList   []fileListItem           `json:"fileList" binding:"required"`
+		DstPath    string                   `json:"dstPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if !validExplorerPath(params.DstPath, true) {
-		self.JsonResponseWithError(http, errors.New("invalid import destination"), 500)
-		return
-	}
 	files := make([]logic.ExplorerImportFile, 0, len(params.FileList))
 	for _, item := range params.FileList {
-		if !validExplorerRelativePath(item.Name) {
-			self.JsonResponseWithError(http, errors.New("invalid import file name"), 500)
-			return
+		name := strings.TrimLeft(function.SafePath(strings.ReplaceAll(item.Name, "\\", "/")), "/")
+		if name == "" || name == "." {
+			name = "file"
 		}
-		files = append(files, logic.ExplorerImportFile{Name: item.Name, Path: item.Path})
+		files = append(files, logic.ExplorerImportFile{Name: name, Path: item.Path})
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	if err == nil {
 		err = (logic.Explorer{}).Import(fileSystem, params.DstPath, files)
 	}
@@ -152,25 +187,20 @@ func (self Explorer) Import(http *gin.Context) {
 
 func (self Explorer) Unzip(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string   `json:"mountPoint" binding:"required"`
-		File       []string `json:"file" binding:"required"`
-		Path       string   `json:"path" binding:"required"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		File       []string                 `json:"file" binding:"required"`
+		Path       string                   `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if !validExplorerPath(params.Path, true) {
-		self.JsonResponseWithError(http, errors.New("invalid unzip destination"), 500)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	for _, filePath := range params.File {
-		if !validExplorerPath(filePath, false) {
-			self.JsonResponseWithError(http, errors.New("invalid archive path"), 500)
-			return
-		}
-	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	if err == nil {
 		err = (logic.Explorer{}).UnArchive(fileSystem, params.File, params.Path)
 	}
@@ -183,18 +213,18 @@ func (self Explorer) Unzip(http *gin.Context) {
 
 func (self Explorer) Archive(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string                `json:"mountPoint" binding:"required"`
-		FileList   []string              `json:"fileList" binding:"required"`
-		Target     string                `json:"target" binding:"required"`
-		Format     archiveservice.Format `json:"format" binding:"required"`
-		Overwrite  bool                  `json:"overwrite"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		FileList   []string                 `json:"fileList" binding:"required"`
+		Target     string                   `json:"target" binding:"required"`
+		Format     archiveservice.Format    `json:"format" binding:"required"`
+		Overwrite  bool                     `json:"overwrite"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if err := validateExplorerPaths(params.FileList, false); err != nil || !validExplorerPath(params.Target, false) {
-		self.JsonResponseWithError(http, errors.New("invalid archive path"), 500)
+	if params.Target == "/" {
+		self.JsonResponseWithError(http, errors.New("cannot create archive at filesystem root"), 500)
 		return
 	}
 	switch params.Format {
@@ -204,12 +234,21 @@ func (self Explorer) Archive(http *gin.Context) {
 		return
 	}
 	for _, source := range params.FileList {
+		if source == "/" {
+			self.JsonResponseWithError(http, errors.New("cannot archive filesystem root"), 500)
+			return
+		}
 		if source == params.Target {
 			self.JsonResponseWithError(http, errors.New("archive target cannot be one of its sources"), 500)
 			return
 		}
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	if err == nil {
 		err = (logic.Explorer{}).Archive(fileSystem, params.FileList, params.Target, params.Format, params.Overwrite)
 	}
@@ -222,24 +261,25 @@ func (self Explorer) Archive(http *gin.Context) {
 
 func (self Explorer) Delete(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string   `json:"mountPoint" binding:"required"`
-		FileList   []string `json:"fileList" binding:"required"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		FileList   []string                 `json:"fileList" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if err := validateExplorerPaths(params.FileList, false); err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	for _, filePath := range params.FileList {
-		if strings.Contains(filePath, "*") {
+		if filePath == "" || filePath == "/" || strings.Contains(filePath, "*") {
 			self.JsonResponseWithError(http, errors.New("unsafe delete path"), 500)
 			return
 		}
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	if err == nil {
 		for _, filePath := range params.FileList {
 			if err = fileSystem.RemoveAll(filePath); err != nil {
@@ -256,18 +296,19 @@ func (self Explorer) Delete(http *gin.Context) {
 
 func (self Explorer) GetPathList(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string `json:"mountPoint" binding:"required"`
-		Path       string `json:"path"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		Path       string                   `json:"path"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if params.Path != "" && !validExplorerPath(params.Path, true) {
-		self.JsonResponseWithError(http, errors.New("invalid explorer path"), 500)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	currentPath := params.Path
 	if err == nil && currentPath == "" {
 		currentPath = fileSystem.WorkingDir()
@@ -308,18 +349,19 @@ func (self Explorer) GetPathList(http *gin.Context) {
 
 func (self Explorer) GetPathSize(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string `json:"mountPoint" binding:"required"`
-		Path       string `json:"path" binding:"required"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		Path       string                   `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if !validExplorerPath(params.Path, true) {
-		self.JsonResponseWithError(http, errors.New("invalid path"), 500)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	var size int64
 	if err == nil {
 		size, err = fileSystem.PathSize(params.Path)
@@ -333,18 +375,19 @@ func (self Explorer) GetPathSize(http *gin.Context) {
 
 func (self Explorer) GetContent(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string `json:"mountPoint" binding:"required"`
-		File       string `json:"file" binding:"required"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		File       string                   `json:"file" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if !validExplorerPath(params.File, false) {
-		self.JsonResponseWithError(http, errors.New("invalid file path"), 500)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	var result logic.ExplorerContent
 	if err == nil {
 		result, err = (logic.Explorer{}).GetContent(fileSystem, params.File)
@@ -358,22 +401,33 @@ func (self Explorer) GetContent(http *gin.Context) {
 
 func (self Explorer) Permission(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint  string   `json:"mountPoint" binding:"required"`
-		FileList    []string `json:"fileList" binding:"required"`
-		Mod         string   `json:"mod"`
-		UID         *int     `json:"uid"`
-		GID         *int     `json:"gid"`
-		HasChildren bool     `json:"hasChildren"`
+		MountPoint  logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		FileList    []string                 `json:"fileList" binding:"required"`
+		Mod         string                   `json:"mod"`
+		UID         *int                     `json:"uid"`
+		GID         *int                     `json:"gid"`
+		HasChildren bool                     `json:"hasChildren"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if err := validateExplorerPaths(params.FileList, !params.HasChildren); err != nil {
+	for _, filePath := range params.FileList {
+		if filePath == "" {
+			self.JsonResponseWithError(http, errors.New("unsafe permission path"), 500)
+			return
+		}
+		if params.HasChildren && filePath == "/" {
+			self.JsonResponseWithError(http, errors.New("cannot recursively change filesystem root permissions"), 500)
+			return
+		}
+	}
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	if err == nil {
 		err = (logic.Explorer{}).Permission(
 			fileSystem, params.FileList, params.Mod, params.UID, params.GID, params.HasChildren,
@@ -388,18 +442,19 @@ func (self Explorer) Permission(http *gin.Context) {
 
 func (self Explorer) GetFileStat(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string `json:"mountPoint" binding:"required"`
-		Path       string `json:"path" binding:"required"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		Path       string                   `json:"path" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if !validExplorerPath(params.Path, true) {
-		self.JsonResponseWithError(http, errors.New("invalid file path"), 500)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	if err == nil {
 		result, statErr := fileSystem.Info(params.Path)
 		if statErr == nil {
@@ -417,13 +472,18 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 
 func (self Explorer) GetUserList(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string `json:"mountPoint" binding:"required"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	if err == nil {
 		identities, userErr := fileSystem.Users()
 		if userErr == nil {
@@ -437,18 +497,23 @@ func (self Explorer) GetUserList(http *gin.Context) {
 
 func (self Explorer) MkDir(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string `json:"mountPoint" binding:"required"`
-		DstPath    string `json:"dstPath" binding:"required"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		DstPath    string                   `json:"dstPath" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if !validExplorerPath(params.DstPath, false) {
-		self.JsonResponseWithError(http, errors.New("invalid directory path"), 500)
+	if params.DstPath == "/" {
+		self.JsonResponseWithError(http, errors.New("cannot create filesystem root"), 500)
 		return
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	if err == nil {
 		err = fileSystem.MkdirAll(params.DstPath, os.ModePerm)
 	}
@@ -461,25 +526,26 @@ func (self Explorer) MkDir(http *gin.Context) {
 
 func (self Explorer) Copy(http *gin.Context) {
 	type ParamsValidate struct {
-		MountPoint string `json:"mountPoint" binding:"required"`
-		SourceFile string `json:"sourceFile" binding:"required"`
-		TargetFile string `json:"targetFile" binding:"required"`
-		IsMove     bool   `json:"isMove"`
-		Overwrite  bool   `json:"overwrite"`
+		MountPoint logic.ExplorerMountPoint `json:"mountPoint" binding:"required"`
+		SourceFile string                   `json:"sourceFile" binding:"required"`
+		TargetFile string                   `json:"targetFile" binding:"required"`
+		IsMove     bool                     `json:"isMove"`
+		Overwrite  bool                     `json:"overwrite"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-	if !validExplorerPath(params.SourceFile, false) || !validExplorerTransferTarget(params.TargetFile) {
-		self.JsonResponseWithError(http, errors.New("invalid copy or move path"), 500)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	fileSystem, err := self.afs(http, params.MountPoint)
+	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
 	if err == nil {
 		target := params.TargetFile
 		if !path.IsAbs(target) {
-			target = path.Join(path.Dir(params.SourceFile), target)
+			target = path.Join(path.Dir(params.SourceFile), function.SafePath(strings.ReplaceAll(target, "\\", "/")))
 		}
 		if params.IsMove {
 			err = fileSystem.Move(params.SourceFile, target, params.Overwrite)
@@ -497,39 +563,18 @@ func (self Explorer) Copy(http *gin.Context) {
 func (self Explorer) DestroyProxyContainer(http *gin.Context) {
 	dockerSdk, err := docker.NewClientWithUser(http)
 	if err == nil {
-		err = (logic.Explorer{}).DestroyProxyContainer(dockerSdk)
+		if dockerSdk == nil || dockerSdk.Client == nil {
+			err = errors.New("docker client is required to destroy explorer proxy")
+		} else {
+			lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, factor.ExplorerName))
+			lock.Lock()
+			err = factor.Destroy(dockerSdk, factor.ExplorerName)
+			lock.Unlock()
+		}
 	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	self.JsonSuccessResponse(http)
-}
-
-func validExplorerPath(value string, allowRoot bool) bool {
-	return value != "" && strings.IndexByte(value, 0) < 0 && path.IsAbs(value) && path.Clean(value) == value && (allowRoot || value != "/")
-}
-
-func validExplorerFileName(value string) bool {
-	return value != "" && value != "." && strings.IndexByte(value, 0) < 0 && !path.IsAbs(value) && path.Clean(value) == value && path.Base(value) == value
-}
-
-func validExplorerRelativePath(value string) bool {
-	return value != "" && value != "." && strings.IndexByte(value, 0) < 0 && !path.IsAbs(value) && path.Clean(value) == value && value != ".." && !strings.HasPrefix(value, "../")
-}
-
-func validExplorerTransferTarget(value string) bool {
-	if path.IsAbs(value) {
-		return validExplorerPath(value, false)
-	}
-	return validExplorerRelativePath(value)
-}
-
-func validateExplorerPaths(values []string, allowRoot bool) error {
-	for _, value := range values {
-		if !validExplorerPath(value, allowRoot) {
-			return errors.New("invalid explorer path")
-		}
-	}
-	return nil
 }

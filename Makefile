@@ -48,8 +48,8 @@ PROJECT_GO_DIR     := $(shell pwd)
 PROJECT_JS_DIR     := $(abspath $(PROJECT_GO_DIR)/../app)
 PROJECT_GO_TARGET := $(PROJECT_GO_DIR)/runtime
 
-PLUGIN_EXPLORER_IMAGE_TARGET := dpanel/explorer
-PLUGIN_EXPLORER_IMAGE_DIR    := $(PROJECT_GO_DIR)/asset/plugin/dpanel-plugin-explorer
+AGENT_IMAGE_TARGET := dpanel/explorer
+AGENT_IMAGE_DIR    := $(PROJECT_GO_DIR)/asset/agent
 
 # 构建时需要指定的构建参数
 APP_VERSION ?= $(_CURRENT_TIME)
@@ -210,21 +210,22 @@ endef
 
 build-explorer-image:
 	@echo ">> Building explorer images for: linux/amd64 linux/arm64 linux/arm/v7"
-	@mkdir -p "$(PLUGIN_EXPLORER_IMAGE_DIR)"
+	@mkdir -p "$(AGENT_IMAGE_DIR)"
 	@temp_outputs=""; \
 	cleanup() { for temp_output in $$temp_outputs; do rm -f "$$temp_output"; done; }; \
 	trap cleanup EXIT INT TERM; \
 	for target in linux/amd64:amd64 linux/arm64:arm64 linux/arm/v7:arm; do \
 		platform="$${target%:*}"; \
 		arch="$${target##*:}"; \
-		output="$(PLUGIN_EXPLORER_IMAGE_DIR)/image-$$arch.tar"; \
+		output="$(AGENT_IMAGE_DIR)/image-$$arch.tar"; \
 		temp_output="$$output.tmp"; \
 		temp_outputs="$$temp_outputs $$temp_output"; \
 		echo ">> Processing $$platform, save in: $$output"; \
 		rm -f "$$temp_output"; \
 		if ! docker build --platform "$$platform" \
 			--build-arg APP_VERSION="$(APP_VERSION)" \
-			--tag "$(PLUGIN_EXPLORER_IMAGE_TARGET)" \
+			--build-arg HTTP_PROXY=${HTTP_PROXY} \
+			--tag "$(AGENT_IMAGE_TARGET)" \
 			--output "type=docker,dest=$$temp_output" \
 			-f docker/Dockerfile-explorer .; then \
 			exit 1; \
@@ -232,10 +233,10 @@ build-explorer-image:
 	done; \
 	for target in linux/amd64:amd64 linux/arm64:arm64 linux/arm/v7:arm; do \
 		arch="$${target##*:}"; \
-		output="$(PLUGIN_EXPLORER_IMAGE_DIR)/image-$$arch.tar"; \
+		output="$(AGENT_IMAGE_DIR)/image-$$arch.tar"; \
 		mv "$$output.tmp" "$$output"; \
 	done
-	@echo ">> Images successfully saved to $(PLUGIN_EXPLORER_IMAGE_DIR)"
+	@echo ">> Images successfully saved to $(AGENT_IMAGE_DIR)"
 
 build: debug
 	@mkdir -p ${PROJECT_GO_TARGET}

@@ -3,11 +3,12 @@ package task
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
-	"path"
+	"regexp"
 	"strings"
 
 	"github.com/donknap/dpanel/app/application/logic"
@@ -15,110 +16,12 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/build"
-	"github.com/donknap/dpanel/common/service/docker/buildx"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 )
 
-func (self Docker) ImageBuildX(messageId string, task accessor.ImageSettingOption) (string, error) {
-	wsBuffer := ws.NewProgressPip(messageId)
-	defer wsBuffer.Close()
-
-	var err error
-	defer func() {
-		if wsBuffer != nil && err != nil {
-			wsBuffer.BroadcastMessage(err.Error())
-		}
-	}()
-
-	// 如果是 git 指定根目录后在仓库中体现 url#branch:path，Dockerfile 无需要再拼接
-	// 如果是 zip 指定根目录后在解包的时候会只保存根目录下的文件，无需要再拼接
-	options := []buildx.Option{
-		buildx.WithBuildArg(task.BuildArgs...),
-		buildx.WithBuildSecret(task.BuildSecret...),
-		buildx.WithPlatform(task.BuildPlatformType...),
-		buildx.WithOutputImage(task.BuildEnablePush, ""),
-	}
-
-	hasTag := false
-	for _, tag := range task.Tags {
-		if !tag.Enable {
-			continue
-		}
-		hasTag = true
-		if v := (logic.Image{}).GetRegistryConfig(tag.Registry); v != nil {
-			options = append(options, buildx.WithRegistryAuth(v.Auth))
-		}
-		options = append(options, buildx.WithTag(tag.Target, tag.Uri()))
-	}
-
-	if !hasTag {
-		return "", define.ErrorImageTagEmpty
-	}
-
-	if task.BuildCacheType != "" {
-		options = append(options, buildx.WithCache(task.BuildCacheType))
-	}
-
-	if task.BuildGit != "" {
-		options = append(options, buildx.WithDockerFilePath(task.BuildDockerfileName))
-		options = append(options, buildx.WithGitUrl(task.BuildGit))
-	} else if task.BuildZip != "" {
-		options = append(options, buildx.WithDockerFilePath(task.BuildDockerfileName))
-		options = append(options, buildx.WithWorkDir(task.BuildDockerfileRoot))
-		options = append(options, buildx.WithZipFilePath(task.BuildZip))
-	} else if task.BuildPath != "" {
-		options = append(options, buildx.WithDockerFilePath(path.Join(task.BuildPath, task.BuildDockerfileName)))
-		options = append(options, buildx.WithWorkDir(task.BuildPath))
-	} else {
-		options = append(options, buildx.WithDockerFileContent([]byte(task.BuildDockerfileContent)))
-	}
-	b, err := buildx.New(wsBuffer.Context(), docker.Sdk, options...)
-	if err != nil {
-		return "", err
-	}
-	cmd, err := b.Execute()
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		b.Close()
-		if cmd.Close() != nil {
-			slog.Error("image", "build", err.Error())
-		}
-	}()
-	out, err := cmd.RunInPip()
-	if err != nil {
-		return "", err
-	}
-	log := new(bytes.Buffer)
-	wsBuffer.OnWrite = func(p string) error {
-		log.WriteString(p)
-		wsBuffer.BroadcastMessage(p)
-		return nil
-	}
-	_, err = io.Copy(wsBuffer, out)
-	if err != nil {
-		return log.String(), function.ErrorMessage(define.ErrorMessageCommonCancelOperator, "message", err.Error())
-	}
-	if strings.Contains(log.String(), "ERROR: no builder") {
-		return log.String(), function.ErrorMessage(define.ErrorMessageImageBuildError, "message", log.String())
-	}
-
-	return log.String(), nil
-}
-
-func (self Docker) ImageBuild(sdk *docker.Client, messageId string, task accessor.ImageSettingOption) (string, error) {
-	wsBuffer := ws.NewProgressPip(messageId)
-	defer wsBuffer.Close()
-
-	var err error
-	defer func() {
-		if wsBuffer != nil && err != nil {
-			wsBuffer.BroadcastMessage(err.Error())
-		}
-	}()
+func (self Docker) Build(sdk *docker.Client, wsBuffer *ws.ProgressPip, task accessor.ImageSettingOption) (string, string, error) {
 
 	// 如果是 git 指定根目录后在仓库中体现 url#branch:path，Dockerfile 无需要再拼接
 	// 如果是 zip 指定根目录后在解包的时候会只保存根目录下的文件，无需要再拼接
@@ -135,23 +38,30 @@ func (self Docker) ImageBuild(sdk *docker.Client, messageId string, task accesso
 		build.WithArgs(task.BuildArgs...),
 	)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	response, err := b.Execute()
-	if err != nil {
-		return "", err
-	}
-	go func() {
-		<-wsBuffer.Done()
-		_ = response.Body.Close()
-		err = sdk.Client.BuildCancel(sdk.Ctx, b.GetBuildId())
-		if err != nil {
-			slog.Error("image build cancel", "error", err.Error())
+	defer func() {
+		if closeErr := b.Close(); closeErr != nil {
+			slog.Warn("image build context cleanup", "error", closeErr)
 		}
 	}()
+	stopBuildCancel := context.AfterFunc(wsBuffer.Context(), func() {
+		if err := sdk.Client.BuildCancel(sdk.Ctx, b.GetBuildId()); err != nil {
+			slog.Error("image build cancel", "error", err)
+		}
+	})
+	defer stopBuildCancel()
+	response, err := b.Execute()
+	if err != nil {
+		return "", "", err
+	}
+	stopResponseClose := context.AfterFunc(wsBuffer.Context(), func() {
+		_ = response.Body.Close()
+	})
+	defer stopResponseClose()
 	defer func() {
-		if response.Body.Close() != nil {
-			slog.Error("image", "build", err.Error())
+		if closeErr := response.Body.Close(); closeErr != nil {
+			slog.Error("image build response close", "error", closeErr)
 		}
 	}()
 
@@ -182,10 +92,36 @@ func (self Docker) ImageBuild(sdk *docker.Client, messageId string, task accesso
 	}
 	_, err = io.Copy(wsBuffer, response.Body)
 	if err != nil {
-		return log.String(), function.ErrorMessage(define.ErrorMessageCommonCancelOperator, "message", err.Error())
+		return log.String(), "", function.ErrorMessage(define.ErrorMessageCommonCancelOperator, "message", err.Error())
 	}
 	if !strings.Contains(log.String(), "Successfully built") {
-		return log.String(), function.ErrorMessage(define.ErrorMessageImageBuildError, "message", "")
+		return log.String(), "", function.ErrorMessage(define.ErrorMessageImageBuildError, "message", "")
 	}
-	return log.String(), nil
+	matches := regexp.MustCompile(`Successfully built\s*([a-f0-9]+)`).FindAllStringSubmatch(log.String(), -1)
+	imageID := strings.Join(function.PluckArrayWalk(matches, func(item []string) (string, bool) {
+		return item[1], true
+	}), "-")
+	if task.BuildEnablePush {
+		for _, tag := range task.Tags {
+			if err = wsBuffer.Context().Err(); err != nil {
+				return log.String(), imageID, err
+			}
+			registryConfig := logic.Image{}.GetRegistryConfig(tag.Registry)
+			wsBuffer.BroadcastMessage("\r\nPushing " + tag.Uri() + "\r\n")
+			err = sdk.ImagePush(wsBuffer.Context(), tag.Uri(), docker.ImagePushOption{
+				Registry: *registryConfig,
+				OnProgress: func(items map[string]*types.PullProgress) {
+					for layer, item := range items {
+						if item != nil {
+							wsBuffer.BroadcastMessage(fmt.Sprintf("\r%s: %.0f%%", layer, max(item.Downloading, item.Extracting)))
+						}
+					}
+				},
+			})
+			if err != nil {
+				return log.String(), imageID, err
+			}
+		}
+	}
+	return log.String(), imageID, nil
 }

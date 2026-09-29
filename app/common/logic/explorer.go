@@ -8,21 +8,21 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/errdefs"
 	"github.com/donknap/dpanel/common/function"
-	serviceagent "github.com/donknap/dpanel/common/service/agent"
+	"github.com/donknap/dpanel/common/service/agent/factor"
 	archiveservice "github.com/donknap/dpanel/common/service/archive"
-	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
+	dockerTypes "github.com/donknap/dpanel/common/service/docker/types"
 	servicefs "github.com/donknap/dpanel/common/service/fs"
 	serviceafs "github.com/donknap/dpanel/common/service/fs/afs"
 	"github.com/donknap/dpanel/common/service/fs/dockerfs"
 	"github.com/donknap/dpanel/common/service/fs/hostfs"
 	"github.com/donknap/dpanel/common/service/fs/tempfs"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/plugin"
 	serviceSsh "github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -40,39 +40,53 @@ const (
 
 type Explorer struct{}
 
-func (self Explorer) Afs(ctx context.Context, mountType, mountName string, dockerSdk *docker.Client) (serviceafs.Fs, error) {
-	switch mountType {
-	case ExplorerMountTypeLocal:
-		rootPath := "/"
-		if mountName == ExplorerMountDPanel {
-			rootPath = "/dpanel"
-			if !function.IsRunInDocker() {
-				rootPath = storage.Local{}.GetStorageLocalPath()
-			}
+type ExplorerMountPoint string
+
+func (self ExplorerMountPoint) mountName() string {
+	_, name, _ := strings.Cut(string(self), ":")
+	return name
+}
+
+func (self ExplorerMountPoint) isHostPath() bool {
+	return self == ExplorerMountPoint(fmt.Sprintf("%s:%s", ExplorerMountTypeLocal, ExplorerMountHost))
+}
+
+func (self ExplorerMountPoint) isDPanelPath() bool {
+	return self == ExplorerMountPoint(fmt.Sprintf("%s:%s", ExplorerMountTypeLocal, ExplorerMountDPanel))
+}
+
+func (self ExplorerMountPoint) isLocalDockerPath() bool {
+	return !function.IsRunInDocker() && self == ExplorerMountPoint(fmt.Sprintf("%s:%s", ExplorerMountTypeDocker, define.DockerDefaultClientName))
+}
+
+func (self ExplorerMountPoint) isDockerPath() bool {
+	return strings.HasPrefix(string(self), fmt.Sprintf("%s:", ExplorerMountTypeDocker))
+}
+
+func (self ExplorerMountPoint) isContainerPath() bool {
+	return strings.HasPrefix(string(self), fmt.Sprintf("%s:", ExplorerMountTypeContainer))
+}
+
+func (self ExplorerMountPoint) isVolumePath() bool {
+	return strings.HasPrefix(string(self), fmt.Sprintf("%s:", ExplorerMountTypeVolume))
+}
+
+func (self Explorer) Afs(ctx context.Context, mountPoint ExplorerMountPoint, dockerSdk *docker.Client) (serviceafs.Fs, error) {
+	mountName := mountPoint.mountName()
+	switch {
+	case mountPoint.isHostPath(), mountPoint.isLocalDockerPath():
+		// local:host 访问面板进程可见的根目录；容器运行时是面板容器的根目录。
+		return newExplorerHostFs(ctx, hostfs.WithRoot("/"), hostfs.WithName(mountName))
+
+	case mountPoint.isDPanelPath():
+		// local:dpanel 在容器中访问 /dpanel，二进制运行时访问本地数据目录。
+		rootPath := "/dpanel"
+		if !function.IsRunInDocker() {
+			rootPath = storage.Local{}.GetStorageLocalPath()
 		}
-		fileSystem, err := servicefs.NewFs(servicefs.WithHostDriver(
-			hostfs.WithRoot(rootPath), hostfs.WithName(mountName),
-		))
-		if err != nil {
-			return nil, err
-		}
-		context.AfterFunc(ctx, func() {
-			_ = fileSystem.Destroy()
-		})
-		return fileSystem, nil
-	case ExplorerMountTypeDocker:
-		if !function.IsRunInDocker() && mountName == define.DockerDefaultClientName {
-			fileSystem, err := servicefs.NewFs(servicefs.WithHostDriver(
-				hostfs.WithRoot("/"), hostfs.WithName(mountName),
-			))
-			if err != nil {
-				return nil, err
-			}
-			context.AfterFunc(ctx, func() {
-				_ = fileSystem.Destroy()
-			})
-			return fileSystem, nil
-		}
+		return newExplorerHostFs(ctx, hostfs.WithRoot(rootPath), hostfs.WithName(mountName))
+
+	case mountPoint.isDockerPath():
 		dockerEnv, err := (Env{}).GetEnvByName(mountName)
 		if err != nil {
 			return nil, err
@@ -80,137 +94,103 @@ func (self Explorer) Afs(ctx context.Context, mountType, mountName string, docke
 		if !dockerEnv.EnableSSH || dockerEnv.SshServerInfo == nil {
 			return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
 		}
-		options := []serviceSsh.Option{
-			serviceSsh.WithContext(ctx),
-			serviceSsh.WithSftpClient(),
-		}
+		options := []serviceSsh.Option{serviceSsh.WithContext(ctx), serviceSsh.WithSftpClient()}
 		options = append(options, serviceSsh.WithServerInfo(dockerEnv.SshServerInfo)...)
 		sshClient, err := serviceSsh.NewClient(options...)
 		if err != nil {
 			return nil, err
 		}
-		fileSystem, err := servicefs.NewFs(servicefs.WithHostDriver(
+		fileSystem, err := newExplorerHostFs(ctx,
 			hostfs.WithSftpClient(sshClient.SftpConn), hostfs.WithName(mountName),
-		))
+		)
 		if err != nil {
 			sshClient.Close()
 			return nil, err
 		}
 		context.AfterFunc(ctx, sshClient.Close)
 		return fileSystem, nil
-	case ExplorerMountTypeContainer, ExplorerMountTypeVolume:
+
+	case mountPoint.isContainerPath():
 		if dockerSdk == nil || dockerSdk.Client == nil {
 			return nil, errors.New("docker client is required for this explorer mount point")
 		}
-		mounts := (Setting{}).GetDPanelInfo().DataMounts
-		if len(mounts) == 0 || mounts[0].Host == "" || mounts[0].Dest != "/dpanel" {
-			return nil, errors.New("dpanel data mount is unavailable")
+		if mountName == factor.ExplorerName {
+			return newExplorerAgentFs(mountPoint, mountName, dockerSdk,
+				factor.ExplorerCreateOption{}, dockerfs.WithRoot("/dpanel"),
+			)
 		}
-		mountPointValue := mountType + ":" + mountName + ":" + function.Sha256Struct(mounts)
-		lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, plugin.ExplorerName))
-		lock.Lock()
-		defer lock.Unlock()
-
-		pluginOption := plugin.CreateOption{Init: true, Hash: mountPointValue, Volumes: mounts}
-		dockerFsOptions := []dockerfs.Option{
-			dockerfs.WithName(mountName),
-			dockerfs.WithDockerSdk(dockerSdk),
-			dockerfs.WithProxyContainer(plugin.ExplorerName),
-		}
-		if mountType == ExplorerMountTypeVolume {
-			volumeInfo, err := dockerSdk.Client.VolumeInspect(dockerSdk.Ctx, mountName)
-			if err != nil {
-				return nil, err
-			}
-			mountPath := path.Join("/", volumeInfo.Name)
-			pluginOption.WorkingDir = mountPath
-			pluginOption.ExtService = compose.ExtService{External: compose.ExternalItem{Volumes: []string{
-				fmt.Sprintf("%s:%s", volumeInfo.Name, mountPath),
-			}}}
-			dockerFsOptions = append(dockerFsOptions, dockerfs.WithRoot(mountPath), dockerfs.WithWorkingDir("/"))
-		} else {
-			pluginOption.HostPID = true
-			dockerFsOptions = append(dockerFsOptions, dockerfs.WithTargetContainer(mountName))
-		}
-
-		explorerPlugin, err := plugin.NewPlugin(dockerSdk, plugin.ExplorerName, pluginOption)
+		containerInfo, err := dockerSdk.Client.ContainerInspect(dockerSdk.Ctx, mountName)
 		if err != nil {
 			return nil, err
 		}
-		if err = explorerPlugin.Create(); err != nil {
+		if containerInfo.State == nil || containerInfo.State.Pid <= 1 {
+			return nil, fmt.Errorf("the %s container does not exist or is not running", mountName)
+		}
+		workingDir := "/"
+		if containerInfo.Config != nil && containerInfo.Config.WorkingDir != "" {
+			workingDir = containerInfo.Config.WorkingDir
+		}
+		return newExplorerAgentFs(mountPoint, mountName, dockerSdk,
+			factor.ExplorerCreateOption{HostPID: true},
+			dockerfs.WithTargetContainer(mountName), dockerfs.WithWorkingDir(workingDir),
+		)
+
+	case mountPoint.isVolumePath():
+		if dockerSdk == nil || dockerSdk.Client == nil {
+			return nil, errors.New("docker client is required for this explorer mount point")
+		}
+		volumeInfo, err := dockerSdk.Client.VolumeInspect(dockerSdk.Ctx, mountName)
+		if err != nil {
 			return nil, err
 		}
-		if mountType == ExplorerMountTypeContainer {
-			containerInfo, err := dockerSdk.Client.ContainerInspect(dockerSdk.Ctx, mountName)
-			if err != nil {
-				return nil, err
-			}
-			if containerInfo.State == nil || containerInfo.State.Pid <= 1 {
-				return nil, fmt.Errorf("the %s container does not exist or is not running", mountName)
-			}
-			workingDir := "/"
-			if containerInfo.Config != nil && containerInfo.Config.WorkingDir != "" {
-				workingDir = containerInfo.Config.WorkingDir
-			}
-			dockerFsOptions = append(dockerFsOptions, dockerfs.WithWorkingDir(workingDir))
-		}
+		mountPath := path.Join("/", volumeInfo.Name)
+		return newExplorerAgentFs(mountPoint, mountName, dockerSdk,
+			factor.ExplorerCreateOption{
+				WorkingDir: mountPath,
+				Volumes:    []dockerTypes.VolumeItem{{Host: volumeInfo.Name, Dest: mountPath, Type: "volume"}},
+			},
+			dockerfs.WithRoot(mountPath), dockerfs.WithWorkingDir("/"),
+		)
 
-		return servicefs.NewFs(servicefs.WithDockerDriver(dockerFsOptions...))
 	default:
-		return nil, errors.New("unknown explorer mount point type")
+		return nil, errors.New("invalid explorer mount point")
 	}
 }
 
-func (self Explorer) DestroyProxyContainer(dockerSdk *docker.Client) error {
-	if dockerSdk == nil || dockerSdk.Client == nil {
-		return errors.New("docker client is required to destroy explorer proxy")
+func newExplorerHostFs(ctx context.Context, options ...hostfs.Option) (serviceafs.Fs, error) {
+	fileSystem, err := servicefs.NewFs(servicefs.WithHostDriver(options...))
+	if err != nil {
+		return nil, err
 	}
-	lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, plugin.ExplorerName))
+	context.AfterFunc(ctx, func() {
+		_ = fileSystem.Destroy()
+	})
+	return fileSystem, nil
+}
+
+func newExplorerAgentFs(mountPoint ExplorerMountPoint, mountName string, dockerSdk *docker.Client, createOption factor.ExplorerCreateOption, fsOptions ...dockerfs.Option) (serviceafs.Fs, error) {
+	mounts := (Setting{}).GetDPanelInfo().DataMounts
+	if len(mounts) == 0 || mounts[0].Host == "" || mounts[0].Dest != "/dpanel" {
+		return nil, errors.New("dpanel data mount is unavailable")
+	}
+	lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, factor.ExplorerName))
 	lock.Lock()
 	defer lock.Unlock()
-	explorerPlugin, err := plugin.NewPlugin(dockerSdk, plugin.ExplorerName, plugin.CreateOption{Init: false})
-	if err != nil {
-		return err
-	}
-	return explorerPlugin.Close()
-}
 
-func (self Explorer) SyncDPanelDirectory(ctx context.Context, dockerSdk *docker.Client, sourcePath, targetPath string) error {
-	temporary, err := storage.Local{}.CreateTempFile("")
-	if err != nil {
-		return err
+	createOption.Hash = function.Sha256Struct(struct {
+		MountPoint ExplorerMountPoint
+		DataMounts []dockerTypes.VolumeItem
+	}{mountPoint, mounts})
+	createOption.Volumes = append(append([]dockerTypes.VolumeItem(nil), mounts...), createOption.Volumes...)
+	if _, err := factor.NewExplorer(dockerSdk, createOption); err != nil {
+		return nil, err
 	}
-	temporaryPath := temporary.Name()
-	if err = temporary.Close(); err != nil {
-		_ = os.Remove(temporaryPath)
-		return err
-	}
-	defer os.Remove(temporaryPath)
-	if err = archiveservice.CreateTar(temporaryPath, archiveservice.WithFile(sourcePath, targetPath)); err != nil {
-		return fmt.Errorf("archive dpanel directory: %w", err)
-	}
-	archive, err := os.Open(temporaryPath)
-	if err != nil {
-		return err
-	}
-	defer archive.Close()
-	if _, err = self.Afs(ctx, ExplorerMountTypeContainer, plugin.ExplorerName, dockerSdk); err != nil {
-		return fmt.Errorf("prepare explorer for dpanel sync: %w", err)
-	}
-	agent, err := serviceagent.NewDockerAgent(dockerSdk, plugin.ExplorerName)
-	if err != nil {
-		return err
-	}
-	if err = agent.ImportDPanel(ctx, archive); !errdefs.IsNotFound(err) {
-		return err
-	}
-	if _, retryErr := self.Afs(ctx, ExplorerMountTypeContainer, plugin.ExplorerName, dockerSdk); retryErr != nil {
-		return errors.Join(err, fmt.Errorf("recreate explorer for dpanel sync: %w", retryErr))
-	}
-	if _, retryErr := archive.Seek(0, io.SeekStart); retryErr != nil {
-		return errors.Join(err, fmt.Errorf("rewind dpanel archive: %w", retryErr))
-	}
-	return agent.ImportDPanel(ctx, archive)
+	fsOptions = append([]dockerfs.Option{
+		dockerfs.WithName(mountName),
+		dockerfs.WithDockerSdk(dockerSdk),
+		dockerfs.WithProxyContainer(factor.ExplorerName),
+	}, fsOptions...)
+	return servicefs.NewFs(servicefs.WithDockerDriver(fsOptions...))
 }
 
 type ExplorerImportFile struct {
@@ -385,21 +365,35 @@ func (self Explorer) UnArchive(fileSystem serviceafs.Fs, archives []string, dest
 }
 
 func (self Explorer) GetContent(fileSystem serviceafs.Fs, filePath string) (ExplorerContent, error) {
+	const maxContentSize = 1024 * 1024
+	fileInfo, err := fileSystem.Stat(filePath)
+	if err != nil {
+		return ExplorerContent{}, err
+	}
+	if !fileInfo.Mode().IsRegular() {
+		return ExplorerContent{}, function.ErrorMessage(define.ErrorMessageContainerExplorerContentUnsupportedType)
+	}
 	file, err := fileSystem.Open(filePath)
 	if err != nil {
 		return ExplorerContent{}, err
 	}
 	defer file.Close()
-	fileInfo, err := file.Stat()
+	fileInfo, err = file.Stat()
 	if err != nil {
 		return ExplorerContent{}, err
 	}
-	if fileInfo.Size() >= 1024*1024 {
+	if !fileInfo.Mode().IsRegular() {
+		return ExplorerContent{}, function.ErrorMessage(define.ErrorMessageContainerExplorerContentUnsupportedType)
+	}
+	if fileInfo.Size() >= maxContentSize {
 		return ExplorerContent{}, function.ErrorMessage(define.ErrorMessageContainerExplorerEditFileMaxSize)
 	}
-	content, err := io.ReadAll(file)
+	content, err := io.ReadAll(io.LimitReader(file, maxContentSize))
 	if err != nil {
 		return ExplorerContent{}, err
+	}
+	if len(content) >= maxContentSize {
+		return ExplorerContent{}, function.ErrorMessage(define.ErrorMessageContainerExplorerEditFileMaxSize)
 	}
 	fileType, _ := filetype.Match(content)
 	if fileType != filetype.Unknown {

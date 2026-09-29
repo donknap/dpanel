@@ -325,6 +325,9 @@ func (self *Fs) Chmod(name string, mode os.FileMode) error {
 }
 
 func (self *Fs) ChmodAll(name string, mode os.FileMode, recursive bool) error {
+	if name == "" {
+		return pathError("chmod", name, errors.New("refusing to chmod empty path"))
+	}
 	name, err := self.pathName(name)
 	if err != nil {
 		return pathError("chmod", name, err)
@@ -353,6 +356,9 @@ func (self *Fs) Chown(name string, uid, gid int) error {
 }
 
 func (self *Fs) ChownAll(name string, uid, gid *int, recursive bool) error {
+	if name == "" {
+		return pathError("chown", name, errors.New("refusing to chown empty path"))
+	}
 	if uid == nil && gid == nil {
 		return errors.New("chown requires uid or gid")
 	}
@@ -568,6 +574,9 @@ func (self *Fs) prepareTransfer(source, target string, overwrite bool) (string, 
 }
 
 func (self *Fs) RemoveAll(name string) error {
+	if name == "" {
+		return pathError("remove_all", name, errors.New("refusing to remove empty path"))
+	}
 	virtualName, err := self.pathName(name)
 	if err != nil {
 		return pathError("remove_all", name, err)
@@ -1057,7 +1066,8 @@ func (self *Fs) pathName(name string) (string, error) {
 	if name == "" {
 		name = self.workingDir
 	}
-	if strings.IndexByte(name, 0) >= 0 || !path.IsAbs(name) || path.Clean(name) != name {
+	if strings.IndexByte(name, 0) >= 0 || !path.IsAbs(name) || path.Clean(name) != name ||
+		len(self.roots) != 0 && filepath.Separator == '\\' && strings.Contains(name, "\\") {
 		return name, errors.New("invalid path")
 	}
 	return name, nil

@@ -17,7 +17,7 @@ type FsTarget struct {
 }
 
 type Fs struct {
-	agent *Agent
+	client *Client
 }
 
 func (self *Fs) Mkdir(ctx context.Context, target FsTarget, path string, mode os.FileMode, recursive bool) error {
@@ -116,7 +116,7 @@ func (self *Fs) exec(ctx context.Context, target FsTarget, result any, args ...s
 	if err != nil {
 		return err
 	}
-	return self.agent.exec(ctx, result, append(args, targetArgs...)...)
+	return self.client.exec(ctx, result, append(args, targetArgs...)...)
 }
 
 func (self FsTarget) args() ([]string, error) {

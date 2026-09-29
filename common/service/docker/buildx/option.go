@@ -3,7 +3,6 @@ package buildx
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +13,33 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 )
+
+type BuildOptions struct {
+	RegistryAuth []*registry.AuthConfig
+	WorkDir      string // 构建上下文路径 (即最后的 .)
+
+	Annotation []string // --annotation: 为镜像添加 OCI 注解
+	BuildArg   []string // --build-arg: 设置构建时变量 (ARG)
+	CacheFrom  []string // --cache-from: 外部缓存源 (例如 "user/app:cache")
+	CacheTo    []string // --cache-to: 缓存导出目的地 (例如 "type=local,dest=path")
+	Labels     []string // --label: 设置镜像的元数据标签
+	Outputs    []string // -o, --output: 输出目的地 (格式: "type=local,dest=path")
+	Platforms  []string // --platform: 设置构建的目标平台 (如 "linux/amd64")
+	Secrets    []string // --secret: 暴露给构建过程的机密信息 (格式: "id=mysecret")
+
+	Builder string               // --builder: 覆盖配置的 builder 实例
+	File    string               // -f, --file: Dockerfile 的名称及路
+	Target  []BuildOptionsTarget // --target: 设置要构建的目标构建阶段 (Stage)
+
+	NoCache bool // --no-cache: 构建时不使用任何缓存
+	Pull    bool // --pull: 始终尝试拉取所有引用的镜像
+	Push    bool // --push: Shorthand for "--output=type=registry"
+}
+
+type BuildOptionsTarget struct {
+	Target string
+	Tags   []string
+}
 
 type Option func(self *Builder) error
 
@@ -69,14 +95,9 @@ func WithDockerFileContent(content []byte) Option {
 			return err
 		}
 		self.options.WorkDir = temp
-		go func() {
-			<-self.ctx.Done()
-			err = os.RemoveAll(self.options.WorkDir)
-			if err != nil {
-				slog.Debug("buildx delete dockerfile temp path", "path", self.options.WorkDir)
-			}
-		}()
-		return os.WriteFile(filepath.Join(self.options.WorkDir, "Dockerfile"), content, 0666)
+		self.options.File = filepath.Join(temp, "Dockerfile")
+		self.tempDirs = append(self.tempDirs, temp)
+		return os.WriteFile(filepath.Join(temp, "Dockerfile"), content, 0600)
 	}
 }
 
@@ -88,7 +109,7 @@ func WithGitUrl(url string) Option {
 	}
 }
 
-func WithZipFilePath(path string) Option {
+func WithZipFilePath(path, root string) Option {
 	return func(self *Builder) error {
 		if path == "" {
 			return nil
@@ -97,22 +118,18 @@ func WithZipFilePath(path string) Option {
 		if err != nil {
 			return err
 		}
-		err = archive.UnArchive(path, temp)
+		self.tempDirs = append(self.tempDirs, temp)
+		archivePath := filepath.Join(temp, "context.tar")
+		err = archive.ZipToTar(self.ctx, path, archivePath, archive.Option{Root: root})
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = os.Remove(path)
-		}()
-		self.options.WorkDir = temp
-		go func() {
-			<-self.ctx.Done()
-			err = os.RemoveAll(self.options.WorkDir)
-			if err != nil {
-				slog.Debug("buildx delete zip temp path", "path", self.options.WorkDir)
-			}
-		}()
-		return nil
+		contextDir := filepath.Join(temp, "context")
+		if err = archive.UnArchiveWithContext(self.ctx, archivePath, contextDir); err != nil {
+			return err
+		}
+		self.options.WorkDir = contextDir
+		return os.Remove(archivePath)
 	}
 }
 
@@ -217,8 +234,7 @@ func WithRegistryAuth(auth ...string) Option {
 		for _, authStr := range auth {
 			authConfig, err := registry.DecodeAuthConfig(authStr)
 			if err != nil {
-				slog.Warn("buildx with registry auth", "auth", authStr, "error", err)
-				continue
+				return fmt.Errorf("decode registry auth: %w", err)
 			}
 			if ok := function.InArrayWalk(self.options.RegistryAuth, func(item *registry.AuthConfig) bool {
 				return item.ServerAddress == authConfig.ServerAddress

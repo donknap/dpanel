@@ -83,13 +83,15 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 			cors.POST("/app/image/tag-search", controller.Image{}.TagSearch)
 
 			cors.POST("/app/image-build/create", controller.ImageBuild{}.Create)
+			cors.POST("/app/image-build/build", controller.ImageBuild{}.Build)
 			cors.POST("/app/image-build/get-list", controller.ImageBuild{}.GetList)
 			cors.POST("/app/image-build/get-detail", controller.ImageBuild{}.GetDetail)
 			cors.POST("/app/image-build/delete", controller.ImageBuild{}.Delete)
 			cors.POST("/app/image-build/prune", controller.ImageBuild{}.Prune)
-			cors.POST("/app/image-buildx/get-detail", controller.ImageBuildx{}.GetDetail)
-			cors.POST("/app/image-buildx/create", controller.ImageBuildx{}.Create)
-			cors.POST("/app/image-buildx/prune", controller.ImageBuildx{}.Prune)
+			cors.POST("/app/image-buildx/get-context", controller.ImageBuildx{}.GetContext)
+			cors.POST("/app/image-buildx/create-context", controller.ImageBuildx{}.CreateContext)
+			cors.POST("/app/image-buildx/build", controller.ImageBuildx{}.Build)
+			cors.POST("/app/image-buildx/clean-context", controller.ImageBuildx{}.CleanContext)
 
 			// 日志相关
 			cors.POST("/app/log/run", controller.RunLog{}.Run)

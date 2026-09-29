@@ -2,15 +2,13 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/build"
 	"github.com/docker/go-units"
-	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/application/logic/task"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -32,9 +30,8 @@ type ImageBuild struct {
 
 func (self ImageBuild) Create(http *gin.Context) {
 	type ParamsValidate struct {
-		Id       int32  `json:"id"`
-		Title    string `json:"title"`
-		OnlySave bool   `json:"onlySave"`
+		Id    int32  `json:"id"`
+		Title string `json:"title"`
 		accessor.ImageSettingOption
 	}
 	params := ParamsValidate{}
@@ -86,84 +83,111 @@ func (self ImageBuild) Create(http *gin.Context) {
 		Status:    define.DockerImageBuildStatusStop,
 		Message:   "",
 	}
-	if imageRow, _ := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First(); imageRow != nil {
+	imageRow, err := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if imageRow != nil {
 		imageNew.ID = imageRow.ID
 		imageNew.Status = imageRow.Status
 		imageNew.Message = imageRow.Message
 	}
-	_ = dao.Image.Save(imageNew)
-
-	if !params.OnlySave {
-		var log string
-		var err error
-		var imageId string
-
-		startTime := time.Now()
-		messageId := fmt.Sprintf(ws.MessageTypeImageBuild, params.Id)
-		if params.BuildEngine == define.ImageBuildBuildX {
-			log, err = task.Docker{}.ImageBuildX(messageId, params.ImageSettingOption)
-			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-			// 检测是否成功
-			matches := regexp.MustCompile(`"containerimage\.digest"\s*:\s*"(sha256:[a-f0-9]+)"`).FindAllStringSubmatch(log, -1)
-			imageId = strings.Join(function.PluckArrayWalk(matches, func(item []string) (string, bool) {
-				return item[1], true
-			}), "-")
-			if imageId == "" {
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImageBuildError, "message", ""), 500)
-				return
-			}
-		} else {
-			log, err = task.Docker{}.ImageBuild(docker.Sdk, messageId, params.ImageSettingOption)
-			if params.ImageSettingOption.BuildEnablePush {
-				wsBuffer := ws.NewProgressPip(messageId)
-				defer wsBuffer.Close()
-				pushCtx, cancelPush := context.WithCancel(docker.Sdk.Ctx)
-				defer cancelPush()
-				stopWatchProgress := context.AfterFunc(wsBuffer.Context(), cancelPush)
-				defer stopWatchProgress()
-				for _, tag := range params.ImageSettingOption.Tags {
-					registryConfig := logic.Image{}.GetRegistryConfig(tag.Registry)
-					err = docker.Sdk.ImagePush(pushCtx, tag.Uri(), docker.ImagePushOption{
-						Registry: *registryConfig,
-						OnProgress: func(progress map[string]*types.PullProgress) {
-							wsBuffer.BroadcastMessage(progress)
-						},
-					})
-					if err != nil {
-						self.JsonResponseWithError(http, err, 500)
-						return
-					}
-				}
-			}
-			matches := regexp.MustCompile(`Successfully built\s*([a-f0-9]+)`).FindAllStringSubmatch(log, -1)
-			imageId = strings.Join(function.PluckArrayWalk(matches, func(item []string) (string, bool) {
-				return item[1], true
-			}), "-")
-		}
-		if err != nil {
-			imageNew.Status = define.DockerImageBuildStatusError
-		} else {
-			imageNew.Status = define.DockerImageBuildStatusSuccess
-		}
-
-		imageNew.Setting.ImageId = imageId
-		imageNew.Setting.UseTime = time.Now().Sub(startTime).Seconds()
-		imageNew.Message = log
-		_ = dao.Image.Save(imageNew)
-
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
+	if err := dao.Image.Save(imageNew); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
 		"id": imageNew.ID,
 	})
 	return
+}
+
+func (self ImageBuild) Build(http *gin.Context) {
+	type ParamsValidate struct {
+		Id int32 `json:"id" binding:"required,gt=0"`
+	}
+	params := ParamsValidate{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	imageRow, err := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if imageRow == nil || imageRow.Setting == nil {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		return
+	}
+	sdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	progress, owner, err := ws.NewFdProgressPip(http, sdk.Name, fmt.Sprintf(ws.MessageTypeImageBuild, params.Id))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if !owner {
+		self.JsonResponseWithError(http, errors.New("image build is already running"), 409)
+		return
+	}
+	defer progress.Close()
+	stopWatchRequest := context.AfterFunc(http.Request.Context(), progress.Close)
+	defer stopWatchRequest()
+	if err := progress.Context().Err(); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if function.IsEmptyArray(imageRow.Setting.Tags) {
+		tag := imageRow.Setting.Tag
+		if tag == "" {
+			tag = imageRow.Tag
+		}
+		if tag != "" {
+			imageRow.Setting.Tags = []accessor.ImageSettingTag{{
+				Tag:    function.ImageTag(tag),
+				Enable: true,
+			}}
+		}
+	}
+	if imageRow.Setting.BuildDockerfileContent == "" {
+		imageRow.Setting.BuildDockerfileContent = imageRow.Setting.BuildDockerfile
+	}
+	if imageRow.Setting.BuildDockerfileRoot == "" {
+		imageRow.Setting.BuildDockerfileRoot = imageRow.Setting.BuildRoot
+	}
+	imageRow.Status = define.DockerImageBuildStatusProcess
+	imageRow.Message = ""
+	if err := dao.Image.Save(imageRow); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
+	startTime := time.Now()
+	log, imageID, err := (task.Docker{}).Build(sdk, progress, *imageRow.Setting)
+	if ctxErr := progress.Context().Err(); ctxErr != nil {
+		err = ctxErr
+		imageRow.Status = define.DockerImageBuildStatusStop
+	} else if err != nil {
+		imageRow.Status = define.DockerImageBuildStatusError
+	} else {
+		imageRow.Status = define.DockerImageBuildStatusSuccess
+	}
+	imageRow.Setting.ImageId = imageID
+	imageRow.Setting.UseTime = time.Since(startTime).Seconds()
+	imageRow.Message = log
+	if saveErr := dao.Image.Save(imageRow); saveErr != nil {
+		err = errors.Join(err, saveErr)
+	}
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{"id": imageRow.ID})
 }
 
 func (self ImageBuild) GetDetail(http *gin.Context) {
@@ -259,7 +283,12 @@ func (self ImageBuild) GetList(http *gin.Context) {
 }
 
 func (self ImageBuild) Prune(http *gin.Context) {
-	res, err := docker.Sdk.Client.BuildCachePrune(docker.Sdk.Ctx, build.CachePruneOptions{
+	sdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	res, err := sdk.Client.BuildCachePrune(sdk.Ctx, build.CachePruneOptions{
 		All: true,
 	})
 	if err != nil {

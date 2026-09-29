@@ -14,9 +14,9 @@ import (
 	agentTypes "github.com/donknap/dpanel/app/agent/types"
 	"github.com/donknap/dpanel/common/accessor"
 	serviceAgent "github.com/donknap/dpanel/common/service/agent"
+	"github.com/donknap/dpanel/common/service/agent/factor"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/stats"
-	"github.com/donknap/dpanel/common/service/plugin"
 )
 
 func (self Stat) ReadSystemStat(ctx context.Context, dockerSdk *docker.Client) <-chan SystemStatFrame {
@@ -66,13 +66,13 @@ func streamSystem(ctx context.Context, dockerSdk *docker.Client, handle func(sys
 	if err := (Stat{}).ReconcileSystemStat(dockerSdk); err != nil {
 		return err
 	}
-	agent, err := serviceAgent.NewDockerAgent(dockerSdk, plugin.MonitorName)
+	client, err := serviceAgent.NewClient(dockerSdk, factor.MonitorName)
 	if err != nil {
 		return err
 	}
 	systemCollector := &agentSystemCollector{}
 	containerCollectors := make(map[string]*stats.Container)
-	return agent.StreamStat(ctx, targets, func(data []byte) error {
+	return client.StreamStat(ctx, targets, func(data []byte) error {
 		system, containers, ready, decodeErr := systemCollector.Decode(data, containerCollectors)
 		if decodeErr != nil {
 			return decodeErr
@@ -416,11 +416,11 @@ func (self Stat) HostDiskUsage(ctx context.Context, dockerSdk *docker.Client) (a
 	if err := self.ReconcileSystemStat(dockerSdk); err != nil {
 		return accessor.SystemDiskUsage{}, err
 	}
-	agent, err := serviceAgent.NewDockerAgent(dockerSdk, plugin.MonitorName)
+	client, err := serviceAgent.NewClient(dockerSdk, factor.MonitorName)
 	if err != nil {
 		return accessor.SystemDiskUsage{}, err
 	}
-	usage, err := agent.Usage(ctx)
+	usage, err := client.Usage(ctx)
 	if err != nil {
 		return accessor.SystemDiskUsage{}, err
 	}
@@ -435,12 +435,6 @@ func (self Stat) ReconcileSystemStat(dockerSdk *docker.Client) error {
 	if !dockerSdk.DockerEnv.EnableSystemStat {
 		return nil
 	}
-	monitor, err := plugin.NewPlugin(dockerSdk, plugin.MonitorName, plugin.CreateOption{
-		Init:            true,
-		MountDockerRoot: true,
-	})
-	if err != nil {
-		return err
-	}
-	return monitor.Create()
+	_, err := factor.NewMonitor(dockerSdk, factor.MonitorCreateOption{})
+	return err
 }

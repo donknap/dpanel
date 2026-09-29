@@ -344,6 +344,7 @@ func (self Compose) GetTask(http *gin.Context) {
 
 	if tasker, _, err := (logic.Compose{}).GetTasker(composeRow); err == nil {
 		data["project"] = tasker.Project
+		data["workingDir"] = tasker.Project.WorkingDir
 		// 获取环境变量时，需要从 .env 文件中拿到最新值和新增的变量
 		composeRow.Setting.Environment = function.PluckMapWalkArray(tasker.Project.Environment, func(k string, v string) (types2.EnvItem, bool) {
 			if dbItem, _, ok := function.PluckArrayItemWalk(composeRow.Setting.Environment, func(item types2.EnvItem) bool {

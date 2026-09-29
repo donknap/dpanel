@@ -13,10 +13,10 @@ import (
 	"github.com/donknap/dpanel/app/common/logic"
 	statLogic "github.com/donknap/dpanel/app/common/logic/stat"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/agent/factor"
 	"github.com/donknap/dpanel/common/service/docker"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	event2 "github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -469,18 +469,10 @@ func (self Env) SystemStat(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	monitor, err := plugin.NewPlugin(dockerSdk, plugin.MonitorName, plugin.CreateOption{
-		Init:            params.Enable,
-		MountDockerRoot: true,
-	})
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
 	if params.Enable {
-		err = monitor.Create()
+		_, err = factor.NewMonitor(dockerSdk, factor.MonitorCreateOption{})
 	} else {
-		err = monitor.Close()
+		err = factor.Destroy(dockerSdk, factor.MonitorName)
 	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

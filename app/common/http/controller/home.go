@@ -30,6 +30,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/agent/factor"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/stats"
 	serviceexec "github.com/donknap/dpanel/common/service/exec"
@@ -110,7 +111,7 @@ func (self Home) WsNotice(http *gin.Context) {
 			return
 		}
 		go func() {
-			if err := (logic.Explorer{}).DestroyProxyContainer(dockerSdk); err != nil {
+			if err := factor.Destroy(dockerSdk, factor.ExplorerName); err != nil {
 				slog.Warn("destroy explorer from notice websocket", "dockerEnv", dockerSdk.Name, "error", err)
 			}
 		}()

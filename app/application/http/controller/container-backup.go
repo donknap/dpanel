@@ -24,12 +24,12 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/agent/factor"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/backup"
 	"github.com/donknap/dpanel/common/service/docker/imports"
 	"github.com/donknap/dpanel/common/service/fs/dockerfs"
 	"github.com/donknap/dpanel/common/service/notice"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -313,15 +313,15 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		Total:   len(progressSteps),
 	})
 
-	var hostExplorer *plugin.Plugin
+	var hostExplorerName string
 	var hostExplorerFs *dockerfs.Fs
 	getHostExplorerFs := func() (*dockerfs.Fs, error) {
 		if hostExplorerFs != nil {
 			return hostExplorerFs, nil
 		}
-		if hostExplorer == nil {
+		if hostExplorerName == "" {
 			var err error
-			hostExplorer, err = plugin.NewHostExplorer(dockerSdk)
+			hostExplorerName, err = factor.NewExplorerHost(dockerSdk, factor.HostCreateOption{})
 			if err != nil {
 				return nil, err
 			}
@@ -329,14 +329,14 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		var err error
 		hostExplorerFs, err = dockerfs.New(
 			dockerfs.WithDockerSdk(dockerSdk),
-			dockerfs.WithProxyContainer(hostExplorer.ContainerName()),
-			dockerfs.WithRoot(plugin.HostExplorerMountPath),
+			dockerfs.WithProxyContainer(hostExplorerName),
+			dockerfs.WithRoot(factor.HostExplorerMountPath),
 		)
 		return hostExplorerFs, err
 	}
 	defer func() {
-		if hostExplorer != nil {
-			_ = hostExplorer.Close()
+		if hostExplorerName != "" {
+			_ = factor.Destroy(dockerSdk, hostExplorerName)
 		}
 	}()
 	for _, item := range manifest {
@@ -355,15 +355,15 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		// 兼容旧的数据
 		if !function.IsEmptyArray(item.Volume) && function.IsEmptyArray(item.VolumeList) {
 			item.VolumeList = function.PluckArrayWalk(item.Volume, func(volume string) (backup.ManifestVolumeInfo, bool) {
-				mount, _, ok := function.PluckArrayItemWalk(containerInfo.Mounts, func(item container.MountPoint) bool {
+				m, _, ok := function.PluckArrayItemWalk(containerInfo.Mounts, func(item container.MountPoint) bool {
 					return strings.HasSuffix(function.Sha256([]byte(item.Destination)), path.Base(volume))
 				})
 				if !ok {
 					return backup.ManifestVolumeInfo{}, false
 				}
 				return backup.ManifestVolumeInfo{
-					Destination: mount.Destination,
-					Source:      mount.Source,
+					Destination: m.Destination,
+					Source:      m.Source,
 					SavePath:    volume,
 					Mode:        os.ModeDir,
 				}, true
@@ -606,8 +606,8 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 								return err
 							}
 							p := path.Dir(bindMount.Source)
-							targetImportPath = path.Join(plugin.HostExplorerMountPath, p)
-							targetImportContainerName = hostExplorer.ContainerName()
+							targetImportPath = path.Join(factor.HostExplorerMountPath, p)
+							targetImportContainerName = hostExplorerName
 							importOption = append(importOption, imports.WithImportFileInTar(tarReader, path.Base(bindMount.Source), func(header *tar.Header) bool {
 								return strings.HasSuffix(volume.Destination, header.Name)
 							}))

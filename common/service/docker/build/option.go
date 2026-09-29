@@ -2,18 +2,18 @@ package build
 
 import (
 	"archive/tar"
-	"archive/zip"
 	"bytes"
 	"context"
-	"io"
-	"log/slog"
+	"errors"
 	"os"
-	"strings"
+	"path/filepath"
 	"time"
 
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/archive"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 )
 
@@ -91,50 +91,32 @@ func WithZipFilePath(trimPath string, path string) Option {
 		if path == "" {
 			return nil
 		}
-		zipArchive, err := zip.OpenReader(path)
+		defer func() { _ = os.Remove(path) }()
+		tempDir, err := storage.Local{}.CreateTempDir("")
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = zipArchive.Close()
-			_ = os.Remove(path)
-		}()
-
-		buf := new(bytes.Buffer)
-		tarWriter := tar.NewWriter(buf)
-		defer func() {
-			_ = tarWriter.Close()
-		}()
-		first := false
-		for _, zipFile := range zipArchive.File {
-			if strings.HasPrefix(zipFile.Name, "__MACOSX") {
-				continue
-			}
-			if !first {
-				first = true
-				slog.Debug("image build zip path", "root", zipFile.Name)
-			}
-			// zip 文件只获取指定根目录下的文件
-			if !strings.HasPrefix(zipFile.Name, trimPath) {
-				continue
-			}
-			fileInfoHeader, err := tar.FileInfoHeader(zipFile.FileInfo(), "")
-			if err != nil {
-				return err
-			}
-			fileInfoHeader.Name = strings.TrimPrefix(zipFile.Name, trimPath)
-
-			err = tarWriter.WriteHeader(fileInfoHeader)
-			if err != nil {
-				return err
-			}
-			zipFileReader, err := zipFile.Open()
-			_, err = io.Copy(tarWriter, zipFileReader)
-			if err != nil {
-				return err
-			}
+		tarPath := filepath.Join(tempDir, "context.tar")
+		if err = archive.ZipToTar(self.ctx, path, tarPath, archive.Option{Root: trimPath}); err != nil {
+			_ = os.RemoveAll(tempDir)
+			return err
 		}
-		self.buildContext = buf
+		contextFile, err := os.Open(tarPath)
+		if err != nil {
+			_ = os.RemoveAll(tempDir)
+			return err
+		}
+		cleanupResult := make(chan error, 1)
+		self.cleanupResults = append(self.cleanupResults, cleanupResult)
+		self.buildContext = contextFile
+		ctx := self.ctx
+		go func() {
+			select {
+			case <-ctx.Done():
+			case <-self.closed:
+			}
+			cleanupResult <- errors.Join(contextFile.Close(), os.RemoveAll(tempDir))
+		}()
 		return nil
 	}
 }

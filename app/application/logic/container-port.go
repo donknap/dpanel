@@ -13,8 +13,8 @@ import (
 	statLogic "github.com/donknap/dpanel/app/common/logic/stat"
 	"github.com/donknap/dpanel/common/function"
 	serviceAgent "github.com/donknap/dpanel/common/service/agent"
+	"github.com/donknap/dpanel/common/service/agent/factor"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/plugin"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/patrickmn/go-cache"
@@ -94,11 +94,11 @@ func (ContainerPort) Check(
 	if err := (statLogic.Stat{}).ReconcileSystemStat(dockerSdk); err != nil {
 		return nil, err
 	}
-	agent, err := serviceAgent.NewDockerAgent(dockerSdk, plugin.MonitorName)
+	client, err := serviceAgent.NewClient(dockerSdk, factor.MonitorName)
 	if err != nil {
 		return nil, err
 	}
-	result, err := agent.CheckPorts(ctx, targets)
+	result, err := client.CheckPorts(ctx, targets)
 	if err != nil {
 		return nil, err
 	}

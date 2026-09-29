@@ -25,10 +25,11 @@ type DPanelInfo struct {
 	LogConsoleLevel  string `json:"logConsoleLevel"`
 	StorageLocalPath string `json:"storageLocalPath"`
 
-	Dns        string             `json:"dns"`
-	Proxy      string             `json:"proxy"`
-	NoProxy    string             `json:"noProxy"`
-	Mount      types.VolumeItem   `json:"mount"` // 通过容器创建时是挂载目录，二进制运行时是直接路径
+	Dns     string `json:"dns"`
+	Proxy   string `json:"proxy"`
+	NoProxy string `json:"noProxy"`
+
+	// 首项为 /dpanel；容器运行时后续项为独立子挂载，二进制运行时仅一项。
 	DataMounts []types.VolumeItem `json:"dataMounts"`
 
 	IsDev  bool `json:"isDev"`

@@ -1,36 +1,25 @@
 package buildx
 
-import (
-	"strconv"
-	"text/template"
-)
-
 const buildShellTmpl = `
 set -e
-set -o pipefail
 
 echo "Starting ..."
 
-{{- if .Push }}
-{{- range .RegistryAuth }}
-echo {{ quote .Password }} | docker login {{ quote .ServerAddress }} -u {{ quote .Username }} --password-stdin
-{{- end }}
-{{- end }}
-
-CONTEXT_NAME="{{.Name}}"
-BUILDER_NAME="$CONTEXT_NAME-builder"
-
-if docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
-    docker buildx inspect --bootstrap >/dev/null
+{{- if .Builder }}
+if docker buildx inspect {{ quote .Builder }} >/dev/null 2>&1; then
+    docker buildx inspect --bootstrap {{ quote .Builder }} >/dev/null
 fi
+{{- else }}
+docker buildx inspect --bootstrap >/dev/null
+{{- end }}
 
 {{- range .Target }}
-TARGET_NAME="{{ if .Target }}{{ .Target }}{{ else }}default{{ end }}"
+TARGET_NAME={{ if .Target }}{{ quote .Target }}{{ else }}"default"{{ end }}
 echo "Building target: $TARGET_NAME ..."
 
-META_TEMP="${TMPDIR:-/tmp}/dpanel_build_${TARGET_NAME}_$$.json"
+META_TEMP="$(mktemp "${TMPDIR:-/tmp}/dpanel_build_XXXXXX")"
 
-if docker buildx build --builder "$BUILDER_NAME" --progress plain --metadata-file "$META_TEMP" {{- if $.Pull }} --pull {{ end -}}
+if docker buildx build {{- if $.Builder }} --builder {{ quote $.Builder }} {{- end }} --progress plain --metadata-file "$META_TEMP" {{- if $.Pull }} --pull {{ end -}}
     {{- if $.Push }} {{- if $.Outputs }} {{- range $.Outputs }} --output {{ quote . }} {{ end -}} {{- else }} --push {{- end }} {{- else }} --load {{- end }}
     {{- if $.NoCache }} --no-cache {{ end -}}
     {{- if $.File }} -f {{ quote $.File }} {{ end -}}
@@ -55,9 +44,3 @@ fi
 
 {{- end }}
 `
-
-var buildShellFunc = template.FuncMap{
-	"quote": func(s string) string {
-		return strconv.Quote(s)
-	},
-}

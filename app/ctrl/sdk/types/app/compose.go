@@ -16,6 +16,7 @@ type ComposeDeployOption struct {
 
 type ComposeDetailResult struct {
 	Detail        *entity.Compose            `json:"detail"`
+	WorkingDir    string                     `json:"workingDir"`
 	Yaml          [2]string                  `json:"yaml"`
 	ContainerList []*compose.ContainerResult `json:"containerList"`
 	Project       struct {

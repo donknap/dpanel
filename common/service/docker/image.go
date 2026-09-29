@@ -76,30 +76,41 @@ func (self Client) ImagePull(ctx context.Context, imageName string, option Image
 	for proxyServer := range registrySdk.New(registryOptions...).GetAvailableServers() {
 		address := proxyServer.Url
 		imageNameDetail.Registry = function.RegistryReference(address)
+		attemptStarted := time.Now()
+		phase := "request"
+		slog.Debug("image pull attempt started", "image", originalImageName.Uri(), "address", address, "source", "proxy")
 		out, err := self.Client.ImagePull(ctx, imageNameDetail.Uri(), image.PullOptions{Platform: option.Platform})
 		if err == nil {
+			phase = "stream"
 			err = (&imageProgressReader{onProgress: option.OnProgress}).read(ctx, out)
 			if err == nil {
 				originalTag := originalImageName.Uri()
 				if tag, _, ok := strings.Cut(originalTag, "@"); ok {
 					originalTag = tag
 				}
+				phase = "tag"
 				if err = self.Client.ImageTag(ctx, imageNameDetail.Uri(), originalTag); err == nil {
+					slog.Debug("image pull attempt finished", "image", originalImageName.Uri(), "address", address, "source", "proxy", "status", "success", "durationSeconds", time.Since(attemptStarted).Seconds())
 					return originalImageName, nil
 				}
 			}
 		}
 		if ctx.Err() != nil {
+			slog.Debug("image pull attempt finished", "image", originalImageName.Uri(), "address", address, "source", "proxy", "status", "canceled", "phase", phase, "durationSeconds", time.Since(attemptStarted).Seconds())
 			return originalImageName, ctx.Err()
 		}
-		lastErr = fmt.Errorf("pull image from %s: %w", address, err)
-		slog.Debug("image remote", "type", "pull", "address", address, "error", err)
+		lastErr = fmt.Errorf("pull image from %s during %s: %w", address, phase, err)
+		slog.Debug("image pull attempt finished", "image", originalImageName.Uri(), "address", address, "source", "proxy", "status", "failed", "phase", phase, "durationSeconds", time.Since(attemptStarted).Seconds(), "error", err)
 	}
 
 	if sourceAddress != "" {
 		imageNameDetail.Registry = function.RegistryReference(sourceAddress)
+		attemptStarted := time.Now()
+		phase := "request"
+		slog.Debug("image pull attempt started", "image", originalImageName.Uri(), "address", sourceAddress, "source", "registry")
 		out, err := self.Client.ImagePull(ctx, imageNameDetail.Uri(), image.PullOptions{Platform: option.Platform, RegistryAuth: registryConfig.Auth})
 		if err == nil {
+			phase = "stream"
 			err = (&imageProgressReader{onProgress: option.OnProgress}).read(ctx, out)
 			if err == nil {
 				originalTag := originalImageName.Uri()
@@ -107,17 +118,22 @@ func (self Client) ImagePull(ctx context.Context, imageName string, option Image
 					originalTag = tag
 				}
 				if imageNameDetail.Uri() == originalTag {
+					slog.Debug("image pull attempt finished", "image", originalImageName.Uri(), "address", sourceAddress, "source", "registry", "status", "success", "durationSeconds", time.Since(attemptStarted).Seconds())
 					return originalImageName, nil
 				}
+				phase = "tag"
 				if err = self.Client.ImageTag(ctx, imageNameDetail.Uri(), originalTag); err == nil {
+					slog.Debug("image pull attempt finished", "image", originalImageName.Uri(), "address", sourceAddress, "source", "registry", "status", "success", "durationSeconds", time.Since(attemptStarted).Seconds())
 					return originalImageName, nil
 				}
 			}
 		}
 		if ctx.Err() != nil {
+			slog.Debug("image pull attempt finished", "image", originalImageName.Uri(), "address", sourceAddress, "source", "registry", "status", "canceled", "phase", phase, "durationSeconds", time.Since(attemptStarted).Seconds())
 			return originalImageName, ctx.Err()
 		}
-		lastErr = fmt.Errorf("pull image from %s: %w", sourceAddress, err)
+		lastErr = fmt.Errorf("pull image from %s during %s: %w", sourceAddress, phase, err)
+		slog.Debug("image pull attempt finished", "image", originalImageName.Uri(), "address", sourceAddress, "source", "registry", "status", "failed", "phase", phase, "durationSeconds", time.Since(attemptStarted).Seconds())
 	}
 	if lastErr != nil {
 		return originalImageName, lastErr

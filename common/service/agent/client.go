@@ -14,8 +14,61 @@ import (
 	"time"
 
 	agentTypes "github.com/donknap/dpanel/app/agent/types"
-	"github.com/donknap/dpanel/common/service/agent/runner"
+	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec"
+	containerexec "github.com/donknap/dpanel/common/service/exec/container"
 )
+
+const executable = "/agent"
+
+type Client struct {
+	dockerSdk     *docker.Client
+	containerName string
+	Fs            *Fs
+}
+
+func NewClient(dockerSdk *docker.Client, containerName string) (*Client, error) {
+	if dockerSdk == nil || dockerSdk.Client == nil || dockerSdk.Ctx == nil {
+		return nil, errors.New("docker client is required for agent client")
+	}
+	if containerName == "" {
+		return nil, errors.New("container name is required for agent client")
+	}
+	info, err := dockerSdk.Client.ContainerInspect(dockerSdk.Ctx, containerName)
+	if err != nil {
+		return nil, fmt.Errorf("inspect agent container %q: %w", containerName, err)
+	}
+	if info.State == nil || !info.State.Running || info.State.Restarting {
+		return nil, fmt.Errorf("agent container %q is not running", containerName)
+	}
+	result := &Client{dockerSdk: dockerSdk, containerName: containerName}
+	result.Fs = &Fs{client: result}
+	return result, nil
+}
+
+func (self *Client) run(ctx context.Context, args ...string) ([]byte, error) {
+	command := append([]string{executable}, args...)
+	return containerexec.QuickRun(ctx, self.dockerSdk.Client, self.containerName, command...)
+}
+
+func (self *Client) stream(ctx context.Context, args ...string) (exec.Pipe, error) {
+	cmd, err := containerexec.New(
+		containerexec.WithDockerClient(self.dockerSdk.Client),
+		containerexec.WithContainerName(self.containerName),
+		containerexec.WithCommandName(executable),
+		containerexec.WithArgs(args...),
+		containerexec.WithCtx(ctx),
+	)
+	if err != nil {
+		return nil, err
+	}
+	pipe, err := cmd.RunInPip()
+	if err != nil {
+		_ = cmd.Close()
+		return nil, err
+	}
+	return pipe, nil
+}
 
 const (
 	portCheckSuccess     = "success"
@@ -27,25 +80,11 @@ const (
 	statHeartbeatInterval = 3 * time.Second
 )
 
-type Agent struct {
-	runner runner.Runner
-	Fs     *Fs
-}
-
-func NewAgent(commandRunner runner.Runner) (*Agent, error) {
-	if commandRunner == nil {
-		return nil, errors.New("agent runner is required")
-	}
-	result := &Agent{runner: commandRunner}
-	result.Fs = &Fs{agent: result}
-	return result, nil
-}
-
-func (self *Agent) exec(ctx context.Context, result any, args ...string) error {
+func (self *Client) exec(ctx context.Context, result any, args ...string) error {
 	if len(args) == 0 {
 		return errors.New("agent command is empty")
 	}
-	output, execErr := self.runner.Run(ctx, args...)
+	output, execErr := self.run(ctx, args...)
 	if len(output) == 0 && execErr != nil {
 		return execErr
 	}
@@ -78,7 +117,7 @@ func (self *Agent) exec(ctx context.Context, result any, args ...string) error {
 	return nil
 }
 
-func (self *Agent) CheckPorts(ctx context.Context, targets []PortCheckTarget) ([]agentTypes.PortCheckResult, error) {
+func (self *Client) CheckPorts(ctx context.Context, targets []PortCheckTarget) ([]agentTypes.PortCheckResult, error) {
 	result := make([]agentTypes.PortCheckResult, 0, len(targets))
 	if len(targets) == 0 {
 		return result, nil
@@ -145,7 +184,7 @@ func (self *Agent) CheckPorts(ctx context.Context, targets []PortCheckTarget) ([
 	return result, nil
 }
 
-func (self *Agent) Usage(ctx context.Context) (agentTypes.FilesystemUsage, error) {
+func (self *Client) Usage(ctx context.Context) (agentTypes.FilesystemUsage, error) {
 	result := agentTypes.FilesystemUsage{}
 	if err := self.exec(ctx, &result, "usage"); err != nil {
 		return agentTypes.FilesystemUsage{}, fmt.Errorf("execute agent usage: %w", err)
@@ -153,7 +192,7 @@ func (self *Agent) Usage(ctx context.Context) (agentTypes.FilesystemUsage, error
 	return result, nil
 }
 
-func (self *Agent) StreamStat(
+func (self *Client) StreamStat(
 	ctx context.Context, targets []ContainerTarget, handle func([]byte) error,
 ) error {
 	if handle == nil {
@@ -166,7 +205,7 @@ func (self *Agent) StreamStat(
 		}
 		args = append(args, "--container-id", fmt.Sprintf("%s:%d", target.ContainerID, target.PID))
 	}
-	session, err := self.runner.Stream(ctx, args...)
+	session, err := self.stream(ctx, args...)
 	if err != nil {
 		return err
 	}
