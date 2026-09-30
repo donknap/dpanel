@@ -207,7 +207,7 @@ define go_build
 	@cp ${PROJECT_GO_DIR}/config.yaml ${PROJECT_GO_TARGET}/config.yaml
 endef
 
-.PHONY: build build-js build-explorer-image build-builder release clean debug test
+.PHONY: build build-js build-explorer-image build-builder release sync sync-aliyun clean debug test
 
 build-explorer-image:
 	@echo ">> Building explorer images for: linux/amd64 linux/arm64 linux/arm/v7"
@@ -285,6 +285,45 @@ release: debug
 		echo ">> Building [Production] edition..."; \
 		docker buildx build --target production $(DOCKER_TAG_PROD) $(DOCKER_BUILD_ARGS) --provenance=false --push; \
 	fi
+
+SYNC_TOOL_IMAGE ?= quay.io/skopeo/stable:latest
+SYNC_TO ?=
+SYNC_DEST_USERNAME ?= $(ALIYUN_USERNAME)
+SYNC_DEST_PASSWORD ?= $(ALIYUN_TOKEN)
+export SYNC_DEST_USERNAME SYNC_DEST_PASSWORD
+
+sync:
+	@set -eu; \
+	: "$${SYNC_DEST_USERNAME:?Set SYNC_DEST_USERNAME}"; \
+	: "$${SYNC_DEST_PASSWORD:?Set SYNC_DEST_PASSWORD}"; \
+	SYNC_TO="$(SYNC_TO)" \
+	docker run --rm \
+		-e SYNC_TO \
+		-e SYNC_DEST_USERNAME -e SYNC_DEST_PASSWORD \
+		-e HTTP_PROXY -e HTTPS_PROXY -e ALL_PROXY -e NO_PROXY \
+		--entrypoint /bin/sh "$(SYNC_TOOL_IMAGE)" -ec '\
+		set -eu; \
+		: "$${SYNC_TO:?Set SYNC_TO}"; \
+		printf %s "$$SYNC_DEST_PASSWORD" | skopeo login --username "$$SYNC_DEST_USERNAME" --password-stdin "$$SYNC_TO"; \
+		for image in $(filter-out -t,$(call _GET_TAGS,$(_REPO_HUB),1) $(if $(filter 1,$(DOCKER_TARGET_PROD)),$(call _GET_TAGS,$(_REPO_HUB),0))); do \
+			destination="$$SYNC_TO/$$image"; \
+			echo "Sync docker.io/$$image -> $$destination"; \
+			skopeo copy --all --preserve-digests --retry-times 3 "docker://docker.io/$$image" "docker://$$destination"; \
+		done'
+
+sync-aliyun: export SYNC_TO := registry.cn-hangzhou.aliyuncs.com
+sync-aliyun:
+	@$(MAKE) sync APP_FAMILY=ce APP_ENV=all BUILD_OS=linux LIBC=musl
+	@$(MAKE) sync APP_FAMILY=ce APP_ENV=all BUILD_OS=linux LIBC=gnu
+	@$(MAKE) sync APP_FAMILY=ce APP_ENV=all BUILD_OS=windows
+	@$(MAKE) sync APP_FAMILY=ce APP_ENV=all BUILD_OS=darwin
+
+	@$(MAKE) sync APP_FAMILY=nw APP_ENV=lite BUILD_OS=linux
+
+	@$(MAKE) sync APP_FAMILY=pe APP_ENV=all BUILD_OS=linux LIBC=musl
+	@$(MAKE) sync APP_FAMILY=pe APP_ENV=all BUILD_OS=linux LIBC=gnu
+	@$(MAKE) sync APP_FAMILY=pe APP_ENV=all BUILD_OS=windows
+	@$(MAKE) sync APP_FAMILY=pe APP_ENV=all BUILD_OS=darwin
 
 test:
 	@printf "$(_CYAN)>> 开始同步 Tag [$(TARGET_TAG)] 代码并执行反向解析...$(_RESET)\n"

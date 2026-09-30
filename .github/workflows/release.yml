@@ -42,12 +42,12 @@ jobs:
             libc: gnu
             build_os: linux
             armv7: 1
-            make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=gnu"
+            make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=hub LIBC=gnu"
           - family: ce
             libc: musl
             build_os: linux
             armv7: 1
-            make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=all LIBC=musl"
+            make_args: "APP_FAMILY=ce APP_ENV=all OS=linux PUSH=hub LIBC=musl"
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -80,12 +80,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Login to ALiYun
-        uses: docker/login-action@v3
-        with:
-          registry: registry.cn-hangzhou.aliyuncs.com
-          username: ${{ secrets.ALIYUN_USERNAME }}
-          password: ${{ secrets.ALIYUN_TOKEN }}
 
       - name: Build CE Version
         if: matrix.family == 'ce'
@@ -114,12 +108,12 @@ jobs:
             libc: gnu
             build_os: windows
             armv7: 0
-            make_args: "BUILD_OS=windows APP_FAMILY=ce APP_ENV=all PUSH=all"
+            make_args: "BUILD_OS=windows APP_FAMILY=ce APP_ENV=all PUSH=hub"
           - family: nw
             libc: musl
             build_os: linux
             armv7: 0
-            make_args: "APP_FAMILY=nw APP_ENV=lite OS=linux PUSH=all"
+            make_args: "APP_FAMILY=nw APP_ENV=lite OS=linux PUSH=hub"
           - family: sy
             libc: musl
             build_os: linux
@@ -157,12 +151,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Login to ALiYun
-        uses: docker/login-action@v3
-        with:
-          registry: registry.cn-hangzhou.aliyuncs.com
-          username: ${{ secrets.ALIYUN_USERNAME }}
-          password: ${{ secrets.ALIYUN_TOKEN }}
 
       - name: Build CE Version
         if: matrix.family == 'ce'
@@ -174,7 +162,7 @@ jobs:
       - name: Build NW Version
         if: matrix.family == 'nw'
         run: |
-          make release APP_FAMILY=nw APP_ENV=lite ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 OS=linux PUSH=all
+          make release APP_FAMILY=nw APP_ENV=lite ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 OS=linux PUSH=hub
 
       - name: Build SY (Synology) Version
         if: matrix.family == 'sy'
@@ -204,15 +192,15 @@ jobs:
           - libc: gnu
             build_os: linux
             armv7: 1
-            make_args: "APP_FAMILY=pe APP_ENV=all OS=linux PUSH=all LIBC=gnu GARBLE=1"
+            make_args: "APP_FAMILY=pe APP_ENV=all OS=linux PUSH=hub LIBC=gnu GARBLE=1"
           - libc: musl
             build_os: linux
             armv7: 1
-            make_args: "APP_FAMILY=pe APP_ENV=all OS=linux PUSH=all LIBC=musl GARBLE=1"
+            make_args: "APP_FAMILY=pe APP_ENV=all OS=linux PUSH=hub LIBC=musl GARBLE=1"
           - libc: gnu
             build_os: windows
             armv7: 0
-            make_args: "BUILD_OS=windows APP_FAMILY=pe APP_ENV=all PUSH=all GARBLE=1"
+            make_args: "BUILD_OS=windows APP_FAMILY=pe APP_ENV=all PUSH=hub GARBLE=1"
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -237,12 +225,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Login to ALiYun
-        uses: docker/login-action@v3
-        with:
-          registry: registry.cn-hangzhou.aliyuncs.com
-          username: ${{ secrets.ALIYUN_USERNAME }}
-          password: ${{ secrets.ALIYUN_TOKEN }}
 
       - name: Build PE Version
         env:
@@ -342,20 +324,14 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Login to ALiYun
-        uses: docker/login-action@v3
-        with:
-          registry: registry.cn-hangzhou.aliyuncs.com
-          username: ${{ secrets.ALIYUN_USERNAME }}
-          password: ${{ secrets.ALIYUN_TOKEN }}
       - name: Build Darwin Image
         env:
           DOCKER_EXT_ARGS: "--cache-from type=gha,scope=${{ matrix.family }}-darwin --cache-to type=gha,mode=max,scope=${{ matrix.family }}-darwin"
         run: |
           if [ "${{ matrix.family }}" = "pe" ]; then
-            make release BUILD_OS=darwin APP_FAMILY=pe APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
+            make release BUILD_OS=darwin APP_FAMILY=pe APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=hub DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
           else
-            make release BUILD_OS=darwin APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=all DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
+            make release BUILD_OS=darwin APP_FAMILY=ce APP_ENV=all ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 ARMV7=0 PUSH=hub DOCKER_EXT_ARGS="${DOCKER_EXT_ARGS}"
           fi
 
   xk-build:
@@ -446,3 +422,16 @@ jobs:
           git push origin --delete "$TAG" || true
           git tag -f "$TAG"
           git push origin "$TAG" --force
+
+  sync-aliyun:
+    needs: [prepare, push-tags-to-related-repos]
+    runs-on: ubuntu-latest
+    env:
+      VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync images to AliYun
+        env:
+          ALIYUN_USERNAME: ${{ secrets.ALIYUN_USERNAME }}
+          ALIYUN_TOKEN: ${{ secrets.ALIYUN_TOKEN }}
+        run: make sync-aliyun ${{ env.VERSION_PARAM }}
