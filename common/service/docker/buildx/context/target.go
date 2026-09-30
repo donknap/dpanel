@@ -76,13 +76,16 @@ func (self *contextService) readTargetConfig(target target) (string, error) {
 	return string(content), nil
 }
 
-func (self *contextService) removeTarget(force bool) error {
+func (self *contextService) removeTarget(force, keepState bool) error {
 	target, err := self.getTarget()
 	if err != nil {
 		return err
 	}
 	if err := self.removeContainer(target, force); err != nil {
 		return err
+	}
+	if keepState {
+		return nil
 	}
 	volumeName := target.Name + "_state"
 	if err := self.sdk.Client.VolumeRemove(self.sdk.Ctx, volumeName, false); err != nil && !errdefs.IsNotFound(err) {

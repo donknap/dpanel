@@ -5,34 +5,34 @@ set -e
 
 echo "Starting ..."
 
-{{- if .Builder }}
-if docker buildx inspect {{ quote .Builder }} >/dev/null 2>&1; then
-    docker buildx inspect --bootstrap {{ quote .Builder }} >/dev/null
+{{- if .builder }}
+if docker buildx inspect {{ quote .builder }} >/dev/null 2>&1; then
+    docker buildx inspect --bootstrap {{ quote .builder }} >/dev/null
 fi
 {{- else }}
 docker buildx inspect --bootstrap >/dev/null
 {{- end }}
 
-{{- range .Target }}
-TARGET_NAME={{ if .Target }}{{ quote .Target }}{{ else }}"default"{{ end }}
+{{- range .target }}
+TARGET_NAME={{ if .target }}{{ quote .target }}{{ else }}"default"{{ end }}
 echo "Building target: $TARGET_NAME ..."
 
 META_TEMP="$(mktemp "${TMPDIR:-/tmp}/dpanel_build_XXXXXX")"
 
-if docker buildx build {{- if $.Builder }} --builder {{ quote $.Builder }} {{- end }} --progress plain --metadata-file "$META_TEMP" {{- if $.Pull }} --pull {{ end -}}
-    {{- if $.Push }} {{- if $.Outputs }} {{- range $.Outputs }} --output {{ quote . }} {{ end -}} {{- else }} --push {{- end }} {{- else }} --load {{- end }}
-    {{- if $.NoCache }} --no-cache {{ end -}}
-    {{- if $.File }} -f {{ quote $.File }} {{ end -}}
-    {{- if .Target }} --target {{ quote .Target }} {{ end -}}
-    {{- range .Tags }} -t {{ quote . }} {{ end -}}
-    {{- range $.BuildArg }} --build-arg {{ quote . }} {{ end -}}
-    {{- range $.CacheFrom }} --cache-from {{ quote . }} {{ end -}}
-    {{- range $.CacheTo }} --cache-to {{ quote . }} {{ end -}}
-    {{- range $.Labels }} --label {{ quote . }} {{ end -}}
-    {{- range $.Annotation }} --annotation {{ quote . }} {{ end -}}
-    {{- range $.Platforms }} --platform {{ quote . }} {{ end -}}
-    {{- range $.Secrets }} --secret {{ quote . }} {{ end -}}
-    {{ quote $.WorkDir }}; then
+if docker buildx build {{- if $.builder }} --builder {{ quote $.builder }} {{- end }} --progress plain --metadata-file "$META_TEMP" {{- if $.pull }} --pull {{ end -}}
+    {{- if $.push }} {{- if $.outputs }} {{- range $.outputs }} --output {{ quote . }} {{ end -}} {{- else }} --push {{- end }} {{- else }} --load {{- end }}
+    {{- if $.noCache }} --no-cache {{ end -}}
+    {{- if $.file }} -f {{ quote $.file }} {{ end -}}
+    {{- if .target }} --target {{ quote .target }} {{ end -}}
+    {{- range .tags }} -t {{ quote . }} {{ end -}}
+    {{- range $.buildArg }} --build-arg {{ quote . }} {{ end -}}
+    {{- range $.cacheFrom }} --cache-from {{ quote . }} {{ end -}}
+    {{- range $.cacheTo }} --cache-to {{ quote . }} {{ end -}}
+    {{- range $.labels }} --label {{ quote . }} {{ end -}}
+    {{- range $.annotation }} --annotation {{ quote . }} {{ end -}}
+    {{- range $.platforms }} --platform {{ quote . }} {{ end -}}
+    {{- range $.secrets }} --secret {{ quote . }} {{ end -}}
+    {{ quote $.workDir }}; then
 
     echo "DPANEL_BUILD_RESULT|${TARGET_NAME}|$(cat "$META_TEMP")"
     rm -f "$META_TEMP"

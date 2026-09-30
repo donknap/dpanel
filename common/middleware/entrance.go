@@ -91,14 +91,14 @@ func (self EntranceMiddleware) renderUnavailable(httpContext *gin.Context) {
 					darkLogoData = base64.StdEncoding.EncodeToString(logo)
 				}
 				pageData := struct {
-					LogoData     string
-					DarkLogoData string
+					LogoData     string `json:"logoData"`
+					DarkLogoData string `json:"darkLogoData"`
 				}{LogoData: logoData, DarkLogoData: darkLogoData}
 
 				page, err := template.New("security-entrance").Parse(string(content))
 				if err == nil {
 					var rendered bytes.Buffer
-					err = page.Execute(&rendered, pageData)
+					err = page.Execute(&rendered, function.StructToMap(pageData))
 					if err == nil {
 						httpContext.Data(http.StatusOK, "text/html; charset=utf-8", rendered.Bytes())
 						httpContext.Abort()

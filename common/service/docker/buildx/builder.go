@@ -13,6 +13,7 @@ import (
 	"text/template"
 
 	"github.com/docker/docker/api/types/registry"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec"
@@ -81,7 +82,7 @@ func (self *Builder) Execute() (exec.Executor, error) {
 		return nil, err
 	}
 	var script strings.Builder
-	if err := tmpl.Execute(&script, self.options); err != nil {
+	if err := tmpl.Execute(&script, function.StructToMap(self.options)); err != nil {
 		return nil, err
 	}
 	if self.options.Push {

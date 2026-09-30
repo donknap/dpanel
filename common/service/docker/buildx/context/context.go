@@ -40,9 +40,9 @@ type CreateOption struct {
 }
 
 type commandData struct {
-	Name        string
-	Description string
-	Force       bool
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Force       bool   `json:"force"`
 }
 
 func newContext(sdk *docker.Client) (*contextService, error) {
@@ -112,6 +112,17 @@ func Create(sdk *docker.Client, option CreateOption) (err error) {
 	if err != nil {
 		return err
 	}
+	previousTarget, err := self.getTarget()
+	if err != nil {
+		return err
+	}
+	var previousConfig string
+	if previousTarget.Exists {
+		previousConfig, err = self.readTargetConfig(previousTarget)
+		if err != nil {
+			return err
+		}
+	}
 	content := option.Config
 	if content == nil {
 		saved, readErr := os.ReadFile(self.configPath)
@@ -129,14 +140,25 @@ func Create(sdk *docker.Client, option CreateOption) (err error) {
 			return readErr
 		}
 	}
-	if err = self.remove(true); err != nil {
+	if err = self.remove(true, true); err != nil {
 		return err
 	}
 	defer func() {
 		if err != nil {
-			err = errors.Join(err, self.remove(true))
+			if cleanupErr := self.remove(true, true); cleanupErr != nil {
+				err = errors.Join(err, fmt.Errorf("clean up failed buildx builder: %w", cleanupErr))
+			}
+			if previousTarget.Exists {
+				if restoreErr := self.create(previousConfig, previousTarget.Proxy); restoreErr != nil {
+					err = errors.Join(err, fmt.Errorf("restore previous buildx builder: %w", restoreErr))
+				}
+			}
 		}
 	}()
+	return self.create(*content, option.Proxy)
+}
+
+func (self *contextService) create(config, proxy string) (err error) {
 	if err = self.runDockerContext("create", commandData{Name: self.name, Description: self.description}); err != nil {
 		return err
 	}
@@ -153,7 +175,7 @@ func Create(sdk *docker.Client, option CreateOption) (err error) {
 		_ = configFile.Close()
 		return err
 	}
-	if _, err = configFile.WriteString(*content); err != nil {
+	if _, err = configFile.WriteString(config); err != nil {
 		_ = configFile.Close()
 		return err
 	}
@@ -161,8 +183,8 @@ func Create(sdk *docker.Client, option CreateOption) (err error) {
 		return err
 	}
 	args := []string{"create", "--name", self.builderName, "--driver", "docker-container", "--driver-opt", "network=host", "--buildkitd-config", configFile.Name()}
-	if option.Proxy != "" {
-		args = append(args, "--driver-opt", "env.HTTP_PROXY="+option.Proxy, "--driver-opt", "env.HTTPS_PROXY="+option.Proxy)
+	if proxy != "" {
+		args = append(args, "--driver-opt", "env.HTTP_PROXY="+proxy, "--driver-opt", "env.HTTPS_PROXY="+proxy)
 	}
 	args = append(args, "--bootstrap", self.name)
 	if _, err = self.runBuildx(args...); err != nil {
@@ -179,20 +201,23 @@ func Remove(sdk *docker.Client, force bool) error {
 	if err != nil {
 		return err
 	}
-	return self.remove(force)
+	return self.remove(force, false)
 }
 
-func (self *contextService) remove(force bool) error {
+func (self *contextService) remove(force, keepState bool) error {
 	if _, err := self.runBuildx("inspect", self.builderName); err == nil {
 		if _, err = self.runBuildx("rm", self.builderName, "--force", "--keep-daemon", "--keep-state"); err != nil {
 			return fmt.Errorf("remove buildx builder %q: %w", self.builderName, err)
 		}
 	}
-	if err := self.removeTarget(force); err != nil {
+	if err := self.removeTarget(force, keepState); err != nil {
 		return err
 	}
 	if err := self.runDockerContext("remove", commandData{Name: self.name, Force: force}); err != nil {
 		return err
+	}
+	if keepState {
+		return nil
 	}
 	return function.SafeDeleteAll(self.configRoot, self.sdk.Name)
 }
@@ -207,7 +232,7 @@ func Prune(sdk *docker.Client) error {
 
 func (self *contextService) runDockerContext(action string, data commandData) error {
 	var script strings.Builder
-	if err := self.tmpl.ExecuteTemplate(&script, action, data); err != nil {
+	if err := self.tmpl.ExecuteTemplate(&script, action, function.StructToMap(data)); err != nil {
 		return err
 	}
 	_, err := self.run("/bin/sh", []string{"-c", script.String()})

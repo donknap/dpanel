@@ -40,7 +40,7 @@ var panelUpdateAllowedArgKeys = []string{
 // 容器内触发升级时必须以 detached 模式运行 installer，避免当前进程/容器退出后升级中断。
 const panelUpdateCommandTemplate = `
 {{- if eq .type "container" -}}
-docker run -d --rm --pull always -v {{ shellSafe .dockerSockHost }}:/var/run/docker.sock{{- range .mounts }} -v {{ shellSafe .Host }}:{{ shellSafe .Dest }}{{- end }} {{ .installerDownloadSource }} upgrade -y --log-path {{ shellSafe .installerLogPath }} --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
+docker run -d --rm --pull always -v {{ shellSafe .dockerSockHost }}:/var/run/docker.sock{{- range .mounts }} -v {{ shellSafe .host }}:{{ shellSafe .dest }}{{- end }} {{ .installerDownloadSource }} upgrade -y --log-path {{ shellSafe .installerLogPath }} --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
 {{- else -}}
 curl -sSL https://dpanel.cc/quick.sh | bash -s -- upgrade -y -d --log-path {{ shellSafe .installerLogPath }} --name {{ shellSafe .name }}{{- range $key, $value := .params }}{{- $arg := shellSafe $value }}{{- if ne $arg "" }} --{{ $key }} {{ $arg }}{{- end }}{{- end }}
 {{- end }}`
@@ -155,6 +155,7 @@ func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
 			return "", errors.New("dpanel data mount is unavailable")
 		}
 		seen := make(map[string]struct{}, len(mounts))
+		templateMounts := make([]map[string]any, 0, len(mounts))
 		for _, mount := range mounts {
 			if mount.Host == "" || (mount.Type != "bind" && mount.Type != "volume") ||
 				!path.IsAbs(mount.Dest) || path.Clean(mount.Dest) != mount.Dest ||
@@ -165,8 +166,9 @@ func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
 				return "", fmt.Errorf("duplicate dpanel data mount %q", mount.Dest)
 			}
 			seen[mount.Dest] = struct{}{}
+			templateMounts = append(templateMounts, function.StructToMap(mount))
 		}
-		templateParams["mounts"] = mounts
+		templateParams["mounts"] = templateMounts
 		templateParams["installerLogPath"] = filepath.Join("/dpanel", "logs", logFileName)
 		dockerSockHost := ""
 		for _, mount := range dpanelInfo.ContainerInfo.Mounts {

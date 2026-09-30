@@ -191,7 +191,11 @@ func readMemory() (agentTypes.MemoryStat, error) {
 	if err != nil {
 		return agentTypes.MemoryStat{}, fmt.Errorf("read host memory: %w", err)
 	}
-	return statparser.ParseMemory(data)
+	memory, err := statparser.ParseMemory(data)
+	if err != nil {
+		return agentTypes.MemoryStat{}, err
+	}
+	return readCgroupMemory(memory)
 }
 
 func readPressure() *agentTypes.PressureStat {

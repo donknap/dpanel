@@ -2,14 +2,11 @@ package compose
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/app"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
 	"github.com/donknap/dpanel/common/accessor"
-	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
@@ -30,7 +27,6 @@ func (self Deploy) GetDescription() string {
 func (self Deploy) Configure(command *cobra.Command) {
 	command.Flags().String("docker-env", "local", "Docker server name")
 	command.Flags().String("name", "", "Compose task name")
-	command.Flags().StringArrayP("environment", "", make([]string, 0), "Compose task environment, eg: TEST=1")
 	command.Flags().String("pull-image", "command", `Methods for pulling images ("dpanel"|"command")`)
 	_ = command.MarkFlagRequired("name")
 }
@@ -38,7 +34,6 @@ func (self Deploy) Configure(command *cobra.Command) {
 func (self Deploy) Handle(cmd *cobra.Command, args []string) {
 	name, _ := cmd.Flags().GetString("name")
 	dockerEnv, _ := cmd.Flags().GetString("docker-env")
-	environment, _ := cmd.Flags().GetStringArray("env")
 	pullImage, _ := cmd.Flags().GetString("pull-image")
 
 	proxyClient, err := proxy.NewProxyClient()
@@ -88,17 +83,7 @@ func (self Deploy) Handle(cmd *cobra.Command, args []string) {
 	}
 
 	err = proxyClient.AppComposeDeploy(&app.ComposeDeployOption{
-		Id: fmt.Sprintf("%d", composeTask.Detail.ID),
-		Environment: function.PluckArrayWalk(environment, func(item string) (types.EnvItem, bool) {
-			if k, v, ok := strings.Cut(item, "="); ok {
-				return types.EnvItem{
-					Name:  k,
-					Value: v,
-				}, true
-			} else {
-				return types.EnvItem{}, false
-			}
-		}),
+		Id:         fmt.Sprintf("%d", composeTask.Detail.ID),
 		CreatePath: false,
 	})
 	if err != nil {

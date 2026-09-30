@@ -112,7 +112,8 @@ func (self ImageBuild) Create(http *gin.Context) {
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"id": imageNew.ID,
+		"id":       imageNew.ID,
+		"buildZip": params.BuildZip,
 	})
 	return
 }

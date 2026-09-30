@@ -10,6 +10,10 @@ import (
 
 type containerReader struct{}
 
+func readCgroupMemory(memory agentTypes.MemoryStat) (agentTypes.MemoryStat, error) {
+	return memory, nil
+}
+
 func newContainerReader([]containerTarget) *containerReader {
 	return &containerReader{}
 }

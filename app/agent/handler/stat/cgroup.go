@@ -18,6 +18,43 @@ import (
 
 const hostCgroupPath = hostSysPath + "/fs/cgroup"
 
+func readCgroupMemory(memory agentTypes.MemoryStat) (agentTypes.MemoryStat, error) {
+	var directory, limitName, usageName string
+	if _, err := os.Stat(filepath.Join(hostCgroupPath, "cgroup.controllers")); err == nil {
+		directory = hostCgroupPath
+		limitName = "memory.max"
+		usageName = "memory.current"
+	} else if !os.IsNotExist(err) {
+		return agentTypes.MemoryStat{}, fmt.Errorf("check host cgroup version: %w", err)
+	} else if path, exists := legacyControllerPath("memory", "/"); exists {
+		directory = path
+		limitName = "memory.limit_in_bytes"
+		usageName = "memory.usage_in_bytes"
+	} else {
+		return memory, nil
+	}
+
+	limit, err := readUintFile(filepath.Join(directory, limitName))
+	if os.IsNotExist(err) {
+		return memory, nil
+	}
+	if err != nil {
+		return agentTypes.MemoryStat{}, fmt.Errorf("read host cgroup memory limit: %w", err)
+	}
+	if limit == 0 || limit == math.MaxUint64 || limit > memory.Total {
+		return memory, nil
+	}
+	// The monitor shares the Docker host's cgroup namespace; a finite root limit
+	// covers the LXC host when Docker runs inside one.
+	usage, err := readUintFile(filepath.Join(directory, usageName))
+	if err != nil {
+		return agentTypes.MemoryStat{}, fmt.Errorf("read host cgroup memory usage: %w", err)
+	}
+	memory.Total = limit
+	memory.Available = limit - min(usage, limit)
+	return memory, nil
+}
+
 type containerReader struct {
 	containers []containerTarget
 	locations  map[string]containerCgroupLocation

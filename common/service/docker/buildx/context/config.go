@@ -12,17 +12,17 @@ import (
 )
 
 const buildxConfigTmpl = `
-{{- if .WorkerNetworkMode }}
+{{- if .workerNetworkMode }}
 [worker.oci]
-  networkMode = {{ quote .WorkerNetworkMode }}
+  networkMode = {{ quote .workerNetworkMode }}
 
 {{- end }}
-{{- range .Registry }}
-[registry.{{ quote .ServerAddress }}]
-{{- if .Mirrors }}
-  mirrors = [{{ range $i, $mirror := .Mirrors }}{{ if $i }}, {{ end }}{{ quote $mirror }}{{ end }}]
+{{- range .registry }}
+[registry.{{ quote .serverAddress }}]
+{{- if .mirrors }}
+  mirrors = [{{ range $i, $mirror := .mirrors }}{{ if $i }}, {{ end }}{{ quote $mirror }}{{ end }}]
 {{- end }}
-{{- if .EnableHttp }}
+{{- if .enableHttp }}
   http = true
 {{- end }}
 
@@ -30,14 +30,14 @@ const buildxConfigTmpl = `
 `
 
 type buildxConfig struct {
-	WorkerNetworkMode string
-	Registry          []buildxConfigRegistry
+	WorkerNetworkMode string                 `json:"workerNetworkMode"`
+	Registry          []buildxConfigRegistry `json:"registry"`
 }
 
 type buildxConfigRegistry struct {
-	ServerAddress string
-	Mirrors       []string
-	EnableHttp    bool
+	ServerAddress string   `json:"serverAddress"`
+	Mirrors       []string `json:"mirrors"`
+	EnableHttp    bool     `json:"enableHttp"`
 }
 
 func (self *contextService) defaultConfig() (string, error) {
@@ -88,7 +88,7 @@ func (self *contextService) defaultConfig() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := configTemplate.Execute(&config, result); err != nil {
+	if err := configTemplate.Execute(&config, function.StructToMap(result)); err != nil {
 		return "", err
 	}
 	return config.String(), nil
