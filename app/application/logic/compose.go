@@ -2,6 +2,7 @@ package logic
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -31,6 +32,8 @@ var ComposeFileNameSuffix = []string{
 	"docker-compose.yml", "docker-compose.yaml",
 	"compose.yml", "compose.yaml",
 }
+
+var ErrEmptyComposeFile = errors.New("请先完善 compose.yaml 文件")
 
 type Compose struct {
 }
@@ -430,6 +433,11 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 }
 
 func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, error) {
+	if dbRow.Setting.Type == accessor.ComposeTypeText && len(dbRow.Setting.Uri) == 1 {
+		if fileInfo, err := os.Stat(dbRow.Setting.GetUriFilePath()); err == nil && fileInfo.Size() == 0 {
+			return nil, nil, ErrEmptyComposeFile
+		}
+	}
 	options := self.ComposeProjectOptionsFn(dbRow)
 	options = append(options, cli.WithLoadOptions(func(options *loader.Options) {
 		options.SkipValidation = true

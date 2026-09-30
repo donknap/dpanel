@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/go-connections/nat"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -199,6 +200,42 @@ func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 		if t, err := time.ParseInLocation(define.DateShowVersion, result.Version, time.UTC); err == nil {
 			result.IsDev = true
 			result.Version = t.Local().Format(define.DateShowVersion)
+		}
+	}
+	result.BaseImage = ""
+	result.PublicPort = 0
+	if result.RunIn == types2.DPanelRunInHost {
+		result.BaseImage = strings.TrimSpace(os.Getenv("INSTALLER_BASE_IMAGE"))
+		if dev, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("APP_DEV"))); err == nil {
+			result.IsDev = dev
+		}
+	} else if result.ContainerInfo.Config != nil {
+		for _, line := range result.ContainerInfo.Config.Env {
+			if value, ok := strings.CutPrefix(line, "INSTALLER_BASE_IMAGE="); ok && value != "" {
+				result.BaseImage = value
+			}
+			if value, ok := strings.CutPrefix(line, "APP_DEV="); ok {
+				if dev, err := strconv.ParseBool(value); err == nil {
+					result.IsDev = dev
+				}
+			}
+		}
+		if result.BaseImage == "" && strings.HasSuffix(result.ContainerInfo.Config.Image, "-debian") {
+			result.BaseImage = "debian"
+		}
+	}
+	if result.ServerPort > 0 {
+		if result.RunIn == types2.DPanelRunInHost || (result.ContainerInfo.HostConfig != nil && string(result.ContainerInfo.HostConfig.NetworkMode) == "host") {
+			result.PublicPort = result.ServerPort
+		} else if result.ContainerInfo.HostConfig != nil {
+			port := nat.Port(strconv.Itoa(result.ServerPort) + "/tcp")
+			for _, binding := range result.ContainerInfo.HostConfig.PortBindings[port] {
+				publicPort, err := strconv.Atoi(binding.HostPort)
+				if err == nil && publicPort > 0 && publicPort <= 65535 {
+					result.PublicPort = publicPort
+					break
+				}
+			}
 		}
 	}
 

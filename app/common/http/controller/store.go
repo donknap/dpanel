@@ -154,7 +154,8 @@ func (self Store) GetList(http *gin.Context) {
 	for _, item := range list {
 		item.Setting.Total = len(item.Setting.Apps)
 		if item.Setting.Type == define.StoreTypeOnePanelLocal {
-			if appList, err := (logic.Store{}).GetAppByOnePanel(item.Name); err == nil {
+			storePath := function.SafePathJoin(storage.Local{}.GetStorePath(), item.Name)
+			if appList, err := (logic.Store{}).GetAppByOnePanel(filepath.Join(storePath, "apps")); err == nil {
 				item.Setting.Apps = appList
 				_ = dao.Store.Save(item)
 			}
@@ -195,6 +196,10 @@ func (self Store) Sync(http *gin.Context) {
 	appList := make([]accessor.StoreAppItem, 0)
 	if params.Type == define.StoreTypeOnePanel || params.Type == define.StoreTypeOnePanelLocal {
 		if params.Type == define.StoreTypeOnePanel {
+			if filepath.Clean(storeRootPath) == filepath.Clean(storage.Local{}.GetStorePath()) {
+				self.JsonResponseWithError(http, os.ErrPermission, 500)
+				return
+			}
 			err = logic.Store{}.SyncByGit(params.Url, logic.SyncByGitOption{
 				TargetPath: storeRootPath,
 			})
@@ -204,7 +209,7 @@ func (self Store) Sync(http *gin.Context) {
 				return
 			}
 		}
-		appList, err = logic.Store{}.GetAppByOnePanel(params.Name)
+		appList, err = logic.Store{}.GetAppByOnePanel(filepath.Join(storeRootPath, "apps"))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -215,7 +220,7 @@ func (self Store) Sync(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		appList, err = logic.Store{}.GetAppByCasaos(params.Name)
+		appList, err = logic.Store{}.GetAppByCasaos(filepath.Join(storeRootPath, "Apps"))
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -228,7 +233,7 @@ func (self Store) Sync(http *gin.Context) {
 			return
 		}
 	} else if params.Type == define.StoreTypeBaoTa {
-		appList, err = logic.Store{}.GetAppByBaoTa(params.Name, params.Url)
+		appList, err = logic.Store{}.GetAppByBaoTa(storeRootPath, params.Url)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

@@ -166,12 +166,19 @@ func (self Container) GetList(http *gin.Context) {
 	})
 
 	containerName := make([]string, 0)
+	dpanelInfo := logic2.Setting{}.GetDPanelInfo()
 	for index, item := range list {
 		containerName = append(containerName, item.Names...)
 		containerInfo, err := sdk.Client.ContainerInspect(sdk.Ctx, item.ID)
 		var inspectInfo *container.InspectResponse
 		if err == nil {
 			inspectInfo = &containerInfo
+			if sdk.DockerEnv.Default && dpanelInfo.ContainerInfo.ContainerJSONBase != nil && dpanelInfo.ContainerInfo.Name == containerInfo.Name {
+				if list[index].Labels == nil {
+					list[index].Labels = make(map[string]string)
+				}
+				list[index].Labels[define.DPanelLabelContainerDPanelSelf] = "true"
+			}
 		}
 		status := logic.Container{}.RuntimeStatus(logic.ContainerRuntimeItem{
 			Summary: item,
@@ -235,13 +242,21 @@ func (self Container) GetDetail(http *gin.Context) {
 		return
 	}
 
-	detail, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.Md5)
+	sdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	detail, err := sdk.Client.ContainerInspect(sdk.Ctx, params.Md5)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	dpanelInfo := logic2.Setting{}.GetDPanelInfo()
-	if docker.Sdk.DockerEnv.Default && dpanelInfo.ContainerInfo.ContainerJSONBase != nil && dpanelInfo.ContainerInfo.Name == detail.Name {
+	if sdk.DockerEnv.Default && dpanelInfo.ContainerInfo.ContainerJSONBase != nil && dpanelInfo.ContainerInfo.Name == detail.Name {
+		if detail.Config.Labels == nil {
+			detail.Config.Labels = make(map[string]string)
+		}
 		detail.Config.Labels[define.DPanelLabelContainerDPanelSelf] = "true"
 	}
 	domain, _ := dao.SiteDomain.Where(dao.SiteDomain.ContainerID.In(detail.Name)).Find()

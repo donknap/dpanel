@@ -82,7 +82,7 @@ If this project has helped you and you want me to keep going, please sponsor me 
 #### Preview
 
 ###### overview
-![home.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/home-en.png)
+![home.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/home-en.png?=1)
 ###### container
 ![app-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/app-list-en.png)
 ###### file explorer in container

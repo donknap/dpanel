@@ -75,6 +75,7 @@ BUILD_OS           := $(shell echo "$$(uname)" | tr '[:lower:]' '[:upper:]')
 BUILD_CPUS         := $(shell [ "$$(uname)" = "Darwin" ] && sysctl -n hw.ncpu || nproc)
 BUILD_COPY_LANG    := en-US zh-CN ja-JP
 BUILD_LIBC         := $(shell echo $(LIBC) | tr '[:lower:]' '[:upper:]')
+ARM64_LINUX_LDFLAGS := -linkmode=external -extldflags=-Wl,-z,max-page-size=65536
 
 CC_AMD64 := $(or $(CC_AMD64),$(CC_PATH_$(BUILD_OS)_$(BUILD_LIBC)_AMD64))
 CC_ARM64 := $(or $(CC_ARM64),$(CC_PATH_$(BUILD_OS)_$(BUILD_LIBC)_ARM64))
@@ -200,7 +201,7 @@ define go_build
 	@# --- Compilation Logic ---
 	GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=$(shell echo $(1) | tr '[:upper:]' '[:lower:]') GOARCH=$(2) GOARM=$(3) CC="$(4)" \
 	$(GO_EXECUTABLE) build -p $(BUILD_CPUS) -trimpath \
-	-ldflags="-s -w -X 'main.DPanelVersion=${APP_VERSION}'" \
+	-ldflags="-s -w -X 'main.DPanelVersion=${APP_VERSION}' $(if $(and $(filter linux,$(_BUILD_OS_LOWER)),$(filter arm64,$(2))),$(ARM64_LINUX_LDFLAGS))" \
 	-tags "${APP_FAMILY},w7_rangine_release,containers_image_openpgp" \
 	-o ${PROJECT_GO_TARGET}/$(TARGET_BIN) ${PROJECT_GO_DIR}/*.go
 	@cp ${PROJECT_GO_DIR}/config.yaml ${PROJECT_GO_TARGET}/config.yaml

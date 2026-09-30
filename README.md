@@ -120,7 +120,7 @@ QQ: 837583876
 ![pro-1](https://cdn.w7.cc/dpanel/pro-1.png)
 
 ###### 概览
-![home.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/home.png)
+![home.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/home.png?t=1)
 ###### 容器管理
 ![app-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/app-list.png)
 ###### 文件管理

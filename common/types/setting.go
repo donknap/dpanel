@@ -19,8 +19,10 @@ type DPanelInfo struct {
 	RunIn         string                    `json:"runIn"`
 
 	BaseURL          string `json:"baseUrl"`
+	BaseImage        string `json:"baseImage,omitempty"`
 	ServerHost       string `json:"serverHost"`
 	ServerPort       int    `json:"serverPort"`
+	PublicPort       int    `json:"publicPort,omitempty"`
 	LogFileLevel     string `json:"logFileLevel"`
 	LogConsoleLevel  string `json:"logConsoleLevel"`
 	StorageLocalPath string `json:"storageLocalPath"`

@@ -117,7 +117,7 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
-	if params.Yaml != "" {
+	if params.Yaml != "" || (params.Id == "" && composeRow.Setting.Type == accessor.ComposeTypeText) {
 		err := os.MkdirAll(filepath.Dir(composeRow.Setting.GetUriFilePath()), os.ModePerm)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
@@ -193,15 +193,16 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
-	// 解析 Compose 配置
 	tasker, warning, err := logic.Compose{}.GetTasker(composeRow)
-	if err != nil {
+	if err != nil && !errors.Is(err, logic.ErrEmptyComposeFile) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
 	}
-	if err = (logic.Compose{}).ValidateProject(tasker.Project); err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	if err == nil {
+		if err = (logic.Compose{}).ValidateProject(tasker.Project); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 
 	if composeRow.ID > 0 {
@@ -341,10 +342,19 @@ func (self Compose) GetTask(http *gin.Context) {
 		"containerList": logic.Compose{}.Ps(composeRow.Name),
 		"detail":        composeRow,
 	}
+	if len(composeRow.Setting.Uri) > 0 && composeRow.Setting.Uri[0] != "" {
+		composeFile := composeRow.Setting.Uri[0]
+		if !filepath.IsAbs(composeFile) {
+			composeFile = filepath.Join(composeRow.Setting.GetWorkingDir(), composeFile)
+		}
+		workDir := filepath.Dir(composeFile)
+		if directory, err := os.Stat(workDir); err == nil && directory.IsDir() {
+			data["workingDir"] = workDir
+		}
+	}
 
 	if tasker, _, err := (logic.Compose{}).GetTasker(composeRow); err == nil {
 		data["project"] = tasker.Project
-		data["workingDir"] = tasker.Project.WorkingDir
 		// 获取环境变量时，需要从 .env 文件中拿到最新值和新增的变量
 		composeRow.Setting.Environment = function.PluckMapWalkArray(tasker.Project.Environment, func(k string, v string) (types2.EnvItem, bool) {
 			if dbItem, _, ok := function.PluckArrayItemWalk(composeRow.Setting.Environment, func(item types2.EnvItem) bool {

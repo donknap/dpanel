@@ -399,8 +399,9 @@ func (self Home) WsShellConsole(http *gin.Context) {
 		return
 	}
 	type ParamsValidate struct {
-		Width  int `json:"width"`
-		Height int `json:"height"`
+		Width   int    `json:"width"`
+		Height  int    `json:"height"`
+		WorkDir string `json:"workDir" form:"workDir"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -451,6 +452,7 @@ func (self Home) WsShellConsole(http *gin.Context) {
 	localCmd, err := local.New(
 		local.WithDefaultShell(),
 		local.WithDefaultShellDir(),
+		local.WithDir(params.WorkDir),
 		local.WithInteractiveTerminalEnv(),
 		local.WithWindowsCodePage(),
 		local.WithCtx(client.CtxContext),

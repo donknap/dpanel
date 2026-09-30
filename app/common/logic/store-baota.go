@@ -21,10 +21,17 @@ import (
 )
 
 func (self Store) GetAppByBaoTa(storePath string, downloadUrl string) ([]accessor.StoreAppItem, error) {
+	storeRootPath := storage.Local{}.GetStorePath()
 	if !filepath.IsAbs(storePath) {
-		storePath = filepath.Join(storage.Local{}.GetStorePath(), storePath)
+		storePath = function.SafePathJoin(storeRootPath, storePath)
 	}
-	_ = os.RemoveAll(storePath)
+	storeRelativePath, err := filepath.Rel(storeRootPath, storePath)
+	if err != nil || storeRelativePath == "." || storeRelativePath == ".." || strings.HasPrefix(storeRelativePath, ".."+string(filepath.Separator)) {
+		return nil, os.ErrPermission
+	}
+	if err = os.RemoveAll(storePath); err != nil {
+		return nil, err
+	}
 	urls, err := url.Parse(downloadUrl)
 	if err != nil {
 		return nil, err
@@ -84,7 +91,7 @@ func (self Store) GetAppByBaoTa(storePath string, downloadUrl string) ([]accesso
 			Website: config.GetString("home"),
 			Version: make(map[string]accessor.StoreAppVersionItem),
 		}
-		storeItemPath := filepath.Join(storePath, "apps", storeItem.Name)
+		storeItemPath := function.SafePathJoin(filepath.Join(storePath, "apps"), storeItem.Name)
 		resourceStoreItemPath, _ := filepath.Rel(storage.Local{}.GetStorePath(), storeItemPath)
 
 		_ = os.MkdirAll(storeItemPath, os.ModePerm)
