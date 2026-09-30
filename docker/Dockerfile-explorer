@@ -9,7 +9,8 @@ ARG HTTP_PROXY
 WORKDIR /src
 
 COPY app/agent/go.mod app/agent/go.sum ./
-RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && go mod download
+RUN export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
+    go mod download
 
 COPY app/agent ./
 
