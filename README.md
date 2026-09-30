@@ -120,21 +120,21 @@ QQ: 837583876
 ![pro-1](https://cdn.w7.cc/dpanel/pro-1.png)
 
 ###### 概览
-![home.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/home.png?t=1)
+![home.png](https://raw.githubusercontent.com/donknap/dpanel-docs/vitepress/storage/image/home.png?t=1)
 ###### 容器管理
-![app-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/app-list.png)
+![app-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/vitepress/storage/image/app-list.png)
 ###### 文件管理
-![app-file.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/app-file.png)
+![app-file.png](https://raw.githubusercontent.com/donknap/dpanel-docs/vitepress/storage/image/app-file.png)
 ###### 镜像管理
-![image-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/image-list.png)
+![image-list.png](https://raw.githubusercontent.com/donknap/dpanel-docs/vitepress/storage/image/image-list.png)
 ###### 创建镜像
-![image-create.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/image-create.png)
+![image-create.png](https://raw.githubusercontent.com/donknap/dpanel-docs/vitepress/storage/image/image-create.png)
 ###### 创建Compose
-![compose-create.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/compose-create.png)
+![compose-create.png](https://raw.githubusercontent.com/donknap/dpanel-docs/vitepress/storage/image/compose-create.png)
 ###### 部署Compose
-![compose-deploy.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/compose-deploy.png)
+![compose-deploy.png](https://raw.githubusercontent.com/donknap/dpanel-docs/vitepress/storage/image/compose-deploy.png)
 ###### 系统管理
-![system-basic.png](https://raw.githubusercontent.com/donknap/dpanel-docs/master/storage/image/system-basic.png)
+![system-basic.png](https://raw.githubusercontent.com/donknap/dpanel-docs/vitepress/storage/image/system-basic.png)
 
 #### 相关仓库
 
