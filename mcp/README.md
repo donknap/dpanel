@@ -74,18 +74,23 @@ uvx --from ./mcp dpanel-mcp
 
 | 分组 | 工具数 | 说明 |
 |---|---|---|
-| system | 4 | 系统信息、资源使用、配置 |
-| env | 4 | Docker 环境（多主机） |
-| container | 15 | 容器列表/详情/统计/生命周期/删除 |
+| system | 5 | 系统信息、资源使用、配置、日志 |
+| env | 5 | Docker 环境（多主机） |
+| container | 14 | 容器列表/详情/统计/生命周期/删除 |
+| upgrade | 4 | 容器升级检查/升级/忽略 |
 | backup | 5 | 容器备份/恢复 |
-| compose | 11 | 项目列表/部署/控制/日志/删除 |
-| image | 14 | 镜像列表/构建/tag/删除/清理 |
+| compose | 10 | 项目列表/部署/控制/日志/销毁 |
+| image | 11 | 镜像列表/tag/删除/清理 |
+| image-build | 6 | 镜像构建任务 |
 | network | 8 | 网络列表/创建/连接/删除 |
 | volume | 5 | 卷列表/创建/删除 |
-| explorer | 8 | 容器文件管理 |
-| cron | 7 | 计划任务 |
+| explorer | 10 | 文件管理（volume/container/docker 挂载点） |
+| cron | 8 | 计划任务（含模板） |
 | store | 5 | 应用商店 |
-| event/notice | 5 | 事件与通知 |
+| registry | 4 | 镜像仓库 |
+| notice | 3 | 通知（操作事件流水） |
+
+共 **99 个工具**。
 
 ## 能力分级
 
@@ -106,6 +111,14 @@ uvx --from ./mcp dpanel-mcp
 3. 401 时透明重登一次
 4. streamable-http 模式下可加 `DPANEL_MCP_AUTH_TOKEN` 门禁（客户端需带 Bearer）
 
-## 版本
+## 版本与兼容性
 
-对齐 DPanel 版本号（当前 1.9.2）。DPanel API 变更时同步升版本。
+**对齐 DPanel 1.11.x**（版本号与 DPanel 一致）。所有路由与参数结构均已在真实 DPanel 1.11.0 容器上逐一验证（126 条路由探测 + compose 全生命周期端到端测试）。
+
+| DPanel 版本 | 兼容性 |
+|---|---|
+| 1.11.x | ✅ 完全兼容（本版本目标） |
+| 1.9.x–1.10.x | ⚠️ 部分路由已重命名（image-delete→delete、explorer 迁移至 common/、container-upgrade 独立模块），约 20 个工具不可用 |
+| ≤1.8.x | ❌ 未验证 |
+
+DPanel API 变更时同步升版本。遇到 `endpoint not found on DPanel` 错误时，说明 DPanel 版本与本 MCP 不匹配。

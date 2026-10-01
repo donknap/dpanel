@@ -23,20 +23,21 @@ def main() -> None:
     if config.transport == "stdio":
         mcp.run(transport="stdio")
     else:
-        # streamable-http; optional bearer token gate
+        # streamable-http; optional bearer token gate (actually mounted on the ASGI app)
         if config.mcp_auth_token:
-            from starlette.requests import Request
+            from starlette.middleware.base import BaseHTTPMiddleware
             from starlette.responses import JSONResponse
 
-            async def auth_middleware(request: Request, call_next):
-                auth = request.headers.get("Authorization", "")
-                if request.url.path == config.http_path and auth != f"Bearer {config.mcp_auth_token}":
-                    return JSONResponse({"error": "unauthorized"}, status_code=401)
-                return await call_next(request)
-
-            mcp._mcp_server  # noqa: B018 - keep reference alive
-            # FastMCP exposes the underlying ASGI app
             app = mcp.http_app(path=config.http_path, transport="streamable-http")
+
+            class AuthGate(BaseHTTPMiddleware):
+                async def dispatch(self, request, call_next):
+                    auth = request.headers.get("Authorization", "")
+                    if request.url.path == config.http_path and auth != f"Bearer {config.mcp_auth_token}":
+                        return JSONResponse({"error": "unauthorized"}, status_code=401)
+                    return await call_next(request)
+
+            app.add_middleware(AuthGate)
             import uvicorn
 
             uvicorn.run(

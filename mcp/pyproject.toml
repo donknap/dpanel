@@ -1,6 +1,6 @@
 [project]
 name = "dpanel-mcp"
-version = "1.9.2"
+version = "1.11.0"
 description = "MCP server for DPanel - expose DPanel Docker management API as MCP tools"
 readme = "README.md"
 requires-python = ">=3.10"

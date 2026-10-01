@@ -94,6 +94,21 @@ class DPanelClient:
     def _unwrap(resp: httpx.Response, expect_auth: bool = True) -> Any:
         if resp.status_code == 401 and expect_auth:
             raise DPanelApiError("unauthorized (token expired or invalid)", 401)
+        # DPanel serves the SPA shell (HTML, HTTP 200) for unknown /dpanel/api routes.
+        # Detect that and give an actionable message instead of raw HTML.
+        content_type = resp.headers.get("content-type", "")
+        if "text/html" in content_type or resp.text.lstrip().startswith("<!DOCTYPE"):
+            req_path = ""
+            try:
+                req_path = str(resp.request.url.path)
+            except Exception:
+                pass
+            raise DPanelApiError(
+                f"endpoint not found on DPanel: {req_path or '(unknown path)'} "
+                f"(got SPA HTML). The DPanel version may not match this MCP server "
+                f"(built for DPanel 1.11.x). Check DPANEL_HOST and the DPanel version.",
+                resp.status_code,
+            )
         try:
             body = resp.json()
         except Exception:

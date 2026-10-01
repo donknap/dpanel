@@ -3,10 +3,10 @@
 Profiles (mirroring portainer-mcp):
   - read-only   : inspection only (lists, details, stats, logs)
   - read-write  : read-only + lifecycle operations (start/stop/restart, deploy, create)
-  - admin       : read-write + destructive operations (delete, prune, restore, kill)
+  - admin       : read-write + destructive operations (delete, prune, restore)
 
-Destructive tools are additionally gated behind MCP elicitation
-(human-in-the-loop confirmation) regardless of profile.
+Destructive tools are additionally gated behind an explicit confirm=true
+argument (fail-closed human-in-the-loop) regardless of profile.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ _PROFILE_RANK = {READ_ONLY: 0, READ_WRITE: 1, ADMIN: 2}
 # tool registry: name -> (minimum profile, destructive?)
 #
 # Destructive tools always require admin AND a confirmation step.
+# Aligned to DPanel 1.11.0 routes (see tools.py docstring).
 # ---------------------------------------------------------------------------
 
 TOOLS: dict[str, tuple[str, bool]] = {
@@ -32,8 +33,10 @@ TOOLS: dict[str, tuple[str, bool]] = {
     "dpanel_system_usage": (READ_ONLY, False),
     "dpanel_system_stat_list": (READ_ONLY, False),
     "dpanel_setting_get": (READ_ONLY, False),
+    "dpanel_log_list": (READ_ONLY, False),
     # ---- environments (docker hosts) ----
     "dpanel_env_list": (READ_ONLY, False),
+    "dpanel_env_detail": (READ_ONLY, False),
     "dpanel_env_switch": (READ_WRITE, False),
     "dpanel_env_create": (READ_WRITE, False),
     "dpanel_env_delete": (ADMIN, True),
@@ -42,15 +45,19 @@ TOOLS: dict[str, tuple[str, bool]] = {
     "dpanel_container_detail": (READ_ONLY, False),
     "dpanel_container_stat": (READ_ONLY, False),
     "dpanel_container_process": (READ_ONLY, False),
+    "dpanel_container_check_port": (READ_ONLY, False),
     "dpanel_container_status": (READ_WRITE, False),   # start/stop/restart/pause/unpause
     "dpanel_container_update": (READ_WRITE, False),
-    "dpanel_container_upgrade": (READ_WRITE, False),
     "dpanel_container_copy": (READ_WRITE, False),
-    "dpanel_container_ignore": (READ_WRITE, False),
-    "dpanel_container_delete": (ADMIN, True),
-    "dpanel_container_prune": (ADMIN, True),
     "dpanel_container_export": (READ_ONLY, False),
     "dpanel_container_commit": (READ_WRITE, False),
+    "dpanel_container_delete": (ADMIN, True),
+    "dpanel_container_prune": (ADMIN, True),
+    # ---- container upgrade (1.11.0: app/container-upgrade/*) ----
+    "dpanel_container_upgrade_list": (READ_ONLY, False),
+    "dpanel_container_upgrade_check": (READ_ONLY, False),
+    "dpanel_container_upgrade": (READ_WRITE, False),
+    "dpanel_container_upgrade_ignore": (READ_WRITE, False),
     # ---- container backups ----
     "dpanel_container_backup_list": (READ_ONLY, False),
     "dpanel_container_backup_detail": (READ_ONLY, False),
@@ -61,28 +68,29 @@ TOOLS: dict[str, tuple[str, bool]] = {
     "dpanel_compose_list": (READ_ONLY, False),
     "dpanel_compose_task": (READ_ONLY, False),
     "dpanel_compose_log": (READ_ONLY, False),
-    "dpanel_compose_parse": (READ_ONLY, False),
     "dpanel_compose_get_from_uri": (READ_ONLY, False),
+    "dpanel_compose_get_from_git": (READ_ONLY, False),
     "dpanel_compose_create": (READ_WRITE, False),
     "dpanel_compose_deploy": (READ_WRITE, False),
     "dpanel_compose_container_ctrl": (READ_WRITE, False),
-    "dpanel_compose_delete": (ADMIN, True),
     "dpanel_compose_destroy": (ADMIN, True),
-    "dpanel_compose_process_kill": (ADMIN, True),
     # ---- images ----
     "dpanel_image_list": (READ_ONLY, False),
     "dpanel_image_detail": (READ_ONLY, False),
-    "dpanel_image_check_upgrade": (READ_ONLY, False),
-    "dpanel_image_template_list": (READ_ONLY, False),
-    "dpanel_image_build_task": (READ_ONLY, False),
-    "dpanel_image_create_by_dockerfile": (READ_WRITE, False),
+    "dpanel_image_tag_search": (READ_ONLY, False),
     "dpanel_image_tag_add": (READ_WRITE, False),
-    "dpanel_image_tag_remote": (READ_WRITE, False),
     "dpanel_image_tag_sync": (READ_WRITE, False),
+    "dpanel_image_tag_push_batch": (READ_WRITE, False),
     "dpanel_image_import": (READ_WRITE, False),
     "dpanel_image_tag_delete": (ADMIN, True),
     "dpanel_image_delete": (ADMIN, True),
     "dpanel_image_prune": (ADMIN, True),
+    # ---- image build (1.11.0: app/image-build/*) ----
+    "dpanel_image_build_task": (READ_ONLY, False),
+    "dpanel_image_build_detail": (READ_ONLY, False),
+    "dpanel_image_create_by_dockerfile": (READ_WRITE, False),
+    "dpanel_image_build_run": (READ_WRITE, False),
+    "dpanel_image_build_delete": (ADMIN, True),
     "dpanel_image_build_prune": (ADMIN, True),
     # ---- networks ----
     "dpanel_network_list": (READ_ONLY, False),
@@ -99,19 +107,22 @@ TOOLS: dict[str, tuple[str, bool]] = {
     "dpanel_volume_create": (READ_WRITE, False),
     "dpanel_volume_delete": (ADMIN, True),
     "dpanel_volume_prune": (ADMIN, True),
-    # ---- container file explorer ----
+    # ---- explorer (1.11.0: common/explorer/*, mountPoint based) ----
     "dpanel_explorer_list": (READ_ONLY, False),
     "dpanel_explorer_content": (READ_ONLY, False),
     "dpanel_explorer_stat": (READ_ONLY, False),
+    "dpanel_explorer_path_size": (READ_ONLY, False),
     "dpanel_explorer_export": (READ_ONLY, False),
     "dpanel_explorer_import": (READ_WRITE, False),
     "dpanel_explorer_unzip": (READ_WRITE, False),
+    "dpanel_explorer_mkdir": (READ_WRITE, False),
     "dpanel_explorer_chmod": (READ_WRITE, False),
     "dpanel_explorer_delete": (ADMIN, True),
     # ---- cron ----
     "dpanel_cron_list": (READ_ONLY, False),
     "dpanel_cron_detail": (READ_ONLY, False),
     "dpanel_cron_log_list": (READ_ONLY, False),
+    "dpanel_cron_template": (READ_ONLY, False),
     "dpanel_cron_create": (READ_WRITE, False),
     "dpanel_cron_run_once": (READ_WRITE, False),
     "dpanel_cron_delete": (ADMIN, True),
@@ -122,11 +133,14 @@ TOOLS: dict[str, tuple[str, bool]] = {
     "dpanel_store_deploy": (READ_WRITE, False),
     "dpanel_store_create": (READ_WRITE, False),
     "dpanel_store_delete": (ADMIN, True),
-    # ---- events / notices ----
-    "dpanel_event_list": (READ_ONLY, False),
+    # ---- registry ----
+    "dpanel_registry_list": (READ_ONLY, False),
+    "dpanel_registry_detail": (READ_ONLY, False),
+    "dpanel_registry_create": (READ_WRITE, False),
+    "dpanel_registry_delete": (ADMIN, True),
+    # ---- notices (1.11.0: events merged into notices) ----
     "dpanel_notice_list": (READ_ONLY, False),
     "dpanel_notice_unread": (READ_ONLY, False),
-    "dpanel_event_prune": (ADMIN, True),
     "dpanel_notice_delete": (ADMIN, True),
 }
 
