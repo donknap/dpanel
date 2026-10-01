@@ -17,4 +17,6 @@ data
 tests
 app/pro/**/.DS_Store
 docker/**/*.log
-.run/**.*
+.run/**.*mcp/.venv/
+mcp/dpanel_mcp/__pycache__/
+mcp/.pytest_cache/
