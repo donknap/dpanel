@@ -122,7 +122,7 @@ func (self Container) GetList(http *gin.Context) {
 	if params.SiteTitle != "" && !isContainerID {
 		searchSiteList, _ := dao.Site.Where(dao.Site.SiteTitle.Like("%" + params.SiteTitle + "%")).Find()
 		for _, item := range searchSiteList {
-			if item.ContainerInfo.Id != "" {
+			if item.ContainerInfo != nil && item.ContainerInfo.Id != "" {
 				searchContainerIds = append(searchContainerIds, item.ContainerInfo.Id)
 			}
 		}

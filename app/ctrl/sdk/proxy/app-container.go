@@ -5,6 +5,7 @@ import (
 
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/app"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,6 +17,9 @@ func (self *Client) AppContainerGetDetail(containerName string) (result app.Cont
 		return result, err
 	}
 	err = json.NewDecoder(data).Decode(&result)
+	if err == nil && result.Info.ContainerJSONBase == nil {
+		err = function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
+	}
 	return result, err
 }
 

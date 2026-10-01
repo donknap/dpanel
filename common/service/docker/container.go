@@ -195,6 +195,9 @@ func (self Client) ContainerCopyInspect(ctx context.Context, containerName strin
 }
 
 func (self Client) ContainerInspectCompat(info container.InspectResponse) (container.InspectResponse, error) {
+	if info.ContainerJSONBase == nil {
+		return info, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
+	}
 	if info.Config != nil {
 		containerConfig := *info.Config
 		if info.Config.Labels != nil {

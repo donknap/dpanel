@@ -135,8 +135,14 @@ func (self Setting) GetValueById(id int32) (*entity.Setting, error) {
 func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 	result := types2.DPanelInfo{}
 	self.GetByKey(SettingGroupSetting, SettingGroupSettingDPanelInfo, &result)
+	runInDocker := function.IsRunInDocker()
+	if runInDocker {
+		result.RunIn = types2.DPanelRunInContainer
+	} else {
+		result.RunIn = types2.DPanelRunInHost
+	}
 	existingName := result.Name
-	if !function.IsRunInDocker() {
+	if !runInDocker {
 		if executablePath, err := os.Executable(); err == nil {
 			executableName := strings.TrimSpace(filepath.Base(executablePath))
 			if executableName != "" && executableName != "." && executableName != string(filepath.Separator) {
@@ -209,7 +215,7 @@ func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 		if dev, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("APP_DEV"))); err == nil {
 			result.IsDev = dev
 		}
-	} else if result.ContainerInfo.Config != nil {
+	} else if result.ContainerInfo.ContainerJSONBase != nil && result.ContainerInfo.Config != nil {
 		for _, line := range result.ContainerInfo.Config.Env {
 			if value, ok := strings.CutPrefix(line, "INSTALLER_BASE_IMAGE="); ok && value != "" {
 				result.BaseImage = value
@@ -225,15 +231,19 @@ func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 		}
 	}
 	if result.ServerPort > 0 {
-		if result.RunIn == types2.DPanelRunInHost || (result.ContainerInfo.HostConfig != nil && string(result.ContainerInfo.HostConfig.NetworkMode) == "host") {
+		if result.RunIn == types2.DPanelRunInHost {
 			result.PublicPort = result.ServerPort
-		} else if result.ContainerInfo.HostConfig != nil {
-			port := nat.Port(strconv.Itoa(result.ServerPort) + "/tcp")
-			for _, binding := range result.ContainerInfo.HostConfig.PortBindings[port] {
-				publicPort, err := strconv.Atoi(binding.HostPort)
-				if err == nil && publicPort > 0 && publicPort <= 65535 {
-					result.PublicPort = publicPort
-					break
+		} else if result.ContainerInfo.ContainerJSONBase != nil && result.ContainerInfo.HostConfig != nil {
+			if string(result.ContainerInfo.HostConfig.NetworkMode) == "host" {
+				result.PublicPort = result.ServerPort
+			} else {
+				port := nat.Port(strconv.Itoa(result.ServerPort) + "/tcp")
+				for _, binding := range result.ContainerInfo.HostConfig.PortBindings[port] {
+					publicPort, err := strconv.Atoi(binding.HostPort)
+					if err == nil && publicPort > 0 && publicPort <= 65535 {
+						result.PublicPort = publicPort
+						break
+					}
 				}
 			}
 		}

@@ -574,7 +574,7 @@ func (self Home) Info(http *gin.Context) {
 	}
 	dpanelInfo := logic.Setting{}.GetDPanelInfo()
 	var containerInfo gin.H
-	if dpanelInfo.ContainerInfo.ContainerJSONBase != nil {
+	if dpanelInfo.ContainerInfo.ContainerJSONBase != nil && dpanelInfo.ContainerInfo.HostConfig != nil {
 		containerInfo = gin.H{
 			"Id":   dpanelInfo.ContainerInfo.ID,
 			"Name": dpanelInfo.ContainerInfo.Name,
