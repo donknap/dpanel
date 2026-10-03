@@ -66,6 +66,8 @@ func (self Container) CheckPort(http *gin.Context) {
 	}
 	total, success, failed, timeout := 0, 0, 0, 0
 	for _, containerResult := range result {
+		total += len(containerResult.Errors)
+		failed += len(containerResult.Errors)
 		for _, port := range containerResult.Ports {
 			if port.Port == "0" {
 				continue

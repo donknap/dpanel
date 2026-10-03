@@ -188,6 +188,7 @@ func checkPort(ctx context.Context, value string) agentTypes.PortCheckItem {
 		result.Status = portCheckSuccess
 		return result
 	}
+	result.Error = err.Error()
 	var netErr net.Error
 	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) && netErr.Timeout() {
 		result.Status = portCheckTimeout

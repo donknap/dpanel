@@ -126,6 +126,17 @@ func collect(ctx context.Context, containerCollect *stats.Container, sdk *client
 			waitFirst.Done()
 		}
 	}()
+	if info, err := sdk.ContainerInspect(ctx, containerCollect.Usage.Container); err == nil && info.HostConfig != nil {
+		var cpuLimit float64
+		if info.HostConfig.NanoCPUs > 0 {
+			cpuLimit = float64(info.HostConfig.NanoCPUs) / 1e9
+		} else if info.HostConfig.CPUQuota > 0 && info.HostConfig.CPUPeriod > 0 {
+			cpuLimit = float64(info.HostConfig.CPUQuota) / float64(info.HostConfig.CPUPeriod)
+		}
+		if cpuLimit > 0 {
+			containerCollect.CPULimit = &cpuLimit
+		}
+	}
 	response, err := sdk.ContainerStats(ctx, containerCollect.Name, stream)
 	if err != nil {
 		containerCollect.SetError(err)

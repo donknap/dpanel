@@ -10,6 +10,7 @@ import (
 
 type Usage struct {
 	Cpu            float64                     `json:"cpu"`
+	CPULimit       *float64                    `json:"cpuLimit,omitempty"`
 	Memory         UsageIo                     `json:"memory"`
 	PrevBlockIO    *UsageIo                    `json:"-"`
 	BlockIO        UsageIo                     `json:"blockIO"`
@@ -35,6 +36,7 @@ type Container struct {
 	mutex sync.RWMutex
 	err   error
 	*Usage
+	CPULimit *float64
 }
 
 func (self *Container) GetError() error {
@@ -58,6 +60,7 @@ func (self *Container) SetStatistics(v *container.StatsResponse, osType string, 
 
 	usage := &Usage{
 		Cpu:           0,
+		CPULimit:      self.CPULimit,
 		Memory:        UsageIo{},
 		BlockIO:       UsageIo{},
 		NetworkIO:     UsageIo{},

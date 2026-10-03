@@ -115,12 +115,13 @@ func NewMonitor(sdk *docker.Client, _ MonitorCreateOption) (string, error) {
 	return create(sdk, MonitorName, function.Sha256Struct(struct {
 		Version string
 		Volumes []types.VolumeItem
-	}{"agent-factor-monitor-v1", volumes}), []builder.Option{
+	}{"agent-factor-monitor-v2", volumes}), []builder.Option{
 		builder.WithNetworkMode("host"),
 		builder.WithCgroupnsMode(container.CgroupnsModeHost),
 		builder.WithReadonlyRootfs(true),
 		builder.WithSecurityOpt("no-new-privileges:true"),
 		builder.WithCapDrop("ALL"),
+		builder.WithCap("SYS_PTRACE", "DAC_READ_SEARCH"),
 		builder.WithEnv(types.EnvItem{Name: "DP_AGENT_CAPS", Value: "usage,stat,check"}),
 		builder.WithLabel(
 			types.ValueItem{Name: "com.dpanel.container.title", Value: "DPanel-主机资源监控"},

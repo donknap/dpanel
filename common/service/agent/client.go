@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -153,9 +154,14 @@ func (self *Client) CheckPorts(ctx context.Context, targets []PortCheckTarget) (
 		if result[index].Ports == nil {
 			result[index].Ports = make([]agentTypes.PortCheckItem, 0)
 		}
+		for _, checkError := range result[index].Errors {
+			if checkError.Check == "" || checkError.Status != portCheckFailed || checkError.Error == "" {
+				return nil, errors.New("port check agent returned invalid discovery error")
+			}
+		}
 		for portIndex, port := range result[index].Ports {
 			if port.Status == portCheckNone || port.Status == portCheckUnsupported {
-				if port.Port != "0" || port.LatencyMillis != nil || len(result[index].Ports) != 1 {
+				if port.Port != "0" || port.LatencyMillis != nil || port.Error != "" || len(result[index].Ports) != 1 {
 					return nil, errors.New("port check agent returned invalid zero-port result")
 				}
 				continue
@@ -167,7 +173,11 @@ func (self *Client) CheckPorts(ctx context.Context, targets []PortCheckTarget) (
 				return nil, fmt.Errorf("port check agent returned invalid port %q", port.Port)
 			}
 			switch port.Status {
-			case portCheckSuccess, portCheckFailed, portCheckTimeout:
+			case portCheckSuccess:
+				if port.Error != "" {
+					return nil, errors.New("port check agent returned error for successful port")
+				}
+			case portCheckFailed, portCheckTimeout:
 			default:
 				return nil, fmt.Errorf("port check agent returned invalid status %q", port.Status)
 			}
@@ -179,6 +189,17 @@ func (self *Client) CheckPorts(ctx context.Context, targets []PortCheckTarget) (
 					return nil, fmt.Errorf("port check agent returned duplicate port %q", port.Port)
 				}
 			}
+		}
+	}
+	seenErrors := make(map[agentTypes.PortCheckError]struct{})
+	for _, item := range result {
+		for _, checkError := range item.Errors {
+			if _, exists := seenErrors[checkError]; exists {
+				continue
+			}
+			seenErrors[checkError] = struct{}{}
+			slog.Debug("agent port discovery error", "dockerEnvName", self.dockerSdk.Name,
+				"check", checkError.Check, "error", checkError.Error)
 		}
 	}
 	return result, nil

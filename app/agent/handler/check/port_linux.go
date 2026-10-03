@@ -47,19 +47,25 @@ func discoverPorts(ctx context.Context, result []agentTypes.PortCheckResult) err
 
 	if _, err := os.Stat(filepath.Join(hostCgroupPath, "cgroup.controllers")); err != nil {
 		if os.IsNotExist(err) {
-			setUnsupported(result, targets)
-			return nil
+			return discoverPortsProc(ctx, result, targets)
 		}
-		return fmt.Errorf("inspect host cgroup: %w", err)
+		for _, index := range targets {
+			result[index].Errors = append(result[index].Errors, agentTypes.PortCheckError{
+				Check: "cgroup", Status: portCheckFailed, Error: fmt.Sprintf("inspect host cgroup: %v", err),
+			})
+		}
+		return nil
 	}
 
-	sockets, cgroupAttributeSeen, err := readHostSockets(ctx)
+	sockets, cgroupAttributeSeen, inetDiagUnavailable, socketErrors, err := readHostSockets(ctx)
 	if err != nil {
-		return fmt.Errorf("query host sockets: %w", err)
+		return err
 	}
-	if len(sockets) > 0 && !cgroupAttributeSeen {
-		setUnsupported(result, targets)
-		return nil
+	if inetDiagUnavailable || len(sockets) > 0 && !cgroupAttributeSeen {
+		return discoverPortsProc(ctx, result, targets)
+	}
+	for _, index := range targets {
+		result[index].Errors = append(result[index].Errors, socketErrors...)
 	}
 	sort.Slice(sockets, func(i, j int) bool {
 		if sockets[i].protocol != sockets[j].protocol {
@@ -100,10 +106,16 @@ func discoverPorts(ctx context.Context, result []agentTypes.PortCheckResult) err
 			return fs.SkipAll
 		}
 		if handleErr != nil {
-			return fmt.Errorf("read cgroup handle %s: %w", path, handleErr)
+			result[containerIndex].Errors = append(result[containerIndex].Errors, agentTypes.PortCheckError{
+				Check: "cgroup", Status: portCheckFailed, Error: fmt.Sprintf("read cgroup handle %s: %v", path, handleErr),
+			})
+			return nil
 		}
 		if len(handle.Bytes()) != 8 {
-			return fmt.Errorf("cgroup handle %s has unexpected size %d", path, len(handle.Bytes()))
+			result[containerIndex].Errors = append(result[containerIndex].Errors, agentTypes.PortCheckError{
+				Check: "cgroup", Status: portCheckFailed, Error: fmt.Sprintf("cgroup handle %s has unexpected size %d", path, len(handle.Bytes())),
+			})
+			return nil
 		}
 
 		supported[containerIndex] = true
@@ -116,7 +128,14 @@ func discoverPorts(ctx context.Context, result []agentTypes.PortCheckResult) err
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("resolve container cgroups: %w", err)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		for _, index := range targets {
+			result[index].Errors = append(result[index].Errors, agentTypes.PortCheckError{
+				Check: "cgroup", Status: portCheckFailed, Error: fmt.Sprintf("walk host cgroups: %v", err),
+			})
+		}
 	}
 	for _, socket := range sockets {
 		if socket.containerIndex == -1 || !supported[socket.containerIndex] {
@@ -138,7 +157,7 @@ func discoverPorts(ctx context.Context, result []agentTypes.PortCheckResult) err
 		}
 	}
 	for _, targetIndex := range targets {
-		if len(result[targetIndex].Ports) != 0 {
+		if len(result[targetIndex].Ports) != 0 || len(result[targetIndex].Errors) != 0 {
 			continue
 		}
 		status := portCheckNone
@@ -184,18 +203,20 @@ func isLowerHex(value byte) bool {
 	return value >= '0' && value <= '9' || value >= 'a' && value <= 'f'
 }
 
-func readHostSockets(ctx context.Context) ([]socketInfo, bool, error) {
+func readHostSockets(ctx context.Context) ([]socketInfo, bool, bool, []agentTypes.PortCheckError, error) {
 	fd, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, unix.NETLINK_SOCK_DIAG)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.Is(err, unix.ENOENT), []agentTypes.PortCheckError{{Check: "socket", Status: portCheckFailed, Error: fmt.Sprintf("open socket diagnostic connection: %v", err)}}, nil
 	}
 	defer unix.Close(fd)
 	if err = unix.Bind(fd, &unix.SockaddrNetlink{Family: unix.AF_NETLINK}); err != nil {
-		return nil, false, err
+		return nil, false, errors.Is(err, unix.ENOENT), []agentTypes.PortCheckError{{Check: "socket", Status: portCheckFailed, Error: fmt.Sprintf("bind socket diagnostic connection: %v", err)}}, nil
 	}
 
 	result := make([]socketInfo, 0)
+	checkErrors := make([]agentTypes.PortCheckError, 0)
 	cgroupAttributeSeen := false
+	inetDiagUnavailable := false
 	sequence := uint32(0)
 	for _, protocol := range []struct {
 		family   uint8
@@ -209,7 +230,7 @@ func readHostSockets(ctx context.Context) ([]socketInfo, bool, error) {
 		{family: unix.AF_INET6, protocol: unix.IPPROTO_UDP, states: ^uint32(0), name: "udp6"},
 	} {
 		if err = ctx.Err(); err != nil {
-			return nil, false, err
+			return nil, false, false, nil, err
 		}
 		sequence++
 		request := make([]byte, unix.NLMSG_HDRLEN+inetDiagRequestSize)
@@ -221,19 +242,25 @@ func readHostSockets(ctx context.Context) ([]socketInfo, bool, error) {
 		request[unix.NLMSG_HDRLEN+1] = protocol.protocol
 		binary.NativeEndian.PutUint32(request[unix.NLMSG_HDRLEN+4:unix.NLMSG_HDRLEN+8], protocol.states)
 		if err = unix.Sendto(fd, request, 0, &unix.SockaddrNetlink{Family: unix.AF_NETLINK}); err != nil {
-			return nil, false, err
+			checkErrors = append(checkErrors, agentTypes.PortCheckError{Check: protocol.name, Status: portCheckFailed, Error: fmt.Sprintf("send socket diagnostic request: %v", err)})
+			continue
 		}
 
 		complete := false
+		protocolSockets := make([]socketInfo, 0)
+		protocolCgroupAttributeSeen := false
+		var queryErr error
 		for !complete {
 			buffer := make([]byte, 64*1024)
 			length, _, receiveErr := unix.Recvfrom(fd, buffer, 0)
 			if receiveErr != nil {
-				return nil, false, receiveErr
+				queryErr = fmt.Errorf("receive socket diagnostic response: %w", receiveErr)
+				break
 			}
 			messages, parseErr := syscall.ParseNetlinkMessage(buffer[:length])
 			if parseErr != nil {
-				return nil, false, parseErr
+				queryErr = fmt.Errorf("parse socket diagnostic response: %w", parseErr)
+				break
 			}
 			for _, message := range messages {
 				if message.Header.Seq != sequence {
@@ -244,38 +271,54 @@ func readHostSockets(ctx context.Context) ([]socketInfo, bool, error) {
 					complete = true
 				case unix.NLMSG_ERROR:
 					if len(message.Data) < 4 {
-						return nil, false, errors.New("short netlink error response")
+						queryErr = errors.New("short netlink error response")
+						break
 					}
 					errno := int32(binary.NativeEndian.Uint32(message.Data[:4]))
 					if errno != 0 {
-						return nil, false, syscall.Errno(-errno)
+						queryErr = fmt.Errorf("kernel socket diagnostic response: %w", syscall.Errno(-errno))
 					}
 				case unix.SOCK_DIAG_BY_FAMILY:
 					if len(message.Data) < inetDiagResponseSize {
-						return nil, false, errors.New("short socket diagnostic response")
+						queryErr = errors.New("short socket diagnostic response")
+						break
 					}
 					cgroupID, found, parseErr := parseCgroupID(message.Data[inetDiagResponseSize:])
 					if parseErr != nil {
-						return nil, false, parseErr
+						queryErr = parseErr
+						break
 					}
-					cgroupAttributeSeen = cgroupAttributeSeen || found
+					protocolCgroupAttributeSeen = protocolCgroupAttributeSeen || found
 					port := binary.BigEndian.Uint16(message.Data[4:6])
 					if port == 0 ||
 						protocol.protocol == unix.IPPROTO_TCP && message.Data[1] != tcpListenState ||
 						protocol.protocol == unix.IPPROTO_UDP && binary.BigEndian.Uint16(message.Data[6:8]) != 0 {
 						continue
 					}
-					result = append(result, socketInfo{
+					protocolSockets = append(protocolSockets, socketInfo{
 						cgroupID:       cgroupID,
 						port:           port,
 						protocol:       protocol.name,
 						containerIndex: -1,
 					})
 				}
+				if queryErr != nil {
+					break
+				}
+			}
+			if queryErr != nil {
+				break
 			}
 		}
+		if queryErr != nil {
+			inetDiagUnavailable = inetDiagUnavailable || errors.Is(queryErr, unix.ENOENT)
+			checkErrors = append(checkErrors, agentTypes.PortCheckError{Check: protocol.name, Status: portCheckFailed, Error: queryErr.Error()})
+			continue
+		}
+		cgroupAttributeSeen = cgroupAttributeSeen || protocolCgroupAttributeSeen
+		result = append(result, protocolSockets...)
 	}
-	return result, cgroupAttributeSeen, nil
+	return result, cgroupAttributeSeen, inetDiagUnavailable, checkErrors, nil
 }
 
 func parseCgroupID(attributes []byte) (uint64, bool, error) {
