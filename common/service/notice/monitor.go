@@ -144,7 +144,7 @@ func (self *monitor) listen(c *client) {
 			return
 		}
 
-		slog.Debug("monitor start", "name", c.dockerEnv, "error", initErr)
+		slog.Debug("monitor start", "name", c.dockerEnv.Name, "remoteType", c.dockerEnv.RemoteType, "tlsEnabled", c.dockerEnv.EnableTLS, "previousAttemptFailed", initErr != nil)
 
 		if c.dockerClient, initErr = docker.NewClientWithDockerEnv(c.dockerEnv); initErr != nil {
 			c.Clear()

@@ -152,10 +152,7 @@ func (self Env) Create(http *gin.Context) {
 		}
 	}
 
-	defaultEnv := false
-	if params.Name == define.DockerDefaultClientName {
-		defaultEnv = true
-	}
+	defaultEnv := params.DockerEnv.IsDefault()
 
 	if params.EnableComposePath {
 		if params.ComposePath == "" {
@@ -440,7 +437,7 @@ func (self Env) GetDetail(http *gin.Context) {
 			}
 		}
 	}
-	if dockerEnv.EnableSSH && dockerEnv.Name != define.DockerDefaultClientName && dockerEnv.ServerUrl == "" {
+	if dockerEnv.EnableSSH && !dockerEnv.IsDefault() && dockerEnv.ServerUrl == "" {
 		dockerEnv.ServerUrl = dockerEnv.SshServerInfo.Address
 	}
 	if dockerEnv.ServerUrl == "" {

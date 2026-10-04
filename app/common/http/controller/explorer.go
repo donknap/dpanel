@@ -46,7 +46,7 @@ func (self Explorer) SyncDPanel(http *gin.Context) {
 		self.JsonResponseWithError(http, errors.New("docker client is required for dpanel sync"), 500)
 		return
 	}
-	if dockerSdk.Name == define.DockerDefaultClientName {
+	if !dockerSdk.DockerEnv.IsRemote() {
 		self.JsonSuccessResponse(http)
 		return
 	}

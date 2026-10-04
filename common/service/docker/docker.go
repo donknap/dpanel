@@ -127,8 +127,8 @@ func (self *Client) Close() {
 // GetTryCtx 获取一个有超时的上下文，用于测试 docker 连接是否正常
 func (self *Client) GetTryCtx() context.Context {
 	timeout := define.DockerConnectServerTimeout
-	// 如果使用 docker.sock 则不要超时时间，某些系统可能启动慢
-	if strings.HasSuffix(self.DockerEnv.Address, "docker.sock") {
+	// 本机 sock 连接可能启动较慢，不限制探测超时。
+	if !self.DockerEnv.IsRemote() {
 		return self.Ctx
 	}
 	tryCtx, _ := context.WithTimeout(context.Background(), timeout)

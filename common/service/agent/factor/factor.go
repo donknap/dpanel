@@ -51,9 +51,8 @@ func NewExplorer(sdk *docker.Client, option ExplorerCreateOption) (string, error
 	return create(sdk, ExplorerName, function.Sha256Struct(struct {
 		Version string
 		Option  ExplorerCreateOption
-	}{"agent-factor-explorer-v1", option}), append([]builder.Option{
+	}{"agent-factor-explorer-v2", option}), append([]builder.Option{
 		builder.WithNetworkMode("none"),
-		builder.WithReadonlyRootfs(true),
 		builder.WithSecurityOpt(security...),
 		builder.WithCapDrop("ALL"),
 		builder.WithCap(caps...),

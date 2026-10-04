@@ -331,10 +331,11 @@ func initDocker() error {
 		defaultDockerEnv = v
 	} else {
 		defaultDockerEnv = &types.DockerEnv{
-			Name:    define.DockerDefaultClientName,
-			Title:   define.DockerDefaultClientName,
-			Address: defaultDockerHost,
-			Default: true,
+			Name:       define.DockerDefaultClientName,
+			Title:      define.DockerDefaultClientName,
+			Address:    defaultDockerHost,
+			Default:    true,
+			RemoteType: define.DockerRemoteTypeSock,
 		}
 		logic.Env{}.UpdateEnv(defaultDockerEnv)
 	}
@@ -352,7 +353,7 @@ func initDocker() error {
 				dockerClient.Close()
 			}
 		} else {
-			slog.Warn("init docker", "env", defaultDockerEnv, "error", err)
+			slog.Warn("init docker", "name", defaultDockerEnv.Name, "remoteType", defaultDockerEnv.RemoteType, "tlsEnabled", defaultDockerEnv.EnableTLS, "errorType", fmt.Sprintf("%T", err))
 		}
 	}()
 	return nil

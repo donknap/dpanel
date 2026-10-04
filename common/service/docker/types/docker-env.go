@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -35,14 +36,46 @@ type DockerEnv struct {
 	Enable            *bool           `json:"enable,omitempty"`
 }
 
-func (self DockerEnv) IsLocal() bool {
-	if self.DockerType == define.DockerRemoteTypeSock {
+// IsRemote 按连接类型、地址和面板运行系统判断 Docker 连接是否按远程处理。
+// 这里判断的是常见连接拓扑；回环端口若被转发到其他主机，仍会按本地处理。
+func (self DockerEnv) IsRemote() bool {
+	switch self.RemoteType {
+	case define.DockerRemoteTypeWSL:
+		// WSL 有独立的 Linux 运行环境，即使从 Windows 本机连接也按远程处理。
 		return true
-	}
-	if self.DockerType == define.DockerRemoteTypeSSH {
+	case define.DockerRemoteTypeSSH:
+		// Windows 通过 SSH 访问的文件系统与面板文件系统分开处理。
+		if runtime.GOOS == "windows" {
+			return true
+		}
+		// Linux/macOS 上 SSH 到本机回环地址，按本地连接处理。
+		if self.SshServerInfo == nil {
+			return true
+		}
+		return !function.IsLoopbackHost(self.SshServerInfo.Address)
+	case define.DockerRemoteTypeSock:
+		// Unix socket 和 Windows 原始 pipe 都是本机端点，与环境名称无关。
 		return false
 	}
-	return strings.HasPrefix(self.Address, "127.0.0.1") || strings.HasPrefix(self.Address, "localhost")
+
+	address, err := url.Parse(self.Address)
+	if err != nil {
+		return true
+	}
+	switch address.Scheme {
+	case "unix", "npipe":
+		// 未标为 sock 的原始 socket/pipe 仍指向本机；SSH/WSL 代理已在上面处理。
+		return false
+	case "tcp":
+		// Windows、Linux 和 macOS 的本机 TCP 回环端点均按本地处理。
+		return !function.IsLoopbackHost(address.Hostname())
+	default:
+		return true
+	}
+}
+
+func (self DockerEnv) IsDefault() bool {
+	return self.Name == define.DockerDefaultClientName
 }
 
 func (self DockerEnv) CommandEnv() []string {

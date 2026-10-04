@@ -8,7 +8,6 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/types"
-	"github.com/donknap/dpanel/common/types/define"
 	"golang.org/x/exp/maps"
 )
 
@@ -63,7 +62,7 @@ func (self Env) GetDefaultEnv() (*types.DockerEnv, error) {
 	}
 
 	if v := function.PluckMapWalkArray(dockerEnvList, func(k string, v *types.DockerEnv) (*types.DockerEnv, bool) {
-		if v.Name == define.DockerDefaultClientName {
+		if v.IsDefault() {
 			return v, true
 		}
 		return nil, false

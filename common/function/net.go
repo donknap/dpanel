@@ -140,6 +140,16 @@ func IpInSubnet(ipAddress, subnetAddress string) (bool, error) {
 	return true, nil
 }
 
+// IsLoopbackHost 判断主机名或 IP 是否为本机回环地址。
+func IsLoopbackHost(host string) bool {
+	host = strings.TrimSuffix(host, ".")
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 func SafeHTTPAddresses(rawURL string, flags ...int) ([]net.IP, error) {
 	uri, err := url.Parse(rawURL)
 	if err != nil {
@@ -156,8 +166,11 @@ func SafeHTTPAddresses(rawURL string, flags ...int) ([]net.IP, error) {
 	for _, flag := range flags {
 		flagValue |= flag
 	}
-	if strings.EqualFold(host, "localhost") && flagValue&SSRFAllowLoopback == 0 {
-		return nil, errors.New("localhost is not allowed")
+	if flagValue&SSRFAllowLoopback == 0 && IsLoopbackHost(host) {
+		if strings.EqualFold(host, "localhost") {
+			return nil, errors.New("localhost is not allowed")
+		}
+		return nil, errors.New("loopback address is not allowed")
 	}
 	ips, err := net.DefaultResolver.LookupIP(context.Background(), "ip", host)
 	if err != nil {

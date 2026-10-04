@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -66,9 +67,10 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		http.AbortWithStatus(401)
 		return
 	}
+	authLog := slog.With("url", currentUrlPath, "peerAddr", http.Request.RemoteAddr, "reportedClientIP", http.ClientIP())
 	authCode := strings.Split(authToken, "Bearer ")
 	if len(authCode) != 2 {
-		slog.Debug("auth middleware", "url", currentUrlPath, "code", authCode)
+		authLog.Debug("auth middleware", "reason", "authorization is not in Bearer format")
 		self.JsonResponseWithError(http, ErrLogin, 401)
 		http.AbortWithStatus(401)
 		return
@@ -87,7 +89,18 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 		return &privateKey.PublicKey, nil
 	}, jwt.WithValidMethods([]string{"RS512"}))
 	if err != nil {
-		slog.Debug("auth middleware", "url", currentUrlPath, "code", authCode)
+		reason := "JWT could not be parsed"
+		switch {
+		case errors.Is(err, jwt.ErrTokenMalformed):
+			reason = "JWT is malformed"
+		case errors.Is(err, jwt.ErrTokenSignatureInvalid):
+			reason = "JWT signature is invalid"
+		case errors.Is(err, jwt.ErrTokenExpired):
+			reason = "JWT has expired"
+		case errors.Is(err, jwt.ErrTokenNotValidYet):
+			reason = "JWT is not valid yet"
+		}
+		authLog.Debug("auth middleware", "reason", reason)
 		self.JsonResponseWithError(http, ErrLogin, 401)
 		http.AbortWithStatus(401)
 		return
@@ -96,7 +109,7 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 	if token.Valid {
 		issuedAt, err := token.Claims.GetIssuedAt()
 		if err != nil {
-			slog.Debug("auth middleware", "error", "no issuedAt time", "jwt", authToken)
+			authLog.Debug("auth middleware", "reason", "JWT issued-at claim is invalid")
 			self.JsonResponseWithError(http, ErrLogin, 401)
 			http.AbortWithStatus(401)
 			return
@@ -104,7 +117,7 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 
 		// Jwt 签发时间必须大于服务启动时间一致，如果签发时间小于启动时间则表示服务重启过，Jwt 全部失效
 		if v, ok := storage.Cache.Get(storage.CacheKeyCommonServerStartTime); !ok || issuedAt == nil || issuedAt.Before(v.(time.Time)) {
-			slog.Debug("auth middleware", "error", "issuedAt time before server start time", "issuedAt", issuedAt, "serverStartedAt", v.(time.Time))
+			authLog.Debug("auth middleware", "reason", "JWT was issued before server start", "issuedAt", issuedAt, "serverStartedAt", v)
 			self.JsonResponseWithError(http, ErrLogin, 401)
 			http.AbortWithStatus(401)
 			return
@@ -135,12 +148,12 @@ func (self AuthMiddleware) Process(http *gin.Context) {
 			http.Next()
 			return
 		}
-		slog.Debug("auth middleware", "err", "user not found", "userInfo", myUserInfo)
+		authLog.Debug("auth middleware", "reason", "user session was not found", "userId", myUserInfo.UserId)
 		self.JsonResponseWithError(http, ErrLogin, 401)
 		http.AbortWithStatus(401)
 		return
 	}
-	slog.Debug("auth middleware", "url", currentUrlPath, "code", authCode)
+	authLog.Debug("auth middleware", "reason", "JWT is invalid")
 	self.JsonResponseWithError(http, ErrLogin, 401)
 	http.AbortWithStatus(401)
 	return

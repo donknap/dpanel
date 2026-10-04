@@ -117,7 +117,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		})
 	}
 
-	if dockerEnv.Name != define.DockerDefaultClientName {
+	if !dockerEnv.IsDefault() {
 		return
 	}
 
@@ -227,7 +227,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 				Dest: "/dpanel",
 				Type: types3.VolumeTypeBind,
 			}
-			if !dockerEnv.IsLocal() && runtime.GOOS == "windows" {
+			if dockerEnv.IsRemote() && runtime.GOOS == "windows" {
 				if v, ok := function.WindowsPathToSlash(storage.Local{}.GetStorageLocalPath()); ok {
 					item.Host = v
 				}
