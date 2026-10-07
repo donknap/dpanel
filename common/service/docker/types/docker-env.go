@@ -78,22 +78,22 @@ func (self DockerEnv) IsDefault() bool {
 	return self.Name == define.DockerDefaultClientName
 }
 
+func (self DockerEnv) GetSockName() string {
+	name := self.RemoteType + "_" + self.Name
+	if runtime.GOOS == "windows" {
+		return "npipe:////./pipe/dp_" + name
+	}
+	return "unix://" + filepath.Join(storage.Local{}.GetLocalProxySockPath(), name+".sock")
+}
+
 func (self DockerEnv) CommandEnv() []string {
 	result := make([]string, 0)
 	if runtime.GOOS == "windows" {
 		result = append(result, "COMPOSE_CONVERT_WINDOWS_PATHS=1")
 	}
 	if self.RemoteType == define.DockerRemoteTypeSSH || self.RemoteType == define.DockerRemoteTypeWSL {
-		proxyName := self.Name
-		if self.RemoteType == define.DockerRemoteTypeWSL {
-			proxyName = "wsl_" + self.Name
-		}
 		// 还需要将系统的 PATH 环境变量传递进去，否则可能会报找不到 ssh 命令
-		if runtime.GOOS == "windows" {
-			result = append(result, fmt.Sprintf("DOCKER_HOST=npipe:////./pipe/dp_%s", proxyName))
-		} else {
-			result = append(result, fmt.Sprintf("DOCKER_HOST=unix://%s/%s.sock", storage.Local{}.GetLocalProxySockPath(), self.Name))
-		}
+		result = append(result, "DOCKER_HOST="+self.GetSockName())
 	} else {
 		result = append(result, fmt.Sprintf("DOCKER_HOST=%s", self.Address))
 		if self.EnableTLS {
@@ -144,15 +144,7 @@ func (self DockerEnv) CommandEnv() []string {
 func (self DockerEnv) CommandParams() []string {
 	result := make([]string, 0)
 	if self.RemoteType == define.DockerRemoteTypeSSH || self.RemoteType == define.DockerRemoteTypeWSL {
-		proxyName := self.Name
-		if self.RemoteType == define.DockerRemoteTypeWSL {
-			proxyName = "wsl_" + self.Name
-		}
-		if runtime.GOOS == "windows" {
-			result = append(result, "-H", fmt.Sprintf("npipe:////./pipe/dp_%s", proxyName))
-		} else {
-			result = append(result, "-H", fmt.Sprintf("unix://%s/%s.sock", storage.Local{}.GetLocalProxySockPath(), self.Name))
-		}
+		result = append(result, "-H", self.GetSockName())
 		return result
 	}
 	result = append(result, "-H", self.Address)

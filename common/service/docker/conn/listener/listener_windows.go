@@ -3,16 +3,22 @@
 package listener
 
 import (
+	"fmt"
 	"net"
+	"strings"
 )
 import winio "github.com/Microsoft/go-winio"
 
-func New(sockPath string) (net.Listener, string, error) {
-	address := `\\.\pipe\dp_` + sockPath
+func New(address string) (net.Listener, string, error) {
+	pipeName, ok := strings.CutPrefix(address, "npipe:////./pipe/")
+	if !ok || pipeName == "" {
+		return nil, "", fmt.Errorf("invalid named pipe address %q", address)
+	}
+	pipePath := `\\.\pipe\` + pipeName
 
-	listener, err := winio.ListenPipe(address, &winio.PipeConfig{})
+	listener, err := winio.ListenPipe(pipePath, &winio.PipeConfig{})
 	if err != nil {
 		return nil, "", err
 	}
-	return listener, `npipe:////./pipe/dp_` + sockPath, nil
+	return listener, address, nil
 }

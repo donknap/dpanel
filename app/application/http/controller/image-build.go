@@ -96,15 +96,17 @@ func (self ImageBuild) Create(http *gin.Context) {
 		Status:    define.DockerImageBuildStatusStop,
 		Message:   "",
 	}
-	imageRow, err := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if imageRow != nil {
-		imageNew.ID = imageRow.ID
-		imageNew.Status = imageRow.Status
-		imageNew.Message = imageRow.Message
+	if params.Id > 0 {
+		imageRow, err := dao.Image.Where(dao.Image.ID.Eq(params.Id)).First()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if imageRow != nil {
+			imageNew.ID = imageRow.ID
+			imageNew.Status = imageRow.Status
+			imageNew.Message = imageRow.Message
+		}
 	}
 	if err := dao.Image.Save(imageNew); err != nil {
 		self.JsonResponseWithError(http, err, 500)

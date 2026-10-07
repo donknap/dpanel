@@ -53,10 +53,10 @@ func newContext(sdk *docker.Client) (*contextService, error) {
 		return nil, fmt.Errorf("invalid Docker environment name %q", sdk.Name)
 	}
 	script := shellCommandTmpl
-	quote := shellQuote
+	quote := function.ShellQuote
 	if runtime.GOOS == "windows" {
 		script = windowsCommandTmpl
-		quote = powershellQuote
+		quote = function.PowerShellQuote
 	}
 	configRoot := filepath.Join(storage.Local{}.GetStorageLocalPath(), "buildx")
 	result := &contextService{
@@ -261,12 +261,4 @@ func (self *contextService) run(name string, args []string) ([]byte, error) {
 	}
 	defer cmd.Close()
 	return cmd.RunWithResult()
-}
-
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
-}
-
-func powershellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }

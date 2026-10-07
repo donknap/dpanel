@@ -44,3 +44,88 @@ fi
 
 {{- end }}
 `
+
+const buildWindowsTmpl = `
+Write-Output 'Starting ...'
+
+{{- if .builder }}
+& docker-buildx inspect {{ quote .builder }} *> $null
+if ($LASTEXITCODE -eq 0) {
+    & docker-buildx inspect --bootstrap {{ quote .builder }} *> $null
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+{{- else }}
+& docker-buildx inspect --bootstrap *> $null
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+{{- end }}
+
+{{- range .target }}
+$targetName = {{ if .target }}{{ quote .target }}{{ else }}'default'{{ end }}
+Write-Output "Building target: $targetName ..."
+$metaTemp = [System.IO.Path]::GetTempFileName()
+try {
+    $buildArgs = @('build')
+    {{- if $.builder }}
+    $buildArgs += @('--builder', {{ quote $.builder }})
+    {{- end }}
+    $buildArgs += @('--progress', 'plain', '--metadata-file', $metaTemp)
+    {{- if $.pull }}
+    $buildArgs += '--pull'
+    {{- end }}
+    {{- if $.push }}
+        {{- if $.outputs }}
+            {{- range $.outputs }}
+    $buildArgs += @('--output', {{ quote . }})
+            {{- end }}
+        {{- else }}
+    $buildArgs += '--push'
+        {{- end }}
+    {{- else }}
+    $buildArgs += '--load'
+    {{- end }}
+    {{- if $.noCache }}
+    $buildArgs += '--no-cache'
+    {{- end }}
+    {{- if $.file }}
+    $buildArgs += @('-f', {{ quote $.file }})
+    {{- end }}
+    {{- if .target }}
+    $buildArgs += @('--target', {{ quote .target }})
+    {{- end }}
+    {{- range .tags }}
+    $buildArgs += @('-t', {{ quote . }})
+    {{- end }}
+    {{- range $.buildArg }}
+    $buildArgs += @('--build-arg', {{ quote . }})
+    {{- end }}
+    {{- range $.cacheFrom }}
+    $buildArgs += @('--cache-from', {{ quote . }})
+    {{- end }}
+    {{- range $.cacheTo }}
+    $buildArgs += @('--cache-to', {{ quote . }})
+    {{- end }}
+    {{- range $.labels }}
+    $buildArgs += @('--label', {{ quote . }})
+    {{- end }}
+    {{- range $.annotation }}
+    $buildArgs += @('--annotation', {{ quote . }})
+    {{- end }}
+    {{- range $.platforms }}
+    $buildArgs += @('--platform', {{ quote . }})
+    {{- end }}
+    {{- range $.secrets }}
+    $buildArgs += @('--secret', {{ quote . }})
+    {{- end }}
+    $buildArgs += {{ quote $.workDir }}
+
+    & docker-buildx @buildArgs
+    if ($LASTEXITCODE -ne 0) {
+        [Console]::Error.WriteLine("Error: Build failed for target $targetName")
+        exit $LASTEXITCODE
+    }
+    Write-Output "DPANEL_BUILD_RESULT|$targetName|$(Get-Content -LiteralPath $metaTemp -Raw)"
+} finally {
+    Remove-Item -LiteralPath $metaTemp -Force -ErrorAction SilentlyContinue
+}
+{{- end }}
+`

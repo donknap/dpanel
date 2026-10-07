@@ -72,7 +72,7 @@ func SafeShell(value any) string {
 	case nil:
 		return ""
 	case string:
-		return "'" + strings.ReplaceAll(v, "'", `'"'"'`) + "'"
+		return ShellQuote(v)
 	case bool:
 		if v {
 			return "true"

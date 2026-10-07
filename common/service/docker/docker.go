@@ -3,7 +3,6 @@ package docker
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -290,20 +289,8 @@ func WithSockProxy() Option {
 		if self.DockerEnv.RemoteType != define.DockerRemoteTypeSSH && self.DockerEnv.RemoteType != define.DockerRemoteTypeWSL {
 			return nil
 		}
-		// 创建代理 sock
-		sockPath := ""
-		if runtime.GOOS == "windows" {
-			sockPath = self.Name
-			if self.DockerEnv.RemoteType == define.DockerRemoteTypeWSL {
-				sockPath = "wsl_" + self.Name
-			}
-		} else {
-			localProxySock := filepath.Join(storage.Local{}.GetLocalProxySockPath(), fmt.Sprintf("%s.sock", self.Name))
-			slog.Info("local sock path remove", "path", localProxySock)
-			_ = os.Remove(localProxySock)
-			sockPath = localProxySock
-		}
-		localSock, _, err := listener.New(sockPath)
+		localSock, _, err := listener.New(self.DockerEnv.GetSockName())
+		slog.Debug("docker with socket proxy", "address", self.DockerEnv.GetSockName(), "sock", localSock)
 		if err != nil {
 			return err
 		}

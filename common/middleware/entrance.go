@@ -67,11 +67,6 @@ func (self EntranceMiddleware) Process(httpContext *gin.Context) {
 	if requestPath == "" {
 		requestPath = "/"
 	}
-	if requestPath == rootPath && !loggedIn {
-		self.renderUnavailable(httpContext)
-		return
-	}
-
 	startTime, ok := storage.LoadCache[time.Time](storage.CacheKeyCommonServerStartTime)
 	if !ok {
 		self.renderUnavailable(httpContext)
@@ -80,6 +75,10 @@ func (self EntranceMiddleware) Process(httpContext *gin.Context) {
 	cookieValue := function.HmacSha256([]byte(strconv.FormatInt(startTime.UnixNano(), 10)), []byte(entrance))
 	if cookie, err := httpContext.Request.Cookie(EntranceCookieName); !loggedIn && err == nil && hmac.Equal([]byte(cookie.Value), []byte(cookieValue)) {
 		httpContext.Next()
+		return
+	}
+	if requestPath == rootPath && !loggedIn {
+		self.renderUnavailable(httpContext)
 		return
 	}
 	if requestPath != entrancePath {

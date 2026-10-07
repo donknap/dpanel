@@ -9,6 +9,7 @@ import (
 	"os"
 	exec2 "os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 	"text/template"
 
@@ -77,7 +78,17 @@ func (self *Builder) Execute() (exec.Executor, error) {
 	for _, item := range self.env {
 		env = append(env, item.String())
 	}
-	tmpl, err := template.New("buildx").Funcs(template.FuncMap{"quote": shellQuote}).Parse(buildShellTmpl)
+	scriptTemplate := buildShellTmpl
+	quote := function.ShellQuote
+	commandName := "/bin/sh"
+	commandArgs := []string{"-c"}
+	if runtime.GOOS == "windows" {
+		scriptTemplate = buildWindowsTmpl
+		quote = function.PowerShellQuote
+		commandName = "powershell"
+		commandArgs = []string{"-NoProfile", "-NonInteractive", "-Command"}
+	}
+	tmpl, err := template.New("buildx").Funcs(template.FuncMap{"quote": quote}).Parse(scriptTemplate)
 	if err != nil {
 		return nil, err
 	}
@@ -96,8 +107,8 @@ func (self *Builder) Execute() (exec.Executor, error) {
 		}
 	}
 	return local.New(
-		local.WithCommandName("/bin/sh"),
-		local.WithArgs("-c", script.String()),
+		local.WithCommandName(commandName),
+		local.WithArgs(append(commandArgs, script.String())...),
 		local.WithEnv(append(env, self.sdk.DockerEnv.CommandEnv()...)),
 		local.WithQuiet(),
 		local.WithCtx(self.ctx),
@@ -137,8 +148,4 @@ func (self *Builder) Run(output io.Writer) (string, string, error) {
 		return log.String(), "", errors.New("buildx output did not include an image digest")
 	}
 	return log.String(), strings.Join(imageIDs, "-"), nil
-}
-
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
