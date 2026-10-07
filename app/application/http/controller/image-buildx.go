@@ -194,7 +194,7 @@ func (self ImageBuildx) CleanContext(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if params.EnablePrune {
+	if params.EnablePrune && !params.EnableRemove {
 		if err := buildxcontext.Prune(sdk); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

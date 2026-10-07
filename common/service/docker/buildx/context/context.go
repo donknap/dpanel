@@ -205,16 +205,29 @@ func Remove(sdk *docker.Client, force bool) error {
 }
 
 func (self *contextService) remove(force, keepState bool) error {
+	var removeErr error
 	if _, err := self.runBuildx("inspect", self.builderName); err == nil {
 		if _, err = self.runBuildx("rm", self.builderName, "--force", "--keep-daemon", "--keep-state"); err != nil {
-			return fmt.Errorf("remove buildx builder %q: %w", self.builderName, err)
+			if keepState {
+				return fmt.Errorf("remove buildx builder %q: %w", self.builderName, err)
+			}
+			removeErr = fmt.Errorf("remove buildx builder %q: %w", self.builderName, err)
 		}
 	}
 	if err := self.removeTarget(force, keepState); err != nil {
-		return err
+		if keepState {
+			return err
+		}
+		removeErr = errors.Join(removeErr, err)
 	}
 	if err := self.runDockerContext("remove", commandData{Name: self.name, Force: force}); err != nil {
-		return err
+		if keepState {
+			return err
+		}
+		removeErr = errors.Join(removeErr, err)
+	}
+	if removeErr != nil {
+		return removeErr
 	}
 	if keepState {
 		return nil
