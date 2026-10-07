@@ -187,11 +187,12 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 	dockerEnvList := make(map[string]*types2.DockerEnv)
 	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDocker, &dockerEnvList)
 	for _, env := range dockerEnvList {
+		if env.Enable != nil && !*env.Enable {
+			continue
+		}
 		facade.Event.Publish(event.PluginDestroy, event.DockerDaemonPayload{
 			DockerEnvName: env.Name,
 		})
-		if env.Enable == nil || *env.Enable {
-			notice.Monitor.Join(env)
-		}
+		notice.Monitor.Join(env)
 	}
 }

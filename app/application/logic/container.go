@@ -11,9 +11,8 @@ import (
 	dockerTypes "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/patrickmn/go-cache"
 )
-
-const containerUpgradeCacheDuration = 10 * time.Minute
 
 type Container struct {
 }
@@ -64,7 +63,7 @@ func (self Container) CheckUpgrade(dockerSdk *docker.Client, containerInfo conta
 			Result:    result,
 			Status:    status,
 		}
-		storage.Cache.Set(cacheKey, cached, containerUpgradeCacheDuration)
+		storage.Cache.Set(cacheKey, cached, cache.NoExpiration)
 		return cached
 	}
 

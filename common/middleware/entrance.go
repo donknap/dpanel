@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"encoding/base64"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -20,14 +21,24 @@ import (
 
 const EntranceCookieName = "DPanelEntrance"
 
+const entranceRenewCacheKey = "entrance:renew:"
+const entranceCookieMaxAge = 7 * 24 * 60 * 60
+const entranceRenewInterval = 8 * time.Hour
+
 type EntranceMiddleware struct {
 	middleware.Abstract
 }
 
 func (self EntranceMiddleware) Process(httpContext *gin.Context) {
-	if _, loggedIn := httpContext.Get("userInfo"); loggedIn {
-		httpContext.Next()
-		return
+	userInfo, loggedIn := httpContext.Get("userInfo")
+	renewKey := ""
+	if loggedIn {
+		user := userInfo.(logic.UserInfo)
+		renewKey = fmt.Sprintf("%s%d:%d", entranceRenewCacheKey, user.UserId, user.IssuedAt.Unix())
+		if _, locked := storage.Cache.Get(renewKey); locked {
+			httpContext.Next()
+			return
+		}
 	}
 
 	login := logic.Setting{}.GetLoginSetting()
@@ -44,7 +55,11 @@ func (self EntranceMiddleware) Process(httpContext *gin.Context) {
 		return
 	}
 
+	entrancePath := strings.TrimRight(function.RouterUri("/"+entrance), "/")
 	requestPath := strings.TrimRight(httpContext.Request.URL.Path, "/")
+	if loggedIn {
+		requestPath = entrancePath
+	}
 	rootPath := strings.TrimRight(function.RouterUri("/"), "/")
 	if rootPath == "" {
 		rootPath = "/"
@@ -52,7 +67,7 @@ func (self EntranceMiddleware) Process(httpContext *gin.Context) {
 	if requestPath == "" {
 		requestPath = "/"
 	}
-	if requestPath == rootPath {
+	if requestPath == rootPath && !loggedIn {
 		self.renderUnavailable(httpContext)
 		return
 	}
@@ -63,18 +78,19 @@ func (self EntranceMiddleware) Process(httpContext *gin.Context) {
 		return
 	}
 	cookieValue := function.HmacSha256([]byte(strconv.FormatInt(startTime.UnixNano(), 10)), []byte(entrance))
-	if cookie, err := httpContext.Request.Cookie(EntranceCookieName); err == nil && hmac.Equal([]byte(cookie.Value), []byte(cookieValue)) {
+	if cookie, err := httpContext.Request.Cookie(EntranceCookieName); !loggedIn && err == nil && hmac.Equal([]byte(cookie.Value), []byte(cookieValue)) {
 		httpContext.Next()
 		return
 	}
-
-	entrancePath := strings.TrimRight(function.RouterUri("/"+entrance), "/")
 	if requestPath != entrancePath {
 		http.Redirect(httpContext.Writer, httpContext.Request, function.RouterUri("/"), http.StatusFound)
 		httpContext.Abort()
 		return
 	}
-	httpContext.SetCookie(EntranceCookieName, cookieValue, 0, "/", "", false, true)
+	httpContext.SetCookie(EntranceCookieName, cookieValue, entranceCookieMaxAge, "/", "", false, true)
+	if loggedIn {
+		storage.Cache.Set(renewKey, true, entranceRenewInterval)
+	}
 	httpContext.Next()
 }
 

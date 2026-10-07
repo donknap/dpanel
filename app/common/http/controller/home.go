@@ -22,8 +22,6 @@ import (
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	applicationLogic "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
 	statLogic "github.com/donknap/dpanel/app/common/logic/stat"
 	"github.com/donknap/dpanel/common/accessor"
@@ -48,8 +46,6 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	ssh2 "golang.org/x/crypto/ssh"
 	"golang.org/x/text/encoding/unicode"
-	"gorm.io/datatypes"
-	"gorm.io/gen"
 	"gorm.io/gorm"
 )
 
@@ -745,79 +741,8 @@ func (self Home) Usage(http *gin.Context) {
 		diskUsage = accessor.DiskUsage{}
 	}
 
-	containerRunningTotal := struct {
-		Stop      int `json:"stop"`
-		Pause     int `json:"pause"`
-		Unhealthy int `json:"unhealthy"`
-	}{
-		Stop:      0,
-		Pause:     0,
-		Unhealthy: 0,
-	}
-
-	var containerList []container.Summary
-
-	if containerList, err = sdk.Client.ContainerList(sdk.Ctx, container.ListOptions{
-		All: true,
-	}); err == nil {
-		containerLogic := applicationLogic.Container{}
-		for _, item := range containerList {
-			unhealthy := false
-			if item.State == string(container.StateExited) {
-				containerRunningTotal.Stop += 1
-			}
-			if item.State == string(container.StatePaused) {
-				containerRunningTotal.Pause += 1
-			}
-			if strings.Contains(item.Status, "unhealthy") {
-				containerRunningTotal.Unhealthy += 1
-				unhealthy = true
-			}
-			if strings.Contains(item.Status, "Restarting") {
-				containerRunningTotal.Unhealthy += 1
-				unhealthy = true
-			}
-			var containerInfo container.InspectResponse
-			var inspectInfo *container.InspectResponse
-			if info, err := sdk.Client.ContainerInspect(sdk.Ctx, item.ID); err == nil {
-				containerInfo = info
-				inspectInfo = &containerInfo
-			}
-			if !unhealthy && containerLogic.RuntimeStatus(applicationLogic.ContainerRuntimeItem{
-				Summary: item,
-				Inspect: inspectInfo,
-			}).Unhealthy {
-				containerRunningTotal.Unhealthy += 1
-			}
-		}
-	}
-
-	networkRow, _ := sdk.Client.NetworkList(sdk.Ctx, network.ListOptions{})
-	recycleQuery := dao.Site.Where(dao.Site.DeletedAt.IsNotNull()).Unscoped().Where(gen.Cond(
-		datatypes.JSONQuery("env").Equals(sdk.Name, "dockerEnvName"),
-	)...)
-	if containerList != nil {
-		names := make([]string, 0)
-		for _, summary := range containerList {
-			for _, name := range summary.Names {
-				names = append(names, strings.TrimPrefix(name, "/"))
-			}
-		}
-		recycleQuery = recycleQuery.Where(dao.Site.SiteName.NotIn(names...))
-	}
-	containerTask, _ := recycleQuery.Count()
-	imageTask, _ := dao.Image.Where(dao.Image.Setting.IsNotNull()).Count()
-	backupData, _ := dao.Backup.Count()
-
 	self.JsonResponseWithoutError(http, gin.H{
 		"diskUsage": diskUsage,
-		"total": map[string]interface{}{
-			"network":          len(networkRow),
-			"containerTask":    int(containerTask),
-			"containerRunning": containerRunningTotal,
-			"imageTask":        int(imageTask),
-			"backup":           int(backupData),
-		},
 	})
 }
 
