@@ -22,6 +22,9 @@ type procSocket struct {
 }
 
 func discoverPortsProc(ctx context.Context, result []agentTypes.PortCheckResult, targets []int) error {
+	// The application only auto-discovers ports for host-network containers.
+	// Bridge containers use published host ports. The monitor also uses host
+	// networking, so the host /proc/net contains the sockets needed here.
 	sockets := make(map[uint64]procSocket)
 	var readErrors []agentTypes.PortCheckError
 	for _, protocol := range []string{"tcp", "tcp6", "udp", "udp6"} {

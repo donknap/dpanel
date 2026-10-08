@@ -10,36 +10,13 @@ import (
 	"github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/archive"
+	"github.com/donknap/dpanel/common/service/docker/buildx/build"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 )
 
-type BuildOptions struct {
-	RegistryAuth []*registry.AuthConfig `json:"-"`
-	WorkDir      string                 `json:"workDir"` // 构建上下文路径 (即最后的 .)
-
-	Annotation []string `json:"annotation"` // --annotation: 为镜像添加 OCI 注解
-	BuildArg   []string `json:"buildArg"`   // --build-arg: 设置构建时变量 (ARG)
-	CacheFrom  []string `json:"cacheFrom"`  // --cache-from: 外部缓存源 (例如 "user/app:cache")
-	CacheTo    []string `json:"cacheTo"`    // --cache-to: 缓存导出目的地 (例如 "type=local,dest=path")
-	Labels     []string `json:"labels"`     // --label: 设置镜像的元数据标签
-	Outputs    []string `json:"outputs"`    // -o, --output: 输出目的地 (格式: "type=local,dest=path")
-	Platforms  []string `json:"platforms"`  // --platform: 设置构建的目标平台 (如 "linux/amd64")
-	Secrets    []string `json:"secrets"`    // --secret: 暴露给构建过程的机密信息 (格式: "id=mysecret")
-
-	Builder string               `json:"builder"` // --builder: 覆盖配置的 builder 实例
-	File    string               `json:"file"`    // -f, --file: Dockerfile 的名称及路
-	Target  []BuildOptionsTarget `json:"target"`  // --target: 设置要构建的目标构建阶段 (Stage)
-
-	NoCache bool `json:"noCache"` // --no-cache: 构建时不使用任何缓存
-	Pull    bool `json:"pull"`    // --pull: 始终尝试拉取所有引用的镜像
-	Push    bool `json:"push"`    // --push: Shorthand for "--output=type=registry"
-}
-
-type BuildOptionsTarget struct {
-	Target string   `json:"target"`
-	Tags   []string `json:"tags"`
-}
+type BuildOptions = build.Options
+type BuildOptionsTarget = build.Target
 
 type Option func(self *Builder) error
 

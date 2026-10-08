@@ -7,18 +7,15 @@ import (
 	"fmt"
 	"io"
 	"os"
-	exec2 "os/exec"
 	"regexp"
-	"runtime"
 	"strings"
-	"text/template"
 
 	"github.com/docker/docker/api/types/registry"
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/docker/buildx/build"
+	buildxcontext "github.com/donknap/dpanel/common/service/docker/buildx/context"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec"
-	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
@@ -67,8 +64,41 @@ func (self Builder) Close() {
 	}
 }
 
+type InfoResult = buildxcontext.Result
+type CreateOption = buildxcontext.CreateOption
+type RemoveOption = buildxcontext.RemoveOption
+
+func (self *Builder) Info() (InfoResult, error) {
+	return buildxcontext.Get(self.sdk)
+}
+
+func (self *Builder) Create(option CreateOption) error {
+	return buildxcontext.Create(self.sdk, option)
+}
+
+func (self *Builder) Prune() error {
+	return buildxcontext.Prune(self.sdk)
+}
+
+func (self *Builder) Remove(option RemoveOption) error {
+	return buildxcontext.Remove(self.sdk, option)
+}
+
 func (self *Builder) Execute() (exec.Executor, error) {
-	self.options.Labels = append(self.options.Labels,
+	state, err := self.Info()
+	if err != nil {
+		return nil, err
+	}
+	if !state.Exists {
+		if err := self.Create(CreateOption{}); err != nil {
+			return nil, err
+		}
+	}
+	if err := self.ctx.Err(); err != nil {
+		return nil, err
+	}
+	options := *self.options
+	options.Labels = append(append([]string{}, self.options.Labels...),
 		"maintainer="+define.PanelAuthor,
 		"com.dpanel.description="+define.PanelDesc,
 		"com.dpanel.website="+define.PanelWebSite,
@@ -78,43 +108,7 @@ func (self *Builder) Execute() (exec.Executor, error) {
 	for _, item := range self.env {
 		env = append(env, item.String())
 	}
-	scriptTemplate := buildShellTmpl
-	quote := function.ShellQuote
-	commandName := "/bin/sh"
-	commandArgs := []string{"-c"}
-	if runtime.GOOS == "windows" {
-		scriptTemplate = buildWindowsTmpl
-		quote = function.PowerShellQuote
-		commandName = "powershell"
-		commandArgs = []string{"-NoProfile", "-NonInteractive", "-Command"}
-	}
-	tmpl, err := template.New("buildx").Funcs(template.FuncMap{"quote": quote}).Parse(scriptTemplate)
-	if err != nil {
-		return nil, err
-	}
-	var script strings.Builder
-	if err := tmpl.Execute(&script, function.StructToMap(self.options)); err != nil {
-		return nil, err
-	}
-	if self.options.Push {
-		for _, auth := range self.options.RegistryAuth {
-			cmd := exec2.CommandContext(self.ctx, "docker", "login", auth.ServerAddress, "-u", auth.Username, "--password-stdin")
-			cmd.Env = self.sdk.DockerEnv.CommandEnv()
-			cmd.Stdin = strings.NewReader(auth.Password + "\n")
-			if err := cmd.Run(); err != nil {
-				return nil, fmt.Errorf("docker login to registry %q: %w", auth.ServerAddress, err)
-			}
-		}
-	}
-	return local.New(
-		local.WithCommandName(commandName),
-		local.WithArgs(append(commandArgs, script.String())...),
-		local.WithEnv(append(env, self.sdk.DockerEnv.CommandEnv()...)),
-		local.WithQuiet(),
-		local.WithCtx(self.ctx),
-		local.WithIndependentProcessGroup(),
-		local.WithKillProcessGroupOnCancel(),
-	)
+	return build.NewExecutor(self.ctx, &options, env, self.sdk.DockerEnv.CommandEnv())
 }
 
 func (self *Builder) Run(output io.Writer) (string, string, error) {

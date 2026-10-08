@@ -13,7 +13,6 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/buildx"
-	buildxcontext "github.com/donknap/dpanel/common/service/docker/buildx/context"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
@@ -94,15 +93,6 @@ func (self ImageBuildx) Build(http *gin.Context) {
 	}
 	startTime := time.Now()
 	log, imageID, err := func() (string, string, error) {
-		state, err := buildxcontext.Get(sdk)
-		if err != nil {
-			return "", "", err
-		}
-		if !state.Exists {
-			if err := buildxcontext.Create(sdk, buildxcontext.CreateOption{}); err != nil {
-				return "", "", err
-			}
-		}
 		if err := progress.Context().Err(); err != nil {
 			return "", "", err
 		}
@@ -144,7 +134,13 @@ func (self ImageBuildx) GetContext(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	state, err := buildxcontext.Get(sdk)
+	builder, err := buildx.New(sdk.Ctx, sdk)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer builder.Close()
+	state, err := builder.Info()
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -172,7 +168,13 @@ func (self ImageBuildx) CreateContext(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if err := buildxcontext.Create(sdk, buildxcontext.CreateOption{Config: params.Config, Proxy: params.Proxy}); err != nil {
+	builder, err := buildx.New(sdk.Ctx, sdk)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer builder.Close()
+	if err := builder.Create(buildx.CreateOption{Config: params.Config, Proxy: params.Proxy}); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -181,9 +183,10 @@ func (self ImageBuildx) CreateContext(http *gin.Context) {
 
 func (self ImageBuildx) CleanContext(http *gin.Context) {
 	type ParamsValidate struct {
-		EnablePrune       bool  `json:"enablePrune"`
-		EnableRemove      bool  `json:"enableRemove"`
-		EnableForceRemove *bool `json:"enableForceRemove"`
+		EnablePrune       bool `json:"enablePrune"`
+		EnableRemove      bool `json:"enableRemove"`
+		EnableForceRemove bool `json:"enableForceRemove"`
+		ClearState        bool `json:"clearState"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -194,15 +197,20 @@ func (self ImageBuildx) CleanContext(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	builder, err := buildx.New(sdk.Ctx, sdk)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer builder.Close()
 	if params.EnablePrune && !params.EnableRemove {
-		if err := buildxcontext.Prune(sdk); err != nil {
+		if err := builder.Prune(); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 	}
 	if params.EnableRemove {
-		force := params.EnableForceRemove == nil || *params.EnableForceRemove
-		if err := buildxcontext.Remove(sdk, force); err != nil {
+		if err := builder.Remove(buildx.RemoveOption{Force: params.EnableForceRemove, ClearState: params.ClearState}); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}

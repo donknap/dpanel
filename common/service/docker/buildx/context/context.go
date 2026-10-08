@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
-	"text/template"
 
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -23,7 +21,6 @@ type contextService struct {
 	description string
 	configRoot  string
 	configPath  string
-	tmpl        *template.Template
 }
 
 type Result struct {
@@ -39,10 +36,9 @@ type CreateOption struct {
 	Proxy  string
 }
 
-type commandData struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Force       bool   `json:"force"`
+type RemoveOption struct {
+	Force      bool
+	ClearState bool
 }
 
 func newContext(sdk *docker.Client) (*contextService, error) {
@@ -52,12 +48,6 @@ func newContext(sdk *docker.Client) (*contextService, error) {
 	if !filepath.IsLocal(sdk.Name) || filepath.Base(sdk.Name) != sdk.Name {
 		return nil, fmt.Errorf("invalid Docker environment name %q", sdk.Name)
 	}
-	script := shellCommandTmpl
-	quote := function.ShellQuote
-	if runtime.GOOS == "windows" {
-		script = windowsCommandTmpl
-		quote = function.PowerShellQuote
-	}
 	configRoot := filepath.Join(storage.Local{}.GetStorageLocalPath(), "buildx")
 	result := &contextService{
 		sdk:         sdk,
@@ -66,7 +56,6 @@ func newContext(sdk *docker.Client) (*contextService, error) {
 		description: fmt.Sprintf("Created by DPanel DO NOT DELETE!!! %s", function.Sha256Struct(sdk.DockerEnv)),
 		configRoot:  configRoot,
 		configPath:  filepath.Join(configRoot, sdk.Name, "config.toml"),
-		tmpl:        template.Must(template.New("docker-context").Funcs(template.FuncMap{"quote": quote}).Parse(script)),
 	}
 	if _, err := result.runBuildx("version"); err != nil {
 		return nil, fmt.Errorf("Docker Buildx CLI is unavailable: %w", err)
@@ -159,7 +148,7 @@ func Create(sdk *docker.Client, option CreateOption) (err error) {
 }
 
 func (self *contextService) create(config, proxy string) (err error) {
-	if err = self.runDockerContext("create", commandData{Name: self.name, Description: self.description}); err != nil {
+	if _, err = self.run("docker", []string{"context", "create", self.name, "--description", self.description}); err != nil {
 		return err
 	}
 	configDir := filepath.Dir(self.configPath)
@@ -196,18 +185,22 @@ func (self *contextService) create(config, proxy string) (err error) {
 	return nil
 }
 
-func Remove(sdk *docker.Client, force bool) error {
+func Remove(sdk *docker.Client, option RemoveOption) error {
 	self, err := newContext(sdk)
 	if err != nil {
 		return err
 	}
-	return self.remove(force, false)
+	return self.remove(option.Force, !option.ClearState)
 }
 
 func (self *contextService) remove(force, keepState bool) error {
 	var removeErr error
 	if _, err := self.runBuildx("inspect", self.builderName); err == nil {
-		if _, err = self.runBuildx("rm", self.builderName, "--force", "--keep-daemon", "--keep-state"); err != nil {
+		args := []string{"rm", self.builderName, "--keep-daemon", "--keep-state"}
+		if force {
+			args = append(args, "--force")
+		}
+		if _, err = self.runBuildx(args...); err != nil {
 			if keepState {
 				return fmt.Errorf("remove buildx builder %q: %w", self.builderName, err)
 			}
@@ -220,7 +213,7 @@ func (self *contextService) remove(force, keepState bool) error {
 		}
 		removeErr = errors.Join(removeErr, err)
 	}
-	if err := self.runDockerContext("remove", commandData{Name: self.name, Force: force}); err != nil {
+	if err := self.removeDockerContext(force); err != nil {
 		if keepState {
 			return err
 		}
@@ -243,20 +236,34 @@ func Prune(sdk *docker.Client) error {
 	return self.pruneTarget()
 }
 
-func (self *contextService) runDockerContext(action string, data commandData) error {
-	var script strings.Builder
-	if err := self.tmpl.ExecuteTemplate(&script, action, function.StructToMap(data)); err != nil {
-		return err
+func (self *contextService) removeDockerContext(force bool) error {
+	for attempt := 0; attempt < 2; attempt++ {
+		output, err := self.run("docker", []string{"context", "ls", "--format", "{{.Name}}"})
+		if err != nil {
+			return err
+		}
+		exists := false
+		for _, name := range strings.Split(string(output), "\n") {
+			if strings.TrimSpace(name) == self.name {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			return nil
+		}
+		if attempt == 1 {
+			return fmt.Errorf("Docker context %q still exists after removal", self.name)
+		}
+		args := []string{"context", "rm", self.name}
+		if force {
+			args = append(args, "--force")
+		}
+		if _, err := self.run("docker", args); err != nil {
+			return err
+		}
 	}
-	_, err := self.run("/bin/sh", []string{"-c", script.String()})
-	return err
-}
-
-func (self *contextService) runBuildx(args ...string) ([]byte, error) {
-	if runtime.GOOS == "windows" {
-		return self.run("docker-buildx", args)
-	}
-	return self.run("docker", append([]string{"buildx"}, args...))
+	return nil
 }
 
 func (self *contextService) run(name string, args []string) ([]byte, error) {
