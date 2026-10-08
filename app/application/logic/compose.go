@@ -64,7 +64,6 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 		return item.Name == composeRow.Name
 	}); ok {
 		composeRow.Setting.Status = v.Status
-		composeRow.Setting.UpdatedAt = v.UpdatedAt.Local().Format(time.DateTime)
 		if strings.HasPrefix(v.RunName, define.ComposeProjectPrefix) {
 			composeRow.Setting.RunName = v.RunName
 		}
@@ -409,14 +408,20 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 		options = append(options, compose.WithYamlPath(path))
 	}
 
+	fileEnv := make(map[string]string)
 	if defaultEnvPath, defaultEnvContent, err := dbRow.Setting.GetDefaultEnv(); err == nil && defaultEnvContent != nil {
 		options = append(options, cli.WithEnvFiles(defaultEnvPath))
+		if fileInfo, err := os.Stat(defaultEnvPath); err == nil {
+			updatedAt, _ := time.ParseInLocation(time.DateTime, dbRow.Setting.UpdatedAt, time.Local)
+			if fileInfo.ModTime().Truncate(time.Second).After(updatedAt) {
+				fileEnv, _ = dotenv.UnmarshalWithLookup(string(defaultEnvContent), nil)
+			}
+		}
 	}
 	options = append(options, cli.WithDotEnv)
-	// 始终以提交上来的环境变量（包含 .env 文件），.env 的内容仅在编辑任务的时候会覆盖写入
+	// 文件较新时使用 .env 中的同名变量，否则使用任务保存的值。
 	globalEnv := function.PluckArrayWalk(dbRow.Setting.Environment, func(i types2.EnvItem) (string, bool) {
-		if i.Rule != nil && i.Rule.IsInEnvFile() {
-			// 如果变量属于 .env 文件，则不主动附加，而是通过上面的 withEnvFile 进行附加
+		if _, ok := fileEnv[i.Name]; ok {
 			return "", false
 		}
 		return fmt.Sprintf("%s=%s", i.Name, i.Value), true

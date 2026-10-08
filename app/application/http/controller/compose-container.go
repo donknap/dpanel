@@ -64,6 +64,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			Uri:           composeRow.Setting.Uri,
 			RemoteUrl:     composeRow.Setting.RemoteUrl,
 			Environment:   params.Environment,
+			UpdatedAt:     composeRow.Setting.UpdatedAt,
 			DockerEnvName: composeRow.Setting.DockerEnvName,
 			RunName:       composeRow.Setting.RunName,
 		},

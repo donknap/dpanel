@@ -501,6 +501,9 @@ func (self Compose) GetFromGit(http *gin.Context) {
 			break
 		}
 	}
+	composeRow.Setting.Uri = function.UniqueArrayWalk(composeRow.Setting.Uri, func(item string) string {
+		return item
+	})
 	err = dao.Compose.Save(composeRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
