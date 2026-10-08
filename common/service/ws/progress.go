@@ -18,6 +18,7 @@ func PushEvent(messageType string, data interface{}) {
 	BroadcastMessage <- NewRespMessage("", messageType, data)
 }
 
+// NewProgressPip 按消息类型创建无 fd 的任务管道；同一类型的新管道会关闭旧管道。
 func NewProgressPip(messageType string) *ProgressPip {
 	collect.progressMu.Lock()
 	defer collect.progressMu.Unlock()
@@ -130,6 +131,7 @@ func (self *ProgressPip) BroadcastMessage(data interface{}) {
 	}
 }
 
+// Close 直接关闭整条管道，不受 fd 数量影响。
 func (self *ProgressPip) Close() {
 	self.progressMu.Lock()
 	defer self.progressMu.Unlock()
@@ -137,24 +139,35 @@ func (self *ProgressPip) Close() {
 	self.close()
 }
 
+// Wait 等待管道结束；请求取消时停止等待。
+func (self *ProgressPip) Wait(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-self.ctx.Done():
+		return nil
+	}
+}
+
 // close 关闭管道，调用方必须持有 progressMu。
 func (self *ProgressPip) close() {
 	self.cancel()
 }
 
+// CloseFd 用于前端关闭消息和 WebSocket 断开：无 fd 管道直接关闭；
+// 有 fd 的共用管道移除当前 fd，仅在最后一个 fd 退出时关闭。
 func (self *ProgressPip) CloseFd(fd string) {
 	self.progressMu.Lock()
 	defer self.progressMu.Unlock()
 
 	self.fdLock.Lock()
-	total := len(self.fd)
 	self.fd = function.PluckArrayWalk(self.fd, func(i string) (string, bool) {
 		if i != fd {
 			return i, true
 		}
 		return "", false
 	})
-	empty := total > len(self.fd) && len(self.fd) == 0
+	empty := len(self.fd) == 0
 	self.fdLock.Unlock()
 	if empty {
 		self.close()

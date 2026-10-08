@@ -40,6 +40,29 @@ func (self Image) TagSync(http *gin.Context) {
 		return
 	}
 
+	var wsBuffer *ws.ProgressPip
+	owner := true
+	if params.Type == "pull" {
+		wsBuffer, owner, err = ws.NewFdProgressPip(http, dockerClient.Name, fmt.Sprintf(ws.MessageTypeImagePull, params.Tag))
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if !owner {
+			if err = wsBuffer.Wait(http.Request.Context()); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			self.JsonResponseWithoutError(http, gin.H{
+				"proxyUrl": imageNameDetail.Registry,
+				"tag":      params.Tag,
+			})
+			return
+		}
+	} else {
+		wsBuffer = ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, params.Tag))
+	}
+
 	pullStarted := time.Now()
 	if params.Type == "pull" {
 		slog.Info("image pull started", "image", imageNameDetail.Uri(), "dockerEnv", dockerClient.Name)
@@ -47,7 +70,6 @@ func (self Image) TagSync(http *gin.Context) {
 		slog.Debug("image remote", "type", params.Type, "tag", imageNameDetail.Uri())
 	}
 
-	wsBuffer := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, params.Tag))
 	defer wsBuffer.Close()
 	operationCtx, cancelOperation := context.WithCancel(dockerClient.Ctx)
 	defer cancelOperation()

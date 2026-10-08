@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -16,7 +17,6 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
-	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/service/ws"
@@ -81,13 +81,6 @@ func (self ImageBuild) Create(http *gin.Context) {
 		return item, true
 	})
 
-	params.BuildSecret = function.PluckArrayWalk(params.BuildSecret, func(item types.EnvItem) (types.EnvItem, bool) {
-		if v, err := function.RSAEncode(item.Value); err == nil {
-			item.Value = v
-		}
-		return item, true
-	})
-
 	imageNew := &entity.Image{
 		Tag:       "",
 		BuildType: "",
@@ -107,6 +100,15 @@ func (self ImageBuild) Create(http *gin.Context) {
 			imageNew.Status = imageRow.Status
 			imageNew.Message = imageRow.Message
 		}
+	}
+	for i := range params.BuildSecret {
+		value, err := function.RSAEncode(params.BuildSecret[i].Value)
+		if err != nil {
+			slog.Error("encrypt image build secret", "error", err)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageUnknow, "error", "failed to save image build settings"), 500)
+			return
+		}
+		params.BuildSecret[i].Value = value
 	}
 	if err := dao.Image.Save(imageNew); err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -238,12 +240,13 @@ func (self ImageBuild) GetDetail(http *gin.Context) {
 		}
 	}
 
-	imageRow.Setting.BuildSecret = function.PluckArrayWalk(imageRow.Setting.BuildSecret, func(item types.EnvItem) (types.EnvItem, bool) {
-		if v, err := function.RSADecode(item.Value, nil); err == nil {
-			item.Value = v
+	for i := range imageRow.Setting.BuildSecret {
+		value, err := function.RSADecode(imageRow.Setting.BuildSecret[i].Value, nil)
+		if err != nil {
+			value = ""
 		}
-		return item, true
-	})
+		imageRow.Setting.BuildSecret[i].Value = value
+	}
 
 	if imageRow.Setting.BuildType == "" {
 		imageRow.Setting.BuildType = imageRow.BuildType

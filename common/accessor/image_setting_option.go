@@ -20,6 +20,10 @@ type ImageSettingOption struct {
 	BuildZip               string            `json:"buildZip"`
 	BuildArgs              []types.EnvItem   `json:"buildArgs,omitempty"`
 	BuildSecret            []types.EnvItem   `json:"buildSecret,omitempty"`
+	BuildLabels            []types.EnvItem   `json:"buildLabels,omitempty"`
+	BuildPull              bool              `json:"buildPull,omitempty"`
+	BuildProvenance        *bool             `json:"buildProvenance,omitempty"`
+	BuildExtraArgs         string            `json:"buildExtraArgs,omitempty"`
 	BuildPlatformType      []string          `json:"buildPlatformType,omitempty"`
 	BuildEnablePush        bool              `json:"buildEnablePush,omitempty"`
 	BuildCacheType         string            `json:"buildCacheType"`

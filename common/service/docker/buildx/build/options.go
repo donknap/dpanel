@@ -10,6 +10,7 @@ type Options struct {
 	CacheFrom    []string
 	CacheTo      []string
 	Labels       []string
+	ExtraArgs    []string
 	Outputs      []string
 	Platforms    []string
 	Secrets      []string
@@ -18,6 +19,7 @@ type Options struct {
 	Target       []Target
 	NoCache      bool
 	Pull         bool
+	Provenance   *bool
 	Push         bool
 }
 

@@ -169,6 +169,8 @@ func (self *imageProgressReader) read(ctx context.Context, reader io.ReadCloser)
 		return errors.New("docker image response stream is empty")
 	}
 	defer reader.Close()
+	stopClose := context.AfterFunc(ctx, func() { _ = reader.Close() })
+	defer stopClose()
 
 	self.progressItems = make(map[string]*dockerTypes.PullProgress)
 	self.lastProgressTime = time.Now()

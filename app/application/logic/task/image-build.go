@@ -34,6 +34,8 @@ func (self Docker) Build(sdk *docker.Client, wsBuffer *ws.ProgressPip, task acce
 			return item.Uri(), true
 		})...),
 		build.WithArgs(task.BuildArgs...),
+		build.WithPull(task.BuildPull),
+		build.WithLabels(task.BuildLabels...),
 	)
 	if err != nil {
 		return "", "", err

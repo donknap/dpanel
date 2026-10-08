@@ -56,6 +56,18 @@ func WithTag(targetName string, tags ...string) Option {
 // WithDockerFilePath WithDockerFile 指定 Dockerfile 路径
 func WithDockerFilePath(path string) Option {
 	return func(self *Builder) error {
+		if self.options.WorkDir != "" {
+			dockerfileName := path
+			if dockerfileName == "" {
+				dockerfileName = "Dockerfile"
+			}
+			dockerfileName = strings.TrimPrefix(dockerfileName, "/")
+			if !filepath.IsLocal(dockerfileName) {
+				return fmt.Errorf("invalid Dockerfile path %q", path)
+			}
+			self.options.File = filepath.Join(self.options.WorkDir, dockerfileName)
+			return nil
+		}
 		self.options.WorkDir = filepath.Dir(path)
 		self.options.File = path
 		return nil
@@ -135,13 +147,62 @@ func WithBuildArg(args ...types.EnvItem) Option {
 func WithBuildSecret(args ...types.EnvItem) Option {
 	return func(self *Builder) error {
 		for _, item := range args {
-			// value 需要解一下密
-			if v, err := function.RSADecode(item.Value, nil); err == nil {
-				item.Value = v
+			value, err := function.RSADecode(item.Value, nil)
+			if err != nil {
+				value = ""
 			}
+			item.Value = value
 			self.env = append(self.env, item)
 			val := fmt.Sprintf("id=%s,env=%s", item.Name, item.Name)
 			self.options.Secrets = append(self.options.Secrets, val)
+		}
+		return nil
+	}
+}
+
+func WithLabels(labels ...types.EnvItem) Option {
+	return func(self *Builder) error {
+		for _, label := range labels {
+			self.options.Labels = append(self.options.Labels, label.Name+"="+label.Value)
+		}
+		return nil
+	}
+}
+
+func WithPull(pull bool) Option {
+	return func(self *Builder) error {
+		self.options.Pull = pull
+		return nil
+	}
+}
+
+func WithProvenance(enabled *bool) Option {
+	return func(self *Builder) error {
+		self.options.Provenance = enabled
+		return nil
+	}
+}
+
+func WithExtraArgs(value string) Option {
+	return func(self *Builder) error {
+		allowed := map[string]bool{
+			"--sbom": true, "--annotation": true, "--no-cache-filter": true,
+			"--add-host": true, "--network": true, "--shm-size": true,
+			"--ulimit": true, "--resource": true,
+		}
+		for _, line := range strings.Split(value, "\n") {
+			arg := strings.TrimSpace(line)
+			if arg == "" {
+				continue
+			}
+			flag, parameter, ok := strings.Cut(arg, "=")
+			if !ok || !allowed[flag] || parameter == "" || strings.ContainsAny(arg, "\r\x00") {
+				return fmt.Errorf("unsupported buildx extension argument %q", arg)
+			}
+			if flag == "--network" && parameter != "default" && parameter != "none" {
+				return fmt.Errorf("unsupported buildx network %q", parameter)
+			}
+			self.options.ExtraArgs = append(self.options.ExtraArgs, arg)
 		}
 		return nil
 	}

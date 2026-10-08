@@ -143,3 +143,19 @@ func WithArgs(args ...types.EnvItem) Option {
 		return nil
 	}
 }
+
+func WithPull(pull bool) Option {
+	return func(self *Builder) error {
+		self.imageBuildOption.PullParent = pull
+		return nil
+	}
+}
+
+func WithLabels(labels ...types.EnvItem) Option {
+	return func(self *Builder) error {
+		for _, label := range labels {
+			self.imageBuildOption.Labels[label.Name] = label.Value
+		}
+		return nil
+	}
+}

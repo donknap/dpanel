@@ -233,6 +233,9 @@ func (self *Executor) runTarget(output io.Writer, target Target, name string) er
 		args = append(args, "--pull")
 	}
 	if self.options.Push {
+		if self.options.Provenance != nil {
+			args = append(args, fmt.Sprintf("--provenance=%t", *self.options.Provenance))
+		}
 		if len(self.options.Outputs) > 0 {
 			for _, value := range self.options.Outputs {
 				args = append(args, "--output", value)
@@ -271,6 +274,7 @@ func (self *Executor) runTarget(output io.Writer, target Target, name string) er
 			args = append(args, items.flag, value)
 		}
 	}
+	args = append(args, self.options.ExtraArgs...)
 	args = append(args, self.options.WorkDir)
 	if err := self.runCommand(output, args...); err != nil {
 		return err

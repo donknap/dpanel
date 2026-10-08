@@ -1,9 +1,6 @@
 package task
 
 import (
-	"fmt"
-	"path/filepath"
-
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/service/docker/buildx"
@@ -15,6 +12,10 @@ func (self Docker) BuildxOptions(task accessor.ImageSettingOption) ([]buildx.Opt
 	options := []buildx.Option{
 		buildx.WithBuildArg(task.BuildArgs...),
 		buildx.WithBuildSecret(task.BuildSecret...),
+		buildx.WithLabels(task.BuildLabels...),
+		buildx.WithPull(task.BuildPull),
+		buildx.WithProvenance(task.BuildProvenance),
+		buildx.WithExtraArgs(task.BuildExtraArgs),
 		buildx.WithPlatform(task.BuildPlatformType...),
 		buildx.WithOutputImage(task.BuildEnablePush, ""),
 	}
@@ -25,7 +26,7 @@ func (self Docker) BuildxOptions(task accessor.ImageSettingOption) ([]buildx.Opt
 			continue
 		}
 		hasTag = true
-		if v := (logic.Image{}).GetRegistryConfig(tag.Registry); v != nil {
+		if v := (logic.Image{}).GetRegistryConfig(tag.Registry); v != nil && v.Auth != "" {
 			options = append(options, buildx.WithRegistryAuth(v.Auth))
 		}
 		options = append(options, buildx.WithTag(tag.Target, tag.Uri()))
@@ -40,18 +41,11 @@ func (self Docker) BuildxOptions(task accessor.ImageSettingOption) ([]buildx.Opt
 	if task.BuildGit != "" {
 		options = append(options, buildx.WithDockerFilePath(task.BuildDockerfileName), buildx.WithGitUrl(task.BuildGit))
 	} else {
-		dockerfileName := task.BuildDockerfileName
-		if dockerfileName == "" {
-			dockerfileName = "Dockerfile"
-		}
-		if !filepath.IsLocal(dockerfileName) {
-			return nil, fmt.Errorf("invalid Dockerfile path %q", dockerfileName)
-		}
 		switch {
 		case task.BuildZip != "":
-			options = append(options, buildx.WithDockerFilePath(dockerfileName), buildx.WithZipFilePath(task.BuildZip, task.BuildDockerfileRoot))
+			options = append(options, buildx.WithZipFilePath(task.BuildZip, task.BuildDockerfileRoot), buildx.WithDockerFilePath(task.BuildDockerfileName))
 		case task.BuildPath != "":
-			options = append(options, buildx.WithDockerFilePath(filepath.Join(task.BuildPath, dockerfileName)), buildx.WithWorkDir(task.BuildPath))
+			options = append(options, buildx.WithWorkDir(task.BuildPath), buildx.WithDockerFilePath(task.BuildDockerfileName))
 		default:
 			options = append(options, buildx.WithDockerFileContent([]byte(task.BuildDockerfileContent)))
 		}
