@@ -272,6 +272,7 @@ func initPath() error {
 		"store",
 		"logs",
 		"sock",
+		"buildx",
 	}
 	for _, path := range initPathList {
 		realPath := storage.Local{}.GetStorageLocalPath() + "/" + path
@@ -330,12 +331,16 @@ func initDocker() error {
 	if v, err := (logic.Env{}).GetDefaultEnv(); err == nil && v != nil {
 		defaultDockerEnv = v
 	} else {
+		remoteType := define.DockerRemoteTypeSock
+		if strings.HasPrefix(defaultDockerHost, "tcp://") {
+			remoteType = define.DockerRemoteTypeTcp
+		}
 		defaultDockerEnv = &types.DockerEnv{
 			Name:       define.DockerDefaultClientName,
 			Title:      define.DockerDefaultClientName,
 			Address:    defaultDockerHost,
 			Default:    true,
-			RemoteType: define.DockerRemoteTypeSock,
+			RemoteType: remoteType,
 		}
 		logic.Env{}.UpdateEnv(defaultDockerEnv)
 	}

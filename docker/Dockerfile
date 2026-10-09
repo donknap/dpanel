@@ -55,6 +55,7 @@ RUN sed -i 's/dl-cdn.alpinelinux111.org/mirrors.ustc.edu.cn/g' /etc/apk/reposito
     mkdir -p /root/.ssh && chmod 700 /root/.ssh
 WORKDIR /app/server
 VOLUME [ "/dpanel" ]
+ENV DOCKER_CONFIG=/dpanel/buildx
 
 FROM base AS lite
 

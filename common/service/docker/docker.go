@@ -2,11 +2,13 @@ package docker
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,7 +17,8 @@ import (
 	"time"
 
 	dockerclient "github.com/docker/docker/client"
-	sshconn "github.com/donknap/dpanel/common/service/docker/conn"
+	"github.com/docker/go-connections/tlsconfig"
+	dockerconn "github.com/donknap/dpanel/common/service/docker/conn"
 	"github.com/donknap/dpanel/common/service/docker/conn/listener"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/ssh"
@@ -37,17 +40,20 @@ func NewClientWithUser(http *gin.Context) (*Client, error) {
 
 func NewClientWithDockerEnv(dockerEnv *types.DockerEnv, opts ...Option) (*Client, error) {
 	options := make([]Option, 0)
+	options = append(options, WithSockName(dockerEnv.GetSockName()))
 	options = append(options, WithDockerEnv(dockerEnv))
 	options = append(options, WithName(dockerEnv.Name))
-	if dockerEnv.EnableTLS {
-		options = append(options, WithTLS(dockerEnv.TlsCa, dockerEnv.TlsCert, dockerEnv.TlsKey))
-	}
-	if dockerEnv.RemoteType == define.DockerRemoteTypeSSH {
+	switch dockerEnv.RemoteType {
+	case define.DockerRemoteTypeSSH:
 		options = append(options, WithSSH(dockerEnv.SshServerInfo, define.DockerConnectServerTimeout))
-	} else if dockerEnv.RemoteType == define.DockerRemoteTypeWSL {
+	case define.DockerRemoteTypeWSL:
 		options = append(options, WithWSL(dockerEnv.Address))
-	} else {
-		options = append(options, WithAddress(dockerEnv.Address))
+	case define.DockerRemoteTypeTcp:
+		options = append(options, WithTCP(dockerEnv.Address, dockerEnv.EnableTLS, dockerEnv.TlsCa, dockerEnv.TlsCert, dockerEnv.TlsKey))
+	case define.DockerRemoteTypeSock:
+		options = append(options, WithSock(dockerEnv.Address))
+	default:
+		return nil, errors.New("invalid Docker remote type")
 	}
 	options = append(options, opts...)
 	return NewClient(options...)
@@ -55,7 +61,7 @@ func NewClientWithDockerEnv(dockerEnv *types.DockerEnv, opts ...Option) (*Client
 
 func NewEmptyClient(dockerEnv *types.DockerEnv) *Client {
 	v, err := NewClient(
-		WithAddress(dockerclient.DefaultDockerHost),
+		WithSock(dockerclient.DefaultDockerHost),
 		WithName(dockerEnv.Name),
 		WithDockerEnv(dockerEnv),
 	)
@@ -106,6 +112,7 @@ type Client struct {
 	DockerEnv     *types.DockerEnv
 	proxyListener net.Listener
 	proxyServer   *http.Server
+	proxySockName string
 }
 
 func (self *Client) Close() {
@@ -143,8 +150,23 @@ func WithName(name string) Option {
 	}
 }
 
-func WithAddress(host string) Option {
+// WithSockName 指定 WithSockProxy 使用的本地代理入口，不改变 Docker SDK 的上游地址。
+func WithSockName(name string) Option {
 	return func(self *Client) error {
+		self.proxySockName = name
+		return nil
+	}
+}
+
+func WithSock(host string) Option {
+	return func(self *Client) error {
+		endpoint, err := url.Parse(host)
+		if err != nil {
+			return err
+		}
+		if endpoint.Scheme != "unix" && endpoint.Scheme != "npipe" {
+			return errors.New("invalid Docker socket address")
+		}
 		self.Option = append(self.Option, dockerclient.WithHost(host))
 		self.Host = host
 		return nil
@@ -153,9 +175,6 @@ func WithAddress(host string) Option {
 
 func WithDockerEnv(info *types.DockerEnv) Option {
 	return func(self *Client) error {
-		if info != nil && strings.HasPrefix(info.Address, "tcp://") && info.RemoteType != define.DockerRemoteTypeSSH {
-			info.RemoteType = define.DockerRemoteTypeTcp
-		}
 		if info.DockerStatus == nil {
 			info.DockerStatus = &types.DockerStatus{
 				Available: false,
@@ -167,27 +186,56 @@ func WithDockerEnv(info *types.DockerEnv) Option {
 	}
 }
 
-func WithTLS(caPath, certPath, keyPath string) Option {
-	certRealPath := map[string]string{
-		"ca":   filepath.Join(storage.Local{}.GetCertPath(), caPath),
-		"cert": filepath.Join(storage.Local{}.GetCertPath(), certPath),
-		"key":  filepath.Join(storage.Local{}.GetCertPath(), keyPath),
-	}
+func WithTCP(address string, enableTLS bool, caPath, certPath, keyPath string) Option {
 	return func(self *Client) error {
-		if caPath == "" || certPath == "" || keyPath == "" {
-			return errors.New("invalid TLS configuration")
+		endpoint, err := url.Parse(address)
+		if err != nil {
+			return err
 		}
-		for _, path := range certRealPath {
-			if _, err := os.Stat(path); err != nil {
-				return errors.New("cert file not found: " + path)
+		if endpoint.Scheme != "tcp" || endpoint.Host == "" {
+			return errors.New("invalid TCP Docker address")
+		}
+		var config *tls.Config
+		if enableTLS {
+			if caPath == "" || certPath == "" || keyPath == "" {
+				return errors.New("invalid TLS configuration")
+			}
+			certRealPath := map[string]string{
+				"ca":   filepath.Join(storage.Local{}.GetCertPath(), caPath),
+				"cert": filepath.Join(storage.Local{}.GetCertPath(), certPath),
+				"key":  filepath.Join(storage.Local{}.GetCertPath(), keyPath),
+			}
+			for _, path := range certRealPath {
+				if _, err := os.Stat(path); err != nil {
+					return errors.New("cert file not found: " + path)
+				}
+			}
+			config, err = tlsconfig.Client(tlsconfig.Options{
+				CAFile:             certRealPath["ca"],
+				CertFile:           certRealPath["cert"],
+				KeyFile:            certRealPath["key"],
+				ExclusiveRootPools: true,
+			})
+			if err != nil {
+				return err
 			}
 		}
-
-		self.Option = append(self.Option, dockerclient.WithTLSClientConfig(
-			certRealPath["ca"],
-			certRealPath["cert"],
-			certRealPath["key"],
-		))
+		dialContext := func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return dockerconn.NewTCP(ctx, endpoint.Host, config)
+		}
+		transport := &http.Transport{
+			IdleConnTimeout:     time.Minute,
+			MaxIdleConnsPerHost: 5,
+			MaxIdleConns:        100,
+			DialContext:         dialContext,
+		}
+		if enableTLS {
+			// SDK 使用 https，代理使用 http；两者都复用 TCP conn 已完成的 TLS 握手。
+			transport.DialTLSContext = dialContext
+			self.Option = append(self.Option, dockerclient.WithScheme("https"))
+		}
+		self.Option = append(self.Option, dockerclient.WithHost(address), dockerclient.WithHTTPClient(&http.Client{Transport: transport}))
+		self.Host = address
 		return nil
 	}
 }
@@ -226,7 +274,7 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 				}
 
 				// 直接返回包装好的 Conn，完全由 http.Client 的生命周期来控制底层 SSH Client 的闭合，去掉了之前导致泄漏的监听协程
-				conn, err := sshconn.New(sshClient, cmdName, "system", "dial-stdio")
+				conn, err := dockerconn.NewSSH(sshClient, cmdName, "system", "dial-stdio")
 				if err != nil {
 					sshClient.Close()
 					return nil, err
@@ -259,7 +307,7 @@ func WithWSL(address string) Option {
 				if err := ctx.Err(); err != nil {
 					return nil, err
 				}
-				return sshconn.NewWSL(distribution, "docker")
+				return dockerconn.NewWSL(distribution, "docker")
 			},
 		}
 		self.Option = append(self.Option, dockerclient.WithHTTPClient(&http.Client{Transport: transport}))
@@ -267,30 +315,30 @@ func WithWSL(address string) Option {
 	}
 }
 
-// 【新增结构体】：延迟加载底层的 Transport
-// 避免在 Client 尚未完全构建完成时发生 HTTPClient() 的空指针异常
+// WithSockProxy 作为 Option 在 Docker SDK Client 构造前执行，上游拨号要等请求到达后才能取得 Client。
 type lazyProxyTransport struct {
 	client *Client
 }
 
 func (t *lazyProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// 在请求真正发生时，Docker Client 一定已经初始化完毕
-	if t.client != nil && t.client.Client != nil {
-		hc := t.client.Client.HTTPClient()
-		if hc != nil && hc.Transport != nil {
-			return hc.Transport.RoundTrip(req)
-		}
+	if t.client == nil || t.client.Client == nil {
+		return nil, errors.New("Docker client is not initialized")
 	}
-	return http.DefaultTransport.RoundTrip(req)
+	httpClient := t.client.Client.HTTPClient()
+	if httpClient == nil || httpClient.Transport == nil {
+		return nil, errors.New("Docker client is not initialized")
+	}
+	return httpClient.Transport.RoundTrip(req)
 }
 
 func WithSockProxy() Option {
 	return func(self *Client) error {
-		if self.DockerEnv.RemoteType != define.DockerRemoteTypeSSH && self.DockerEnv.RemoteType != define.DockerRemoteTypeWSL {
+		if self.DockerEnv.RemoteType == define.DockerRemoteTypeSock {
 			return nil
 		}
-		localSock, _, err := listener.New(self.DockerEnv.GetSockName())
-		slog.Debug("docker with socket proxy", "address", self.DockerEnv.GetSockName(), "sock", localSock)
+		address := self.proxySockName
+		localSock, _, err := listener.New(address)
+		slog.Debug("docker with socket proxy", "address", address, "sock", localSock)
 		if err != nil {
 			return err
 		}
@@ -301,15 +349,12 @@ func WithSockProxy() Option {
 			_ = localSock.Close()
 		}()
 
-		// 【关键优化】：使用标准库 httputil.ReverseProxy 替代原先手写的残缺版代理逻辑
 		proxy := &httputil.ReverseProxy{
-			Director: func(req *http.Request) {
-				req.URL.Scheme = "http"
-				req.URL.Host = "api.dpanel.localhost"
-				// 必须清空 RequestURI，否则 http.Client 拨号会报错
-				req.RequestURI = ""
+			Rewrite: func(req *httputil.ProxyRequest) {
+				req.Out.URL.Scheme = "http"
+				req.Out.URL.Host = "api.dpanel.localhost"
+				req.Out.RequestURI = ""
 			},
-			// 【修复点 2】：利用上面定义的延迟加载器，代替直接读取 self.Client.HTTPClient().Transport
 			Transport: &lazyProxyTransport{client: self},
 			ModifyResponse: func(r *http.Response) error {
 				return nil

@@ -66,6 +66,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 WORKDIR /app/server
 VOLUME [ "/dpanel" ]
+ENV DOCKER_CONFIG=/dpanel/buildx
 
 FROM base AS lite
 

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"text/template"
@@ -22,6 +23,8 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/types/define"
+	"github.com/google/uuid"
 )
 
 var (
@@ -111,7 +114,23 @@ func (self Cron) AddCronJob(task *entity.Cron) error {
 
 		var commandArgs []string
 		if containerName != "" {
-			dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv)
+			options := make([]docker.Option, 0, 2)
+			if dockerEnv.RemoteType != define.DockerRemoteTypeSock {
+				sockName := dockerEnv.GetSockName()
+				if strings.HasPrefix(sockName, "unix://") {
+					sockName = "unix://" + filepath.Join(filepath.Dir(strings.TrimPrefix(sockName, "unix://")), "cron-"+uuid.NewString()+".sock")
+				} else {
+					sockName += "-cron-" + uuid.NewString()
+				}
+				options = append(options, docker.WithSockName(sockName), docker.WithSockProxy())
+				for i, item := range globalEnv {
+					if name, _, ok := strings.Cut(item, "="); ok && strings.EqualFold(name, "DOCKER_HOST") {
+						globalEnv[i] = "DOCKER_HOST=" + sockName
+						break
+					}
+				}
+			}
+			dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv, options...)
 			if err != nil {
 				ctx.Err = err
 				return

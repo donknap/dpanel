@@ -1,4 +1,4 @@
-package sshconn
+package conn
 
 import (
 	"fmt"

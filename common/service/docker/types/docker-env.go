@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -79,6 +78,9 @@ func (self DockerEnv) IsDefault() bool {
 }
 
 func (self DockerEnv) GetSockName() string {
+	if self.RemoteType == define.DockerRemoteTypeSock {
+		return self.Address
+	}
 	name := self.RemoteType + "_" + self.Name
 	if runtime.GOOS == "windows" {
 		return "npipe:////./pipe/dp_" + name
@@ -91,18 +93,7 @@ func (self DockerEnv) CommandEnv() []string {
 	if runtime.GOOS == "windows" {
 		result = append(result, "COMPOSE_CONVERT_WINDOWS_PATHS=1")
 	}
-	if self.RemoteType == define.DockerRemoteTypeSSH || self.RemoteType == define.DockerRemoteTypeWSL {
-		// 还需要将系统的 PATH 环境变量传递进去，否则可能会报找不到 ssh 命令
-		result = append(result, "DOCKER_HOST="+self.GetSockName())
-	} else {
-		result = append(result, fmt.Sprintf("DOCKER_HOST=%s", self.Address))
-		if self.EnableTLS {
-			result = append(result,
-				"DOCKER_TLS_VERIFY=1",
-				"DOCKER_CERT_PATH="+filepath.Dir(filepath.Join(storage.Local{}.GetCertPath(), self.TlsCa)),
-			)
-		}
-	}
+	result = append(result, "DOCKER_HOST="+self.GetSockName())
 	// 只获取指定的系统环境变量，避免其它的污染
 	systemEnvList := []string{
 		"LANG", "PATH", "HOME", "USER",
@@ -119,7 +110,7 @@ func (self DockerEnv) CommandEnv() []string {
 		"SystemDrive", "WinDir",
 
 		// @todo dpanel 要用到的环境变量，期待以后修正为以 DP_ 开头
-		"STORAGE_LOCAL_PATH", "DP_ACME_CONFIG_HOME", "DB_DATABASE",
+		"STORAGE_LOCAL_PATH", "DP_ACME_CONFIG_HOME", "DB_DATABASE", "DOCKER_CONFIG",
 		"APP_ENV", "APP_NAME", "APP_FAMILY", "APP_SERVER_PORT", "APP_VERSION",
 	}
 	result = append(result, function.PluckArrayWalk(os.Environ(), func(item string) (string, bool) {
@@ -142,20 +133,7 @@ func (self DockerEnv) CommandEnv() []string {
 }
 
 func (self DockerEnv) CommandParams() []string {
-	result := make([]string, 0)
-	if self.RemoteType == define.DockerRemoteTypeSSH || self.RemoteType == define.DockerRemoteTypeWSL {
-		result = append(result, "-H", self.GetSockName())
-		return result
-	}
-	result = append(result, "-H", self.Address)
-	if self.EnableTLS {
-		result = append(result, "--tlsverify",
-			"--tlscacert", filepath.Join(storage.Local{}.GetCertPath(), self.TlsCa),
-			"--tlscert", filepath.Join(storage.Local{}.GetCertPath(), self.TlsCert),
-			"--tlskey", filepath.Join(storage.Local{}.GetCertPath(), self.TlsKey),
-		)
-	}
-	return result
+	return []string{"-H", self.GetSockName()}
 }
 
 func (self DockerEnv) CertRoot() string {

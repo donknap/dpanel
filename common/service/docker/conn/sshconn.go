@@ -1,16 +1,16 @@
-// Package sshconn provides a net.Conn implementation that connects to a remote
-// Docker daemon via SSH by running "docker system dial-stdio".
+// Package conn provides net.Conn implementations for Docker daemon connections.
+// SSH connections run "docker system dial-stdio" on the remote host.
 //
 // Example:
 //
 //	httpClient := &http.Client{
 //		Transport: &http.Transport{
 //			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-//				return sshconn.New(ctx, sshClient, "docker", "system", "dial-stdio")
+//				return conn.NewSSH(sshClient, "docker", "system", "dial-stdio")
 //			},
 //		},
 //	}
-package sshconn
+package conn
 
 import (
 	"bytes"
@@ -28,11 +28,10 @@ import (
 	ssh2 "golang.org/x/crypto/ssh"
 )
 
-// New returns a net.Conn that runs the given command via SSH.
+// NewSSH returns a net.Conn that runs the given command via SSH.
 // The command should provide a stdio-based protocol (e.g., "docker system dial-stdio").
-func New(sshClient *ssh.Client, cmd string, args ...string) (net.Conn, error) {
-	// Do not cancel the SSH session when ctx is cancelled.
-	// The lifetime should be managed by the http.Client, not the dial context.
+func NewSSH(sshClient *ssh.Client, cmd string, args ...string) (net.Conn, error) {
+	// The returned connection owns the SSH session until the HTTP transport closes it.
 	session, err := sshClient.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ssh session: %w", err)
