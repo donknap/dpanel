@@ -140,6 +140,11 @@ func (self *reader) Extract(fileName string, targetPath string) error {
 	if err != nil {
 		return err
 	}
+	root, err := os.OpenRoot(targetAbs)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
 
 	ctx := context.Background()
 	format, stream, err := archives.Identify(ctx, fileName, out)
@@ -162,25 +167,29 @@ func (self *reader) Extract(fileName string, targetPath string) error {
 		if outAbs == targetAbs {
 			return errors.New("invalid archive path")
 		}
+		relPath, err := filepath.Rel(targetAbs, outAbs)
+		if err != nil {
+			return err
+		}
 		if !f.IsDir() && !f.Mode().IsRegular() {
 			return nil
 		}
 		if f.IsDir() {
-			return os.MkdirAll(outAbs, f.Mode())
+			return root.MkdirAll(relPath, f.Mode().Perm())
 		}
-		if err := os.MkdirAll(filepath.Dir(outAbs), 0755); err != nil {
+		if err := root.MkdirAll(filepath.Dir(relPath), 0755); err != nil {
 			return err
 		}
-		out, err := os.OpenFile(outAbs, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-		if err != nil {
-			return err
-		}
-		defer out.Close()
 		rc, err := f.Open()
 		if err != nil {
 			return err
 		}
 		defer rc.Close()
+		out, err := root.OpenFile(relPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode().Perm())
+		if err != nil {
+			return err
+		}
+		defer out.Close()
 		_, err = io.Copy(out, rc)
 		return err
 	}
