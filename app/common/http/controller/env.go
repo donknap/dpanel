@@ -44,6 +44,9 @@ func (self Env) GetList(http *gin.Context) {
 	result := make([]*types2.DockerEnv, 0)
 	if setting, err := (logic.Setting{}).GetValue(logic.SettingGroupSetting, logic.SettingGroupSettingDocker); err == nil {
 		for _, item := range setting.Value.Docker {
+			if item.RemoteType == define.DockerRemoteTypeWSL {
+				item.ServerUrl = "127.0.0.1"
+			}
 			if params.EnableCertContent && item.EnableTLS {
 				if content, err := os.ReadFile(function.SafePathJoin(storage.Local{}.GetCertPath(), item.TlsCa)); err == nil {
 					item.TlsCa = string(content)
@@ -114,6 +117,7 @@ func (self Env) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, fmt.Errorf("invalid WSL Docker environment"), 500)
 			return
 		}
+		params.ServerUrl = "127.0.0.1"
 	}
 	if !function.IsSafeName(params.Name) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvNameInvalid), 500)
@@ -413,6 +417,9 @@ func (self Env) GetDetail(http *gin.Context) {
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+	if dockerEnv.RemoteType == define.DockerRemoteTypeWSL {
+		dockerEnv.ServerUrl = "127.0.0.1"
 	}
 	if dockerEnv.EnableSystemStat {
 		dockerSdk := docker.Sdk

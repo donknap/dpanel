@@ -228,6 +228,7 @@ func initDb() error {
 		&migrate.Upgrade20250113{},
 		&migrate.Upgrade20250401{},
 		&migrate.Upgrade20250521{},
+		&migrate.Upgrade20261011{},
 	}
 	for _, updater := range migrateTableData {
 		slog.Info("main", "migrate", updater.Version())
