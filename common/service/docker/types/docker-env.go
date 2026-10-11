@@ -110,7 +110,7 @@ func (self DockerEnv) CommandEnv() []string {
 		"SystemDrive", "WinDir",
 
 		// @todo dpanel 要用到的环境变量，期待以后修正为以 DP_ 开头
-		"STORAGE_LOCAL_PATH", "DP_ACME_CONFIG_HOME", "DB_DATABASE", "DOCKER_CONFIG",
+		"DP_SYSTEM_STORAGE_LOCAL_PATH", "DP_ACME_CONFIG_HOME", "DB_DATABASE", "DOCKER_CONFIG",
 		"APP_ENV", "APP_NAME", "APP_FAMILY", "APP_SERVER_PORT", "APP_VERSION",
 	}
 	result = append(result, function.PluckArrayWalk(os.Environ(), func(item string) (string, bool) {

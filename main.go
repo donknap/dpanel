@@ -54,13 +54,20 @@ var (
 var DPanelVersion string
 
 func main() {
-	// 兼容没有配置存储目录的情况
-	if os.Getenv("STORAGE_LOCAL_PATH") == "" {
+	storagePath := os.Getenv("DP_SYSTEM_STORAGE_LOCAL_PATH")
+	// 兼容旧变量；同时配置时以旧变量为准。
+	if v := os.Getenv("STORAGE_LOCAL_PATH"); v != "" {
+		storagePath = v
+	}
+	if storagePath == "" {
+		// 兼容没有配置存储目录的情况
 		exePath, _ := os.Executable()
-		_ = os.Setenv("STORAGE_LOCAL_PATH", filepath.Dir(exePath))
+		storagePath = filepath.Dir(exePath)
+	}
+	if err := os.Setenv("DP_SYSTEM_STORAGE_LOCAL_PATH", storagePath); err != nil {
+		panic(err)
 	}
 
-	storagePath := os.Getenv("STORAGE_LOCAL_PATH")
 	storagePathStat, err := os.Stat(storagePath)
 	if err == nil && !storagePathStat.IsDir() {
 		panic(fmt.Sprintf("%s must be a directory", storagePathStat.Name()))

@@ -166,28 +166,6 @@ func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 	result.LogFileLevel = facade.GetConfig().GetString("log.file.level")
 	result.StorageLocalPath = facade.GetConfig().GetString("system.storage.local.path")
 
-	if result.ServerHost == "" {
-		result.ServerHost = os.Getenv("APP_SERVER_HOST")
-	}
-	if result.ServerPort <= 0 {
-		if v := os.Getenv("APP_SERVER_PORT"); v != "" {
-			if port, err := strconv.Atoi(v); err == nil {
-				result.ServerPort = port
-			}
-		}
-	}
-	if result.BaseURL == "" {
-		result.BaseURL = os.Getenv("DP_SYSTEM_BASEURL")
-	}
-	if result.LogConsoleLevel == "" {
-		result.LogConsoleLevel = os.Getenv("DP_LOG_CONSOLE_LEVEL")
-	}
-	if result.LogFileLevel == "" {
-		result.LogFileLevel = os.Getenv("DP_LOG_FILE_LEVEL")
-	}
-	if result.StorageLocalPath == "" {
-		result.StorageLocalPath = os.Getenv("STORAGE_LOCAL_PATH")
-	}
 	if result.Dns == "" {
 		result.Dns = os.Getenv("DP_DNS")
 	}

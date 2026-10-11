@@ -342,6 +342,10 @@ func WithSockProxy() Option {
 		if err != nil {
 			return err
 		}
+		if localSock == nil {
+			// The proxy at this address belongs to another client or process.
+			return nil
+		}
 		self.proxyListener = localSock
 
 		go func() {

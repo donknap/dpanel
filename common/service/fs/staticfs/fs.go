@@ -19,7 +19,7 @@ import (
 
 func NewStaticFs(fs fs.FS) http.FileSystem {
 	var cacheDir string
-	if os.Getenv("APP_ENV") == "debug" {
+	if facade.GetConfig().GetString("app.env") == "debug" {
 		cacheDir, _ = storage.Local{}.CreateTempDir("dpanel_js_cache")
 	} else {
 		cacheDir = filepath.Join(os.TempDir(), "dpanel_js_cache")

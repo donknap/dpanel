@@ -22,7 +22,7 @@ log:
       - console
   file:
     driver: file
-    path: ${STORAGE_LOCAL_PATH}/logs/dpanel.log
+    path: ${DP_SYSTEM_STORAGE_LOCAL_PATH}/logs/dpanel.log
     level: ${DP_LOG_FILE_LEVEL-info}
   console:
     driver: console
@@ -32,7 +32,7 @@ database:
     driver: sqlite
     user_name: ${DB_USERNAME-root}
     password: ${DB_PASSWORD-123456}
-    db_name: ${STORAGE_LOCAL_PATH}/dpanel.db
+    db_name: ${DP_SYSTEM_STORAGE_LOCAL_PATH}/dpanel.db
     charset: utf8mb4
     prefix: ims_
     options:
@@ -43,11 +43,11 @@ system:
   entrance: ${DP_SYSTEM_ENTRANCE}
   storage:
     local:
-      path: ${STORAGE_LOCAL_PATH}
+      path: ${DP_SYSTEM_STORAGE_LOCAL_PATH}
   permission:
     default_username: __public__
   rsa:
-    key: ${STORAGE_LOCAL_PATH}/cert/rsa/id_rsa
-    pub: ${STORAGE_LOCAL_PATH}/cert/rsa/id_rsa.pub
+    key: ${DP_SYSTEM_STORAGE_LOCAL_PATH}/cert/rsa/id_rsa
+    pub: ${DP_SYSTEM_STORAGE_LOCAL_PATH}/cert/rsa/id_rsa.pub
 asusnw:
   gui_theme: ${DP_GUI_THEME-dark} # rog_1 | rog_2 | dark | light

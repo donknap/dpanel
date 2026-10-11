@@ -17,6 +17,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 var (
@@ -278,7 +279,7 @@ func (self Site) MakeNginxResolver() error {
 	}
 	resolverFile, err := os.OpenFile("/etc/nginx/conf.d/include/resolver.conf", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
 	if err != nil {
-		if os.Getenv("APP_ENV") == "debug" {
+		if facade.GetConfig().GetString("app.env") == "debug" {
 			return nil
 		}
 		return fmt.Errorf("create Nginx resolver configuration failed %s", err.Error())

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -193,7 +192,7 @@ func (self *monitor) listen(c *client) {
 					initErr = fmt.Errorf("docker event stream closed")
 					break eventLoop
 				}
-				if os.Getenv("APP_ENV") == "debug" {
+				if facade.GetConfig().GetString("app.env") == "debug" {
 					if _, _, ok := function.PluckArrayItemWalk(skipActionLog, func(item string) bool {
 						return strings.HasPrefix(string(message.Action), item)
 					}); !ok {
