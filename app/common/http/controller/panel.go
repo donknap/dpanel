@@ -215,17 +215,18 @@ func (self Panel) Backup(http *gin.Context) {
 
 func (self Panel) Proxy(http *gin.Context) {
 	type ParamsValidate struct {
-		Proxy   string `json:"proxy"`
-		NoProxy string `json:"noProxy"`
+		Proxy      string   `json:"proxy"`
+		NoProxy    string   `json:"noProxy"`
+		TargetUrls []string `json:"targetUrls"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
 
-	if params.Proxy != "" {
-		if err := (logic.Panel{}).ValidateProxy(params.Proxy); err != nil {
-			self.JsonResponseWithError(http, err, 500)
+	if params.Proxy != "" && !function.IsEmptyArray(params.TargetUrls) {
+		if err := (logic.Panel{}).ValidateProxy(params.Proxy, params.TargetUrls); err != nil {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessagePanelProxyUnavailable, "error", err.Error()), 500)
 			return
 		}
 	}
@@ -357,7 +358,7 @@ func (self Panel) Update(http *gin.Context) {
 }
 
 func (self Panel) BackupList(http *gin.Context) {
-	root := logic.Panel{}.SaveRootPath()
+	root := storage.Local{}.GetPanelBackupPath()
 	type backupFileItem struct {
 		Path      string    `json:"path"`
 		CreatedAt time.Time `json:"createdAt"`
@@ -405,13 +406,13 @@ func (self Panel) BackupDelete(http *gin.Context) {
 		return
 	}
 	for _, s := range params.Name {
-		backupFilePath := function.SafePathJoin(logic.Panel{}.SaveRootPath(), s)
+		backupFilePath := function.SafePathJoin(storage.Local{}.GetPanelBackupPath(), s)
 		if _, err := os.Stat(backupFilePath); errors.Is(err, os.ErrNotExist) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 		err := function.SafeDelete(
-			logic.Panel{}.SaveRootPath(),
+			storage.Local{}.GetPanelBackupPath(),
 			s,
 		)
 		if err != nil {
@@ -432,7 +433,7 @@ func (self Panel) BackupDownload(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	backupFilePath := filepath.Join(logic.Panel{}.SaveRootPath(), function.SafeFileName(params.Name))
+	backupFilePath := filepath.Join(storage.Local{}.GetPanelBackupPath(), function.SafeFileName(params.Name))
 	if _, err := os.Stat(backupFilePath); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -456,7 +457,7 @@ func (self Panel) BackupRestore(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	backupTar := filepath.Join(logic.Panel{}.SaveRootPath(), function.SafeFileName(params.Name))
+	backupTar := filepath.Join(storage.Local{}.GetPanelBackupPath(), function.SafeFileName(params.Name))
 	if _, err := os.Stat(backupTar); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

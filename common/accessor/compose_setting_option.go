@@ -16,7 +16,6 @@ const (
 	ComposeTypeRemoteUrl   = "remoteUrl"
 	ComposeTypeStoragePath = "storagePath"
 	ComposeTypeOutPath     = "outPath"
-	ComposeTypeDangling    = "dangling"
 	ComposeTypeStore       = "store"
 	ComposeStatusWaiting   = "waiting"
 	ComposeStatusDeploying = "deploying"
@@ -25,6 +24,7 @@ const (
 
 type ComposeSettingOption struct {
 	Status            string          `json:"status,omitempty"`
+	Dangling          bool            `json:"dangling"`
 	Type              string          `json:"type"`
 	Uri               []string        `json:"uri,omitempty"`
 	RemoteUrl         string          `json:"remoteUrl,omitempty"`

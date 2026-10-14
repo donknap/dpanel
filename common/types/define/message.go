@@ -10,6 +10,7 @@ const (
 	ErrorMessageCommonUploadFileEmpty                       = ".commonUploadFileEmpty"
 	ErrorMessageCommonUseWsConnect                          = ".commonUseWsConnect"
 	ErrorMessageCommonCancelOperator                        = ".commonCancelOperator"
+	ErrorMessagePanelProxyUnavailable                       = ".panelProxyUnavailable"
 	ErrorMessageProLicenseParseErr                          = ".proLicenseFileIsCorrect"
 	ErrorMessageXkLicenseParseErr                           = ".xkLicenseFileIsCorrect"
 	ErrorMessageComposeDeleteFileMustDeleteTask             = ".composeDeleteFileMustDeleteTask"

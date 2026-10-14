@@ -78,40 +78,34 @@ func (self Panel) GetPanelPath() []*types.ValueItem {
 	return savePath
 }
 
-func (self Panel) ValidateProxy(proxy string) error {
-	proxyUrl, err := url.ParseRequestURI(proxy)
-	if err != nil || proxyUrl.Scheme == "" || proxyUrl.Host == "" || proxyUrl.Hostname() == "" {
+func (self Panel) ValidateProxy(proxy string, targetUrls []string) error {
+	proxyURL, err := url.ParseRequestURI(proxy)
+	if err != nil || proxyURL.Hostname() == "" || (proxyURL.Scheme != "http" && proxyURL.Scheme != "https" && proxyURL.Scheme != "socks5") {
 		return errors.New("invalid proxy url")
 	}
-	switch proxyUrl.Scheme {
-	case "http", "https", "socks5":
-	default:
-		return errors.New("unsupported proxy scheme")
-	}
-
+	transport := &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+	defer transport.CloseIdleConnections()
 	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyURL(proxyUrl),
+		Transport: transport,
+		Timeout:   8 * time.Second,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
 		},
-		Timeout: 8 * time.Second,
 	}
-	resp, err := client.Get("https://registry-1.docker.io/v2/")
-	if err != nil {
-		return errors.New("proxy external access check failed: " + err.Error())
+	for _, targetURL := range targetUrls {
+		resp, err := client.Get(targetURL)
+		if err != nil {
+			return err
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode == http.StatusProxyAuthRequired {
+			return errors.New("proxy authentication failed")
+		}
+		if resp.StatusCode >= http.StatusInternalServerError {
+			return fmt.Errorf("proxy target returned status %d", resp.StatusCode)
+		}
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusUnauthorized {
-		return nil
-	}
-	if resp.StatusCode == http.StatusProxyAuthRequired {
-		return errors.New("proxy authentication failed")
-	}
-	return fmt.Errorf("proxy external access check failed: %d", resp.StatusCode)
-}
-
-func (self Panel) SaveRootPath() string {
-	return filepath.Join(storage.Local{}.GetBackupPath(), "dpanel")
+	return nil
 }
 
 func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {

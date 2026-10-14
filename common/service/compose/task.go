@@ -10,11 +10,13 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	types2 "github.com/donknap/dpanel/common/service/docker/types"
 )
 
 type Task struct {
-	Name    string
-	Project *types.Project
+	Name        string
+	Project     *types.Project
+	Environment []types2.EnvItem
 }
 
 func (self Task) Deploy(removeOrphans bool, pullImage bool) (io.ReadCloser, error) {

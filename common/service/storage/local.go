@@ -68,6 +68,10 @@ func (self Local) GetBackupPath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "backup")
 }
 
+func (self Local) GetPanelBackupPath() string {
+	return filepath.Join(self.GetBackupPath(), "dpanel")
+}
+
 func (self Local) GetLocalProxySockPath() string {
 	path := filepath.Join(self.GetStorageLocalPath(), "sock")
 	return path

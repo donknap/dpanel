@@ -79,8 +79,10 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	} else {
 		if params.Type == accessor.ComposeTypeStoragePath {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDisableStorageType), 500)
-			return
+			if !function.IsSafeName(params.Name) || params.Yaml != "" || params.YamlOverride != "" {
+				self.JsonResponseWithError(http, fmt.Errorf("storage path task requires a safe name and an empty directory"), 400)
+				return
+			}
 		}
 		if params.Type == accessor.ComposeTypeStore {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDisableStore), 500)
@@ -108,7 +110,7 @@ func (self Compose) Create(http *gin.Context) {
 			},
 		}
 		if function.InArray([]string{
-			accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl,
+			accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl, accessor.ComposeTypeStoragePath,
 		}, params.Type) {
 			safeComposeName := function.SafeFileName(params.Name)
 			composeRow.Setting.Uri = []string{
@@ -168,48 +170,91 @@ func (self Compose) Create(http *gin.Context) {
 	}
 	composeRow.Setting.Environment = newEnv
 
-	// 将存在于 .env 的变量的值重新写入到 .env 文件，并添加 EnvInFile 标识
-	// 数据库中的环境变量包含了文件+数据库+自定义字段选项等完整数据
-	if envFilePath, envFileContent, err := composeRow.Setting.GetDefaultEnv(); err == nil {
-		envLines := strings.Split(string(envFileContent), "\n")
-		for j, item := range composeRow.Setting.Environment {
-			if _, i, ok := function.PluckArrayItemWalk(envLines, func(line string) bool {
-				return strings.HasPrefix(line, item.Name+"=")
-			}); ok {
-				envLines[i] = fmt.Sprintf("%s=%s", item.Name, strconv.Quote(item.Value))
-				if composeRow.Setting.Environment[j].Rule == nil {
-					composeRow.Setting.Environment[j].Rule = &types2.EnvValueRule{
-						Kind: types2.EnvValueRuleInEnvFile,
+	newStoragePath := params.Id == "" && params.Type == accessor.ComposeTypeStoragePath
+	if newStoragePath {
+		composeRow.Setting.Dangling = true
+	} else {
+		tasker, warning, taskErr := (logic.Compose{}).GetTasker(composeRow)
+		if errors.Is(taskErr, logic.ErrEmptyComposeFile) {
+			composeRow.Setting.Dangling = true
+		} else if taskErr != nil {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, taskErr).Error()), 500)
+			return
+		} else {
+			if err = (logic.Compose{}).ValidateProject(tasker.Project); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			composeRow.Setting.Dangling = false
+		}
+	}
+	envFilePath, _, err := composeRow.Setting.GetDefaultEnv()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	envLines := make([]string, 0, len(composeRow.Setting.Environment))
+	if !newStoragePath {
+		for i, item := range composeRow.Setting.Environment {
+			envLines = append(envLines, fmt.Sprintf("%s=%s", item.Name, strconv.Quote(strings.ReplaceAll(item.Value, "$", "$$"))))
+			if composeRow.Setting.Environment[i].Rule == nil {
+				composeRow.Setting.Environment[i].Rule = &types2.EnvValueRule{Kind: types2.EnvValueRuleInEnvFile}
+			} else {
+				composeRow.Setting.Environment[i].Rule.Kind |= types2.EnvValueRuleInEnvFile
+			}
+		}
+	}
+
+	created := false
+	createdDirectory := false
+	if newStoragePath {
+		taskDir := storage.Local{}.GetComposeProjectPath(dockerEnvName, params.Name)
+		if err = os.MkdirAll(filepath.Dir(taskDir), os.ModePerm); err == nil {
+			err = os.Mkdir(taskDir, os.ModePerm)
+			if err == nil {
+				createdDirectory = true
+			} else if errors.Is(err, os.ErrExist) {
+				var entries []os.DirEntry
+				var info os.FileInfo
+				info, err = os.Lstat(taskDir)
+				if err == nil && !info.IsDir() {
+					err = fmt.Errorf("compose task path is not a directory: %s", taskDir)
+				}
+				if err == nil {
+					entries, err = os.ReadDir(taskDir)
+					if err == nil && len(entries) != 0 {
+						err = fmt.Errorf("compose task directory is not empty: %s", taskDir)
 					}
-				} else {
-					composeRow.Setting.Environment[j].Rule.Kind |= types2.EnvValueRuleInEnvFile
 				}
 			}
 		}
-		err = os.WriteFile(envFilePath, []byte(strings.Join(envLines, "\n")), 0o600)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 	}
-
-	tasker, warning, err := logic.Compose{}.GetTasker(composeRow)
-	if err != nil && !errors.Is(err, logic.ErrEmptyComposeFile) {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
+	if composeRow.ID > 0 {
+		composeRow.Setting.UpdatedAt = time.Now().Local().Format(time.DateTime)
+		err = dao.Compose.Save(composeRow)
+	} else if composeRow.Setting.Type != accessor.ComposeTypeOutPath {
+		err = dao.Compose.Create(composeRow)
+		created = err == nil
+	}
+	if err != nil {
+		if createdDirectory {
+			_ = os.Remove(storage.Local{}.GetComposeProjectPath(dockerEnvName, params.Name))
+		}
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if err == nil {
-		if err = (logic.Compose{}).ValidateProject(tasker.Project); err != nil {
+	// 新建挂载目录时不写入 .env，目录保持为空，等待用户放置 Compose 文件。
+	if !newStoragePath {
+		if err = os.WriteFile(envFilePath, []byte(strings.Join(envLines, "\n")), 0o600); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 	}
-
-	if composeRow.ID > 0 {
-		composeRow.Setting.UpdatedAt = time.Now().Local().Format(time.DateTime)
-		_ = dao.Compose.Save(composeRow)
-	} else if composeRow.Setting.Type != accessor.ComposeTypeOutPath {
-		_ = dao.Compose.Create(composeRow)
+	if created {
 		facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposePayload{
 			Compose: composeRow,
 			Ctx:     http,
@@ -299,12 +344,11 @@ func (self Compose) GetList(http *gin.Context) {
 				UpdatedAt:     runItem.UpdatedAt.Local().Format(time.DateTime),
 			},
 		}
-		if runItem.CanManage {
-			outPathTask.Setting.Type = accessor.ComposeTypeOutPath
-		} else {
-			outPathTask.Setting.Type = accessor.ComposeTypeDangling
-		}
 		composeList = append(composeList, outPathTask)
+	}
+	for _, item := range composeList {
+		_, _, configErr := (logic.Compose{}).GetTasker(item)
+		item.Setting.Dangling = errors.Is(configErr, logic.ErrMissingComposeFile) || errors.Is(configErr, logic.ErrEmptyComposeFile) || errors.Is(configErr, os.ErrNotExist)
 	}
 
 	sort.Slice(composeList, func(i, j int) bool {
@@ -353,30 +397,19 @@ func (self Compose) GetTask(http *gin.Context) {
 		}
 	}
 
-	if tasker, _, err := (logic.Compose{}).GetTasker(composeRow); err == nil {
-		data["project"] = tasker.Project
-		// 获取环境变量时，需要从 .env 文件中拿到最新值和新增的变量
-		composeRow.Setting.Environment = function.PluckMapWalkArray(tasker.Project.Environment, func(k string, v string) (types2.EnvItem, bool) {
-			if dbItem, _, ok := function.PluckArrayItemWalk(composeRow.Setting.Environment, func(item types2.EnvItem) bool {
-				return item.Name == k
-			}); ok {
-				dbItem.Value = v
-				return dbItem, true
-			}
-			return types2.EnvItem{
-				Name:  k,
-				Value: v,
-				Rule: &types2.EnvValueRule{
-					Kind: types2.EnvValueRuleInEnvFile,
-				},
-			}, true
-		})
+	tasker, _, configErr := (logic.Compose{}).GetTasker(composeRow)
+	if configErr == nil || errors.Is(configErr, logic.ErrEmptyComposeFile) {
+		if tasker.Project != nil {
+			data["project"] = tasker.Project
+		}
+		composeRow.Setting.Environment = tasker.Environment
 	}
 
 	if run := (logic.Compose{}).LsItem(composeRow.Name); run != nil {
 		composeRow.Setting.Status = run.Status
 		composeRow.Setting.UpdatedAt = run.UpdatedAt.Format(time.DateTime)
 	}
+	composeRow.Setting.Dangling = errors.Is(configErr, logic.ErrMissingComposeFile) || errors.Is(configErr, logic.ErrEmptyComposeFile) || errors.Is(configErr, os.ErrNotExist)
 
 	self.JsonResponseWithoutError(http, data)
 	return

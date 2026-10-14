@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ var ComposeFileNameSuffix = []string{
 }
 
 var ErrEmptyComposeFile = errors.New("请先完善 compose.yaml 文件")
+var ErrMissingComposeFile = errors.New("compose file not found")
 
 type Compose struct {
 }
@@ -68,14 +70,13 @@ func (self Compose) Get(key string) (*entity.Compose, error) {
 			composeRow.Setting.RunName = v.RunName
 		}
 		if composeRow.Setting.Type == accessor.ComposeTypeOutPath {
-			if !v.CanManage {
-				composeRow.Setting.Type = accessor.ComposeTypeDangling
-			}
 			composeRow.Setting.Uri = v.ConfigFileList
 		}
 	} else {
 		composeRow.Setting.Status = accessor.ComposeStatusWaiting
 	}
+	_, _, err := self.GetTasker(composeRow)
+	composeRow.Setting.Dangling = errors.Is(err, ErrMissingComposeFile) || errors.Is(err, ErrEmptyComposeFile) || errors.Is(err, os.ErrNotExist)
 
 	return composeRow, nil
 }
@@ -287,13 +288,6 @@ func (self Compose) Sync(dockerEnvName string) error {
 			dbComposeRow.Setting.Uri = find.Setting.Uri
 			_ = dao.Compose.Save(dbComposeRow)
 			delete(findComposeList, dbComposeRow.Name)
-		} else {
-			// 除非任务的类型是属于当前的环境才执行删除
-			if function.InArray([]string{
-				accessor.ComposeTypeOutPath, accessor.ComposeTypeStoragePath, accessor.ComposeTypeStore,
-			}, dbComposeRow.Setting.Type) && dbComposeRow.Setting.DockerEnvName == docker.Sdk.Name {
-				_, _ = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Delete()
-			}
 		}
 	}
 
@@ -306,7 +300,7 @@ func (self Compose) Sync(dockerEnvName string) error {
 	return nil
 }
 
-func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.ProjectOptionsFn {
+func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose, taskEnv []types2.EnvItem) []cli.ProjectOptionsFn {
 	workingDir := dbRow.Setting.GetWorkingDir()
 
 	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
@@ -408,22 +402,7 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 		options = append(options, compose.WithYamlPath(path))
 	}
 
-	fileEnv := make(map[string]string)
-	if defaultEnvPath, defaultEnvContent, err := dbRow.Setting.GetDefaultEnv(); err == nil && defaultEnvContent != nil {
-		options = append(options, cli.WithEnvFiles(defaultEnvPath))
-		if fileInfo, err := os.Stat(defaultEnvPath); err == nil {
-			updatedAt, _ := time.ParseInLocation(time.DateTime, dbRow.Setting.UpdatedAt, time.Local)
-			if fileInfo.ModTime().Truncate(time.Second).After(updatedAt) {
-				fileEnv, _ = dotenv.UnmarshalWithLookup(string(defaultEnvContent), nil)
-			}
-		}
-	}
-	options = append(options, cli.WithDotEnv)
-	// 文件较新时使用 .env 中的同名变量，否则使用任务保存的值。
-	globalEnv := function.PluckArrayWalk(dbRow.Setting.Environment, func(i types2.EnvItem) (string, bool) {
-		if _, ok := fileEnv[i.Name]; ok {
-			return "", false
-		}
+	globalEnv := function.PluckArrayWalk(taskEnv, func(i types2.EnvItem) (string, bool) {
 		return fmt.Sprintf("%s=%s", i.Name, i.Value), true
 	})
 	options = append(options, cli.WithEnv(globalEnv))
@@ -438,12 +417,56 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) []cli.Project
 }
 
 func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, error) {
-	if dbRow.Setting.Type == accessor.ComposeTypeText && len(dbRow.Setting.Uri) == 1 {
-		if fileInfo, err := os.Stat(dbRow.Setting.GetUriFilePath()); err == nil && fileInfo.Size() == 0 {
-			return nil, nil, ErrEmptyComposeFile
+	if len(dbRow.Setting.Uri) == 0 || dbRow.Setting.Uri[0] == "" {
+		return nil, nil, ErrMissingComposeFile
+	}
+	taskEnv := append(make([]types2.EnvItem, 0, len(dbRow.Setting.Environment)), dbRow.Setting.Environment...)
+	fileInfo, err := os.Stat(dbRow.Setting.GetUriFilePath())
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil, ErrMissingComposeFile
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if fileInfo.Size() == 0 {
+		return &compose.Task{Environment: taskEnv}, nil, ErrEmptyComposeFile
+	}
+	defaultEnvPath, defaultEnvContent, err := dbRow.Setting.GetDefaultEnv()
+	if err != nil {
+		return nil, nil, err
+	}
+	if defaultEnvContent != nil {
+		if fileInfo, err := os.Stat(defaultEnvPath); err == nil {
+			updatedAt, _ := time.ParseInLocation(time.DateTime, dbRow.Setting.UpdatedAt, time.Local)
+			if fileInfo.ModTime().Truncate(time.Second).After(updatedAt) {
+				fileEnv, err := dotenv.UnmarshalWithLookup(string(defaultEnvContent), nil)
+				if err != nil {
+					return nil, nil, fmt.Errorf("parse compose .env: %w", err)
+				}
+				index := make(map[string]int, len(taskEnv))
+				for i, item := range taskEnv {
+					index[item.Name] = i
+				}
+				names := make([]string, 0, len(fileEnv))
+				for name := range fileEnv {
+					names = append(names, name)
+				}
+				sort.Strings(names)
+				for _, name := range names {
+					if i, ok := index[name]; ok {
+						taskEnv[i].Value = fileEnv[name]
+					} else {
+						taskEnv = append(taskEnv, types2.EnvItem{
+							Name:  name,
+							Value: fileEnv[name],
+							Rule:  &types2.EnvValueRule{Kind: types2.EnvValueRuleInEnvFile},
+						})
+					}
+				}
+			}
 		}
 	}
-	options := self.ComposeProjectOptionsFn(dbRow)
+	options := self.ComposeProjectOptionsFn(dbRow, taskEnv)
 	options = append(options, cli.WithLoadOptions(func(options *loader.Options) {
 		options.SkipValidation = true
 	}))
@@ -452,6 +475,7 @@ func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, erro
 		slog.Warn("compose get task ", "error", err)
 		return nil, nil, err
 	}
+	task.Environment = taskEnv
 	return task, warning, nil
 }
 
