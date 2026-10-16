@@ -864,7 +864,7 @@ func (self *Fs) checkCopyAliases(source, target string, sourceInfo, targetInfo o
 		}
 		realTarget := path.Join(realParent, path.Base(target))
 		if targetExists {
-			if resolved, resolveErr := self.sftpClient.RealPath(target); resolveErr == nil {
+			if resolved, err := self.sftpClient.RealPath(target); err == nil {
 				realTarget = resolved
 			}
 		}
@@ -1347,8 +1347,8 @@ func (self *Fs) importEntry(source, target string) error {
 		_ = sourceFile.Close()
 		return err
 	}
-	_, copyErr := io.Copy(targetFile, sourceFile)
-	err = errors.Join(copyErr, targetFile.Close(), sourceFile.Close())
+	_, err = io.Copy(targetFile, sourceFile)
+	err = errors.Join(err, targetFile.Close(), sourceFile.Close())
 	if err != nil {
 		return err
 	}
@@ -1402,8 +1402,8 @@ func (self *Fs) exportEntry(source, target string) error {
 	}
 	temporaryPath := temporaryFile.Name()
 	defer os.Remove(temporaryPath)
-	_, copyErr := io.Copy(temporaryFile, sourceFile)
-	err = errors.Join(copyErr, temporaryFile.Chmod(info.Mode().Perm()), temporaryFile.Close(), sourceFile.Close())
+	_, err = io.Copy(temporaryFile, sourceFile)
+	err = errors.Join(err, temporaryFile.Chmod(info.Mode().Perm()), temporaryFile.Close(), sourceFile.Close())
 	if err != nil {
 		return err
 	}

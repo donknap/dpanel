@@ -51,9 +51,9 @@ func (self *Fs) UnArchive(archivePaths []string, destination string) (err error)
 		if err = self.validateTransferSource(archivePath); err != nil {
 			return err
 		}
-		source, openErr := self.Open(archivePath)
-		if openErr != nil {
-			return openErr
+		source, err := self.Open(archivePath)
+		if err != nil {
+			return err
 		}
 		sources = append(sources, source)
 		sourcePaths[archivePath] = struct{}{}
@@ -114,8 +114,8 @@ func (self *Fs) UnArchive(archivePaths []string, destination string) (err error)
 			if err != nil {
 				return err
 			}
-			_, copyErr := io.Copy(file, content)
-			err = errors.Join(copyErr, file.Close())
+			_, err = io.Copy(file, content)
+			err = errors.Join(err, file.Close())
 			if err != nil {
 				return err
 			}

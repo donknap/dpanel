@@ -25,10 +25,10 @@ func (self *MkdirCommand) Run(root *os.Root, option options) (any, error) {
 	}
 	created := true
 	if option.recursive {
-		_, statErr := root.Lstat(name)
-		created = errors.Is(statErr, os.ErrNotExist)
-		if statErr != nil && !created {
-			return nil, fmt.Errorf("lstat directory %q: %w", option.path, statErr)
+		_, err = root.Lstat(name)
+		created = errors.Is(err, os.ErrNotExist)
+		if err != nil && !created {
+			return nil, fmt.Errorf("lstat directory %q: %w", option.path, err)
 		}
 		err = root.MkdirAll(name, mode.Perm())
 	} else {

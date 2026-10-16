@@ -181,11 +181,11 @@ func (self Fnnas) User(request *http.Request) (FnnasUser, error) {
 	userID := request.Header.Get("X-Trim-Userid")
 	isAdminRaw := request.Header.Get("X-Trim-Isadmin")
 	username := request.Header.Get("X-Trim-Username")
-	parsedAdmin, parseErr := strconv.ParseBool(strings.TrimSpace(isAdminRaw))
+	parsedAdmin, err := strconv.ParseBool(strings.TrimSpace(isAdminRaw))
 	if userID == "" || isAdminRaw == "" || username == "" {
 		return FnnasUser{}, errors.New("fnnas user header is empty")
 	}
-	if parseErr != nil {
+	if err != nil {
 		return FnnasUser{}, errors.New("fnnas user isadmin header is invalid")
 	}
 	return FnnasUser{

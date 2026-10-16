@@ -249,8 +249,8 @@ func (self Swarm) Log(http *gin.Context) {
 		case <-http.Request.Context().Done():
 		case <-progress.Done():
 		}
-		closeErr := response.Close()
-		slog.Info("service run log response close", "id", fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id), "err", closeErr)
+		err := response.Close()
+		slog.Info("service run log response close", "id", fmt.Sprintf(ws.MessageTypeSwarmLog, params.Type, params.Id), "err", err)
 	}()
 	_, err = io.Copy(progress, response)
 	self.JsonResponseWithoutError(http, gin.H{

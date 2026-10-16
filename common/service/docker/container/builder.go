@@ -93,9 +93,9 @@ func (self *Builder) Execute() (containerID string, err error) {
 		containerID, restoreErr := self.rollback.restore(self.dockerSdk, response.ID)
 		return containerID, errors.Join(err, restoreErr)
 	}
-	if commitErr := self.rollback.commit(self.dockerSdk); commitErr != nil {
+	if err := self.rollback.commit(self.dockerSdk); err != nil {
 		containerID, restoreErr := self.rollback.restore(self.dockerSdk, response.ID)
-		return containerID, errors.Join(commitErr, restoreErr)
+		return containerID, errors.Join(err, restoreErr)
 	}
 	return response.ID, nil
 }

@@ -169,7 +169,7 @@ func (self Panel) Backup(http *gin.Context) {
 	manifest := make([]backup.Manifest, 0)
 	backupPathMap := function.PluckArrayMapWalk(params.BackupVolumePathList, func(item string) (string, string, bool) {
 		realPath := filepath.Join(storage.Local{}.GetStorageLocalPath(), item)
-		if _, statErr := os.Lstat(realPath); errors.Is(statErr, os.ErrNotExist) {
+		if _, err := os.Lstat(realPath); errors.Is(err, os.ErrNotExist) {
 			return "", "", false
 		}
 		return realPath, item, true

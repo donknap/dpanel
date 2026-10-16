@@ -63,9 +63,9 @@ func (self *Fs) UnArchive(archivePaths []string, destination string) (err error)
 		if err != nil {
 			return err
 		}
-		info, _, statErr := self.LstatIfPossible(archivePath)
-		if statErr != nil {
-			return statErr
+		info, _, err := self.LstatIfPossible(archivePath)
+		if err != nil {
+			return err
 		}
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("archive source %q is not a regular file", archivePath)
@@ -73,26 +73,26 @@ func (self *Fs) UnArchive(archivePaths []string, destination string) (err error)
 		if err = self.validateExportSource(archivePath); err != nil {
 			return err
 		}
-		backendSource, pathErr := self.backendPath(archivePath)
-		if pathErr != nil {
-			return pathErr
+		backendSource, err := self.backendPath(archivePath)
+		if err != nil {
+			return err
 		}
-		transport, _, copyErr := self.sdk.Client.CopyFromContainer(self.sdk.Ctx, self.targetContainerName, backendSource)
-		if copyErr != nil {
-			return copyErr
+		transport, _, err := self.sdk.Client.CopyFromContainer(self.sdk.Ctx, self.targetContainerName, backendSource)
+		if err != nil {
+			return err
 		}
-		file, createErr := temporaryFileSystem.Create(fmt.Sprintf("/%d.tar", index))
-		if createErr != nil {
-			return errors.Join(createErr, transport.Close())
+		file, err := temporaryFileSystem.Create(fmt.Sprintf("/%d.tar", index))
+		if err != nil {
+			return errors.Join(err, transport.Close())
 		}
-		_, copyErr = io.Copy(file, transport)
-		copyErr = errors.Join(copyErr, transport.Close())
-		if copyErr != nil {
-			return errors.Join(copyErr, file.Close())
+		_, err = io.Copy(file, transport)
+		err = errors.Join(err, transport.Close())
+		if err != nil {
+			return errors.Join(err, file.Close())
 		}
-		source, inspectErr := inspectArchiveTransport(file)
-		if inspectErr != nil {
-			return errors.Join(inspectErr, file.Close())
+		source, err := inspectArchiveTransport(file)
+		if err != nil {
+			return errors.Join(err, file.Close())
 		}
 		sources = append(sources, source)
 		sourcePaths[archivePath] = struct{}{}
@@ -140,9 +140,9 @@ func (self *Fs) UnArchive(archivePaths []string, destination string) (err error)
 	writeResult := make(chan error, 1)
 	go func() {
 		tarWriter := tar.NewWriter(archiveWriter)
-		var writeErr error
+		var err error
 		for _, source := range sources {
-			writeErr = archiveservice.ReadEntries(source.Reader(), func(name string, entry archives.FileInfo, content io.Reader) error {
+			err = archiveservice.ReadEntries(source.Reader(), func(name string, entry archives.FileInfo, content io.Reader) error {
 				header, err := tar.FileInfoHeader(entry.FileInfo, "")
 				if err != nil {
 					return err
@@ -166,17 +166,17 @@ func (self *Fs) UnArchive(archivePaths []string, destination string) (err error)
 				}
 				return err
 			})
-			if writeErr != nil {
+			if err != nil {
 				break
 			}
 		}
-		writeErr = errors.Join(writeErr, tarWriter.Close())
-		_ = archiveWriter.CloseWithError(writeErr)
-		writeResult <- writeErr
+		err = errors.Join(err, tarWriter.Close())
+		_ = archiveWriter.CloseWithError(err)
+		writeResult <- err
 	}()
-	copyErr := self.sdk.ContainerImport(self.sdk.Ctx, self.targetContainerName, backendDestination, archiveReader)
-	_ = archiveReader.CloseWithError(copyErr)
-	if err = errors.Join(copyErr, <-writeResult); err != nil {
+	err = self.sdk.ContainerImport(self.sdk.Ctx, self.targetContainerName, backendDestination, archiveReader)
+	_ = archiveReader.CloseWithError(err)
+	if err = errors.Join(err, <-writeResult); err != nil {
 		return err
 	}
 	for target, metadata := range files {

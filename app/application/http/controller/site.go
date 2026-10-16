@@ -201,7 +201,7 @@ func (self Site) CreateByImage(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.SiteName), 500)
 			return
 		}
-	} else if inspectInfo, inspectErr := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId); inspectErr == nil {
+	} else if inspectInfo, err := docker.Sdk.Client.ContainerInspect(docker.Sdk.Ctx, params.ContainerId); err == nil {
 		oldContainerInfo = &inspectInfo
 	}
 

@@ -78,8 +78,8 @@ func (self *Fs) ReadDir(name string) ([]os.DirEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	entries, readErr := directory.ReadDir(-1)
-	return entries, errors.Join(readErr, directory.Close())
+	entries, err := directory.ReadDir(-1)
+	return entries, errors.Join(err, directory.Close())
 }
 
 func (self *Fs) localName(name string) (string, error) {

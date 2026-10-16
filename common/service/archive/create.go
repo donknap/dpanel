@@ -265,9 +265,9 @@ func collectFileEntries(source createSource) ([]createEntry, error) {
 	}
 
 	entries := make([]createEntry, 0)
-	err = filepath.WalkDir(source.sourcePath, func(filePath string, directoryEntry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+	err = filepath.WalkDir(source.sourcePath, func(filePath string, directoryEntry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
 		info, err := directoryEntry.Info()
 		if err != nil {

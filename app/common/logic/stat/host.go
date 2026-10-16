@@ -47,10 +47,10 @@ func streamSystem(ctx context.Context, dockerSdk *docker.Client, handle func(sys
 		slog.Warn("list containers for agent stat", "dockerEnvName", dockerSdk.Name, "error", err)
 	} else {
 		for _, item := range containerList {
-			containerInfo, inspectErr := dockerSdk.Client.ContainerInspect(ctx, item.ID)
-			if inspectErr != nil {
+			containerInfo, err := dockerSdk.Client.ContainerInspect(ctx, item.ID)
+			if err != nil {
 				slog.Warn("inspect container for agent stat", "dockerEnvName", dockerSdk.Name,
-					"container", item.ID, "error", inspectErr)
+					"container", item.ID, "error", err)
 				continue
 			}
 			if containerInfo.HostConfig == nil || containerInfo.State == nil || containerInfo.State.Pid <= 0 ||
@@ -73,9 +73,9 @@ func streamSystem(ctx context.Context, dockerSdk *docker.Client, handle func(sys
 	systemCollector := &agentSystemCollector{}
 	containerCollectors := make(map[string]*stats.Container)
 	return client.StreamStat(ctx, targets, func(data []byte) error {
-		system, containers, ready, decodeErr := systemCollector.Decode(data, containerCollectors)
-		if decodeErr != nil {
-			return decodeErr
+		system, containers, ready, err := systemCollector.Decode(data, containerCollectors)
+		if err != nil {
+			return err
 		}
 		if !ready {
 			return nil

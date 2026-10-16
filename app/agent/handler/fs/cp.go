@@ -81,7 +81,7 @@ func (self *CpCommand) copyPath(root *os.Root, source, target string, move, over
 		if sameFile(sourceInfo, targetInfo) {
 			return errors.New("source and target are the same file")
 		}
-		if resolvedTarget, statErr := root.Stat(target); statErr == nil && sameFile(sourceInfo, resolvedTarget) {
+		if resolvedTarget, err := root.Stat(target); err == nil && sameFile(sourceInfo, resolvedTarget) {
 			return errors.New("source and target are the same file")
 		}
 		if err = preflightTargetAliases(root, source, target); err != nil {
@@ -91,7 +91,7 @@ func (self *CpCommand) copyPath(root *os.Root, source, target string, move, over
 	if sourceInfo.IsDir() {
 		targetInsideSource := targetExists && directoryIDExists(sourceDirectories, targetInfo)
 		if targetExists {
-			if resolvedTarget, statErr := root.Stat(target); statErr == nil {
+			if resolvedTarget, err := root.Stat(target); err == nil {
 				targetInsideSource = targetInsideSource || directoryIDExists(sourceDirectories, resolvedTarget)
 			}
 		}

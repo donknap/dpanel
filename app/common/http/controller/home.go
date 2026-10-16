@@ -680,16 +680,16 @@ func (self Home) Usage(http *gin.Context) {
 		}
 		dockerResult := make(chan dockerUsageResult, 1)
 		go func() {
-			usage, collectErr := (statLogic.Stat{}).DockerDiskUsage(ctx, sdk)
-			dockerResult <- dockerUsageResult{usage: usage, err: collectErr}
+			usage, err := (statLogic.Stat{}).DockerDiskUsage(ctx, sdk)
+			dockerResult <- dockerUsageResult{usage: usage, err: err}
 		}()
 
 		var hostResult chan hostUsageResult
 		if sdk.DockerEnv.EnableSystemStat {
 			hostResult = make(chan hostUsageResult, 1)
 			go func() {
-				usage, collectErr := (statLogic.Stat{}).HostDiskUsage(ctx, sdk)
-				hostResult <- hostUsageResult{usage: usage, err: collectErr}
+				usage, err := (statLogic.Stat{}).HostDiskUsage(ctx, sdk)
+				hostResult <- hostUsageResult{usage: usage, err: err}
 			}()
 		}
 

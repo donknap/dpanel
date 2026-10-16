@@ -78,9 +78,9 @@ func discoverPorts(ctx context.Context, result []agentTypes.PortCheckResult) err
 	})
 
 	supported := make([]bool, len(result))
-	err = filepath.WalkDir(hostCgroupPath, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+	err = filepath.WalkDir(hostCgroupPath, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
 		if err = ctx.Err(); err != nil {
 			return err
@@ -100,14 +100,14 @@ func discoverPorts(ctx context.Context, result []agentTypes.PortCheckResult) err
 			return nil
 		}
 
-		handle, _, handleErr := unix.NameToHandleAt(unix.AT_FDCWD, path, 0)
-		if errors.Is(handleErr, unix.ENOSYS) || errors.Is(handleErr, unix.EOPNOTSUPP) {
+		handle, _, err := unix.NameToHandleAt(unix.AT_FDCWD, path, 0)
+		if errors.Is(err, unix.ENOSYS) || errors.Is(err, unix.EOPNOTSUPP) {
 			setUnsupported(result, targets)
 			return fs.SkipAll
 		}
-		if handleErr != nil {
+		if err != nil {
 			result[containerIndex].Errors = append(result[containerIndex].Errors, agentTypes.PortCheckError{
-				Check: "cgroup", Status: portCheckFailed, Error: fmt.Sprintf("read cgroup handle %s: %v", path, handleErr),
+				Check: "cgroup", Status: portCheckFailed, Error: fmt.Sprintf("read cgroup handle %s: %v", path, err),
 			})
 			return nil
 		}
@@ -252,14 +252,14 @@ func readHostSockets(ctx context.Context) ([]socketInfo, bool, bool, []agentType
 		var queryErr error
 		for !complete {
 			buffer := make([]byte, 64*1024)
-			length, _, receiveErr := unix.Recvfrom(fd, buffer, 0)
-			if receiveErr != nil {
-				queryErr = fmt.Errorf("receive socket diagnostic response: %w", receiveErr)
+			length, _, err := unix.Recvfrom(fd, buffer, 0)
+			if err != nil {
+				queryErr = fmt.Errorf("receive socket diagnostic response: %w", err)
 				break
 			}
-			messages, parseErr := syscall.ParseNetlinkMessage(buffer[:length])
-			if parseErr != nil {
-				queryErr = fmt.Errorf("parse socket diagnostic response: %w", parseErr)
+			messages, err := syscall.ParseNetlinkMessage(buffer[:length])
+			if err != nil {
+				queryErr = fmt.Errorf("parse socket diagnostic response: %w", err)
 				break
 			}
 			for _, message := range messages {
@@ -283,9 +283,9 @@ func readHostSockets(ctx context.Context) ([]socketInfo, bool, bool, []agentType
 						queryErr = errors.New("short socket diagnostic response")
 						break
 					}
-					cgroupID, found, parseErr := parseCgroupID(message.Data[inetDiagResponseSize:])
-					if parseErr != nil {
-						queryErr = parseErr
+					cgroupID, found, err := parseCgroupID(message.Data[inetDiagResponseSize:])
+					if err != nil {
+						queryErr = err
 						break
 					}
 					protocolCgroupAttributeSeen = protocolCgroupAttributeSeen || found

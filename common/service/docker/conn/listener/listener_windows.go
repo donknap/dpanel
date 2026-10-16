@@ -19,18 +19,18 @@ func New(address string) (net.Listener, string, error) {
 		return nil, "", fmt.Errorf("invalid named pipe address %q", address)
 	}
 	pipePath := `\\.\pipe\` + pipeName
-	conn, dialErr := winio.DialPipe(pipePath, pipeProbeTimeout())
-	if dialErr == nil {
+	conn, err := winio.DialPipe(pipePath, pipeProbeTimeout())
+	if err == nil {
 		_ = conn.Close()
 		return nil, address, nil
 	}
-	if !errors.Is(dialErr, syscall.ERROR_FILE_NOT_FOUND) {
-		return nil, "", fmt.Errorf("probe named pipe %s: %w", pipePath, dialErr)
+	if !errors.Is(err, syscall.ERROR_FILE_NOT_FOUND) {
+		return nil, "", fmt.Errorf("probe named pipe %s: %w", pipePath, err)
 	}
 
 	listener, err := winio.ListenPipe(pipePath, &winio.PipeConfig{})
 	if err != nil {
-		if conn, dialErr := winio.DialPipe(pipePath, pipeProbeTimeout()); dialErr == nil {
+		if conn, err := winio.DialPipe(pipePath, pipeProbeTimeout()); err == nil {
 			_ = conn.Close()
 			return nil, address, nil
 		}

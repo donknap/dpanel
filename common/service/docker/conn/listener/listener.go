@@ -22,20 +22,20 @@ func New(address string) (net.Listener, string, error) {
 		if info.Mode()&os.ModeSocket == 0 {
 			return nil, "", fmt.Errorf("%s exists and is not a socket", sockPath)
 		}
-		conn, dialErr := net.DialTimeout("unix", sockPath, time.Second)
-		if dialErr == nil {
+		conn, err := net.DialTimeout("unix", sockPath, time.Second)
+		if err == nil {
 			_ = conn.Close()
 			return nil, address, nil
 		}
-		if !errors.Is(dialErr, syscall.ECONNREFUSED) && !errors.Is(dialErr, os.ErrNotExist) {
-			return nil, "", fmt.Errorf("probe Unix socket %s: %w", sockPath, dialErr)
+		if !errors.Is(err, syscall.ECONNREFUSED) && !errors.Is(err, os.ErrNotExist) {
+			return nil, "", fmt.Errorf("probe Unix socket %s: %w", sockPath, err)
 		}
-		if current, statErr := os.Lstat(sockPath); statErr == nil && os.SameFile(info, current) {
+		if current, err := os.Lstat(sockPath); err == nil && os.SameFile(info, current) {
 			if err := os.Remove(sockPath); err != nil {
 				return nil, "", err
 			}
-		} else if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
-			return nil, "", statErr
+		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, "", err
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, "", err
@@ -43,7 +43,7 @@ func New(address string) (net.Listener, string, error) {
 	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: sockPath})
 	if err != nil {
 		// Another process may have bound the address after the probe.
-		if conn, dialErr := net.DialTimeout("unix", sockPath, time.Second); dialErr == nil {
+		if conn, err := net.DialTimeout("unix", sockPath, time.Second); err == nil {
 			_ = conn.Close()
 			return nil, address, nil
 		}

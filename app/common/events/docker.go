@@ -186,23 +186,21 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 							fmt.Sprintf(define.DPanelNetworkHostName, strings.Trim(info.Name, "/")),
 						},
 					})
-					var nginxErr error
 					var cmd exec.Executor
 					if facade.GetConfig().Get("app.env") == define.PanelAppEnvStandard {
 						err = logic2.Site{}.MakeNginxResolver()
 						if err != nil {
 							slog.Warn("init nginx make resolver", "error", err)
 						}
-						_, nginxErr = local.QuickRun("nginx -s reload")
-						if nginxErr != nil {
+						_, err = local.QuickRun("nginx -s reload")
+						if err != nil {
 							// 尝试启动 nginx
 							if cmd, err = local.New(
 								local.WithCommandName("nginx"),
 								local.WithArgs("-g", "daemon on;"),
 							); err == nil {
-								nginxErr = cmd.Run()
-								if nginxErr != nil {
-									slog.Warn("init nginx make resolver", "error", nginxErr)
+								if err = cmd.Run(); err != nil {
+									slog.Warn("init nginx make resolver", "error", err)
 								}
 							}
 						}

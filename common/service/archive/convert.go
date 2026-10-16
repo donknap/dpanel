@@ -50,10 +50,10 @@ func ZipToTar(ctx context.Context, zipPath, tarPath string, option Option) error
 	if err = validateArchiveTarget(tarPath); err != nil {
 		return err
 	}
-	if targetInfo, statErr := os.Lstat(tarPath); statErr == nil && os.SameFile(sourceInfo, targetInfo) {
+	if targetInfo, err := os.Lstat(tarPath); err == nil && os.SameFile(sourceInfo, targetInfo) {
 		return fmt.Errorf("tar target %q is the ZIP source", tarPath)
-	} else if statErr != nil && !errors.Is(statErr, fs.ErrNotExist) {
-		return statErr
+	} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
 	}
 	temporaryFile, err := os.CreateTemp(filepath.Dir(tarPath), "."+filepath.Base(tarPath)+"-*")
 	if err != nil {

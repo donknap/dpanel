@@ -41,8 +41,8 @@ func (self Docker) Build(sdk *docker.Client, wsBuffer *ws.ProgressPip, task acce
 		return "", "", err
 	}
 	defer func() {
-		if closeErr := b.Close(); closeErr != nil {
-			slog.Warn("image build context cleanup", "error", closeErr)
+		if err := b.Close(); err != nil {
+			slog.Warn("image build context cleanup", "error", err)
 		}
 	}()
 	stopBuildCancel := context.AfterFunc(wsBuffer.Context(), func() {
@@ -60,8 +60,8 @@ func (self Docker) Build(sdk *docker.Client, wsBuffer *ws.ProgressPip, task acce
 	})
 	defer stopResponseClose()
 	defer func() {
-		if closeErr := response.Body.Close(); closeErr != nil {
-			slog.Error("image build response close", "error", closeErr)
+		if err := response.Body.Close(); err != nil {
+			slog.Error("image build response close", "error", err)
 		}
 	}()
 

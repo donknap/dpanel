@@ -26,15 +26,15 @@ func (self *ChownCommand) Run(root *os.Root, option options) (any, error) {
 	}
 	uid, gid := -1, -1
 	if option.uid != "" {
-		value, parseErr := strconv.ParseUint(option.uid, 10, 32)
-		if parseErr != nil || strconv.FormatUint(value, 10) != option.uid {
+		value, err := strconv.ParseUint(option.uid, 10, 32)
+		if err != nil || strconv.FormatUint(value, 10) != option.uid {
 			return nil, fmt.Errorf("invalid uid %q", option.uid)
 		}
 		uid = int(value)
 	}
 	if option.gid != "" {
-		value, parseErr := strconv.ParseUint(option.gid, 10, 32)
-		if parseErr != nil || strconv.FormatUint(value, 10) != option.gid {
+		value, err := strconv.ParseUint(option.gid, 10, 32)
+		if err != nil || strconv.FormatUint(value, 10) != option.gid {
 			return nil, fmt.Errorf("invalid gid %q", option.gid)
 		}
 		gid = int(value)

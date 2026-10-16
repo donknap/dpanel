@@ -255,9 +255,9 @@ func (self Explorer) Export(fileSystem serviceafs.Fs, fileList []string, exportT
 	optionList := make([]archiveservice.CreateOption, 0, len(fileList))
 	for index, sourcePath := range fileList {
 		archiveName := path.Base(sourcePath)
-		localPath, pathErr := temporaryFileSystem.LocalPath(path.Join("/", strconv.Itoa(index), archiveName))
-		if pathErr != nil {
-			return nil, pathErr
+		localPath, err := temporaryFileSystem.LocalPath(path.Join("/", strconv.Itoa(index), archiveName))
+		if err != nil {
+			return nil, err
 		}
 		transferList = append(transferList, serviceafs.TransferFile{Source: sourcePath, Target: localPath})
 		optionList = append(optionList, archiveservice.WithFile(localPath, archiveName))
@@ -310,15 +310,15 @@ func (self Explorer) ImportFileContent(fileSystem serviceafs.Fs, fileName, conte
 	}
 	targetPath := path.Join(destination, fileName)
 	mode := os.FileMode(fileMode)
-	if targetInfo, statErr := fileSystem.Stat(targetPath); statErr == nil {
+	if targetInfo, err := fileSystem.Stat(targetPath); err == nil {
 		if targetInfo.IsDir() {
 			return errors.New("target is a directory")
 		}
 		if mode == 0 {
 			mode = targetInfo.Mode().Perm()
 		}
-	} else if !errors.Is(statErr, os.ErrNotExist) && !errdefs.IsNotFound(statErr) {
-		return statErr
+	} else if !errors.Is(err, os.ErrNotExist) && !errdefs.IsNotFound(err) {
+		return err
 	}
 	if mode == 0 {
 		mode = 0o666
@@ -327,8 +327,8 @@ func (self Explorer) ImportFileContent(fileSystem serviceafs.Fs, fileName, conte
 	if err != nil {
 		return err
 	}
-	_, writeErr := io.WriteString(file, content)
-	return errors.Join(writeErr, file.Close())
+	_, err = io.WriteString(file, content)
+	return errors.Join(err, file.Close())
 }
 
 func (self Explorer) Import(fileSystem serviceafs.Fs, destination string, fileList []ExplorerImportFile) (err error) {
@@ -465,9 +465,9 @@ func (self Explorer) Archive(fileSystem serviceafs.Fs, sources []string, target 
 	optionList := make([]archiveservice.CreateOption, 0, len(sources))
 	for index, source := range sources {
 		archiveName := path.Base(source)
-		localPath, pathErr := temporaryFileSystem.LocalPath(path.Join("/", strconv.Itoa(index), archiveName))
-		if pathErr != nil {
-			return pathErr
+		localPath, err := temporaryFileSystem.LocalPath(path.Join("/", strconv.Itoa(index), archiveName))
+		if err != nil {
+			return err
 		}
 		transferList = append(transferList, serviceafs.TransferFile{Source: source, Target: localPath})
 		optionList = append(optionList, archiveservice.WithFile(localPath, archiveName))

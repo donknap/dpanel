@@ -457,8 +457,8 @@ func (self *Fs) RootDirs() ([]string, error) {
 		result = append(result, containerInfo.Config.WorkingDir)
 	}
 	for _, item := range containerInfo.Mounts {
-		pathStat, statErr := self.sdk.Client.ContainerStatPath(self.sdk.Ctx, containerInfo.ID, item.Destination)
-		if statErr == nil && pathStat.Mode.IsDir() {
+		pathStat, err := self.sdk.Client.ContainerStatPath(self.sdk.Ctx, containerInfo.ID, item.Destination)
+		if err == nil && pathStat.Mode.IsDir() {
 			result = append(result, item.Destination)
 		}
 	}
@@ -585,20 +585,20 @@ func (self *Fs) writeFile(backendName string, file *os.File, info os.FileInfo) (
 			Name: path.Base(backendName), Mode: int64(formatTarMode(info.Mode())), Size: fileStat.Size(),
 			ModTime: fileStat.ModTime(), AccessTime: fileStat.ModTime(), Format: tar.FormatPAX,
 		}
-		writeErr := tarWriter.WriteHeader(header)
-		if writeErr == nil {
-			_, writeErr = io.CopyN(tarWriter, file, fileStat.Size())
+		err := tarWriter.WriteHeader(header)
+		if err == nil {
+			_, err = io.CopyN(tarWriter, file, fileStat.Size())
 		}
-		writeErr = errors.Join(writeErr, tarWriter.Close())
-		_ = archiveWriter.CloseWithError(writeErr)
-		writeResult <- writeErr
+		err = errors.Join(err, tarWriter.Close())
+		_ = archiveWriter.CloseWithError(err)
+		writeResult <- err
 	}()
-	copyErr := self.sdk.Client.CopyToContainer(
+	err = self.sdk.Client.CopyToContainer(
 		self.sdk.Ctx, self.targetContainerName, path.Dir(backendName), archiveReader,
 		container.CopyToContainerOptions{},
 	)
-	_ = archiveReader.CloseWithError(copyErr)
-	return errors.Join(copyErr, <-writeResult)
+	_ = archiveReader.CloseWithError(err)
+	return errors.Join(err, <-writeResult)
 }
 
 func (self *Fs) resolvePath(name string) (string, container.PathStat, bool, error) {
@@ -819,9 +819,9 @@ func (self *Fs) Import(fileList []serviceafs.TransferFile) (err error) {
 	if err != nil {
 		return err
 	}
-	copyErr := self.sdk.ContainerImport(self.sdk.Ctx, self.targetContainerName, "/", archiveFile)
+	err = self.sdk.ContainerImport(self.sdk.Ctx, self.targetContainerName, "/", archiveFile)
 	_ = archiveFile.Close()
-	return copyErr
+	return err
 }
 
 func (self *Fs) Export(fileList []serviceafs.TransferFile) error {
@@ -946,8 +946,8 @@ func (self *Fs) exportEntry(source, target string) (err error) {
 		_ = archiveReader.Close()
 		return err
 	}
-	_, copyErr := io.Copy(archiveFile, archiveReader)
-	err = errors.Join(copyErr, archiveFile.Close(), archiveReader.Close())
+	_, err = io.Copy(archiveFile, archiveReader)
+	err = errors.Join(err, archiveFile.Close(), archiveReader.Close())
 	if err != nil {
 		return err
 	}
@@ -962,10 +962,10 @@ func (self *Fs) exportEntry(source, target string) (err error) {
 	extractedSource := extractDirectory
 	if source != "/" || self.rootPath != "/" {
 		extractedSource = filepath.Join(extractDirectory, filepath.FromSlash(path.Base(backendSource)))
-		if _, statErr := os.Lstat(extractedSource); statErr != nil {
-			entries, readErr := temporaryFileSystem.ReadDir("/files")
-			if readErr != nil {
-				return readErr
+		if _, err := os.Lstat(extractedSource); err != nil {
+			entries, err := temporaryFileSystem.ReadDir("/files")
+			if err != nil {
+				return err
 			}
 			if len(entries) != 1 {
 				return errors.New("docker export archive has an unexpected layout")
@@ -1020,8 +1020,8 @@ func copyLocalEntry(source, target string) error {
 	}
 	temporaryPath := temporaryFile.Name()
 	defer os.Remove(temporaryPath)
-	_, copyErr := io.Copy(temporaryFile, sourceFile)
-	err = errors.Join(copyErr, temporaryFile.Chmod(info.Mode().Perm()), temporaryFile.Close(), sourceFile.Close())
+	_, err = io.Copy(temporaryFile, sourceFile)
+	err = errors.Join(err, temporaryFile.Chmod(info.Mode().Perm()), temporaryFile.Close(), sourceFile.Close())
 	if err != nil {
 		return err
 	}

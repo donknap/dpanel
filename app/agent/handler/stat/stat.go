@@ -58,17 +58,17 @@ func (*Handler) HandleStream(ctx context.Context, args []string, write func(any)
 			return nil
 		default:
 		}
-		currentCPU, readErr := readCPU()
-		if readErr != nil {
-			return readErr
+		currentCPU, err := readCPU()
+		if err != nil {
+			return err
 		}
-		memory, readErr := readMemory()
-		if readErr != nil {
-			return readErr
+		memory, err := readMemory()
+		if err != nil {
+			return err
 		}
-		load, readErr := readLoad()
-		if readErr != nil {
-			return readErr
+		load, err := readLoad()
+		if err != nil {
+			return err
 		}
 		result := agentTypes.SystemStat{
 			SchemaVersion:  agentTypes.StatSchemaVersion,
@@ -80,7 +80,7 @@ func (*Handler) HandleStream(ctx context.Context, args []string, write func(any)
 			ContainerStats: containerReader.Read(sampledAt, currentCPU, memory.Total),
 		}
 		result.Network, _ = readNetwork()
-		if result.Disk, readErr = readDisk(ctx); readErr != nil {
+		if result.Disk, err = readDisk(ctx); err != nil {
 			result.Disk = nil
 		}
 		select {
@@ -234,12 +234,12 @@ func readDisk(ctx context.Context) ([]agentTypes.DiskStat, error) {
 		if _, err = os.Stat(devicePath + "/device"); err != nil {
 			continue
 		}
-		if deviceType, readErr := os.ReadFile(devicePath + "/device/type"); readErr == nil &&
+		if deviceType, err := os.ReadFile(devicePath + "/device/type"); err == nil &&
 			strings.TrimSpace(string(deviceType)) != "0" {
 			continue
 		}
-		slaves, readErr := os.ReadDir(devicePath + "/slaves")
-		if readErr != nil || len(slaves) != 0 {
+		slaves, err := os.ReadDir(devicePath + "/slaves")
+		if err != nil || len(slaves) != 0 {
 			continue
 		}
 		result = append(result, agentTypes.DiskStat{
