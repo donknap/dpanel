@@ -16,13 +16,21 @@ func (self *Client) AppComposeDeploy(params *app.ComposeDeployOption) error {
 	return nil
 }
 
-func (self *Client) AppComposeTask(name string) (result app.ComposeDetailResult, err error) {
-	data, err := self.Post(function.RouterApiUri("/app/compose/get-task"), gin.H{
-		"id": name,
+func (self *Client) AppComposeDetail(name, dockerEnvName string) (result app.ComposeDetailResult, err error) {
+	data, err := self.Post(function.RouterApiUri("/app/compose/get-detail"), gin.H{
+		"name":          name,
+		"dockerEnvName": dockerEnvName,
 	})
 	if err != nil {
 		return result, err
 	}
 	err = json.NewDecoder(data).Decode(&result)
 	return result, err
+}
+
+func (self *Client) AppComposeSyncDir(id string) error {
+	_, err := self.Post(function.RouterApiUri("/app/compose/sync-dir"), gin.H{
+		"id": id,
+	})
+	return err
 }

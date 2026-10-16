@@ -11,20 +11,24 @@ import (
 	"github.com/compose-spec/compose-go/v2/paths"
 )
 
-// WindowsPathToSlash converts a Windows drive path such as c:\my\path to /c/my/path.
+// PathSeparatorToSlash 在任意运行系统上统一路径分隔符，例如 C:\app\compose.yaml 转为 C:/app/compose.yaml。
+// 不同于 filepath.ToSlash，它在非 Windows 系统上也会转换反斜杠；保留盘符、.、.. 和空字符串，不清理或映射目录。
+func PathSeparatorToSlash(pathValue string) string {
+	return strings.ReplaceAll(pathValue, "\\", "/")
+}
+
+// WindowsPathToSlash 将 Windows 盘符绝对路径转换为 /盘符/...，例如 C:\app\compose.yaml 转为 /c/app/compose.yaml。
+// 转换时小写盘符并清理 .、.. 和多余分隔符；不支持的输入原样返回，bool 为 false。
+// 结果仅遵循项目的盘符映射约定，不代表目录存在，也不添加 /mnt/host 等运行环境前缀。
 func WindowsPathToSlash(p string) (string, bool) {
 	if !paths.IsWindowsAbs(p) {
 		return p, false
 	}
-	pathName, pathValue, ok := strings.Cut(p, ":\\")
+	pathName, pathValue, ok := strings.Cut(PathSeparatorToSlash(p), ":/")
 	if !ok {
-		// 再尝试用 d:/ 来切割
-		pathName, pathValue, ok = strings.Cut(p, ":/")
-		if !ok {
-			return p, false
-		}
+		return p, false
 	}
-	convertedSource := fmt.Sprintf("/%s/%s", strings.ToLower(pathName), strings.ReplaceAll(pathValue, "\\", "/"))
+	convertedSource := fmt.Sprintf("/%s/%s", strings.ToLower(pathName), pathValue)
 	return path.Clean(convertedSource), true
 }
 

@@ -13,7 +13,11 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v2/paths"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/sirupsen/logrus"
 )
@@ -59,22 +63,24 @@ func WithYamlContent(content ...string) cli.ProjectOptionsFn {
 	}
 }
 
-func NewCompose(opts ...cli.ProjectOptionsFn) (wrapper *Task, warning, err error) {
-	// 自定义解析
-	opts = append(opts,
-		cli.WithExtension(ExtensionServiceName, ExtService{}),
-	)
-	options, err := cli.NewProjectOptions(
-		[]string{},
-		opts...,
-	)
-	if err != nil {
-		return nil, warning, err
+func NewCompose(ctx context.Context, dockerSdk *docker.Client, options *cli.ProjectOptions) (wrapper *Task, warning, err error) {
+	if len(options.ConfigPaths) == 0 {
+		return nil, nil, errors.New("compose configuration files are required")
 	}
-
+	var loadOptions *loader.Options
+	for _, configure := range []cli.ProjectOptionsFn{
+		cli.WithExtension(ExtensionServiceName, ExtService{}),
+		cli.WithResolvedPaths(false),
+		cli.WithLoadOptions(func(options *loader.Options) {
+			loadOptions = options
+		}),
+	} {
+		if err := configure(options); err != nil {
+			return nil, warning, err
+		}
+	}
 	originalFormatter := logrus.StandardLogger().Formatter
 	originalOutput := logrus.StandardLogger().Out
-
 	bufOut := new(bytes.Buffer)
 	logrus.SetOutput(bufOut)
 	logrus.SetFormatter(&logrus.JSONFormatter{
@@ -86,11 +92,41 @@ func NewCompose(opts ...cli.ProjectOptionsFn) (wrapper *Task, warning, err error
 		logrus.SetOutput(originalOutput)
 		logrus.SetFormatter(originalFormatter)
 	}()
-
-	project, err := options.LoadProject(context.Background())
+	workingDir := options.WorkingDir
+	sourceDir := filepath.Dir(options.ConfigPaths[0])
+	options.WorkingDir = sourceDir
+	model, err := options.LoadModel(ctx)
+	options.WorkingDir = workingDir
 	if err != nil {
 		return nil, warning, err
 	}
+	resources := make(map[string]any)
+	if services, ok := model["services"].(map[string]any); ok {
+		for name, value := range services {
+			service, ok := value.(map[string]any)
+			if !ok {
+				return nil, warning, fmt.Errorf("invalid compose service %q", name)
+			}
+			files := make(map[string]any)
+			for _, key := range []string{"env_file", "label_file"} {
+				if value, ok := service[key]; ok {
+					files[key] = value
+				}
+			}
+			resources[name] = files
+		}
+	}
+	if err := paths.ResolveRelativePaths(map[string]any{"services": resources}, sourceDir, nil); err != nil {
+		return nil, warning, err
+	}
+	project, err := loader.ModelToProject(model, loadOptions, types.ConfigDetails{
+		WorkingDir:  workingDir,
+		Environment: options.Environment,
+	})
+	if err != nil {
+		return nil, warning, err
+	}
+	project.ComposeFiles = append([]string(nil), options.ConfigPaths...)
 
 	if bufOut.Len() > 0 {
 		msg := make([]string, 0)
@@ -109,7 +145,11 @@ func NewCompose(opts ...cli.ProjectOptionsFn) (wrapper *Task, warning, err error
 	}
 
 	wrapper = &Task{
-		Project: project,
+		dockerSdk:    dockerSdk,
+		Name:         project.Name,
+		Project:      project,
+		ComposeFiles: project.ComposeFiles,
+		WorkingDir:   project.WorkingDir,
 	}
 	return wrapper, warning, nil
 }

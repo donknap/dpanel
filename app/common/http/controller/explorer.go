@@ -6,86 +6,21 @@ import (
 	"mime"
 	"os"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/agent/factor"
 	archiveservice "github.com/donknap/dpanel/common/service/archive"
 	"github.com/donknap/dpanel/common/service/docker"
-	serviceafs "github.com/donknap/dpanel/common/service/fs/afs"
 	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
-	"gorm.io/datatypes"
-	"gorm.io/gen"
 )
 
 type Explorer struct {
 	controller.Abstract
-}
-
-func (self Explorer) SyncDPanel(http *gin.Context) {
-	type ParamsValidate struct {
-		ComposeName string `json:"composeName" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !self.Validate(http, &params) {
-		return
-	}
-	dockerSdk, err := docker.NewClientWithUser(http)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if dockerSdk == nil || dockerSdk.Client == nil || dockerSdk.Ctx == nil || dockerSdk.DockerEnv == nil {
-		self.JsonResponseWithError(http, errors.New("docker client is required for dpanel sync"), 500)
-		return
-	}
-	if !dockerSdk.DockerEnv.IsRemote() {
-		self.JsonSuccessResponse(http)
-		return
-	}
-	dockerEnvName := define.DockerDefaultClientName
-	if dockerSdk.DockerEnv.EnableComposePath {
-		dockerEnvName = dockerSdk.Name
-	}
-	composeRow, err := dao.Compose.Where(dao.Compose.Name.Eq(params.ComposeName)).Where(gen.Cond(
-		datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
-	)...).First()
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	if composeRow == nil || params.ComposeName == "." || params.ComposeName == ".." ||
-		filepath.Base(params.ComposeName) != params.ComposeName {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
-		return
-	}
-	sourceDir := storage.Local{}.GetComposeProjectPath(dockerEnvName, params.ComposeName)
-	relativeDir, err := filepath.Rel(storage.Local{}.GetStorageLocalPath(), sourceDir)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	fileSystem, err := (logic.Explorer{}).Afs(http,
-		logic.ExplorerMountPoint(logic.ExplorerMountTypeContainer+":"+factor.ExplorerName), dockerSdk,
-	)
-	if err == nil {
-		err = fileSystem.Import([]serviceafs.TransferFile{{
-			Source: sourceDir,
-			Target: path.Join("/", filepath.ToSlash(relativeDir)),
-		}})
-	}
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
 }
 
 func (self Explorer) Export(http *gin.Context) {
@@ -324,42 +259,35 @@ func (self Explorer) GetPathList(http *gin.Context) {
 		return
 	}
 	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
-	currentPath := params.Path
-	if err == nil && currentPath == "" {
-		currentPath = fileSystem.WorkingDir()
-	}
-	var listErr error
-	var list any
-	if err == nil {
-		fileList, readErr := fileSystem.List(currentPath)
-		if readErr == nil {
-			sort.Slice(fileList, func(i, j int) bool {
-				if fileList[i].IsDir != fileList[j].IsDir {
-					return fileList[i].IsDir
-				}
-				return fileList[i].Name < fileList[j].Name
-			})
-			list = fileList
-		} else {
-			listErr = readErr
-		}
-	}
-	var rootDirs []string
-	if err == nil && listErr == nil {
-		rootDirs, listErr = fileSystem.RootDirs()
-	}
-	if err == nil && listErr == nil {
-		self.JsonResponseWithoutError(http, gin.H{
-			"currentPath": currentPath,
-			"list":        list,
-			"rootDirs":    rootDirs,
-		})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	if err == nil {
-		err = listErr
+	currentPath := params.Path
+	if currentPath == "" {
+		currentPath = fileSystem.WorkingDir()
 	}
-	self.JsonResponseWithError(http, err, 500)
+	fileList, err := fileSystem.List(currentPath)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	sort.Slice(fileList, func(i, j int) bool {
+		if fileList[i].IsDir != fileList[j].IsDir {
+			return fileList[i].IsDir
+		}
+		return fileList[i].Name < fileList[j].Name
+	})
+	rootDirs, err := fileSystem.RootDirs()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"currentPath": currentPath,
+		"list":        fileList,
+		"rootDirs":    rootDirs,
+	})
 }
 
 func (self Explorer) GetPathSize(http *gin.Context) {
@@ -470,19 +398,20 @@ func (self Explorer) GetFileStat(http *gin.Context) {
 		return
 	}
 	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
-	if err == nil {
-		result, statErr := fileSystem.Info(params.Path)
-		if statErr == nil {
-			self.JsonResponseWithoutError(http, gin.H{"info": gin.H{
-				"isDir":  result.IsDir,
-				"target": result.Path,
-				"name":   result.Name,
-			}})
-			return
-		}
-		err = statErr
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
-	self.JsonResponseWithError(http, err, 500)
+	result, err := fileSystem.Info(params.Path)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{"info": gin.H{
+		"isDir":  result.IsDir,
+		"target": result.Path,
+		"name":   result.Name,
+	}})
 }
 
 func (self Explorer) GetUserList(http *gin.Context) {
@@ -499,15 +428,16 @@ func (self Explorer) GetUserList(http *gin.Context) {
 		return
 	}
 	fileSystem, err := (logic.Explorer{}).Afs(http, params.MountPoint, dockerSdk)
-	if err == nil {
-		identities, userErr := fileSystem.Users()
-		if userErr == nil {
-			self.JsonResponseWithoutError(http, identities)
-			return
-		}
-		err = userErr
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
-	self.JsonResponseWithError(http, err, 500)
+	identities, err := fileSystem.Users()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, identities)
 }
 
 func (self Explorer) MkDir(http *gin.Context) {

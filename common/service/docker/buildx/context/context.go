@@ -56,7 +56,7 @@ func newContext(sdk *docker.Client) (*contextService, error) {
 	if sdk == nil || sdk.Client == nil || sdk.DockerEnv == nil {
 		return nil, errors.New("Docker client is required for buildx")
 	}
-	if !filepath.IsLocal(sdk.Name) || filepath.Base(sdk.Name) != sdk.Name {
+	if !function.IsSafeString(sdk.Name, function.StringRuleName) {
 		return nil, fmt.Errorf("invalid Docker environment name %q", sdk.Name)
 	}
 	configRoot := filepath.Join(storage.Local{}.GetStorageLocalPath(), "buildx")
@@ -198,19 +198,19 @@ func Create(sdk *docker.Client, option CreateOption) (err error) {
 	}
 	content := option.Config
 	if content == nil {
-		saved, readErr := os.ReadFile(self.configPath)
+		saved, err := os.ReadFile(self.configPath)
 		switch {
-		case readErr == nil:
+		case err == nil:
 			config := string(saved)
 			content = &config
-		case errors.Is(readErr, os.ErrNotExist):
+		case errors.Is(err, os.ErrNotExist):
 			config, err := self.defaultConfig()
 			if err != nil {
 				return err
 			}
 			content = &config
 		default:
-			return readErr
+			return err
 		}
 	}
 	if builderExists {

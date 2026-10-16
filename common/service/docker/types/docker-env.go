@@ -77,6 +77,13 @@ func (self DockerEnv) IsDefault() bool {
 	return self.Name == define.DockerDefaultClientName
 }
 
+func (self DockerEnv) GetComposeEnvName() string {
+	if self.EnableComposePath {
+		return self.Name
+	}
+	return define.DockerDefaultClientName
+}
+
 func (self DockerEnv) GetSockName() string {
 	if self.RemoteType == define.DockerRemoteTypeSock {
 		return self.Address

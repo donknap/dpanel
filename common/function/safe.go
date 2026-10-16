@@ -5,8 +5,18 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
+)
+
+type StringRule string
+
+const (
+	StringRuleName StringRule = "name"
+	StringRulePath StringRule = "path"
 )
 
 // SafePath 对路径做安全净化。
@@ -51,18 +61,25 @@ func SafeFileName(name string) string {
 	return base
 }
 
-func IsSafeName(name string) bool {
-	if name == "" {
+func IsSafeString(value string, rule StringRule) bool {
+	if value == "" || !utf8.ValidString(value) {
 		return false
 	}
-	for _, r := range name {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
-			r == '_' || r == '-' {
-			continue
+	for _, character := range value {
+		if unicode.IsControl(character) {
+			return false
 		}
+	}
+	switch rule {
+	case StringRuleName:
+		return value != "." && filepath.IsLocal(value) && !strings.ContainsAny(value, "/\\")
+	case StringRulePath:
+		return !slices.Contains(strings.FieldsFunc(value, func(character rune) bool {
+			return character == '/' || character == '\\'
+		}), "..")
+	default:
 		return false
 	}
-	return true
 }
 
 // SafeShell 将参数转换为可安全放入 shell 命令参数位置的值。

@@ -133,12 +133,12 @@ func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 		}
 		if containerInfo.HostConfig.AutoRemove {
 			for {
-				_, inspectErr := dockerClient.Client.ContainerInspect(dockerClient.Ctx, containerInfo.ID)
-				if errdefs.IsNotFound(inspectErr) {
+				_, err := dockerClient.Client.ContainerInspect(dockerClient.Ctx, containerInfo.ID)
+				if errdefs.IsNotFound(err) {
 					break
 				}
-				if inspectErr != nil {
-					self.JsonResponseWithError(http, inspectErr, 500)
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
 					return
 				}
 				select {

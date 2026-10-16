@@ -2,10 +2,12 @@ package logic
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -15,24 +17,24 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/donknap/dpanel/app/common/logic"
+	commonlogic "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/agent/factor"
 	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
+	serviceafs "github.com/donknap/dpanel/common/service/fs/afs"
+	"github.com/donknap/dpanel/common/service/fs/dockerfs"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
+	"gorm.io/gorm"
 )
-
-var ComposeFileNameSuffix = []string{
-	"docker-compose.yml", "docker-compose.yaml",
-	"compose.yml", "compose.yaml",
-}
 
 var ErrEmptyComposeFile = errors.New("请先完善 compose.yaml 文件")
 var ErrMissingComposeFile = errors.New("compose file not found")
@@ -40,44 +42,51 @@ var ErrMissingComposeFile = errors.New("compose file not found")
 type Compose struct {
 }
 
+// 仅支持 id 和 运行中 compose 名称获取
 func (self Compose) Get(key string) (*entity.Compose, error) {
 	var composeRow *entity.Compose
-
-	if id, err := strconv.Atoi(key); err == nil {
-		composeRow, _ = dao.Compose.Where(dao.Compose.ID.Eq(int32(id))).First()
+	var runTask *compose.ProjectResult
+	id, err := strconv.Atoi(key)
+	if err == nil {
+		composeRow, err = dao.Compose.Where(dao.Compose.ID.Eq(int32(id))).First()
+		if err != nil {
+			return nil, err
+		}
+		runTask = self.LsItem(composeRow.Name)
 	} else {
-		composeRow, _ = dao.Compose.Where(dao.Compose.Name.Eq(key)).First()
-	}
-
-	if composeRow == nil {
+		runTask = self.LsItem(key)
+		if runTask == nil {
+			return nil, gorm.ErrRecordNotFound
+		}
 		composeRow = &entity.Compose{
 			Name:  key,
 			Title: "",
 			Setting: &accessor.ComposeSettingOption{
 				Type:          accessor.ComposeTypeOutPath,
-				DockerEnvName: docker.Sdk.Name,
+				DockerEnvName: docker.Sdk.DockerEnv.GetComposeEnvName(),
 				Environment:   make([]types2.EnvItem, 0),
 			},
 		}
 	}
+	if composeRow.Setting == nil {
+		return nil, errors.New("compose settings are required")
+	}
+	if composeRow.ID == 0 && composeRow.Setting.CreatedAt == "" {
+		composeRow.Setting.CreatedAt = time.Now().Local().Format(time.DateTime)
+		composeRow.Setting.UpdatedAt = composeRow.Setting.CreatedAt
+	}
 
-	runTaskList := self.Ls()
-	if v, _, ok := function.PluckArrayItemWalk(runTaskList, func(item *compose.ProjectResult) bool {
-		return item.Name == composeRow.Name
-	}); ok {
-		composeRow.Setting.Status = v.Status
-		if strings.HasPrefix(v.RunName, define.ComposeProjectPrefix) {
-			composeRow.Setting.RunName = v.RunName
+	if runTask != nil {
+		composeRow.Setting.Status = runTask.Status
+		if strings.HasPrefix(runTask.RunName, define.ComposeProjectPrefix) {
+			composeRow.Setting.RunName = runTask.RunName
 		}
-		if composeRow.Setting.Type == accessor.ComposeTypeOutPath {
-			composeRow.Setting.Uri = v.ConfigFileList
+		if composeRow.Setting.Type == accessor.ComposeTypeOutPath && len(composeRow.Setting.Uri) == 0 {
+			composeRow.Setting.Uri = runTask.ConfigFileList
 		}
 	} else {
 		composeRow.Setting.Status = accessor.ComposeStatusWaiting
 	}
-	_, _, err := self.GetTasker(composeRow)
-	composeRow.Setting.Dangling = errors.Is(err, ErrMissingComposeFile) || errors.Is(err, ErrEmptyComposeFile) || errors.Is(err, os.ErrNotExist)
-
 	return composeRow, nil
 }
 
@@ -167,6 +176,7 @@ func (self Compose) Ls() []*compose.ProjectResult {
 		for _, summary := range containerList {
 			if configFiles, ok := summary.Labels[define.ComposeLabelConfigFiles]; ok {
 				task.ConfigFileList = append(task.ConfigFileList, function.PluckArrayWalk(strings.Split(configFiles, ","), func(item string) (string, bool) {
+					item = function.PathSeparatorToSlash(item)
 					return item, !function.InArray(task.ConfigFileList, item)
 				})...)
 			}
@@ -242,13 +252,13 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 		return findComposeList
 	}
 
-	for _, path := range pathList {
-		if !path.IsDir() {
+	for _, dirEntry := range pathList {
+		if !dirEntry.IsDir() {
 			continue
 		}
-		for _, suffix := range ComposeFileNameSuffix {
-			relYamlFilePath := filepath.Join(path.Name(), suffix)
-			name := strings.ToLower(path.Name())
+		for _, suffix := range accessor.ComposeFileNameSuffix {
+			relYamlFilePath := path.Join(dirEntry.Name(), suffix)
+			name := strings.ToLower(dirEntry.Name())
 			if _, err = os.Stat(filepath.Join(rootDir, relYamlFilePath)); err == nil {
 				// 强制转为小写
 				findRow := &entity.Compose{
@@ -260,10 +270,10 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 						Uri: []string{
 							relYamlFilePath,
 						},
-						DockerEnvName: docker.Sdk.Name,
+						DockerEnvName: docker.Sdk.DockerEnv.GetComposeEnvName(),
 					},
 				}
-				relOverrideYamlPath := filepath.Join(path.Name(), define.ComposeProjectDeployOverrideFileName)
+				relOverrideYamlPath := path.Join(dirEntry.Name(), define.ComposeProjectDeployOverrideFileName)
 				if _, err = os.Stat(filepath.Join(rootDir, relOverrideYamlPath)); err == nil {
 					findRow.Setting.Uri = append(findRow.Setting.Uri, relOverrideYamlPath)
 				}
@@ -284,10 +294,23 @@ func (self Compose) Sync(dockerEnvName string) error {
 	composeList, _ := dao.Compose.Find()
 	for _, dbComposeRow := range composeList {
 		if find, ok := findComposeList[dbComposeRow.Name]; ok && find.Setting.DockerEnvName == dbComposeRow.Setting.DockerEnvName {
-			// 终始以目录下的实际文件为准
-			dbComposeRow.Setting.Uri = find.Setting.Uri
-			_ = dao.Compose.Save(dbComposeRow)
+			if dbComposeRow.Setting.Type != accessor.ComposeTypeOutPath {
+				dbComposeRow.Setting.Uri = find.Setting.Uri
+				_ = dao.Compose.Save(dbComposeRow)
+			} else if dbComposeRow.Setting.Delegate == nil {
+				dbComposeRow.Setting.Delegate = function.Ptr(true)
+				if err := dao.Compose.Save(dbComposeRow); err != nil {
+					return err
+				}
+			}
 			delete(findComposeList, dbComposeRow.Name)
+		}
+	}
+	for _, running := range self.Ls() {
+		if find, ok := findComposeList[running.Name]; ok {
+			find.Setting.Type = accessor.ComposeTypeOutPath
+			find.Setting.Uri = running.ConfigFileList
+			find.Setting.Delegate = function.Ptr(true)
 		}
 	}
 
@@ -300,138 +323,88 @@ func (self Compose) Sync(dockerEnvName string) error {
 	return nil
 }
 
-func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose, taskEnv []types2.EnvItem) []cli.ProjectOptionsFn {
-	workingDir := dbRow.Setting.GetWorkingDir()
+func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (*compose.Task, error, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// 如果面板的 /dpanel 挂载到了宿主机，则重新设置 workDir
-	linkComposePath := ""
-	volumeComposePath := ""
-	dpanelInfo := logic.Setting{}.GetDPanelInfo()
-
-	if function.IsRunInDocker() {
-		for i, mount := range dpanelInfo.ContainerInfo.Mounts {
-			if mount.Type != types.VolumeTypeBind {
-				continue
+	if dbRow == nil || dbRow.Setting == nil || !function.IsSafeString(dbRow.Name, function.StringRuleName) {
+		return nil, nil, errors.New("invalid compose task")
+	}
+	composeSetting := *dbRow.Setting
+	composeSetting.Uri = make([]string, len(dbRow.Setting.Uri))
+	for index, uri := range dbRow.Setting.Uri {
+		composeSetting.Uri[index] = function.PathSeparatorToSlash(uri)
+	}
+	composeFile, overrideFile, err := composeSetting.GetUriPath(dbRow.Name)
+	if err != nil {
+		return nil, nil, err
+	}
+	rootDir := storage.Local{}.GetComposePath(composeSetting.DockerEnvName)
+	fileList := make([]string, 0, len(composeSetting.Uri)+1)
+	for index, uri := range composeSetting.Uri {
+		filePath := function.SlashPathToSystem(uri)
+		if composeSetting.Type != accessor.ComposeTypeOutPath || composeSetting.IsDelegate() {
+			filename := path.Base(uri)
+			if index > 0 && composeSetting.IsDelegate() && filename == fmt.Sprintf(define.ComposeProjectDeployOverrideOutPathFileName, dbRow.Name) {
+				filename = define.ComposeProjectDeployOverrideFileName
 			}
-			if v, ok := function.WindowsPathToSlash(mount.Source); ok {
-				dpanelInfo.ContainerInfo.Mounts[i].Source = filepath.Join("/", "mnt", "host", v)
-			}
+			filePath = filepath.Join(filepath.Dir(composeFile), filename)
 		}
-
-		for _, mount := range dpanelInfo.ContainerInfo.Mounts {
-			if mount.Destination != "/dpanel" {
-				continue
-			}
-			if mount.Type == types.VolumeTypeBind && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
-				linkComposePath = filepath.Join(mount.Source, filepath.Base(workingDir))
-			} else if mount.Type == types.VolumeTypeVolume {
-				volumeComposePath = filepath.Join(define.ComposeVolumeCheckPath, dbRow.Setting.DockerEnvName)
-			}
-		}
-
-		// 如果开启了独立目录，获取挂载目录也应该只取对应的的
-		mountComposePath := "/dpanel/compose"
-
-		if docker.Sdk.DockerEnv.EnableComposePath {
-			mountComposePath = filepath.Join("/", "dpanel", "compose-"+dbRow.Setting.DockerEnvName)
-		}
-
-		for _, mount := range dpanelInfo.ContainerInfo.Mounts {
-			if mount.Destination != mountComposePath {
-				continue
-			}
-			if mount.Type == types.VolumeTypeBind && !strings.HasSuffix(filepath.VolumeName(mount.Source), ":") {
-				linkComposePath = mount.Source
-				volumeComposePath = ""
-			} else if mount.Type == types.VolumeTypeVolume {
-				volumeComposePath = filepath.Join(define.ComposeVolumeCheckPath, dbRow.Setting.DockerEnvName)
-				linkComposePath = ""
-			}
-		}
-		if volumeComposePath != "" {
-			linkComposePath = volumeComposePath
+		if !function.InArray(fileList, filePath) {
+			fileList = append(fileList, filePath)
 		}
 	}
-
-	if linkComposePath != "" {
-		// 把软连的上级目录创建出来
-		if _, err := os.Stat(linkComposePath); err != nil {
-			_ = os.MkdirAll(filepath.Dir(linkComposePath), os.ModePerm)
-		}
-		if _, err := os.Readlink(linkComposePath); err != nil {
-			// 当容器挂载了外部目录，创建时必须保证此目录有文件可以访问。否则相对目录会错误
-			err = os.Symlink(workingDir, linkComposePath)
-			if err != nil {
-				slog.Warn("db compose make path symlink", "workdir", workingDir, "target", linkComposePath, "error", err)
+	workingDir := filepath.Dir(composeFile)
+	if composeSetting.Type == accessor.ComposeTypeOutPath {
+		// 补交配置不应改变相对挂载的基准，否则会指向面板目录。
+		workingDir = path.Dir(composeSetting.Uri[0])
+		if !function.InArray(fileList, overrideFile) {
+			if _, err := os.Stat(overrideFile); err == nil {
+				fileList = append(fileList, overrideFile)
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return nil, nil, err
 			}
 		}
-		workingDir = linkComposePath
-	}
-
-	slog.Info("db compose ", "workDir", workingDir)
-
-	taskFileDir := filepath.Join(workingDir, filepath.Dir(dbRow.Setting.Uri[0]))
-
-	yamlFilePath := make([]string, 0)
-
-	if dbRow.Setting.Type == accessor.ComposeTypeOutPath {
-		taskFileDir = filepath.Join(filepath.Dir(dbRow.Setting.Uri[0]))
-
-		// 外部路径分两种，一种是原目录挂载，二是将Yaml文件放置到存储目录中（这种情况还是会当成挂载文件来对待）
-		// 外部任务也可能是 dpanel 面板创建的，面板会将 compose 的文件地址与宿主机中的保持一致
-		// 就会导致无法找到真正的文件，需要把文件中的主机路径，还是需要再添加一个软链接
-		for _, item := range dbRow.Setting.Uri {
-			yamlFilePath = append(yamlFilePath, item)
+	} else if hostDir := self.ComposeHostDir(rootDir, composeSetting.DockerEnvName); hostDir != "" {
+		relativeDir, err := filepath.Rel(rootDir, workingDir)
+		if err != nil {
+			return nil, nil, err
 		}
-
-		// 查找当前目录下是否有 dpanel-override 文件
-		overrideFilePath := filepath.Join(taskFileDir, fmt.Sprintf(define.ComposeProjectDeployOverrideOutPathFileName, dbRow.Name))
-		if len(yamlFilePath) > 0 && !function.InArray(yamlFilePath, overrideFilePath) {
-			if _, err := os.Stat(overrideFilePath); err == nil {
-				yamlFilePath = append(yamlFilePath, overrideFilePath)
-			}
-		}
-	} else {
-		for _, item := range dbRow.Setting.Uri {
-			yamlFilePath = append(yamlFilePath, filepath.Join(taskFileDir, filepath.Base(item)))
-		}
+		workingDir = path.Join(hostDir, filepath.ToSlash(relativeDir))
 	}
-
-	options := make([]cli.ProjectOptionsFn, 0)
-	for _, path := range yamlFilePath {
-		options = append(options, compose.WithYamlPath(path))
-	}
-
-	globalEnv := function.PluckArrayWalk(taskEnv, func(i types2.EnvItem) (string, bool) {
-		return fmt.Sprintf("%s=%s", i.Name, i.Value), true
-	})
-	options = append(options, cli.WithEnv(globalEnv))
-
-	if dbRow.Setting.RunName != "" {
-		options = append(options, cli.WithName(dbRow.Setting.RunName))
-	} else {
-		options = append(options, cli.WithName(dbRow.Name))
-	}
-
-	return options
-}
-
-func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, error) {
-	if len(dbRow.Setting.Uri) == 0 || dbRow.Setting.Uri[0] == "" {
-		return nil, nil, ErrMissingComposeFile
-	}
+	fileList[0] = composeFile
 	taskEnv := append(make([]types2.EnvItem, 0, len(dbRow.Setting.Environment)), dbRow.Setting.Environment...)
-	fileInfo, err := os.Stat(dbRow.Setting.GetUriFilePath())
+	task := &compose.Task{
+		Name:         dbRow.Name,
+		ComposeFiles: fileList,
+		WorkingDir:   workingDir,
+		Environment:  taskEnv,
+	}
+	if dbRow.Setting.RunName != "" {
+		task.Name = dbRow.Setting.RunName
+	}
+	options, err := cli.NewProjectOptions(task.ComposeFiles, func(options *cli.ProjectOptions) error {
+		options.WorkingDir = task.WorkingDir
+		options.Name = task.Name
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	fileInfo, err := os.Stat(task.ComposeFiles[0])
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil, ErrMissingComposeFile
 	}
 	if err != nil {
 		return nil, nil, err
 	}
-	if fileInfo.Size() == 0 {
-		return &compose.Task{Environment: taskEnv}, nil, ErrEmptyComposeFile
+	if !fileInfo.Mode().IsRegular() {
+		return nil, nil, fmt.Errorf("compose file %q is not a regular file", task.ComposeFiles[0])
 	}
-	defaultEnvPath, defaultEnvContent, err := dbRow.Setting.GetDefaultEnv()
+	if fileInfo.Size() == 0 {
+		return nil, nil, ErrEmptyComposeFile
+	}
+	defaultEnvPath, defaultEnvContent, err := task.GetDefaultEnv()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -466,30 +439,41 @@ func (self Compose) GetTasker(dbRow *entity.Compose) (*compose.Task, error, erro
 			}
 		}
 	}
-	options := self.ComposeProjectOptionsFn(dbRow, taskEnv)
-	options = append(options, cli.WithLoadOptions(func(options *loader.Options) {
-		options.SkipValidation = true
-	}))
-	task, warning, err := compose.NewCompose(options...)
-	if err != nil {
-		slog.Warn("compose get task ", "error", err)
+	task.Environment = taskEnv
+	if err := cli.WithEnv(function.PluckArrayWalk(taskEnv, func(item types2.EnvItem) (string, bool) {
+		return fmt.Sprintf("%s=%s", item.Name, item.Value), true
+	}))(options); err != nil {
 		return nil, nil, err
 	}
-	task.Environment = taskEnv
-	return task, warning, nil
+	if err := cli.WithLoadOptions(func(options *loader.Options) {
+		options.SkipValidation = true
+	})(options); err != nil {
+		return nil, nil, err
+	}
+	tasker, warning, err := compose.NewCompose(ctx, dockerSdk, options)
+	if err != nil {
+		slog.Warn("compose get task ", "error", err)
+		return nil, warning, err
+	}
+	tasker.Environment = taskEnv
+	tasker.WorkingDir = function.SlashPathToSystem(tasker.WorkingDir)
+	if hostDir, ok := function.WindowsPathToSlash(tasker.WorkingDir); ok && function.IsRunInDocker() {
+		tasker.WorkingDir = filepath.Join("/mnt/host", strings.TrimPrefix(hostDir, "/"))
+	}
+	return tasker, warning, nil
 }
 
-func (self Compose) ValidateProject(project *types.Project) error {
+func (self Compose) ValidateRelativeBindMounts(project *types.Project) error {
 	if project == nil || !strings.HasPrefix(filepath.Clean(project.WorkingDir), define.ComposeVolumeCheckPath+string(filepath.Separator)) {
 		return nil
 	}
-	for serviceName, service := range project.Services {
+	for serviceName, service := range project.AllServices() {
 		for _, volume := range service.Volumes {
 			if volume.Type != types.VolumeTypeBind {
 				continue
 			}
-			source := filepath.Clean(volume.Source)
-			if !strings.HasPrefix(source, define.ComposeVolumeCheckPath+string(filepath.Separator)) {
+			source := paths.ExpandUser(volume.Source)
+			if source == "" || filepath.IsAbs(source) || paths.IsWindowsAbs(source) {
 				continue
 			}
 			return function.ErrorMessage(
@@ -528,4 +512,98 @@ func (self Compose) ParseEnvItemValue(env []types2.EnvItem) ([]types2.EnvItem, e
 		}
 		return item, true
 	}), nil
+}
+
+// ComposeHostDir finds the path used by the local Docker host for a panel Compose directory.
+func (self Compose) ComposeHostDir(workingDir, dockerEnvName string) string {
+	if !function.IsRunInDocker() {
+		return ""
+	}
+
+	linkPath := ""
+	dpanelInfo := commonlogic.Setting{}.GetDPanelInfo()
+	for _, mount := range dpanelInfo.ContainerInfo.Mounts {
+		if mount.Destination != "/dpanel" && mount.Destination != workingDir {
+			continue
+		}
+		source := function.PathSeparatorToSlash(mount.Source)
+		candidate := ""
+		switch mount.Type {
+		case "bind":
+			if filepath.IsAbs(source) || paths.IsWindowsAbs(source) {
+				candidate = source
+				if mount.Destination == "/dpanel" {
+					candidate = path.Join(source, filepath.Base(workingDir))
+				}
+			}
+		case "volume":
+			candidate = filepath.Join(define.ComposeVolumeCheckPath, dockerEnvName)
+		}
+		if candidate != "" && (mount.Destination == workingDir || linkPath == "") {
+			linkPath = candidate
+		}
+	}
+	return filepath.ToSlash(linkPath)
+}
+
+// SyncLocalDir aligns a host path with a directory visible to the panel.
+func (self Compose) SyncLocalDir(sourceDir, targetDir string) error {
+	if filepath.Clean(sourceDir) == filepath.Clean(targetDir) {
+		return nil
+	}
+	if targetInfo, err := os.Stat(targetDir); err == nil && targetInfo.IsDir() {
+		if sourceInfo, err := os.Stat(sourceDir); err == nil && os.SameFile(sourceInfo, targetInfo) {
+			return nil
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(targetDir), os.ModePerm); err != nil {
+		return fmt.Errorf("prepare compose path %q: %w", targetDir, err)
+	}
+	if existing, err := os.Readlink(targetDir); err == nil {
+		if filepath.Clean(existing) == filepath.Clean(sourceDir) {
+			return nil
+		}
+		return fmt.Errorf("compose path %q already links to %q", targetDir, existing)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("compose path %q already exists: %w", targetDir, err)
+	}
+	if err := os.Symlink(sourceDir, targetDir); err != nil {
+		return fmt.Errorf("link compose directory %q: %w", targetDir, err)
+	}
+	return nil
+}
+
+// SyncRemoteDir copies a panel Compose directory to the selected remote Docker filesystem.
+func (self Compose) SyncRemoteDir(ctx context.Context, dockerSdk *docker.Client, sourceDir, targetDir string, hostTarget bool) (err error) {
+	var fileSystem serviceafs.Fs
+	if hostTarget {
+		if !path.IsAbs(targetDir) || path.Clean(targetDir) != targetDir {
+			return fmt.Errorf("invalid remote compose target %q", targetDir)
+		}
+		var hostExplorerName string
+		hostExplorerName, err = factor.NewExplorerHost(dockerSdk, factor.HostCreateOption{})
+		if err != nil {
+			return err
+		}
+		defer func() { err = errors.Join(err, factor.Destroy(dockerSdk, hostExplorerName)) }()
+		fileSystem, err = dockerfs.New(
+			dockerfs.WithDockerSdk(dockerSdk),
+			dockerfs.WithProxyContainer(hostExplorerName),
+			dockerfs.WithRoot(factor.HostExplorerMountPath),
+		)
+	} else {
+		var relativeDir string
+		relativeDir, err = filepath.Rel(storage.Local{}.GetStorageLocalPath(), sourceDir)
+		if err != nil {
+			return err
+		}
+		targetDir = path.Join("/", filepath.ToSlash(relativeDir))
+		fileSystem, err = (commonlogic.Explorer{}).Afs(ctx,
+			commonlogic.ExplorerMountPoint(commonlogic.ExplorerMountTypeContainer+":"+factor.ExplorerName), dockerSdk,
+		)
+	}
+	if err != nil {
+		return err
+	}
+	return fileSystem.Import([]serviceafs.TransferFile{{Source: sourceDir, Target: targetDir}})
 }

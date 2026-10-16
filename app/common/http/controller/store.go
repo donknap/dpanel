@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -362,6 +363,7 @@ func (self Store) Deploy(http *gin.Context) {
 		return
 	}
 
+	dockerEnvName := docker.Sdk.DockerEnv.GetComposeEnvName()
 	composeNew := &entity.Compose{
 		Name:  strings.ToLower(params.TaskName),
 		Title: params.AppTitle,
@@ -370,16 +372,13 @@ func (self Store) Deploy(http *gin.Context) {
 			Store:       fmt.Sprintf("%s:%s@%s@%s", storeRow.Setting.Type, storeRow.Title, storeRow.Setting.Url, params.AppName),
 			Environment: params.VersionInfo.Environment,
 			Uri: []string{
-				filepath.Join(function.SafeFileName(params.TaskName), filepath.Base(params.VersionInfo.ComposeFile)),
+				path.Join(function.SafeFileName(params.TaskName), filepath.Base(params.VersionInfo.ComposeFile)),
 			},
-			DockerEnvName: docker.Sdk.Name,
+			DockerEnvName: dockerEnvName,
 		},
 	}
 
-	targetPath := storage.Local{}.GetComposeProjectPath("", params.TaskName)
-	if docker.Sdk.DockerEnv.EnableComposePath {
-		targetPath = storage.Local{}.GetComposeProjectPath(docker.Sdk.Name, params.TaskName)
-	}
+	targetPath := storage.Local{}.GetComposeProjectPath(dockerEnvName, params.TaskName)
 
 	err = dao.Compose.Create(composeNew)
 	if err != nil {

@@ -6,7 +6,9 @@ import (
 	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/app"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
-	"github.com/donknap/dpanel/common/accessor"
+	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
@@ -46,6 +48,16 @@ func (self Deploy) Handle(cmd *cobra.Command, args []string) {
 		utils.Result{}.Error(err)
 		return
 	}
+	if dockerEnv == "" {
+		dockerEnv = dockerEnvList.CurrentName
+	}
+	dockerEnvOption, _, ok := function.PluckArrayItemWalk(dockerEnvList.List, func(item *types.DockerEnv) bool {
+		return item.Name == dockerEnv
+	})
+	if !ok {
+		utils.Result{}.Error(fmt.Errorf("docker environment %q not found", dockerEnv))
+		return
+	}
 	if dockerEnv != "" && dockerEnv != dockerEnvList.CurrentName {
 		err = proxyClient.CommonEnvSwitch(dockerEnv)
 		if err != nil {
@@ -57,20 +69,23 @@ func (self Deploy) Handle(cmd *cobra.Command, args []string) {
 		}()
 	}
 
-	composeTask, err := proxyClient.AppComposeTask(name)
+	composeDetail, err := proxyClient.AppComposeDetail(name, dockerEnvOption.GetComposeEnvName())
 	if err != nil {
 		utils.Result{}.Error(err)
 		return
 	}
-	if composeTask.Detail.Setting.Type != accessor.ComposeTypeOutPath {
-		err = proxyClient.CommonExplorerSyncDPanel(composeTask.Detail.Name)
-		if err != nil {
-			utils.Result{}.Error(err)
-			return
-		}
+	if composeDetail.Detail == nil || composeDetail.Detail.ID <= 0 {
+		utils.Result{}.Error(function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted))
+		return
+	}
+	id := fmt.Sprintf("%d", composeDetail.Detail.ID)
+	err = proxyClient.AppComposeSyncDir(id)
+	if err != nil {
+		utils.Result{}.Error(err)
+		return
 	}
 	if pullImage == "dpanel" {
-		for _, item := range composeTask.Project.Services {
+		for _, item := range composeDetail.Project.Services {
 			_, err = proxyClient.AppImageTagRemote(&app.ImageTagRemoteOption{
 				Tag:  item.Image,
 				Type: "pull",
@@ -83,7 +98,7 @@ func (self Deploy) Handle(cmd *cobra.Command, args []string) {
 	}
 
 	err = proxyClient.AppComposeDeploy(&app.ComposeDeployOption{
-		Id:         fmt.Sprintf("%d", composeTask.Detail.ID),
+		Id:         id,
 		CreatePath: false,
 	})
 	if err != nil {

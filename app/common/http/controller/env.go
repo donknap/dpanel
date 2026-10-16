@@ -119,7 +119,7 @@ func (self Env) Create(http *gin.Context) {
 		}
 		params.ServerUrl = "127.0.0.1"
 	}
-	if !function.IsSafeName(params.Name) {
+	if !function.IsSafeString(params.Name, function.StringRuleName) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvNameInvalid), 500)
 		return
 	}

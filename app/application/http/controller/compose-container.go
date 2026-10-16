@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
@@ -48,19 +47,20 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
-	composeRow, _ := logic.Compose{}.Get(params.Id)
-	if composeRow == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+	composeRow, err := logic.Compose{}.Get(params.Id)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
 	if !function.IsEmptyArray(params.DeployServiceName) {
 		composeRow.Setting.DeployServiceName = params.DeployServiceName
 	}
-	tasker, warning, err := logic.Compose{}.GetTasker(&entity.Compose{
+	tasker, warning, err := logic.Compose{}.GetTasker(dockerSdk, &entity.Compose{
 		Name: composeRow.Name,
 		Setting: &accessor.ComposeSettingOption{
 			Type:          composeRow.Setting.Type,
+			Delegate:      composeRow.Setting.Delegate,
 			Uri:           composeRow.Setting.Uri,
 			RemoteUrl:     composeRow.Setting.RemoteUrl,
 			Environment:   params.Environment,
@@ -73,7 +73,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
 	}
-	if err = (logic.Compose{}).ValidateProject(tasker.Project); err != nil {
+	if err = (logic.Compose{}).ValidateRelativeBindMounts(tasker.Project); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -92,17 +92,8 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		}
 	}
 
-	// 尝试创建 compose 挂载的目录，如果运行在容器内创建也无效
 	if params.CreatePath {
-		for _, service := range tasker.Project.Services {
-			for _, volume := range service.Volumes {
-				if filepath.IsAbs(volume.Source) {
-					if _, err = os.Stat(volume.Source); err != nil {
-						_ = os.MkdirAll(volume.Source, os.ModePerm)
-					}
-				}
-			}
-		}
+		tasker.CreateBindPath()
 	}
 	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
 
@@ -231,14 +222,23 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	composeRow, _ := logic.Compose{}.Get(params.Id)
-	if composeRow == nil {
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	composeRow, err := logic.Compose{}.Get(params.Id)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if composeRow.Setting.DockerEnvName != dockerSdk.DockerEnv.GetComposeEnvName() {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
 	runCompose := logic.Compose{}.LsItem(composeRow.Name)
 	if runCompose != nil && len(runCompose.ContainerList) != 0 {
-		tasker, _, err := logic.Compose{}.GetTasker(composeRow)
+		tasker, _, err := logic.Compose{}.GetTasker(dockerSdk, composeRow)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
@@ -289,10 +289,7 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeleteFileMustDeleteTask), 500)
 			return
 		}
-		targetPath := storage.Local{}.GetComposeProjectPath(composeRow.Setting.DockerEnvName, composeRow.Name)
-		if !function.IsEmptyArray(composeRow.Setting.Uri) {
-			targetPath = filepath.Dir(composeRow.Setting.GetUriFilePath())
-		}
+		targetPath := storage.Local{}.GetComposeProjectPath(dockerSdk.DockerEnv.GetComposeEnvName(), composeRow.Name)
 		err := os.RemoveAll(targetPath)
 		if err != nil {
 			slog.Info("compose", "destroy", err)
@@ -313,12 +310,17 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	composeRow, _ := logic.Compose{}.Get(params.Id)
-	if composeRow == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	tasker, _, err := logic.Compose{}.GetTasker(composeRow)
+	composeRow, err := logic.Compose{}.Get(params.Id)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	tasker, _, err := logic.Compose{}.GetTasker(dockerSdk, composeRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -355,13 +357,18 @@ func (self Compose) ContainerLog(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	composeRow, _ := logic.Compose{}.Get(params.Id)
-	if composeRow == nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	tasker, _, err := logic.Compose{}.GetTasker(composeRow)
+
+	composeRow, err := logic.Compose{}.Get(params.Id)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	tasker, _, err := logic.Compose{}.GetTasker(dockerSdk, composeRow)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -404,8 +411,8 @@ func (self Compose) ContainerLog(http *gin.Context) {
 		case <-http.Request.Context().Done():
 		case <-progress.Done():
 		}
-		if closeErr := response.Close(); closeErr != nil {
-			slog.Warn("compose run log progress close", "id", fmt.Sprintf(ws.MessageTypeComposeLog, params.Id), "error", closeErr)
+		if err := response.Close(); err != nil {
+			slog.Warn("compose run log progress close", "id", fmt.Sprintf(ws.MessageTypeComposeLog, params.Id), "error", err)
 		}
 	}()
 
