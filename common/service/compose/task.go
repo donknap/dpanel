@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
@@ -78,22 +80,27 @@ func (self Task) Build() (io.ReadCloser, error) {
 }
 
 func (self Task) CreateBindPath() {
+	if self.dockerSdk.DockerEnv.IsRemote() {
+		return
+	}
 	for _, service := range self.Project.Services {
 		for _, volume := range service.Volumes {
 			if volume.Type != types.VolumeTypeBind || volume.Source == "" {
 				continue
 			}
-			source := volume.Source
+			source := paths.ExpandUser(volume.Source)
 			if !filepath.IsAbs(source) {
 				if _, windowsPath := function.WindowsPathToSlash(source); !windowsPath {
-					source = filepath.Join(self.WorkingDir, source)
+					source = filepath.Join(function.SlashPathToSystem(self.WorkingDir), source)
 				}
 			}
 			if converted, ok := function.WindowsPathToSlash(source); ok && function.IsRunInDocker() {
 				source = filepath.Join("/mnt/host", strings.TrimPrefix(converted, "/"))
 			}
 			if filepath.IsAbs(source) {
-				_ = os.MkdirAll(source, os.ModePerm)
+				if err := os.MkdirAll(source, os.ModePerm); err != nil {
+					slog.Warn("compose create bind path", "path", source, "error", err)
+				}
 			}
 		}
 	}
@@ -158,8 +165,12 @@ func (self Task) Logs(tail int, showTime, follow bool) (io.ReadCloser, error) {
 
 func (self Task) runCommand(command []string) (io.ReadCloser, error) {
 	sourceDir := filepath.Dir(self.ComposeFiles[0])
+	workingDir := function.SlashPathToSystem(self.WorkingDir)
+	if hostDir, ok := function.WindowsPathToSlash(self.WorkingDir); ok && function.IsRunInDocker() {
+		workingDir = filepath.Join("/mnt/host", strings.TrimPrefix(hostDir, "/"))
+	}
 	cmd := make([]string, 0)
-	cmd = append(cmd, "--project-directory", self.WorkingDir)
+	cmd = append(cmd, "--project-directory", workingDir)
 	for _, file := range self.ComposeFiles {
 		cmd = append(cmd, "-f", file)
 	}

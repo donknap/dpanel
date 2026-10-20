@@ -15,7 +15,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/paths"
-	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -67,18 +66,15 @@ func NewCompose(ctx context.Context, dockerSdk *docker.Client, options *cli.Proj
 	if len(options.ConfigPaths) == 0 {
 		return nil, nil, errors.New("compose configuration files are required")
 	}
-	var loadOptions *loader.Options
-	for _, configure := range []cli.ProjectOptionsFn{
-		cli.WithExtension(ExtensionServiceName, ExtService{}),
-		cli.WithResolvedPaths(false),
-		cli.WithLoadOptions(func(options *loader.Options) {
-			loadOptions = options
-		}),
-	} {
-		if err := configure(options); err != nil {
-			return nil, warning, err
-		}
+	workingDir, err := options.GetWorkingDir()
+	if err != nil {
+		return nil, warning, err
 	}
+	configDetails, err := options.ReadConfigFiles(ctx, workingDir, options)
+	if err != nil {
+		return nil, warning, err
+	}
+	configDetails.Environment = options.Environment
 	originalFormatter := logrus.StandardLogger().Formatter
 	originalOutput := logrus.StandardLogger().Out
 	bufOut := new(bytes.Buffer)
@@ -92,41 +88,44 @@ func NewCompose(ctx context.Context, dockerSdk *docker.Client, options *cli.Proj
 		logrus.SetOutput(originalOutput)
 		logrus.SetFormatter(originalFormatter)
 	}()
-	workingDir := options.WorkingDir
-	sourceDir := filepath.Dir(options.ConfigPaths[0])
-	options.WorkingDir = sourceDir
-	model, err := options.LoadModel(ctx)
-	options.WorkingDir = workingDir
-	if err != nil {
-		return nil, warning, err
-	}
-	resources := make(map[string]any)
-	if services, ok := model["services"].(map[string]any); ok {
-		for name, value := range services {
-			service, ok := value.(map[string]any)
-			if !ok {
-				return nil, warning, fmt.Errorf("invalid compose service %q", name)
-			}
-			files := make(map[string]any)
-			for _, key := range []string{"env_file", "label_file"} {
-				if value, ok := service[key]; ok {
-					files[key] = value
-				}
-			}
-			resources[name] = files
-		}
-	}
-	if err := paths.ResolveRelativePaths(map[string]any{"services": resources}, sourceDir, nil); err != nil {
-		return nil, warning, err
-	}
-	project, err := loader.ModelToProject(model, loadOptions, types.ConfigDetails{
-		WorkingDir:  workingDir,
-		Environment: options.Environment,
+	var loadOptions *loader.Options
+	model, err := loader.LoadModelWithContext(ctx, *configDetails, func(modelOptions *loader.Options) {
+		modelOptions.ResolvePaths = false
+		modelOptions.KnownExtensions = map[string]any{ExtensionServiceName: ExtService{}}
+		modelOptions.ResourceLoaders = options.ResourceLoaders
+		modelOptions.Listeners = options.Listeners
+		modelOptions.SetProjectName(options.Name, true)
+		loadOptions = modelOptions
 	})
 	if err != nil {
 		return nil, warning, err
 	}
-	project.ComposeFiles = append([]string(nil), options.ConfigPaths...)
+	serviceFileMap := make(map[string]any)
+	if serviceMap, ok := model["services"].(map[string]any); ok {
+		for serviceName, value := range serviceMap {
+			service, ok := value.(map[string]any)
+			if !ok {
+				return nil, warning, fmt.Errorf("invalid compose service %q", serviceName)
+			}
+			fileMap := make(map[string]any)
+			for _, fieldName := range []string{"env_file", "label_file"} {
+				if fieldValue, ok := service[fieldName]; ok {
+					fileMap[fieldName] = fieldValue
+				}
+			}
+			serviceFileMap[serviceName] = fileMap
+		}
+	}
+	if err := paths.ResolveRelativePaths(map[string]any{"services": serviceFileMap}, configDetails.WorkingDir, nil); err != nil {
+		return nil, warning, err
+	}
+	project, err := loader.ModelToProject(model, loadOptions, *configDetails)
+	if err != nil {
+		return nil, warning, err
+	}
+	for _, configFile := range configDetails.ConfigFiles {
+		project.ComposeFiles = append(project.ComposeFiles, configFile.Filename)
+	}
 
 	if bufOut.Len() > 0 {
 		msg := make([]string, 0)

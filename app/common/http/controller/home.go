@@ -22,6 +22,7 @@ import (
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	applicationlogic "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
 	statLogic "github.com/donknap/dpanel/app/common/logic/stat"
 	"github.com/donknap/dpanel/common/accessor"
@@ -612,6 +613,8 @@ func (self Home) Info(http *gin.Context) {
 			"public": public,
 		},
 	}
+	_, hostDir := (applicationlogic.Compose{}).ComposeDir(dockerEnv.GetComposeEnvName())
+	result["composeHostPath"] = hostDir
 	if runtime.GOOS == "windows" {
 		wslList := make([]string, 0)
 		ctx, cancel := context.WithTimeout(http.Request.Context(), 10*time.Second)

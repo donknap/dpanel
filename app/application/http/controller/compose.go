@@ -6,21 +6,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	http2 "net/http"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -67,18 +71,22 @@ func (self Compose) SyncDir(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
 	}
-	if err = (logic.Compose{}).ValidateRelativeBindMounts(tasker.Project); err != nil {
+	if err = (logic.Compose{}).ValidateRelativeBindMounts(tasker); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	sourceDir := filepath.Dir(tasker.ComposeFiles[0])
-	targetDir := tasker.Project.WorkingDir
+	targetDir := tasker.WorkingDir
 	if composeRow.Setting.Type == accessor.ComposeTypeOutPath && !composeRow.Setting.IsDelegate() {
 		self.JsonSuccessResponse(http)
 		return
 	}
 	if function.IsRunInDocker() {
-		err = (logic.Compose{}).SyncLocalDir(sourceDir, tasker.WorkingDir)
+		workingDir := function.SlashPathToSystem(targetDir)
+		if hostDir, ok := function.WindowsPathToSlash(targetDir); ok {
+			workingDir = filepath.Join("/mnt/host", strings.TrimPrefix(hostDir, "/"))
+		}
+		err = (logic.Compose{}).SyncLocalDir(sourceDir, workingDir)
 	}
 	if err == nil && dockerSdk.DockerEnv.IsRemote() {
 		err = (logic.Compose{}).SyncRemoteDir(http, dockerSdk, sourceDir, targetDir, composeRow.Setting.Type == accessor.ComposeTypeOutPath)
@@ -188,61 +196,62 @@ func (self Compose) Create(http *gin.Context) {
 	}
 	composeRow.Setting.Environment, err = (logic.Compose{}).ParseEnvItemValue(params.Environment)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+		composeRow.Setting.Environment = params.Environment
+		slog.Warn("compose save environment parse failed", "name", composeRow.Name)
 	}
 	composeDir := filepath.Dir(composeFile)
 	if err = os.MkdirAll(composeDir, os.ModePerm); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	// 空输入表示未提交该文件的修改，不能清空或删除已有配置。
 	if params.Yaml != "" {
 		if err = os.WriteFile(composeFile, []byte(params.Yaml), 0644); err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-	}
-	if params.YamlOverride != "" {
-		if err = os.WriteFile(overrideFile, []byte(params.YamlOverride), 0644); err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		if composeRow.Setting.Type != accessor.ComposeTypeOutPath {
-			overrideUri := path.Join(path.Dir(composeRow.Setting.Uri[0]), define.ComposeProjectDeployOverrideFileName)
-			if !function.InArray(composeRow.Setting.Uri, overrideUri) {
-				composeRow.Setting.Uri = append(composeRow.Setting.Uri, overrideUri)
+		if params.YamlOverride != "" {
+			if err = os.WriteFile(overrideFile, []byte(params.YamlOverride), 0644); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
 			}
-		}
-	}
-	if len(composeRow.Setting.Environment) > 0 {
-		envLineList := make([]string, 0, len(composeRow.Setting.Environment))
-		for index, item := range composeRow.Setting.Environment {
-			envLineList = append(envLineList, fmt.Sprintf("%s=%s", item.Name, strconv.Quote(strings.ReplaceAll(item.Value, "$", "$$"))))
-			if composeRow.Setting.Environment[index].Rule == nil {
-				composeRow.Setting.Environment[index].Rule = &types2.EnvValueRule{Kind: types2.EnvValueRuleInEnvFile}
-			} else {
-				composeRow.Setting.Environment[index].Rule.Kind |= types2.EnvValueRuleInEnvFile
+			if composeRow.Setting.Type != accessor.ComposeTypeOutPath {
+				overrideUri := path.Join(path.Dir(composeRow.Setting.Uri[0]), define.ComposeProjectDeployOverrideFileName)
+				if !function.InArray(composeRow.Setting.Uri, overrideUri) {
+					composeRow.Setting.Uri = append(composeRow.Setting.Uri, overrideUri)
+				}
 			}
-		}
-		envFilePath := filepath.Join(composeDir, define.ComposeDefaultEnvFileName)
-		if err = os.WriteFile(envFilePath, []byte(strings.Join(envLineList, "\n")), 0o600); err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
+		} else {
+			if err = os.Remove(overrideFile); err != nil && !errors.Is(err, os.ErrNotExist) {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			overrideUri := path.Join(path.Dir(composeRow.Setting.Uri[0]), filepath.Base(overrideFile))
+			composeRow.Setting.Uri = slices.DeleteFunc(composeRow.Setting.Uri, func(uri string) bool {
+				return uri == overrideUri || composeRow.Setting.IsDelegate() && uri == path.Join(path.Dir(composeRow.Setting.Uri[0]), fmt.Sprintf(define.ComposeProjectDeployOverrideOutPathFileName, composeRow.Name))
+			})
 		}
 	}
-	tasker, warning, err := (logic.Compose{}).GetTasker(dockerSdk, composeRow)
-	switch {
-	case err == nil:
-		composeRow.Setting.Environment = tasker.Environment
-		composeRow.Setting.Dangling = false
-	case errors.Is(err, logic.ErrMissingComposeFile), errors.Is(err, logic.ErrEmptyComposeFile):
-		// 允许先保存空任务，后续再补齐配置。
-		composeRow.Setting.Dangling = true
-	default:
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
+	envLineList := make([]string, 0, len(composeRow.Setting.Environment))
+	for index, item := range composeRow.Setting.Environment {
+		envLineList = append(envLineList, fmt.Sprintf("%s=%s", item.Name, strconv.Quote(strings.ReplaceAll(item.Value, "$", "$$"))))
+		if composeRow.Setting.Environment[index].Rule == nil {
+			composeRow.Setting.Environment[index].Rule = &types2.EnvValueRule{Kind: types2.EnvValueRuleInEnvFile}
+		} else {
+			composeRow.Setting.Environment[index].Rule.Kind |= types2.EnvValueRuleInEnvFile
+		}
+	}
+	envFilePath := filepath.Join(composeDir, define.ComposeDefaultEnvFileName)
+	if err = os.WriteFile(envFilePath, []byte(strings.Join(envLineList, "\n")), 0o600); err != nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	tasker, _, err := (logic.Compose{}).GetTasker(dockerSdk, composeRow)
+	if err == nil {
+		composeRow.Setting.Environment = tasker.Environment
+	} else if !errors.Is(err, logic.ErrMissingComposeFile) {
+		slog.Warn("compose save config parse failed", "name", composeRow.Name)
+	}
+	composeRow.Setting.Dangling = errors.Is(err, logic.ErrMissingComposeFile)
 	if composeRow.Setting.Type == accessor.ComposeTypeOutPath && !composeRow.Setting.IsDelegate() {
 		self.JsonResponseWithoutError(http, gin.H{
 			"id": composeRow.Name,
@@ -349,7 +358,7 @@ func (self Compose) GetList(http *gin.Context) {
 	}
 	for _, item := range composeList {
 		_, _, err := (logic.Compose{}).GetTasker(dockerSdk, item)
-		item.Setting.Dangling = errors.Is(err, logic.ErrMissingComposeFile) || errors.Is(err, logic.ErrEmptyComposeFile) || errors.Is(err, os.ErrNotExist)
+		item.Setting.Dangling = errors.Is(err, logic.ErrMissingComposeFile)
 	}
 
 	sort.Slice(composeList, func(i, j int) bool {
@@ -400,23 +409,36 @@ func (self Compose) GetDetail(http *gin.Context) {
 		return
 	}
 
+	if err = (logic.Compose{}).Sync(composeRow.Setting.DockerEnvName); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	composeRow, err = (logic.Compose{}).Get(params.Id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
+		}
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+
 	// 查询任务中是否包含子任务
 	subTask := make([]*entity.Compose, 0)
 
-	tasker, warning, err := (logic.Compose{}).GetTasker(dockerSdk, composeRow)
-	if err != nil {
-		self.JsonResponseWithError(http, errors.Join(warning, err), 500)
+	tasker, _, err := (logic.Compose{}).GetTasker(dockerSdk, composeRow)
+	if err != nil && tasker == nil {
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	composeRow.Setting.Environment = tasker.Environment
-	composeRow.Setting.Dangling = false
+	composeRow.Setting.Dangling = errors.Is(err, logic.ErrMissingComposeFile)
 	data := gin.H{
 		"yaml":          tasker.GetYaml(),
 		"task":          subTask,
 		"project":       tasker.Project,
 		"containerList": logic.Compose{}.Ps(composeRow.Name),
 		"detail":        composeRow,
-		"workingDir":    tasker.Project.WorkingDir,
+		"workingDir":    tasker.WorkingDir,
 	}
 
 	if run := (logic.Compose{}).LsItem(composeRow.Name); run != nil {
@@ -564,8 +586,7 @@ func (self Compose) Download(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
-	dockerSdk, err := docker.NewClientWithUser(http)
-	if err != nil {
+	if _, err := docker.NewClientWithUser(http); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -575,11 +596,17 @@ func (self Compose) Download(http *gin.Context) {
 		return
 	}
 
-	tasker, warning, err := (logic.Compose{}).GetTasker(dockerSdk, yamlRow)
+	optionList, err := (logic.Compose{}).ComposeProjectOptionsFn(yamlRow)
 	if err != nil {
-		self.JsonResponseWithError(http, errors.Join(warning, err), 500)
+		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	projectOptions, err := cli.NewProjectOptions(nil, optionList...)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	tasker := compose.Task{ComposeFiles: projectOptions.ConfigPaths}
 	yaml := tasker.GetYaml()
 	if yaml[0] == "" {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeNotFoundYaml), 500)

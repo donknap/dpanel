@@ -72,7 +72,6 @@ func NewExplorerHost(sdk *docker.Client, _ HostCreateOption) (string, error) {
 	name := ExplorerName + "-" + uuid.NewString()
 	containerName, err := create(sdk, name, function.Sha256Struct("agent-factor-host-v1"), []builder.Option{
 		builder.WithNetworkMode("none"),
-		builder.WithReadonlyRootfs(true),
 		builder.WithSecurityOpt("no-new-privileges:true"),
 		builder.WithCapDrop("ALL"),
 		builder.WithCap("DAC_OVERRIDE", "DAC_READ_SEARCH", "CHOWN", "FOWNER", "FSETID"),

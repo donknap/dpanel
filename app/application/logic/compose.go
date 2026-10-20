@@ -16,7 +16,6 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
-	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/docker/api/types/container"
@@ -36,7 +35,6 @@ import (
 	"gorm.io/gorm"
 )
 
-var ErrEmptyComposeFile = errors.New("请先完善 compose.yaml 文件")
 var ErrMissingComposeFile = errors.New("compose file not found")
 
 type Compose struct {
@@ -297,17 +295,21 @@ func (self Compose) Sync(dockerEnvName string) error {
 			if dbComposeRow.Setting.Type != accessor.ComposeTypeOutPath {
 				dbComposeRow.Setting.Uri = find.Setting.Uri
 				_ = dao.Compose.Save(dbComposeRow)
-			} else if dbComposeRow.Setting.Delegate == nil {
-				dbComposeRow.Setting.Delegate = function.Ptr(true)
-				if err := dao.Compose.Save(dbComposeRow); err != nil {
-					return err
-				}
 			}
 			delete(findComposeList, dbComposeRow.Name)
 		}
 	}
 	for _, running := range self.Ls() {
 		if find, ok := findComposeList[running.Name]; ok {
+			if len(running.ConfigFileList) == 0 {
+				delete(findComposeList, running.Name)
+				continue
+			}
+			composeFile := filepath.Join(rootDir, running.Name, path.Base(running.ConfigFileList[0]))
+			if fileInfo, err := os.Stat(composeFile); err != nil || !fileInfo.Mode().IsRegular() {
+				delete(findComposeList, running.Name)
+				continue
+			}
 			find.Setting.Type = accessor.ComposeTypeOutPath
 			find.Setting.Uri = running.ConfigFileList
 			find.Setting.Delegate = function.Ptr(true)
@@ -323,12 +325,9 @@ func (self Compose) Sync(dockerEnvName string) error {
 	return nil
 }
 
-func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (*compose.Task, error, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
+func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) ([]cli.ProjectOptionsFn, error) {
 	if dbRow == nil || dbRow.Setting == nil || !function.IsSafeString(dbRow.Name, function.StringRuleName) {
-		return nil, nil, errors.New("invalid compose task")
+		return nil, errors.New("invalid compose task")
 	}
 	composeSetting := *dbRow.Setting
 	composeSetting.Uri = make([]string, len(dbRow.Setting.Uri))
@@ -337,9 +336,8 @@ func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (
 	}
 	composeFile, overrideFile, err := composeSetting.GetUriPath(dbRow.Name)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	rootDir := storage.Local{}.GetComposePath(composeSetting.DockerEnvName)
 	fileList := make([]string, 0, len(composeSetting.Uri)+1)
 	for index, uri := range composeSetting.Uri {
 		filePath := function.SlashPathToSystem(uri)
@@ -354,46 +352,88 @@ func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (
 			fileList = append(fileList, filePath)
 		}
 	}
-	workingDir := filepath.Dir(composeFile)
 	if composeSetting.Type == accessor.ComposeTypeOutPath {
-		// 补交配置不应改变相对挂载的基准，否则会指向面板目录。
-		workingDir = path.Dir(composeSetting.Uri[0])
 		if !function.InArray(fileList, overrideFile) {
 			if _, err := os.Stat(overrideFile); err == nil {
 				fileList = append(fileList, overrideFile)
 			} else if !errors.Is(err, os.ErrNotExist) {
-				return nil, nil, err
+				return nil, err
 			}
 		}
-	} else if hostDir := self.ComposeHostDir(rootDir, composeSetting.DockerEnvName); hostDir != "" {
-		relativeDir, err := filepath.Rel(rootDir, workingDir)
-		if err != nil {
-			return nil, nil, err
-		}
-		workingDir = path.Join(hostDir, filepath.ToSlash(relativeDir))
 	}
 	fileList[0] = composeFile
-	taskEnv := append(make([]types2.EnvItem, 0, len(dbRow.Setting.Environment)), dbRow.Setting.Environment...)
-	task := &compose.Task{
-		Name:         dbRow.Name,
-		ComposeFiles: fileList,
-		WorkingDir:   workingDir,
-		Environment:  taskEnv,
+	optionList := make([]cli.ProjectOptionsFn, 0, len(fileList)+2)
+	for _, filePath := range fileList {
+		optionList = append(optionList, compose.WithYamlPath(filePath))
 	}
-	if dbRow.Setting.RunName != "" {
-		task.Name = dbRow.Setting.RunName
-	}
-	options, err := cli.NewProjectOptions(task.ComposeFiles, func(options *cli.ProjectOptions) error {
-		options.WorkingDir = task.WorkingDir
-		options.Name = task.Name
+	optionList = append(optionList, func(options *cli.ProjectOptions) error {
+		options.WorkingDir = filepath.Dir(composeFile)
 		return nil
 	})
+	if dbRow.Setting.RunName != "" {
+		optionList = append(optionList, cli.WithName(dbRow.Setting.RunName))
+	} else {
+		optionList = append(optionList, cli.WithName(dbRow.Name))
+	}
+	return optionList, nil
+}
+
+func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (*compose.Task, error, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	optionList, err := self.ComposeProjectOptionsFn(dbRow)
 	if err != nil {
 		return nil, nil, err
 	}
+	projectOptions, err := cli.NewProjectOptions(nil, optionList...)
+	if err != nil {
+		return nil, nil, err
+	}
+	taskEnv := append(make([]types2.EnvItem, 0, len(dbRow.Setting.Environment)), dbRow.Setting.Environment...)
+	task := &compose.Task{ComposeFiles: projectOptions.ConfigPaths}
+	defaultEnvPath, defaultEnvContent, err := task.GetDefaultEnv()
+	if err != nil {
+		return nil, nil, err
+	}
+	if defaultEnvContent != nil {
+		fileEnv, err := dotenv.UnmarshalWithLookup(string(defaultEnvContent), nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("parse compose .env: %w", err)
+		}
+		fileInfo, err := os.Stat(defaultEnvPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		updatedAt, _ := time.ParseInLocation(time.DateTime, dbRow.Setting.UpdatedAt, time.Local)
+		envIndexMap := make(map[string]int, len(taskEnv))
+		for envIndex, item := range taskEnv {
+			envIndexMap[item.Name] = envIndex
+		}
+		envNameList := make([]string, 0, len(fileEnv))
+		for name := range fileEnv {
+			envNameList = append(envNameList, name)
+		}
+		sort.Strings(envNameList)
+		for _, name := range envNameList {
+			if envIndex, ok := envIndexMap[name]; ok {
+				if fileInfo.ModTime().Truncate(time.Second).After(updatedAt) {
+					taskEnv[envIndex].Value = fileEnv[name]
+				}
+			} else {
+				taskEnv = append(taskEnv, types2.EnvItem{
+					Name:  name,
+					Value: fileEnv[name],
+					Rule:  &types2.EnvValueRule{Kind: types2.EnvValueRuleInEnvFile},
+				})
+			}
+		}
+	}
+	task.Environment = taskEnv
+	task.Project = &types.Project{}
 	fileInfo, err := os.Stat(task.ComposeFiles[0])
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil, ErrMissingComposeFile
+		return task, nil, ErrMissingComposeFile
 	}
 	if err != nil {
 		return nil, nil, err
@@ -402,72 +442,36 @@ func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (
 		return nil, nil, fmt.Errorf("compose file %q is not a regular file", task.ComposeFiles[0])
 	}
 	if fileInfo.Size() == 0 {
-		return nil, nil, ErrEmptyComposeFile
+		return task, nil, ErrMissingComposeFile
 	}
-	defaultEnvPath, defaultEnvContent, err := task.GetDefaultEnv()
-	if err != nil {
-		return nil, nil, err
-	}
-	if defaultEnvContent != nil {
-		if fileInfo, err := os.Stat(defaultEnvPath); err == nil {
-			updatedAt, _ := time.ParseInLocation(time.DateTime, dbRow.Setting.UpdatedAt, time.Local)
-			if fileInfo.ModTime().Truncate(time.Second).After(updatedAt) {
-				fileEnv, err := dotenv.UnmarshalWithLookup(string(defaultEnvContent), nil)
-				if err != nil {
-					return nil, nil, fmt.Errorf("parse compose .env: %w", err)
-				}
-				index := make(map[string]int, len(taskEnv))
-				for i, item := range taskEnv {
-					index[item.Name] = i
-				}
-				names := make([]string, 0, len(fileEnv))
-				for name := range fileEnv {
-					names = append(names, name)
-				}
-				sort.Strings(names)
-				for _, name := range names {
-					if i, ok := index[name]; ok {
-						taskEnv[i].Value = fileEnv[name]
-					} else {
-						taskEnv = append(taskEnv, types2.EnvItem{
-							Name:  name,
-							Value: fileEnv[name],
-							Rule:  &types2.EnvValueRule{Kind: types2.EnvValueRuleInEnvFile},
-						})
-					}
-				}
-			}
-		}
-	}
-	task.Environment = taskEnv
 	if err := cli.WithEnv(function.PluckArrayWalk(taskEnv, func(item types2.EnvItem) (string, bool) {
 		return fmt.Sprintf("%s=%s", item.Name, item.Value), true
-	}))(options); err != nil {
-		return nil, nil, err
+	}))(projectOptions); err != nil {
+		return task, nil, err
 	}
-	if err := cli.WithLoadOptions(func(options *loader.Options) {
-		options.SkipValidation = true
-	})(options); err != nil {
-		return nil, nil, err
-	}
-	tasker, warning, err := compose.NewCompose(ctx, dockerSdk, options)
+	tasker, warning, err := compose.NewCompose(ctx, dockerSdk, projectOptions)
 	if err != nil {
 		slog.Warn("compose get task ", "error", err)
-		return nil, warning, err
+		return task, warning, err
 	}
 	tasker.Environment = taskEnv
-	tasker.WorkingDir = function.SlashPathToSystem(tasker.WorkingDir)
-	if hostDir, ok := function.WindowsPathToSlash(tasker.WorkingDir); ok && function.IsRunInDocker() {
-		tasker.WorkingDir = filepath.Join("/mnt/host", strings.TrimPrefix(hostDir, "/"))
+	if dbRow.Setting.Type == accessor.ComposeTypeOutPath {
+		tasker.WorkingDir = path.Dir(function.PathSeparatorToSlash(dbRow.Setting.Uri[0]))
+	} else if containerDir, hostDir := self.ComposeDir(dbRow.Setting.DockerEnvName); hostDir != "" {
+		relativeDir, err := filepath.Rel(function.SlashPathToSystem(containerDir), tasker.Project.WorkingDir)
+		if err != nil {
+			return nil, warning, err
+		}
+		tasker.WorkingDir = path.Join(hostDir, filepath.ToSlash(relativeDir))
 	}
 	return tasker, warning, nil
 }
 
-func (self Compose) ValidateRelativeBindMounts(project *types.Project) error {
-	if project == nil || !strings.HasPrefix(filepath.Clean(project.WorkingDir), define.ComposeVolumeCheckPath+string(filepath.Separator)) {
+func (self Compose) ValidateRelativeBindMounts(tasker *compose.Task) error {
+	if tasker == nil || !strings.HasPrefix(filepath.Clean(tasker.WorkingDir), define.ComposeVolumeCheckPath+string(filepath.Separator)) {
 		return nil
 	}
-	for serviceName, service := range project.AllServices() {
+	for serviceName, service := range tasker.Project.AllServices() {
 		for _, volume := range service.Volumes {
 			if volume.Type != types.VolumeTypeBind {
 				continue
@@ -514,36 +518,43 @@ func (self Compose) ParseEnvItemValue(env []types2.EnvItem) ([]types2.EnvItem, e
 	}), nil
 }
 
-// ComposeHostDir finds the path used by the local Docker host for a panel Compose directory.
-func (self Compose) ComposeHostDir(workingDir, dockerEnvName string) string {
+func (self Compose) ComposeDir(dockerEnvName string) (containerDir, hostDir string) {
+	containerDir, err := filepath.Abs(storage.Local{}.GetComposePath(dockerEnvName))
+	if err != nil {
+		return "", ""
+	}
+	containerDir = filepath.ToSlash(containerDir)
 	if !function.IsRunInDocker() {
-		return ""
+		return containerDir, containerDir
 	}
 
-	linkPath := ""
 	dpanelInfo := commonlogic.Setting{}.GetDPanelInfo()
+	mountDestination := ""
 	for _, mount := range dpanelInfo.ContainerInfo.Mounts {
-		if mount.Destination != "/dpanel" && mount.Destination != workingDir {
+		destination := filepath.Clean(mount.Destination)
+		if !filepath.IsAbs(destination) || len(destination) <= len(mountDestination) {
 			continue
 		}
+		relativeDir, err := filepath.Rel(destination, containerDir)
+		if err != nil || !filepath.IsLocal(relativeDir) {
+			continue
+		}
+		mountDestination = destination
+		hostDir = ""
 		source := function.PathSeparatorToSlash(mount.Source)
-		candidate := ""
 		switch mount.Type {
 		case "bind":
 			if filepath.IsAbs(source) || paths.IsWindowsAbs(source) {
-				candidate = source
-				if mount.Destination == "/dpanel" {
-					candidate = path.Join(source, filepath.Base(workingDir))
+				hostDir = source
+				if relativeDir != "." {
+					hostDir = path.Join(source, filepath.ToSlash(relativeDir))
 				}
 			}
 		case "volume":
-			candidate = filepath.Join(define.ComposeVolumeCheckPath, dockerEnvName)
-		}
-		if candidate != "" && (mount.Destination == workingDir || linkPath == "") {
-			linkPath = candidate
+			hostDir = path.Join(define.ComposeVolumeCheckPath, dockerEnvName)
 		}
 	}
-	return filepath.ToSlash(linkPath)
+	return containerDir, hostDir
 }
 
 // SyncLocalDir aligns a host path with a directory visible to the panel.
@@ -569,6 +580,36 @@ func (self Compose) SyncLocalDir(sourceDir, targetDir string) error {
 	}
 	if err := os.Symlink(sourceDir, targetDir); err != nil {
 		return fmt.Errorf("link compose directory %q: %w", targetDir, err)
+	}
+	return nil
+}
+
+func (self Compose) DeleteLocalLink(sourceDir, targetDir string) error {
+	if filepath.Clean(sourceDir) == filepath.Clean(targetDir) {
+		return nil
+	}
+	fileInfo, err := os.Lstat(targetDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if fileInfo.Mode()&os.ModeSymlink == 0 {
+		return nil
+	}
+	linkDir, err := os.Readlink(targetDir)
+	if err != nil {
+		return err
+	}
+	if !filepath.IsAbs(linkDir) {
+		linkDir = filepath.Join(filepath.Dir(targetDir), linkDir)
+	}
+	if filepath.Clean(linkDir) != filepath.Clean(sourceDir) {
+		return function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
+	}
+	if err = os.Remove(targetDir); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	return nil
 }
@@ -606,4 +647,24 @@ func (self Compose) SyncRemoteDir(ctx context.Context, dockerSdk *docker.Client,
 		return err
 	}
 	return fileSystem.Import([]serviceafs.TransferFile{{Source: sourceDir, Target: targetDir}})
+}
+
+func (self Compose) DeleteRemoteDir(ctx context.Context, dockerSdk *docker.Client, sourceDir string) error {
+	composePath := storage.Local{}.GetComposePath(dockerSdk.DockerEnv.GetComposeEnvName())
+	relativeDir, err := filepath.Rel(composePath, sourceDir)
+	if err != nil || relativeDir == "." || !filepath.IsLocal(relativeDir) {
+		return function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
+	}
+	fileSystem, err := (commonlogic.Explorer{}).Afs(ctx,
+		commonlogic.ExplorerMountPoint(commonlogic.ExplorerMountTypeContainer+":"+factor.ExplorerName), dockerSdk,
+	)
+	if err != nil {
+		return err
+	}
+	defer fileSystem.Destroy()
+	targetDir := path.Join("/", filepath.Base(composePath), filepath.ToSlash(relativeDir))
+	if err = fileSystem.RemoveAll(targetDir); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }

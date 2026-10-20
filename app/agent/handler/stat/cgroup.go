@@ -41,6 +41,29 @@ func readCgroupMemory(memory agentTypes.MemoryStat) (agentTypes.MemoryStat, erro
 	if err != nil {
 		return agentTypes.MemoryStat{}, fmt.Errorf("read host cgroup memory limit: %w", err)
 	}
+	if directory == hostCgroupPath && limit > 0 {
+		file, err := os.Open("/proc/self/mountinfo")
+		if err != nil {
+			return agentTypes.MemoryStat{}, fmt.Errorf("read monitor mount info: %w", err)
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			mountInfo, filesystemInfo, ok := strings.Cut(scanner.Text(), " - ")
+			if !ok {
+				continue
+			}
+			fieldList := strings.Fields(mountInfo)
+			if len(fieldList) >= 5 && fieldList[4] == hostProcPath+"/meminfo" &&
+				strings.HasPrefix(filesystemInfo, "fuse.lxcfs ") {
+				return readLXCFSHostMemory(min(limit, memory.Total), memory.SwapTotal)
+			}
+		}
+		if err = scanner.Err(); err != nil {
+			return agentTypes.MemoryStat{}, fmt.Errorf("parse monitor mount info: %w", err)
+		}
+	}
 	if limit == 0 || limit == math.MaxUint64 || limit > memory.Total {
 		return memory, nil
 	}
@@ -53,6 +76,41 @@ func readCgroupMemory(memory agentTypes.MemoryStat) (agentTypes.MemoryStat, erro
 	memory.Total = limit
 	memory.Available = limit - min(usage, limit)
 	return memory, nil
+}
+
+func readLXCFSHostMemory(total, swapTotal uint64) (agentTypes.MemoryStat, error) {
+	usage, err := readUintFile(filepath.Join(hostCgroupPath, "memory.current"))
+	if err != nil {
+		return agentTypes.MemoryStat{}, fmt.Errorf("read LXC host memory usage: %w", err)
+	}
+	valueMap, err := readKeyValues(filepath.Join(hostCgroupPath, "memory.stat"))
+	if err != nil {
+		return agentTypes.MemoryStat{}, fmt.Errorf("read LXC host memory stat: %w", err)
+	}
+	for _, name := range []string{"active_file", "inactive_file", "slab_reclaimable"} {
+		value, exists := valueMap[name]
+		if !exists {
+			return agentTypes.MemoryStat{}, fmt.Errorf("LXC host memory stat is missing %q", name)
+		}
+		usage -= min(usage, value)
+	}
+	result := agentTypes.MemoryStat{
+		Total:     total,
+		Available: total - min(usage, total),
+	}
+	if swapTotal > 0 {
+		limit, err := readUintFile(filepath.Join(hostCgroupPath, "memory.swap.max"))
+		if err != nil {
+			return agentTypes.MemoryStat{}, fmt.Errorf("read LXC host swap limit: %w", err)
+		}
+		usage, err := readUintFile(filepath.Join(hostCgroupPath, "memory.swap.current"))
+		if err != nil {
+			return agentTypes.MemoryStat{}, fmt.Errorf("read LXC host swap usage: %w", err)
+		}
+		result.SwapTotal = min(limit, swapTotal)
+		result.SwapAvailable = result.SwapTotal - min(usage, result.SwapTotal)
+	}
+	return result, nil
 }
 
 type containerReader struct {

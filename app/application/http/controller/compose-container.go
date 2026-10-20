@@ -6,6 +6,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
@@ -14,6 +16,7 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	containerexec "github.com/donknap/dpanel/common/service/exec/container"
@@ -24,6 +27,8 @@ import (
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"gorm.io/datatypes"
+	"gorm.io/gen"
 )
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
@@ -73,7 +78,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
 		return
 	}
-	if err = (logic.Compose{}).ValidateRelativeBindMounts(tasker.Project); err != nil {
+	if err = (logic.Compose{}).ValidateRelativeBindMounts(tasker); err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
@@ -210,7 +215,8 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 func (self Compose) ContainerDestroy(http *gin.Context) {
 	type ParamsValidate struct {
-		Id                 string   `json:"id" binding:"required"`
+		Id                 string   `json:"id" binding:"required_without=Name"`
+		Name               string   `json:"name" binding:"required_without=Id"`
 		DeleteImage        bool     `json:"deleteImage"`
 		DeleteVolume       bool     `json:"deleteVolume"`
 		DeleteData         bool     `json:"deleteData"`
@@ -227,16 +233,77 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	composeRow, err := logic.Compose{}.Get(params.Id)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	dockerEnvName := dockerSdk.DockerEnv.GetComposeEnvName()
+	var composeRow *entity.Compose
+	var runCompose *compose.ProjectResult
+	if params.Id == "" {
+		if !params.DeletePath || params.DeleteImage || params.DeleteVolume || len(params.DestroyServiceName) > 0 || !function.IsSafeString(params.Name, function.StringRuleName) {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+			return
+		}
+		composeList, err := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(
+			datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
+		)...).Find()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if len(composeList) > 0 {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+			return
+		}
+		runCompose = logic.Compose{}.LsItem(params.Name)
+		if runCompose != nil {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+			return
+		}
+		composeRow = &entity.Compose{
+			Name: params.Name,
+			Setting: &accessor.ComposeSettingOption{
+				Type:          accessor.ComposeTypeText,
+				DockerEnvName: dockerEnvName,
+				Uri: []string{
+					path.Join(params.Name, define.ComposeProjectDeployComposeFileName),
+				},
+			},
+		}
+	} else {
+		composeRow, err = logic.Compose{}.Get(params.Id)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		runCompose = logic.Compose{}.LsItem(composeRow.Name)
 	}
-	if composeRow.Setting.DockerEnvName != dockerSdk.DockerEnv.GetComposeEnvName() {
+	if composeRow.Setting.DockerEnvName != dockerEnvName {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-	runCompose := logic.Compose{}.LsItem(composeRow.Name)
+	composePath := storage.Local{}.GetComposePath(composeRow.Setting.DockerEnvName)
+	var targetPath string
+	if params.DeletePath {
+		if composeRow.ID > 0 && !params.DeleteData {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeleteFileMustDeleteTask), 500)
+			return
+		}
+		targetPath = composeRow.Name
+		if composeRow.Setting.Type != accessor.ComposeTypeOutPath {
+			composeFile, _, err := composeRow.Setting.GetUriPath(composeRow.Name)
+			if err != nil {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+				return
+			}
+			targetPath, err = filepath.Rel(composePath, filepath.Dir(composeFile))
+			if err != nil {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+				return
+			}
+		}
+		if targetPath == "." || !filepath.IsLocal(targetPath) {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+			return
+		}
+	}
 	if runCompose != nil && len(runCompose.ContainerList) != 0 {
 		tasker, _, err := logic.Compose{}.GetTasker(dockerSdk, composeRow)
 		if err != nil {
@@ -268,34 +335,72 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		}
 	}
 
-	if params.DeleteData {
+	if params.DeleteData && composeRow.ID > 0 {
 		_, err := dao.Compose.Where(dao.Compose.ID.Eq(composeRow.ID)).Delete()
 		if err != nil {
-			slog.Info("compose", "destroy", err)
-		} else {
-			facade.GetEvent().Publish(event.ComposeDeleteEvent, event.ComposePayload{
-				Compose: composeRow,
-				Ctx:     http,
-			})
+			self.JsonResponseWithError(http, err, 500)
+			return
 		}
-	} else {
+		facade.GetEvent().Publish(event.ComposeDeleteEvent, event.ComposePayload{
+			Compose: composeRow,
+			Ctx:     http,
+		})
+	} else if composeRow.ID > 0 {
 		composeRow.Setting.DeployServiceName = make([]string, 0)
 		composeRow.Setting.Status = ""
-		_ = dao.Compose.Save(composeRow)
+		if err = dao.Compose.Save(composeRow); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
 	}
 
 	if params.DeletePath {
-		if !params.DeleteData {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeleteFileMustDeleteTask), 500)
+		sourceDir := filepath.Join(composePath, targetPath)
+		if composeRow.ID > 0 {
+			if function.IsRunInDocker() {
+				var targetDir string
+				if composeRow.Setting.Type == accessor.ComposeTypeOutPath {
+					if composeRow.Setting.IsDelegate() && len(composeRow.Setting.Uri) > 0 {
+						targetDir = path.Dir(function.PathSeparatorToSlash(composeRow.Setting.Uri[0]))
+					}
+				} else if _, hostDir := (logic.Compose{}).ComposeDir(composeRow.Setting.DockerEnvName); hostDir != "" {
+					targetDir = path.Join(hostDir, filepath.ToSlash(targetPath))
+				}
+				if targetDir != "" {
+					workingDir := function.SlashPathToSystem(targetDir)
+					if hostDir, ok := function.WindowsPathToSlash(targetDir); ok {
+						workingDir = filepath.Join("/mnt/host", strings.TrimPrefix(hostDir, "/"))
+					}
+					if err = (logic.Compose{}).DeleteLocalLink(sourceDir, workingDir); err != nil {
+						self.JsonResponseWithError(http, err, 500)
+						return
+					}
+				}
+			}
+			if dockerSdk.DockerEnv.IsRemote() && composeRow.Setting.Type != accessor.ComposeTypeOutPath {
+				if err = (logic.Compose{}).DeleteRemoteDir(http, dockerSdk, sourceDir); err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+			}
+		}
+		composeRoot, err := os.OpenRoot(composePath)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-		targetPath := storage.Local{}.GetComposeProjectPath(dockerSdk.DockerEnv.GetComposeEnvName(), composeRow.Name)
-		err := os.RemoveAll(targetPath)
-		if err != nil {
-			slog.Info("compose", "destroy", err)
+		if err == nil {
+			defer composeRoot.Close()
+			if err = composeRoot.RemoveAll(targetPath); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
 		}
 	}
-	_ = notice.Message{}.Info(".composeDestroy", "name", composeRow.Name)
+
+	if composeRow.ID > 0 || runCompose != nil {
+		_ = notice.Message{}.Info(".composeDestroy", "name", composeRow.Name)
+	}
 
 	self.JsonSuccessResponse(http)
 	return
