@@ -16,7 +16,6 @@ import (
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	containerexec "github.com/donknap/dpanel/common/service/exec/container"
@@ -27,8 +26,6 @@ import (
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
-	"gorm.io/datatypes"
-	"gorm.io/gen"
 )
 
 func (self Compose) ContainerDeploy(http *gin.Context) {
@@ -128,10 +125,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 	_, err = io.Copy(progress, response)
 	if err != nil {
-		// copy 出错的只记录日志，不提示用户
 		slog.Warn("compose container deploy copy", "error", err)
-	}
-	if err != nil {
 		if function.ErrorHasKeyword(err, "denied: You may not login") {
 			_ = notice.Message{}.Error(".imagePullInvalidAuth")
 		} else if function.ErrorHasKeyword(err, "Mounts denied") {
@@ -145,6 +139,10 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	}
 	if composeRow.ID > 0 {
 		_ = dao.Compose.Save(composeRow)
+	}
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 
 	// 查看当前任务下的容器 hash 值是否部署成功
@@ -215,8 +213,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 
 func (self Compose) ContainerDestroy(http *gin.Context) {
 	type ParamsValidate struct {
-		Id                 string   `json:"id" binding:"required_without=Name"`
-		Name               string   `json:"name" binding:"required_without=Id"`
+		Id                 string   `json:"id" binding:"required"`
 		DeleteImage        bool     `json:"deleteImage"`
 		DeleteVolume       bool     `json:"deleteVolume"`
 		DeleteData         bool     `json:"deleteData"`
@@ -234,47 +231,12 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 		return
 	}
 	dockerEnvName := dockerSdk.DockerEnv.GetComposeEnvName()
-	var composeRow *entity.Compose
-	var runCompose *compose.ProjectResult
-	if params.Id == "" {
-		if !params.DeletePath || params.DeleteImage || params.DeleteVolume || len(params.DestroyServiceName) > 0 || !function.IsSafeString(params.Name, function.StringRuleName) {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
-			return
-		}
-		composeList, err := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(
-			datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
-		)...).Find()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		if len(composeList) > 0 {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
-			return
-		}
-		runCompose = logic.Compose{}.LsItem(params.Name)
-		if runCompose != nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
-			return
-		}
-		composeRow = &entity.Compose{
-			Name: params.Name,
-			Setting: &accessor.ComposeSettingOption{
-				Type:          accessor.ComposeTypeText,
-				DockerEnvName: dockerEnvName,
-				Uri: []string{
-					path.Join(params.Name, define.ComposeProjectDeployComposeFileName),
-				},
-			},
-		}
-	} else {
-		composeRow, err = logic.Compose{}.Get(params.Id)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		runCompose = logic.Compose{}.LsItem(composeRow.Name)
+	composeRow, err := logic.Compose{}.Get(params.Id)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
+	runCompose := logic.Compose{}.LsItem(composeRow.Name)
 	if composeRow.Setting.DockerEnvName != dockerEnvName {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
@@ -444,7 +406,9 @@ func (self Compose) ContainerCtrl(http *gin.Context) {
 	}()
 	_, err = io.Copy(progress, response)
 	if err != nil {
-		slog.Warn("compose destroy copy", "error", err)
+		slog.Warn("compose container ctrl copy", "error", err)
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 
 	self.JsonSuccessResponse(http)

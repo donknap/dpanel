@@ -399,7 +399,7 @@ func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (
 	if defaultEnvContent != nil {
 		fileEnv, err := dotenv.UnmarshalWithLookup(string(defaultEnvContent), nil)
 		if err != nil {
-			return nil, nil, fmt.Errorf("parse compose .env: %w", err)
+			return task, nil, fmt.Errorf("parse compose .env: %w", err)
 		}
 		fileInfo, err := os.Stat(defaultEnvPath)
 		if err != nil {

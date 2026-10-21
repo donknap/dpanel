@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -426,19 +427,24 @@ func (self Compose) GetDetail(http *gin.Context) {
 	subTask := make([]*entity.Compose, 0)
 
 	tasker, _, err := (logic.Compose{}).GetTasker(dockerSdk, composeRow)
-	if err != nil && tasker == nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	composeRow.Setting.Environment = tasker.Environment
 	composeRow.Setting.Dangling = errors.Is(err, logic.ErrMissingComposeFile)
 	data := gin.H{
-		"yaml":          tasker.GetYaml(),
+		"yaml":          [2]string{},
 		"task":          subTask,
-		"project":       tasker.Project,
+		"project":       &types.Project{},
 		"containerList": logic.Compose{}.Ps(composeRow.Name),
 		"detail":        composeRow,
-		"workingDir":    tasker.WorkingDir,
+		"error":         "",
+	}
+	if tasker != nil {
+		data["yaml"] = tasker.GetYaml()
+	}
+	if err == nil {
+		composeRow.Setting.Environment = tasker.Environment
+		data["project"] = tasker.Project
+		data["workingDir"] = tasker.WorkingDir
+	} else if !errors.Is(err, logic.ErrMissingComposeFile) {
+		data["error"] = err.Error()
 	}
 
 	if run := (logic.Compose{}).LsItem(composeRow.Name); run != nil {
