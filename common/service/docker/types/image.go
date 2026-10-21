@@ -14,7 +14,7 @@ type ImageDigestInspectResult struct {
 }
 
 func (self ImageDigestInspectResult) IsAvailable() bool {
-	return len(self.LocalDigests) > 0 && self.RemoteDigest != ""
+	return self.RemoteDigest != ""
 }
 
 func (self ImageDigestInspectResult) IsDifferent() bool {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	http2 "net/http"
 	"os"
 	"path"
@@ -46,7 +45,8 @@ type Compose struct {
 
 func (self Compose) SyncDir(http *gin.Context) {
 	type ParamsValidate struct {
-		Id string `json:"id" binding:"required"`
+		Id       string `json:"id" binding:"required"`
+		BackupId string `json:"backupId"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -67,19 +67,42 @@ func (self Compose) SyncDir(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	if composeRow.Setting.DockerEnvName != dockerSdk.DockerEnv.GetComposeEnvName() {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		return
+	}
+	backup, err := logic.GetComposeBackup(params.BackupId, composeRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		if err != nil {
+			if backup != nil {
+				if restoreErr := backup.Restore(); restoreErr != nil {
+					err = errors.Join(err, restoreErr)
+				}
+			}
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if backup != nil {
+			storage.Cache.Set(fmt.Sprintf(storage.CacheKeyComposeBackup, backup.Id), backup, time.Hour)
+		}
+		self.JsonSuccessResponse(http)
+	}()
+
 	tasker, warning, err := (logic.Compose{}).GetTasker(dockerSdk, composeRow)
 	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
+		err = function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error())
 		return
 	}
 	if err = (logic.Compose{}).ValidateRelativeBindMounts(tasker); err != nil {
-		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	sourceDir := filepath.Dir(tasker.ComposeFiles[0])
 	targetDir := tasker.WorkingDir
 	if composeRow.Setting.Type == accessor.ComposeTypeOutPath && !composeRow.Setting.IsDelegate() {
-		self.JsonSuccessResponse(http)
 		return
 	}
 	if function.IsRunInDocker() {
@@ -92,11 +115,6 @@ func (self Compose) SyncDir(http *gin.Context) {
 	if err == nil && dockerSdk.DockerEnv.IsRemote() {
 		err = (logic.Compose{}).SyncRemoteDir(http, dockerSdk, sourceDir, targetDir, composeRow.Setting.Type == accessor.ComposeTypeOutPath)
 	}
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-	self.JsonSuccessResponse(http)
 }
 
 func (self Compose) Create(http *gin.Context) {
@@ -128,12 +146,6 @@ func (self Compose) Create(http *gin.Context) {
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
-		}
-		if params.Title != "" {
-			composeRow.Title = params.Title
-		}
-		if params.Type != "" {
-			composeRow.Setting.Type = params.Type
 		}
 	} else {
 		if params.Type == accessor.ComposeTypeStore {
@@ -175,6 +187,23 @@ func (self Compose) Create(http *gin.Context) {
 		}
 	}
 
+	if composeRow.Setting.DockerEnvName != dockerEnvName {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		return
+	}
+	backup, err := logic.NewComposeBackup(composeRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if params.Id != "" {
+		if params.Title != "" {
+			composeRow.Title = params.Title
+		}
+		if params.Type != "" {
+			composeRow.Setting.Type = params.Type
+		}
+	}
 	for index, uri := range composeRow.Setting.Uri {
 		composeRow.Setting.Uri[index] = function.PathSeparatorToSlash(uri)
 	}
@@ -195,24 +224,26 @@ func (self Compose) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	composeRow.Setting.Environment, err = (logic.Compose{}).ParseEnvItemValue(params.Environment)
-	if err != nil {
-		composeRow.Setting.Environment = params.Environment
-		slog.Warn("compose save environment parse failed", "name", composeRow.Name)
-	}
 	composeDir := filepath.Dir(composeFile)
-	if err = os.MkdirAll(composeDir, os.ModePerm); err != nil {
+	if err = backup.Backup(); err != nil {
 		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		if err != nil {
+			self.JsonResponseWithError(http, fmt.Errorf("save compose with backup %q: %w", backup.Id, err), 500)
+		}
+	}()
+	composeRow.Setting.Environment = params.Environment
+	if err = os.MkdirAll(composeDir, os.ModePerm); err != nil {
 		return
 	}
 	if params.Yaml != "" {
 		if err = os.WriteFile(composeFile, []byte(params.Yaml), 0644); err != nil {
-			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 		if params.YamlOverride != "" {
 			if err = os.WriteFile(overrideFile, []byte(params.YamlOverride), 0644); err != nil {
-				self.JsonResponseWithError(http, err, 500)
 				return
 			}
 			if composeRow.Setting.Type != accessor.ComposeTypeOutPath {
@@ -223,7 +254,6 @@ func (self Compose) Create(http *gin.Context) {
 			}
 		} else {
 			if err = os.Remove(overrideFile); err != nil && !errors.Is(err, os.ErrNotExist) {
-				self.JsonResponseWithError(http, err, 500)
 				return
 			}
 			overrideUri := path.Join(path.Dir(composeRow.Setting.Uri[0]), filepath.Base(overrideFile))
@@ -243,19 +273,18 @@ func (self Compose) Create(http *gin.Context) {
 	}
 	envFilePath := filepath.Join(composeDir, define.ComposeDefaultEnvFileName)
 	if err = os.WriteFile(envFilePath, []byte(strings.Join(envLineList, "\n")), 0o600); err != nil {
-		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	tasker, _, err := (logic.Compose{}).GetTasker(dockerSdk, composeRow)
-	if err == nil {
-		composeRow.Setting.Environment = tasker.Environment
-	} else if !errors.Is(err, logic.ErrMissingComposeFile) {
-		slog.Warn("compose save config parse failed", "name", composeRow.Name)
+	fileInfo, err := os.Stat(composeFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return
 	}
-	composeRow.Setting.Dangling = errors.Is(err, logic.ErrMissingComposeFile)
+	composeRow.Setting.Dangling = errors.Is(err, os.ErrNotExist) || fileInfo.Size() == 0
+	err = nil
 	if composeRow.Setting.Type == accessor.ComposeTypeOutPath && !composeRow.Setting.IsDelegate() {
 		self.JsonResponseWithoutError(http, gin.H{
-			"id": composeRow.Name,
+			"id":       composeRow.Name,
+			"backupId": backup.Id,
 		})
 		return
 	}
@@ -268,8 +297,6 @@ func (self Compose) Create(http *gin.Context) {
 		createSuccess = err == nil
 	}
 	if err != nil {
-		_ = os.Remove(composeDir)
-		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	if createSuccess {
@@ -280,7 +307,8 @@ func (self Compose) Create(http *gin.Context) {
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"id": composeRow.ID,
+		"id":       composeRow.ID,
+		"backupId": backup.Id,
 	})
 
 	return

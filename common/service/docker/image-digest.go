@@ -45,9 +45,6 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 	}
 	result.ImageID = imageInfo.ID
 	result.LocalDigests = append(result.LocalDigests, imageInfo.RepoDigests...)
-	if len(result.LocalDigests) == 0 {
-		return result, nil
-	}
 
 	imageNameDetail := function.ImageTag(result.ImageName)
 	if imageNameDetail.BaseName == "" || imageNameDetail.Version == "" || imageNameDetail.Registry == "" {
@@ -75,9 +72,12 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 			username,
 			password,
 		)).Client(dockerTypes.HTTPContextInterceptor{Context: attemptContext})
+
+		manifestUrl := fmt.Sprintf("%s/v2/%s/manifests/%s", strings.TrimSuffix(registryClient.Address(), "/"), imageNameDetail.BaseName, imageNameDetail.Version)
+		slog.Debug("image digest inspect", "url", manifestUrl)
 		request, err := http.NewRequest(
 			http.MethodHead,
-			fmt.Sprintf("%s/v2/%s/manifests/%s", strings.TrimSuffix(registryClient.Address(), "/"), imageNameDetail.BaseName, imageNameDetail.Version),
+			manifestUrl,
 			nil,
 		)
 		if err != nil {

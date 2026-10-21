@@ -10,4 +10,5 @@ const (
 	DPanelLabelImageCommitSourceID  = "com.dpanel.image-commit.source-id"
 	DPanelLabelImageCommitSourceTag = "com.dpanel.image-commit.source-tag"
 	DPanelLabelImageCommitMerged    = "com.dpanel.image-commit.merged"
+	DPanelLabelImageDigest          = "com.dpanel.image.digest"
 )

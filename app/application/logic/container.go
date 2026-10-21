@@ -7,11 +7,13 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/agent/factor"
 	"github.com/donknap/dpanel/common/service/docker"
 	dockerTypes "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/patrickmn/go-cache"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 type Container struct {
@@ -35,6 +37,11 @@ type ContainerUpgradeCheckResult struct {
 	Status    string
 }
 
+func (self Container) IsUpgradeIgnore(containerName string) bool {
+	containerName = strings.TrimPrefix(strings.TrimSpace(containerName), "/")
+	return containerName == strings.TrimPrefix(strings.TrimSpace(facade.GetConfig().GetString("app.name")), "/") || containerName == factor.MonitorName
+}
+
 func (self Container) CheckUpgrade(dockerSdk *docker.Client, containerInfo container.InspectResponse, force bool) ContainerUpgradeCheckResult {
 	cacheKey := fmt.Sprintf(storage.CacheKeyContainerUpgradeCheck, dockerSdk.Name, containerInfo.ID)
 	refreshCache := func() ContainerUpgradeCheckResult {
@@ -56,6 +63,9 @@ func (self Container) CheckUpgrade(dockerSdk *docker.Client, containerInfo conta
 			status = define.ContainerUpgradeStatusUnavailable
 		} else if result.IsDifferent() {
 			status = define.ContainerUpgradeStatusUpgrade
+			if len(result.LocalDigests) == 0 && containerInfo.Config != nil && strings.Contains(containerInfo.Config.Labels[define.DPanelLabelImageDigest], result.RemoteDigest) {
+				status = define.ContainerUpgradeStatusLatest
+			}
 		}
 		cached := ContainerUpgradeCheckResult{
 			CheckedAt: time.Now().Format(define.DateShowYmdHis),

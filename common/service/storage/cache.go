@@ -37,6 +37,7 @@ var (
 	CacheKeyRsaPub                        = "rsa:pub"
 	CacheKeyAttach                        = "attach:%s"
 	CacheKeyAsset                         = "asset"
+	CacheKeyComposeBackup                 = "compose:backup:%s"
 )
 
 var (

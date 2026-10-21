@@ -109,6 +109,7 @@ func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 		builder.WithContainerRollback(containerInfo, params.EnableBak),
 		builder.WithContainerInfo(containerInfo),
 		builder.WithImage(imageName),
+		builder.WithImageDigest(),
 		builder.WithImageRuntimeConfig(params.EnableResetImageConfig),
 	}
 	if containerInfo.NetworkSettings != nil {
@@ -282,7 +283,7 @@ func (self ContainerUpgrade) Check(http *gin.Context) {
 	ignore := accessor.ContainerCheckIgnoreUpgrade{}
 	logic2.Setting{}.GetByKey(logic2.SettingGroupSetting, logic2.SettingGroupSettingCheckContainerIgnore, &ignore)
 	ignoreStatus := ""
-	if function.InArray(ignore, fmt.Sprintf("%s@*", containerInfo.Name)) {
+	if (logic.Container{}).IsUpgradeIgnore(containerInfo.Name) || function.InArray(ignore, fmt.Sprintf("%s@*", containerInfo.Name)) {
 		ignoreStatus = define.ContainerUpgradeStatusIgnoreAlways
 	} else if function.InArray(ignore, fmt.Sprintf("%s@%s", containerInfo.Name, containerInfo.Image)) {
 		ignoreStatus = define.ContainerUpgradeStatusIgnoreCurrent
@@ -349,7 +350,7 @@ func (self ContainerUpgrade) GetList(http *gin.Context) {
 			errorMessage = result.Error
 			status = result.Status
 		}
-		if function.InArray(ignore, fmt.Sprintf("%s@*", containerName)) {
+		if (logic.Container{}).IsUpgradeIgnore(containerName) || function.InArray(ignore, fmt.Sprintf("%s@*", containerName)) {
 			status = define.ContainerUpgradeStatusIgnoreAlways
 			errorMessage = ""
 		} else if function.InArray(ignore, fmt.Sprintf("%s@%s", containerName, item.ImageID)) {

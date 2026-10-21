@@ -3,6 +3,8 @@ package container
 import (
 	"errors"
 	"fmt"
+	"log/slog"
+	"maps"
 	"net"
 	"strings"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/docker/go-units"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 type Option func(builder *Builder) error
@@ -76,6 +79,24 @@ func WithImage(imageName string) Option {
 			return errors.New("image name is empty")
 		}
 		self.containerConfig.Image = imageName
+		return nil
+	}
+}
+
+func WithImageDigest() Option {
+	return func(self *Builder) error {
+		imageDigest := ""
+		imageInfo, err := self.dockerSdk.Client.ImageInspect(self.dockerSdk.Ctx, self.containerConfig.Image)
+		if err != nil {
+			slog.Warn("record container image digest", "image", self.containerConfig.Image, "error", err)
+		} else {
+			imageDigest = strings.Join(imageInfo.RepoDigests, ",")
+		}
+		self.containerConfig.Labels = maps.Clone(self.containerConfig.Labels)
+		if self.containerConfig.Labels == nil {
+			self.containerConfig.Labels = make(map[string]string)
+		}
+		self.containerConfig.Labels[define.DPanelLabelImageDigest] = imageDigest
 		return nil
 	}
 }

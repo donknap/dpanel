@@ -18,6 +18,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/service/exec"
 	containerexec "github.com/donknap/dpanel/common/service/exec/container"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
@@ -31,6 +32,7 @@ import (
 func (self Compose) ContainerDeploy(http *gin.Context) {
 	type ParamsValidate struct {
 		Id                string          `json:"id" binding:"required"`
+		BackupId          string          `json:"backupId"`
 		Environment       []types.EnvItem `json:"environment"`
 		DeployServiceName []string        `json:"deployServiceName"`
 		CreatePath        bool            `json:"createPath"`
@@ -54,6 +56,30 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	if composeRow.Setting.DockerEnvName != dockerSdk.DockerEnv.GetComposeEnvName() {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		return
+	}
+	backup, err := logic.GetComposeBackup(params.BackupId, composeRow)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		if err != nil {
+			if backup != nil {
+				if restoreErr := backup.Restore(); restoreErr != nil {
+					err = errors.Join(err, restoreErr)
+				}
+			}
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if backup != nil {
+			storage.Cache.Delete(fmt.Sprintf(storage.CacheKeyComposeBackup, backup.Id))
+		}
+		self.JsonSuccessResponse(http)
+	}()
 
 	if !function.IsEmptyArray(params.DeployServiceName) {
 		composeRow.Setting.DeployServiceName = params.DeployServiceName
@@ -72,22 +98,21 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		},
 	})
 	if err != nil {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error()), 500)
+		err = function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error())
 		return
 	}
 	if err = (logic.Compose{}).ValidateRelativeBindMounts(tasker); err != nil {
-		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
 	// 添加禁用服务，只有部署的时候需要，避免在获取详情时拿不到全部服务
 	if !function.IsEmptyArray(composeRow.Setting.DeployServiceName) {
-		services, err := tasker.Project.GetServices()
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
+		serviceList, serviceErr := tasker.Project.GetServices()
+		if serviceErr != nil {
+			err = serviceErr
 			return
 		}
-		for _, item := range services {
+		for _, item := range serviceList {
 			if !function.InArray(composeRow.Setting.DeployServiceName, item.Name) {
 				tasker.Project = tasker.Project.WithServicesDisabled(item.Name)
 			}
@@ -97,7 +122,6 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	if params.CreatePath {
 		tasker.CreateBindPath()
 	}
-	_ = notice.Message{}.Info(".composeDeploy", "name", composeRow.Name)
 
 	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
 	defer progress.Close()
@@ -109,7 +133,6 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		response, err = tasker.Deploy(params.RemoveOrphans, params.PullImage)
 	}
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
@@ -141,20 +164,19 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		_ = dao.Compose.Save(composeRow)
 	}
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 
 	// 查看当前任务下的容器 hash 值是否部署成功
 	runCompose := logic.Compose{}.LsItem(composeRow.Name)
 	if runCompose == nil || len(runCompose.ContainerList) != len(tasker.Project.Services) {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
+		err = function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect)
 		return
 	}
 
 	for _, item := range runCompose.ContainerList {
 		if item.Container.State != container.StateRunning {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
+			err = function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect)
 			return
 		}
 	}
@@ -180,7 +202,8 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			return item.Name == "PHP_EXTENSIONS"
 		}); ok {
 			_, _ = progress.Write([]byte("Install PHP_EXTENSIONS " + phpExt.String() + "\n"))
-			cmd, err := containerexec.New(
+			var cmd exec.Executor
+			cmd, err = containerexec.New(
 				containerexec.WithDockerClient(dockerSdk.Client),
 				containerexec.WithContainerName(runCompose.ContainerList[0].Container.ID),
 				containerexec.WithCommandName("install-ext"),
@@ -189,25 +212,22 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 				containerexec.WithExecOptions(container.ExecOptions{Privileged: true}),
 			)
 			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
 				return
 			}
 			defer cmd.Close()
-			out, err := cmd.RunInReadPip()
+			var out io.ReadCloser
+			out, err = cmd.RunInReadPip()
 			if err != nil {
-				self.JsonResponseWithError(http, err, 500)
 				return
 			}
 			defer out.Close()
 			_, err = io.Copy(progress, out)
 			if err != nil {
-				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect), 500)
 				return
 			}
 		}
 	}
 
-	self.JsonSuccessResponse(http)
 	return
 }
 
