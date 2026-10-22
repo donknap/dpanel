@@ -12,8 +12,10 @@ import (
 	"sync"
 
 	"github.com/creack/pty"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec"
 	"github.com/donknap/dpanel/common/service/exec/local"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 type Executor struct {
@@ -183,6 +185,9 @@ func (self *Executor) runCommand(output io.Writer, args ...string) error {
 	}
 	defer pipe.Close()
 	_, err = io.Copy(output, pipe)
+	if err != nil && args[0] == "build" {
+		return function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect)
+	}
 	return err
 }
 
@@ -208,7 +213,6 @@ func (self *Executor) run(output io.Writer) error {
 			return err
 		}
 		if err := self.runTarget(output, target, name); err != nil {
-			_, _ = fmt.Fprintf(output, "Error: Build failed for target %s\n", name)
 			return err
 		}
 	}

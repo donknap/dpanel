@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -81,7 +82,9 @@ func (self Docker) Build(sdk *docker.Client, wsBuffer *ws.ProgressPip, task acce
 		if err = decoder.Decode(&msg); err == io.EOF {
 			break
 		} else if err != nil {
-			return log.String(), "", fmt.Errorf("read image build response: %w", err)
+			err = fmt.Errorf("read image build response: %w", err)
+			wsBuffer.BroadcastMessage(function.ConsoleWriteError(err.Error()))
+			return log.String(), "", function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect)
 		}
 		buildErr := msg.ErrorDetail.Message
 		if buildErr == "" {
@@ -89,7 +92,7 @@ func (self Docker) Build(sdk *docker.Client, wsBuffer *ws.ProgressPip, task acce
 		}
 		if buildErr != "" {
 			wsBuffer.BroadcastMessage(buildErr)
-			return log.String(), "", function.ErrorMessage(define.ErrorMessageImageBuildError, "message", buildErr)
+			return log.String(), "", function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect)
 		}
 		if msg.Aux.ID != "" {
 			imageID = msg.Aux.ID
@@ -107,7 +110,9 @@ func (self Docker) Build(sdk *docker.Client, wsBuffer *ws.ProgressPip, task acce
 		imageID = legacyID
 	}
 	if imageID == "" {
-		return log.String(), "", function.ErrorMessage(define.ErrorMessageImageBuildError, "message", "")
+		err = errors.New("image build response did not include an image ID")
+		wsBuffer.BroadcastMessage(function.ConsoleWriteError(err.Error()))
+		return log.String(), "", function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect)
 	}
 	if task.BuildEnablePush {
 		for _, tag := range task.Tags {

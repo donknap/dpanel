@@ -118,8 +118,9 @@ func (self ImageBuildx) Build(http *gin.Context) {
 	imageRow.Setting.ImageId = imageID
 	imageRow.Setting.UseTime = time.Since(startTime).Seconds()
 	imageRow.Message = log
-	if saveErr := dao.Image.Save(imageRow); saveErr != nil {
-		err = errors.Join(err, saveErr)
+	if err := dao.Image.Save(imageRow); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)

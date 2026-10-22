@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types/registry"
+	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/buildx/build"
 	buildxcontext "github.com/donknap/dpanel/common/service/docker/buildx/context"
@@ -130,16 +131,15 @@ func (self *Builder) Run(output io.Writer) (string, string, error) {
 	if err != nil {
 		return log.String(), "", err
 	}
-	if strings.Contains(log.String(), "ERROR: no builder") {
-		return log.String(), "", errors.New("buildx builder is unavailable")
-	}
 	matches := regexp.MustCompile(`"containerimage\.digest"\s*:\s*"(sha256:[a-f0-9]+)"`).FindAllStringSubmatch(log.String(), -1)
 	imageIDs := make([]string, 0, len(matches))
 	for _, match := range matches {
 		imageIDs = append(imageIDs, match[1])
 	}
 	if len(imageIDs) == 0 {
-		return log.String(), "", errors.New("buildx output did not include an image digest")
+		err = errors.New("buildx output did not include an image digest")
+		_, _ = io.WriteString(io.MultiWriter(&log, output), function.ConsoleWriteError(err.Error()))
+		return log.String(), "", function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect)
 	}
 	return log.String(), strings.Join(imageIDs, "-"), nil
 }

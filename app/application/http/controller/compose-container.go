@@ -123,9 +123,6 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		tasker.CreateBindPath()
 	}
 
-	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
-	defer progress.Close()
-
 	var response io.ReadCloser
 	if params.Build {
 		response, err = tasker.Build()
@@ -136,19 +133,15 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		return
 	}
 
+	progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
+	defer progress.Close()
 	go func() {
 		<-progress.Done()
 		_ = response.Close()
 	}()
 
-	progress.OnWrite = func(p string) error {
-		progress.BroadcastMessage(p)
-		return nil
-	}
-
 	_, err = io.Copy(progress, response)
 	if err != nil {
-		slog.Warn("compose container deploy copy", "error", err)
 		if function.ErrorHasKeyword(err, "denied: You may not login") {
 			_ = notice.Message{}.Error(".imagePullInvalidAuth")
 		} else if function.ErrorHasKeyword(err, "Mounts denied") {
@@ -164,19 +157,20 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		_ = dao.Compose.Save(composeRow)
 	}
 	if err != nil {
+		err = function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect)
 		return
 	}
 
 	// 查看当前任务下的容器 hash 值是否部署成功
 	runCompose := logic.Compose{}.LsItem(composeRow.Name)
 	if runCompose == nil || len(runCompose.ContainerList) != len(tasker.Project.Services) {
-		err = function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect)
+		err = function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect)
 		return
 	}
 
 	for _, item := range runCompose.ContainerList {
 		if item.Container.State != container.StateRunning {
-			err = function.ErrorMessage(define.ErrorMessageComposeDeployIncorrect)
+			err = function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect)
 			return
 		}
 	}
@@ -223,6 +217,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 			defer out.Close()
 			_, err = io.Copy(progress, out)
 			if err != nil {
+				err = function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect)
 				return
 			}
 		}
@@ -298,21 +293,20 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 			}
 		}
 
-		progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
-		defer progress.Close()
-
 		response, err := tasker.Destroy(params.DeleteImage, params.DeleteVolume)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
+		progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
+		defer progress.Close()
 		go func() {
 			<-progress.Done()
 			_ = response.Close()
 		}()
 		_, err = io.Copy(progress, response)
 		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect), 500)
 			return
 		}
 	}
