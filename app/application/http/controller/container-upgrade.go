@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"slices"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -204,6 +206,12 @@ func (self ContainerUpgrade) Upgrade(http *gin.Context) {
 				self.JsonResponseWithError(http, err, 500)
 				return
 			}
+		}
+	}
+
+	if containerInfo.Image != newContainerInfo.Image {
+		if _, err = dockerClient.Client.ImageRemove(dockerClient.Ctx, containerInfo.Image, image.RemoveOptions{}); err != nil {
+			slog.Debug("container upgrade kept old image", "imageId", containerInfo.Image, "error", err)
 		}
 	}
 

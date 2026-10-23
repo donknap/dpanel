@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
+	"slices"
+	"strings"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -63,21 +64,19 @@ func (self Image) TagSync(http *gin.Context) {
 		wsBuffer = ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeImagePull, params.Tag))
 	}
 
-	pullStarted := time.Now()
-	if params.Type == "pull" {
-		slog.Info("image pull started", "image", imageNameDetail.Uri(), "dockerEnv", dockerClient.Name)
-	} else {
-		slog.Debug("image remote", "type", params.Type, "tag", imageNameDetail.Uri())
-	}
-
 	defer wsBuffer.Close()
 	operationCtx, cancelOperation := context.WithCancel(dockerClient.Ctx)
 	defer cancelOperation()
 	stopWatchProgress := context.AfterFunc(wsBuffer.Context(), cancelOperation)
 	defer stopWatchProgress()
 
+	oldImage, err := dockerClient.Client.ImageInspect(operationCtx, params.Tag)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 	if params.Type == "pull" {
-		imageNameDetail, err = dockerClient.ImagePull(operationCtx, params.Tag, docker.ImagePullOption{
+		_, err = dockerClient.ImagePull(operationCtx, params.Tag, docker.ImagePullOption{
 			Registry: *registryConfig,
 			Platform: params.Platform,
 			OnProgress: func(progress map[string]*dockerTypes.PullProgress) {
@@ -85,6 +84,7 @@ func (self Image) TagSync(http *gin.Context) {
 			},
 		})
 	} else {
+		slog.Debug("image remote", "type", params.Type, "tag", imageNameDetail.Uri())
 		// 推荐送镜像时保持原样
 		// 自建仓库不需要添加 library
 		// 即使推送 hub 镜像，library 命名空间属于官方空间，也不应该添加
@@ -95,19 +95,6 @@ func (self Image) TagSync(http *gin.Context) {
 			},
 		})
 	}
-	if params.Type == "pull" {
-		status := "success"
-		if err != nil {
-			status = "failed"
-		}
-		slog.Info("image pull finished",
-			"image", imageNameDetail.Uri(),
-			"dockerEnv", dockerClient.Name,
-			"status", status,
-			"durationSeconds", time.Since(pullStarted).Seconds(),
-		)
-	}
-
 	if err != nil {
 		if function.ErrorHasKeyword(err, "not found:", "repository does not exist") {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageImagePullTagNotFound, "tag", params.Tag), 500)
@@ -125,15 +112,44 @@ func (self Image) TagSync(http *gin.Context) {
 	}
 
 	if params.Type == "pull" {
-		// 不能取消掉原有的镜像文件会导致 digest 丢失
-		//oldImageNameDetail := registry2.GetImageTagDetail(params.Tag)
-		//
-		//if oldImageNameDetail.Registry != imageNameDetail.Registry {
-		//	_, err = docker.Sdk.Client.ImageRemove(docker.Sdk.Ctx, imageNameDetail.Uri(), image.RemoveOptions{})
-		//	if err != nil {
-		//		slog.Debug("image remote tag", "error", err)
-		//	}
-		//}
+		newImage, err := dockerClient.Client.ImageInspect(operationCtx, params.Tag)
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if oldImage.ID == newImage.ID {
+			self.JsonResponseWithoutError(http, gin.H{
+				"proxyUrl": imageNameDetail.Registry,
+				"tag":      params.Tag,
+			})
+			return
+		}
+		for _, tag := range oldImage.RepoTags {
+			tagDetail := function.ImageTag(tag)
+			tagDigest := tagDetail.Version[strings.LastIndex(tagDetail.Version, "-")+1:]
+			if tagDetail.BaseName == "" || function.IsDockerObjectID(tagDigest) {
+				continue
+			}
+			tagRegistry := (logic.Image{}).GetRegistryConfig(tagDetail.Registry)
+			if slices.ContainsFunc(tagRegistry.ProxyAddress, func(address string) bool {
+				return strings.EqualFold(function.RegistryReference(address), tagDetail.Registry)
+			}) {
+				continue
+			}
+			if err = dockerClient.Client.ImageTag(operationCtx, newImage.ID, tag); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
+		if _, err = dockerClient.Client.ImageRemove(operationCtx, oldImage.ID, image.RemoveOptions{}); err != nil {
+			slog.Debug("image pull kept old image", "imageId", oldImage.ID, "error", err)
+			historyTag := *imageNameDetail
+			historyTag.Version = strings.TrimPrefix(oldImage.ID, "sha256:")[:12]
+			if err = dockerClient.Client.ImageTag(operationCtx, oldImage.ID, historyTag.Uri()); err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+		}
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
