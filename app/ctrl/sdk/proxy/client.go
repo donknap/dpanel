@@ -19,6 +19,7 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/gorilla/websocket"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
@@ -39,6 +40,10 @@ type Client struct {
 	tokenExpire time.Duration
 	apiUrl      string
 	ctx         context.Context
+	fd          string
+	wsConn      *websocket.Conn
+	wsDone      chan struct{}
+	wsCancel    context.CancelCauseFunc
 }
 
 func (self *Client) Post(uri string, payload any) (data io.Reader, err error) {
@@ -56,7 +61,7 @@ func (self *Client) Post(uri string, payload any) (data io.Reader, err error) {
 	if err != nil {
 		return nil, err
 	}
-	request, err := http.NewRequest("POST", uri, postData)
+	request, err := http.NewRequestWithContext(self.ctx, "POST", uri, postData)
 	if err != nil {
 		return nil, err
 	}
@@ -66,10 +71,18 @@ func (self *Client) Post(uri string, payload any) (data io.Reader, err error) {
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+token)
+	if self.fd != "" {
+		request.Header.Set("AuthorizationFd", self.fd)
+	}
 
 	c := &http.Client{}
 	response, err := c.Do(request)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			if cause := context.Cause(self.ctx); cause != nil {
+				return nil, cause
+			}
+		}
 		return nil, err
 	}
 	defer func() {

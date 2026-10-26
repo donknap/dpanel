@@ -1,9 +1,15 @@
 package container
 
 import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/donknap/dpanel/app/ctrl/command/image"
 	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/app"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
+	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/spf13/cobra"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 )
@@ -80,6 +86,31 @@ func (self Upgrade) Handle(cmd *cobra.Command, args []string) {
 	if imageName == "" {
 		imageName = containerInfo.Info.Config.Image
 	}
+	err = proxyClient.ConnectWs(func(message proxy.WsMessage) {
+		if utils.IsQuiet() {
+			return
+		}
+		switch message.Type {
+		case fmt.Sprintf(ws.MessageTypeImagePull, imageName):
+			progressMap := map[string]*types.PullProgress{}
+			if json.Unmarshal(message.Data, &progressMap) == nil {
+				image.PrintPullProgress(cmd.ErrOrStderr(), imageName, progressMap)
+			}
+		case fmt.Sprintf(ws.MessageTypeContainerUpgrade, containerInfo.Info.ID):
+			progress := struct {
+				Current int `json:"current"`
+				Total   int `json:"total"`
+			}{}
+			if json.Unmarshal(message.Data, &progress) == nil {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Upgrading %s: step %d/%d\n", name, progress.Current, progress.Total)
+			}
+		}
+	})
+	if err != nil {
+		utils.Result{}.Error(err)
+		return
+	}
+	defer proxyClient.Close()
 	_, err = proxyClient.AppImageTagRemote(&app.ImageTagRemoteOption{
 		Tag:  imageName,
 		Type: "pull",

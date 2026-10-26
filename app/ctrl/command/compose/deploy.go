@@ -1,13 +1,16 @@
 package compose
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/donknap/dpanel/app/ctrl/command/image"
 	"github.com/donknap/dpanel/app/ctrl/sdk/proxy"
 	"github.com/donknap/dpanel/app/ctrl/sdk/types/app"
 	"github.com/donknap/dpanel/app/ctrl/sdk/utils"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
@@ -85,6 +88,26 @@ func (self Deploy) Handle(cmd *cobra.Command, args []string) {
 		return
 	}
 	if pullImage == "dpanel" {
+		err = proxyClient.ConnectWs(func(message proxy.WsMessage) {
+			if utils.IsQuiet() {
+				return
+			}
+			for _, item := range composeDetail.Project.Services {
+				if message.Type != fmt.Sprintf(ws.MessageTypeImagePull, item.Image) {
+					continue
+				}
+				progressMap := map[string]*types.PullProgress{}
+				if json.Unmarshal(message.Data, &progressMap) == nil {
+					image.PrintPullProgress(cmd.ErrOrStderr(), item.Image, progressMap)
+				}
+				break
+			}
+		})
+		if err != nil {
+			utils.Result{}.Error(err)
+			return
+		}
+		defer proxyClient.Close()
 		for _, item := range composeDetail.Project.Services {
 			_, err = proxyClient.AppImageTagRemote(&app.ImageTagRemoteOption{
 				Tag:  item.Image,
