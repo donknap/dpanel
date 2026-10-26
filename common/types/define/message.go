@@ -18,6 +18,7 @@ const (
 	ErrorMessageComposeNotFoundYaml                         = ".composeNotFoundYaml"
 	ErrorMessageComposeDisableStorageType                   = ".composeDisableStorageType"
 	ErrorMessageComposeDisableStore                         = ".composeDisableStore"
+	ErrorMessageComposeNameInvalid                          = ".composeNameInvalid"
 	ErrorMessageComposeParseYamlIncorrect                   = ".composeParseYamlIncorrect"
 	ErrorMessageComposeRelativeBindOnVolume                 = ".composeRelativeBindOnVolume"
 	ErrorMessageContainerUpgradeDPanel                      = ".containerUpgradeDPanel"

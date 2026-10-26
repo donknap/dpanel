@@ -8,6 +8,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
 	builder "github.com/donknap/dpanel/common/service/docker/container"
@@ -15,7 +16,6 @@ import (
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/google/uuid"
-	"github.com/patrickmn/go-cache"
 )
 
 const (
@@ -189,30 +189,31 @@ func create(sdk *docker.Client, name, hash string, options []builder.Option) (st
 }
 
 func prepareImage(sdk *docker.Client) (string, error) {
-	loadedKey := "agent:image:loaded:" + sdk.Name
-	_, loaded := storage.Cache.Get(loadedKey)
-	if !loaded {
-		version, err := sdk.Client.ServerVersion(sdk.Ctx)
-		if err != nil {
-			return "", err
-		}
-		asset, ok := storage.LoadCache[embed.FS](storage.CacheKeyAsset)
-		if !ok {
-			return "", define.ErrorAssetEmpty
-		}
-		imageFile, err := asset.Open("asset/agent/image-" + version.Arch + ".tar")
-		if err != nil {
-			return "", fmt.Errorf("open agent image for %s: %w", version.Arch, err)
-		}
-		defer imageFile.Close()
-		if err = sdk.ImageLoadFsFile(sdk.Ctx, imageFile); err != nil {
-			return "", fmt.Errorf("load agent image: %w", err)
-		}
-		storage.Cache.Set(loadedKey, true, cache.NoExpiration)
-	}
 	info, err := sdk.Client.ImageInspect(sdk.Ctx, imageName)
+	if err == nil {
+		return info.ID, nil
+	}
+	if !errdefs.IsNotFound(err) {
+		return "", fmt.Errorf("inspect agent image: %w", err)
+	}
+	version, err := sdk.Client.ServerVersion(sdk.Ctx)
 	if err != nil {
-		storage.Cache.Delete(loadedKey)
+		return "", err
+	}
+	asset, ok := storage.LoadCache[embed.FS](storage.CacheKeyAsset)
+	if !ok {
+		return "", define.ErrorAssetEmpty
+	}
+	imageFile, err := asset.Open("asset/agent/image-" + version.Arch + ".tar")
+	if err != nil {
+		return "", fmt.Errorf("open agent image for %s: %w", version.Arch, err)
+	}
+	defer imageFile.Close()
+	if err = sdk.ImageLoadFsFile(sdk.Ctx, imageFile); err != nil {
+		return "", fmt.Errorf("load agent image: %w", err)
+	}
+	info, err = sdk.Client.ImageInspect(sdk.Ctx, imageName)
+	if err != nil {
 		return "", fmt.Errorf("inspect agent image: %w", err)
 	}
 	return info.ID, nil
@@ -229,6 +230,46 @@ func Destroy(sdk *docker.Client, name string) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 	return destroy(sdk, name)
+}
+
+func DestroyAll(sdk *docker.Client) error {
+	if sdk == nil || sdk.Client == nil {
+		return errors.New("docker client is required for agent container destroy")
+	}
+	if sdk.DockerEnv == nil {
+		return errors.New("docker environment is required for agent container destroy")
+	}
+	mutex := storage.NewMutex(fmt.Sprintf(storage.CacheKeyAgentLock, sdk.Name))
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	containerList, err := sdk.ContainerList(sdk.Ctx, container.ListOptions{
+		All:     true,
+		Filters: filters.NewArgs(filters.Arg(docker.ContainerFilterLabel, define.DPanelLabelContainerName)),
+	})
+	if err != nil {
+		return err
+	}
+	imageMap := make(map[string]struct{})
+	for _, containerInfo := range containerList {
+		agentName := containerInfo.Labels[define.DPanelLabelContainerName]
+		if agentName != ExplorerName && agentName != MonitorName {
+			continue
+		}
+		if agentName == MonitorName && sdk.DockerEnv.EnableSystemStat {
+			continue
+		}
+		if !sdk.DockerEnv.EnableSystemStat {
+			imageMap[containerInfo.Image] = struct{}{}
+		}
+		err = errors.Join(err, destroy(sdk, containerInfo.ID))
+	}
+	for imageName := range imageMap {
+		err = errors.Join(err, sdk.ImageRemove(sdk.Ctx, filters.NewArgs(
+			filters.Arg(docker.ImageFilterReference, imageName),
+		)))
+	}
+	return err
 }
 
 func destroy(sdk *docker.Client, name string) error {

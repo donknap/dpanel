@@ -287,6 +287,9 @@ func (self Compose) FindPathTask(rootDir string) map[string]*entity.Compose {
 func (self Compose) Sync(dockerEnvName string) error {
 	rootDir := storage.Local{}.GetComposePath(dockerEnvName)
 	findComposeList := self.FindPathTask(rootDir)
+	if _, err := os.Stat(rootDir); err != nil {
+		return nil
+	}
 
 	// 循环任务，添加，清理任务
 	composeList, _ := dao.Compose.Find()
@@ -297,6 +300,18 @@ func (self Compose) Sync(dockerEnvName string) error {
 				_ = dao.Compose.Save(dbComposeRow)
 			}
 			delete(findComposeList, dbComposeRow.Name)
+		} else if dbComposeRow.Setting.DockerEnvName == dockerEnvName && (dbComposeRow.Setting.Type != accessor.ComposeTypeOutPath || dbComposeRow.Setting.IsDelegate()) {
+			composeFile, _, err := dbComposeRow.Setting.GetUriPath(dbComposeRow.Name)
+			if err != nil {
+				return err
+			}
+			if _, err = os.Lstat(filepath.Dir(composeFile)); errors.Is(err, os.ErrNotExist) {
+				if _, err = dao.Compose.Where(dao.Compose.ID.Eq(dbComposeRow.ID)).Delete(); err != nil {
+					return err
+				}
+			} else if err != nil {
+				return err
+			}
 		}
 	}
 	for _, running := range self.Ls() {

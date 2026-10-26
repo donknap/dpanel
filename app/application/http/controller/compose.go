@@ -94,7 +94,11 @@ func (self Compose) SyncDir(http *gin.Context) {
 
 	tasker, warning, err := (logic.Compose{}).GetTasker(dockerSdk, composeRow)
 	if err != nil {
-		err = function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error())
+		if function.ErrorHasKeyword(err, "invalid project name") {
+			err = function.ErrorMessage(define.ErrorMessageComposeNameInvalid)
+		} else {
+			err = function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error())
+		}
 		return
 	}
 	if err = (logic.Compose{}).ValidateRelativeBindMounts(tasker); err != nil {
@@ -455,6 +459,10 @@ func (self Compose) GetDetail(http *gin.Context) {
 	subTask := make([]*entity.Compose, 0)
 
 	tasker, _, err := (logic.Compose{}).GetTasker(dockerSdk, composeRow)
+	if err != nil && function.ErrorHasKeyword(err, "invalid project name") {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeNameInvalid), 500)
+		return
+	}
 	composeRow.Setting.Dangling = errors.Is(err, logic.ErrMissingComposeFile)
 	data := gin.H{
 		"yaml":          [2]string{},

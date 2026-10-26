@@ -98,7 +98,11 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		},
 	})
 	if err != nil {
-		err = function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error())
+		if function.ErrorHasKeyword(err, "invalid project name") {
+			err = function.ErrorMessage(define.ErrorMessageComposeNameInvalid)
+		} else {
+			err = function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error())
+		}
 		return
 	}
 	if err = (logic.Compose{}).ValidateRelativeBindMounts(tasker); err != nil {
