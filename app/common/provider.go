@@ -92,6 +92,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		// 应用商店
 		cors.POST("/common/store/create", controller.Store{}.Create)
 		cors.POST("/common/store/get-list", controller.Store{}.GetList)
+		cors.POST("/common/store/get-app-detail", controller.Store{}.GetAppDetail)
 		cors.POST("/common/store/delete", controller.Store{}.Delete)
 		cors.POST("/common/store/sync", controller.Store{}.Sync)
 		cors.POST("/common/store/deploy", controller.Store{}.Deploy)

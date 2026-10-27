@@ -18,6 +18,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/app/application/logic"
 	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
@@ -151,11 +153,14 @@ func (self Compose) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
-	} else {
-		if params.Type == accessor.ComposeTypeStore {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageComposeDisableStore), 500)
+		if params.Type != composeRow.Setting.Type && (composeRow.Setting.Type == accessor.ComposeTypeStore || params.Type == accessor.ComposeTypeStore) {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 			return
 		}
+		if composeRow.Setting.Type == accessor.ComposeTypeStore && params.Environment == nil {
+			params.Environment = composeRow.Setting.Environment
+		}
+	} else {
 		// 新建时应该先检测任务
 		if v, _ := dao.Compose.Where(dao.Compose.Name.Eq(params.Name)).Where(gen.Cond(
 			datatypes.JSONQuery("setting").Equals(dockerEnvName, "dockerEnvName"),
@@ -163,7 +168,18 @@ func (self Compose) Create(http *gin.Context) {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
 			return
 		}
-		if v := (logic.Compose{}).LsItem(params.Name); v != nil {
+		containerList, err := dockerSdk.ContainerList(dockerSdk.Ctx, container.ListOptions{
+			All: true,
+			Filters: filters.NewArgs(
+				filters.Arg(docker.ContainerFilterCompose, params.Name),
+				filters.Arg(docker.ContainerFilterCompose, define.ComposeProjectPrefix+params.Name),
+			),
+		})
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		if len(containerList) > 0 {
 			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.Name), 500)
 			return
 		}
@@ -182,7 +198,7 @@ func (self Compose) Create(http *gin.Context) {
 			},
 		}
 		if function.InArray([]string{
-			accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl, accessor.ComposeTypeStoragePath,
+			accessor.ComposeTypeText, accessor.ComposeTypeRemoteUrl, accessor.ComposeTypeStoragePath, accessor.ComposeTypeStore,
 		}, params.Type) {
 			safeComposeName := function.SafeFileName(params.Name)
 			composeRow.Setting.Uri = []string{
@@ -235,6 +251,9 @@ func (self Compose) Create(http *gin.Context) {
 	}
 	defer func() {
 		if err != nil {
+			if params.Id == "" && composeRow.ID == 0 {
+				err = errors.Join(err, backup.Restore())
+			}
 			self.JsonResponseWithError(http, fmt.Errorf("save compose with backup %q: %w", backup.Id, err), 500)
 		}
 	}()
@@ -297,8 +316,12 @@ func (self Compose) Create(http *gin.Context) {
 		composeRow.Setting.UpdatedAt = time.Now().Local().Format(time.DateTime)
 		err = dao.Compose.Save(composeRow)
 	} else {
-		err = dao.Compose.Create(composeRow)
-		createSuccess = err == nil
+		composeNew := *composeRow
+		err = dao.Compose.Create(&composeNew)
+		if err == nil {
+			composeRow.ID = composeNew.ID
+			createSuccess = true
+		}
 	}
 	if err != nil {
 		return

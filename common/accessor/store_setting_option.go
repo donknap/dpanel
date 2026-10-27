@@ -4,6 +4,12 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
+type InstallAppDetail struct {
+	StoreId int32  `json:"storeId" binding:"required,gt=0"`
+	AppName string `json:"appName" binding:"required"`
+	Version string `json:"version" binding:"required"`
+}
+
 type StoreAppItem struct {
 	Title        string                         `json:"title"`
 	Name         string                         `json:"name"`

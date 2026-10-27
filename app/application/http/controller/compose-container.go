@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/errdefs"
 	"github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
@@ -287,31 +289,48 @@ func (self Compose) ContainerDestroy(http *gin.Context) {
 	}
 	if runCompose != nil && len(runCompose.ContainerList) != 0 {
 		tasker, _, err := logic.Compose{}.GetTasker(dockerSdk, composeRow)
+		// 配置不可用不应阻止清理已创建的容器，因此加载失败时回退为直接删除关联容器资源。
 		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		if !function.IsEmptyArray(params.DestroyServiceName) {
-			for _, item := range params.DestroyServiceName {
-				tasker.Project = tasker.Project.WithServicesDisabled(item)
+			for _, item := range runCompose.ContainerList {
+				if len(params.DestroyServiceName) > 0 && !function.InArray(params.DestroyServiceName, item.Service) {
+					continue
+				}
+				if err = dockerSdk.Client.ContainerRemove(dockerSdk.Ctx, item.Container.ID, container.RemoveOptions{
+					Force:         true,
+					RemoveVolumes: params.DeleteVolume,
+				}); err != nil && !errdefs.IsNotFound(err) {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+				if params.DeleteImage {
+					if _, err = dockerSdk.Client.ImageRemove(dockerSdk.Ctx, item.Container.ImageID, image.RemoveOptions{}); err != nil && !errdefs.IsNotFound(err) {
+						slog.Warn("compose fallback remove image", "image", item.Container.ImageID, "error", err)
+					}
+				}
 			}
-		}
+		} else {
+			if !function.IsEmptyArray(params.DestroyServiceName) {
+				for _, item := range params.DestroyServiceName {
+					tasker.Project = tasker.Project.WithServicesDisabled(item)
+				}
+			}
 
-		response, err := tasker.Destroy(params.DeleteImage, params.DeleteVolume)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
-		defer progress.Close()
-		go func() {
-			<-progress.Done()
-			_ = response.Close()
-		}()
-		_, err = io.Copy(progress, response)
-		if err != nil {
-			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect), 500)
-			return
+			response, err := tasker.Destroy(params.DeleteImage, params.DeleteVolume)
+			if err != nil {
+				self.JsonResponseWithError(http, err, 500)
+				return
+			}
+			progress := ws.NewProgressPip(fmt.Sprintf(ws.MessageTypeCompose, params.Id))
+			defer progress.Close()
+			go func() {
+				<-progress.Done()
+				_ = response.Close()
+			}()
+			_, err = io.Copy(progress, response)
+			if err != nil {
+				self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDeployIncorrect), 500)
+				return
+			}
 		}
 	}
 

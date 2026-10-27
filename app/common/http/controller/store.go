@@ -1,27 +1,20 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
-	"log/slog"
 	"os"
-	"path"
 	"path/filepath"
-	"strings"
+	"strconv"
 	"time"
 
-	"github.com/docker/docker/api/types/network"
-	logic2 "github.com/donknap/dpanel/app/application/logic"
 	"github.com/donknap/dpanel/app/common/logic"
-	"github.com/donknap/dpanel/app/common/logic/baota"
-	"github.com/donknap/dpanel/app/common/logic/onepanel"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
-	"github.com/donknap/dpanel/common/service/compose"
 	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
-	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
@@ -29,6 +22,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"gorm.io/gorm"
 )
 
 type Store struct {
@@ -259,163 +253,157 @@ func (self Store) Sync(http *gin.Context) {
 
 func (self Store) Deploy(http *gin.Context) {
 	type ParamsValidate struct {
-		StoreId     int32                        `json:"storeId" binding:"required"`
-		TaskName    string                       `json:"taskName"`
-		AppName     string                       `json:"appName"`
-		AppTitle    string                       `json:"appTitle"`
-		VersionInfo accessor.StoreAppVersionItem `json:"versionInfo"`
+		accessor.InstallAppDetail
+		Id string `json:"id" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
 		return
 	}
-
-	storeRow, err := dao.Store.Where(dao.Store.ID.Eq(params.StoreId)).First()
-	if storeRow == nil {
-		slog.Debug("store deploy get store", "error", err)
+	id, err := strconv.ParseInt(params.Id, 10, 32)
+	if err != nil || id <= 0 {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
 		return
 	}
-
-	composeYamlRealPath := function.SafePathJoin(storage.Local{}.GetStorePath(), params.VersionInfo.ComposeFile)
-
-	// 创建私有网络
-	if v, ok := map[string]string{
-		define.StoreTypeOnePanel:      define.StoreTypeOnePanelNetwork,
-		define.StoreTypeBaoTa:         define.StoreTypeBaoTaNetwork,
-		define.StoreTypeOnePanelLocal: define.StoreTypeOnePanelNetwork,
-	}[storeRow.Setting.Type]; ok {
-		if _, err := docker.Sdk.Client.NetworkInspect(docker.Sdk.Ctx, v, network.InspectOptions{}); err != nil {
-			if _, err = docker.Sdk.Client.NetworkCreate(docker.Sdk.Ctx, v, network.CreateOptions{}); err != nil {
-				self.JsonResponseWithError(http, err, 500)
-				return
-			}
-		}
+	dockerSdk, err := docker.NewClientWithUser(http)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
-
-	// 适配 1panel
-	if storeRow.Setting.Type == define.StoreTypeOnePanel || storeRow.Setting.Type == define.StoreTypeOnePanelLocal {
-		if v, ok := onepanel.DefaultEnv[params.AppName]; ok {
-			params.VersionInfo.Environment = append(params.VersionInfo.Environment, v...)
-		}
-		// docker 29 容器名称变量变为严格判断不能为空
-		params.VersionInfo.Environment = append(params.VersionInfo.Environment, onepanel.CommonEnv[define.StoreEnvContainerName])
+	composeRow, err := dao.Compose.Where(dao.Compose.ID.Eq(int32(id))).First()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
-
-	// 适配 bt
-	if storeRow.Setting.Type == define.StoreTypeBaoTa {
-		params.VersionInfo.Environment = function.PluckArrayWalk(params.VersionInfo.Environment, func(item types.EnvItem) (types.EnvItem, bool) {
-			if find, _, ok := function.PluckMapItemWalk(baota.CommonEnv, func(k int, v types.EnvItem) bool {
-				return v.Name == item.Name
-			}); ok {
-				item.Value = find.Value
-				if item.Rule == nil {
-					item.Rule = &types.EnvValueRule{}
-				}
-				item.Rule.Kind |= find.Rule.Kind
-				item.Rule.Option = find.Rule.Option
-			}
-			return item, true
-		})
-		// 下载数据
-		err := logic.Store{}.SyncByZip(filepath.Dir(filepath.Dir(composeYamlRealPath)), params.VersionInfo.Download, params.AppName)
+	if composeRow.Setting == nil || composeRow.Setting.Type != accessor.ComposeTypeStore || composeRow.Setting.DockerEnvName != dockerSdk.DockerEnv.GetComposeEnvName() {
+		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+		return
+	}
+	storeRow, err := dao.Store.Where(dao.Store.ID.Eq(params.StoreId)).First()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	composeFile, _, err := composeRow.Setting.GetUriPath(composeRow.Name)
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	// 已保存的空变量列表也是用户输入，不再补商店默认值。
+	if composeRow.Setting.Environment == nil {
+		composeRow.Setting.Environment = make([]types.EnvItem, 0)
+	}
+	detail, err := (logic.Store{}).GetAppComposeDetail(storeRow, logic.StoreAppComposeOption{
+		InstallAppDetail: params.InstallAppDetail,
+		TaskName:         composeRow.Name,
+		Environment:      composeRow.Setting.Environment,
+	})
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		if detail.TempDir != "" {
+			_ = os.RemoveAll(detail.TempDir)
+		}
+	}()
+	envFilePath := filepath.Join(filepath.Dir(composeFile), define.ComposeDefaultEnvFileName)
+	envFileInfo, err := os.Lstat(envFilePath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	var envContent []byte
+	if envFileInfo != nil {
+		if !envFileInfo.Mode().IsRegular() {
+			self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted), 500)
+			return
+		}
+		envContent, err = os.ReadFile(envFilePath)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return
 		}
 	}
-
-	valueReplaceTable := function.NewReplacerTable(compose.ValueReplaceTable...)
-	valueReplaceTable = append(valueReplaceTable, func(v *string) {
-		*v = function.StringReplaceAll(*v, compose.PlaceholderAppTaskName, params.TaskName)
-	})
-	valueReplaceTable = append(valueReplaceTable, func(v *string) {
-		*v = function.StringReplaceAll(*v, compose.PlaceholderAppName, params.AppName)
-	})
-	valueReplaceTable = append(valueReplaceTable, func(v *string) {
-		*v = function.StringReplaceAll(*v, compose.PlaceholderAppVersion, params.VersionInfo.Name)
-	})
-	valueReplaceTable = append(valueReplaceTable, func(v *string) {
-		if data, ok := http.Get("userInfo"); ok {
-			if userInfo, ok := data.(logic.UserInfo); ok {
-				*v = function.StringReplaceAll(*v, compose.PlaceholderCurrentUsername, userInfo.Username)
-				return
-			}
-		}
-	})
-	function.Placeholder(&params.TaskName, valueReplaceTable...)
-
-	envReplaceTable := function.NewReplacerTable(compose.EnvItemReplaceTable...)
-	envReplaceTable = append(envReplaceTable, func(v *types.EnvItem) {
-		function.Placeholder(&v.Value, valueReplaceTable...)
-		return
-	})
-	for i, item := range params.VersionInfo.Environment {
-		function.Placeholder(&item, envReplaceTable...)
-		params.VersionInfo.Environment[i] = item
-	}
-
-	runComposeList := logic2.Compose{}.Ls()
-	if _, _, ok := function.PluckArrayItemWalk(runComposeList, func(item *compose.ProjectResult) bool {
-		return item.Name == params.TaskName
-	}); ok {
-		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageCommonIdAlreadyExists, "name", params.TaskName), 500)
-		return
-	}
-
-	dockerEnvName := docker.Sdk.DockerEnv.GetComposeEnvName()
-	composeNew := &entity.Compose{
-		Name:  strings.ToLower(params.TaskName),
-		Title: params.AppTitle,
-		Setting: &accessor.ComposeSettingOption{
-			Type:        accessor.ComposeTypeStore,
-			Store:       fmt.Sprintf("%s:%s@%s@%s", storeRow.Setting.Type, storeRow.Title, storeRow.Setting.Url, params.AppName),
-			Environment: params.VersionInfo.Environment,
-			Uri: []string{
-				path.Join(function.SafeFileName(params.TaskName), filepath.Base(params.VersionInfo.ComposeFile)),
-			},
-			DockerEnvName: dockerEnvName,
-		},
-	}
-
-	targetPath := storage.Local{}.GetComposeProjectPath(dockerEnvName, params.TaskName)
-
-	err = dao.Compose.Create(composeNew)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	err = function.CopyDir(targetPath, filepath.Dir(composeYamlRealPath))
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
-
-	// 适配 1panel
-	if storeRow.Setting.Type == define.StoreTypeOnePanel || storeRow.Setting.Type == define.StoreTypeOnePanelLocal {
-		initScript := filepath.Join(targetPath, "scripts", "init.sh")
-		if _, err := os.Stat(initScript); err == nil {
-			if cmd, err := local.New(
-				local.WithCommandName("sh"),
-				local.WithArgs(initScript),
-				local.WithDir(targetPath),
-			); err == nil {
-				err = cmd.Run()
-				if err != nil {
-					slog.Debug("store deploy run init.sh", "error", err)
+	storeFileList, err := (logic.Store{}).InstallApp(dockerSdk, storeRow.Setting.Type, detail, filepath.Dir(composeFile))
+	defer func() {
+		if err != nil {
+			for index := len(storeFileList) - 1; index >= 0; index-- {
+				if removeErr := os.Remove(storeFileList[index]); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+					err = errors.Join(err, removeErr)
 				}
 			}
+			if envFileInfo == nil {
+				if removeErr := os.Remove(envFilePath); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+					err = errors.Join(err, removeErr)
+				}
+			} else {
+				err = errors.Join(err, os.WriteFile(envFilePath, envContent, envFileInfo.Mode().Perm()))
+			}
+			self.JsonResponseWithError(http, err, 500)
 		}
+	}()
+	if err != nil {
+		return
 	}
+	composeRow.Setting.Environment = detail.Detail.Setting.Environment
+	composeRow.Setting.Store = fmt.Sprintf("%s:%s@%s@%s", storeRow.Setting.Type, storeRow.Title, storeRow.Setting.Url, params.AppName)
+	fileInfo, err := os.Stat(composeFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	composeRow.Setting.Dangling = errors.Is(err, os.ErrNotExist) || fileInfo.Size() == 0
+	composeRow.Setting.UpdatedAt = time.Now().Local().Format(time.DateTime)
+	if err = dao.Compose.Save(composeRow); err != nil {
+		return
+	}
+	self.JsonSuccessResponse(http)
+}
 
-	facade.GetEvent().Publish(event.ComposeCreateEvent, event.ComposePayload{
-		Compose: composeNew,
-		Ctx:     http,
+func (self Store) GetAppDetail(http *gin.Context) {
+	params := accessor.InstallAppDetail{}
+	if !self.Validate(http, &params) {
+		return
+	}
+	storeRow, err := dao.Store.Where(dao.Store.ID.Eq(params.StoreId)).First()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
+		}
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	data, _ := http.Get("userInfo")
+	userInfo, _ := data.(logic.UserInfo)
+	detail, err := (logic.Store{}).GetAppComposeDetail(storeRow, logic.StoreAppComposeOption{
+		InstallAppDetail: params,
+		Username:         userInfo.Username,
 	})
-
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	defer func() {
+		if detail.TempDir != "" {
+			_ = os.RemoveAll(detail.TempDir)
+		}
+	}()
 	self.JsonResponseWithoutError(http, gin.H{
-		"id": composeNew.ID,
+		"detail": gin.H{
+			"id":    0,
+			"name":  "",
+			"title": detail.Detail.Title,
+			"setting": gin.H{
+				"type":        accessor.ComposeTypeStore,
+				"environment": detail.Detail.Setting.Environment,
+				"remoteUrl":   "",
+				"dangling":    false,
+			},
+		},
+		"yaml":          detail.Yaml,
+		"error":         "",
+		"project":       gin.H{},
+		"containerList": []any{},
+		"task":          []*entity.Compose{},
 	})
-	return
 }
