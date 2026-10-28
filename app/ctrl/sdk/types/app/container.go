@@ -28,6 +28,7 @@ type ContainerCheckUpgradeResult struct {
 	Digest      string   `json:"digest"`
 	DigestLocal []string `json:"digestLocal"`
 	Error       string   `json:"error"`
+	Message     string   `json:"message"`
 	Status      string   `json:"status"`
 }
 

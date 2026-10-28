@@ -301,20 +301,28 @@ func (self ContainerUpgrade) Check(http *gin.Context) {
 			"upgrade":     false,
 			"digest":      "",
 			"digestLocal": make([]string, 0),
-			"error":       "",
+			"message":     "",
 			"status":      ignoreStatus,
 		})
 		return
 	}
 
 	result := (logic.Container{}).CheckUpgrade(dockerSdk, containerInfo, params.Force)
-	self.JsonResponseWithoutError(http, gin.H{
+	response := gin.H{
 		"upgrade":     result.Status == define.ContainerUpgradeStatusUpgrade,
-		"digest":      result.Result.RemoteDigest,
+		"digest":      "",
 		"digestLocal": result.Result.LocalDigests,
-		"error":       result.Error,
 		"status":      result.Status,
-	})
+	}
+	if result.Result.RemoteDigest != nil {
+		response["digest"] = *result.Result.RemoteDigest
+	}
+	if result.Status == define.ContainerUpgradeStatusFailed {
+		response["error"] = result.Error
+	} else {
+		response["message"] = result.Error
+	}
+	self.JsonResponseWithoutError(http, response)
 }
 
 func (self ContainerUpgrade) GetList(http *gin.Context) {

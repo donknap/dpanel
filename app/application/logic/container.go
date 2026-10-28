@@ -1,10 +1,12 @@
 package logic
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/agent/factor"
@@ -44,12 +46,42 @@ func (self Container) IsUpgradeIgnore(containerName string) bool {
 
 func (self Container) CheckUpgrade(dockerSdk *docker.Client, containerInfo container.InspectResponse, force bool) ContainerUpgradeCheckResult {
 	cacheKey := fmt.Sprintf(storage.CacheKeyContainerUpgradeCheck, dockerSdk.Name, containerInfo.ID)
-	refreshCache := func() ContainerUpgradeCheckResult {
+	refreshCache := func() (cached ContainerUpgradeCheckResult) {
 		imageName := ""
 		var localDigestList []string
 		if containerInfo.Config != nil {
 			imageName = containerInfo.Config.Image
 			localDigestList = strings.Split(containerInfo.Config.Labels[define.DPanelLabelImageDigest], ",")
+		}
+		cached = ContainerUpgradeCheckResult{
+			CheckedAt: time.Now().Format(define.DateShowYmdHis),
+			Result: dockerTypes.ImageDigestInspectResult{
+				ImageID:      containerInfo.Image,
+				ImageName:    imageName,
+				LocalDigests: make([]string, 0),
+			},
+			Status: define.ContainerUpgradeStatusLatest,
+		}
+		defer func() {
+			storage.Cache.Set(cacheKey, cached, cache.NoExpiration)
+		}()
+		if strings.Contains(imageName, "@") || strings.HasPrefix(imageName, "sha256:") || function.IsDockerObjectID(imageName) {
+			cached.Error = "container uses a fixed image ID or digest; cannot check for updates"
+			cached.Status = define.ContainerUpgradeStatusUnavailable
+			return cached
+		}
+		inspectContext, inspectCancel := context.WithTimeout(dockerSdk.Ctx, define.DockerConnectServerTimeout)
+		imageInfo, err := dockerSdk.Client.ImageInspect(inspectContext, imageName)
+		inspectCancel()
+		if err != nil && !errdefs.IsNotFound(err) {
+			cached.Error = fmt.Sprintf("inspect local image %s: %v", imageName, err)
+			cached.Status = define.ContainerUpgradeStatusFailed
+			return cached
+		}
+		// 同名标签已指向另一镜像时，容器仍使用旧镜像，无需查询远端摘要。
+		if err == nil && imageInfo.ID != containerInfo.Image {
+			cached.Status = define.ContainerUpgradeStatusUpgrade
+			return cached
 		}
 		imageNameDetail := function.ImageTag(imageName)
 		registryConfig := Image{}.GetRegistryConfig(imageNameDetail.Registry)
@@ -57,23 +89,16 @@ func (self Container) CheckUpgrade(dockerSdk *docker.Client, containerInfo conta
 			Registry:        *registryConfig,
 			LocalDigestList: localDigestList,
 		})
-		errorMessage := result.Error
-		status := define.ContainerUpgradeStatusLatest
+		cached.Result = result
+		cached.Error = result.Error
 		if err != nil {
-			errorMessage = err.Error()
-			status = define.ContainerUpgradeStatusFailed
+			cached.Error = err.Error()
+			cached.Status = define.ContainerUpgradeStatusFailed
 		} else if !result.IsAvailable() {
-			status = define.ContainerUpgradeStatusUnavailable
+			cached.Status = define.ContainerUpgradeStatusUnavailable
 		} else if result.IsDifferent() {
-			status = define.ContainerUpgradeStatusUpgrade
+			cached.Status = define.ContainerUpgradeStatusUpgrade
 		}
-		cached := ContainerUpgradeCheckResult{
-			CheckedAt: time.Now().Format(define.DateShowYmdHis),
-			Error:     errorMessage,
-			Result:    result,
-			Status:    status,
-		}
-		storage.Cache.Set(cacheKey, cached, cache.NoExpiration)
 		return cached
 	}
 

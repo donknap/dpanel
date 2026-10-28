@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/containerd/errdefs"
 	dockerRegistry "github.com/docker/docker/api/types/registry"
 	"github.com/donknap/dpanel/common/function"
 	dockerTypes "github.com/donknap/dpanel/common/service/docker/types"
@@ -41,21 +42,21 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 	inspectContext, inspectCancel := context.WithTimeout(ctx, define.DockerConnectServerTimeout)
 	imageInfo, err := self.Client.ImageInspect(inspectContext, result.ImageID)
 	inspectCancel()
-	if err != nil {
+	if err != nil && !errdefs.IsNotFound(err) {
 		return result, fmt.Errorf("inspect local image %s: %w", result.ImageID, err)
 	}
-	result.ImageID = imageInfo.ID
-	result.LocalDigests = append(result.LocalDigests, imageInfo.RepoDigests...)
-	for _, localDigest := range option.LocalDigestList {
-		if localDigest = strings.TrimSpace(localDigest); localDigest != "" {
-			result.LocalDigests = append(result.LocalDigests, localDigest)
+	if err == nil {
+		result.ImageID = imageInfo.ID
+		result.LocalDigests = append(result.LocalDigests, imageInfo.RepoDigests...)
+	}
+	// 历史摘要仅在当前镜像没有摘要时补偿，避免旧记录掩盖镜像变化。
+	if len(result.LocalDigests) == 0 {
+		for _, localDigest := range option.LocalDigestList {
+			if localDigest = strings.TrimSpace(localDigest); localDigest != "" {
+				result.LocalDigests = append(result.LocalDigests, localDigest)
+			}
 		}
 	}
-	if len(result.LocalDigests) == 0 {
-		result.Error = "local image and container have no repository digest; cannot check for updates"
-		return result, nil
-	}
-
 	imageNameDetail := function.ImageTag(result.ImageName)
 	if imageNameDetail.BaseName == "" || imageNameDetail.Version == "" || imageNameDetail.Registry == "" {
 		return result, fmt.Errorf("invalid image name: %s", result.ImageName)
@@ -76,7 +77,7 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 		username = authConfig.Username
 		password = authConfig.Password
 	}
-	inspect := func(address, username, password string, attemptContext context.Context) (bool, string, error) {
+	inspect := func(address, username, password string, attemptContext context.Context) (*string, error) {
 		registryClient := registrySdk.New(registrySdk.WithServer(
 			address,
 			username,
@@ -91,7 +92,7 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 			nil,
 		)
 		if err != nil {
-			return false, "", err
+			return nil, err
 		}
 		for _, mediaType := range registryManifestAccepts {
 			request.Header.Add("Accept", mediaType)
@@ -99,12 +100,13 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 		response, err := registryClient.Do(request)
 		if err != nil {
 			if errors.Is(err, registryTypes.NotFoundCodeErr) {
-				return false, "", nil
+				return nil, nil
 			}
-			return false, "", err
+			return nil, err
 		}
 		defer response.Body.Close()
-		return true, response.Header.Get("Docker-Content-Digest"), nil
+		remoteDigest := response.Header.Get("Docker-Content-Digest")
+		return &remoteDigest, nil
 	}
 	// 更新检测与拉取保持同一顺序：代理地址匿名优先，最后才使用带权限的源仓库。
 	// 完全未匹配到仓库配置时，Registry 只包含镜像原地址，因此会直接检测原仓库。
@@ -119,7 +121,7 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 			attemptPassword = password
 		}
 		attemptContext, attemptCancel := context.WithTimeout(ctx, define.DockerConnectServerTimeout)
-		ok, remoteDigest, err := inspect(address, attemptUsername, attemptPassword, attemptContext)
+		remoteDigest, err := inspect(address, attemptUsername, attemptPassword, attemptContext)
 		attemptCancel()
 		if ctx.Err() != nil {
 			return result, ctx.Err()
@@ -127,16 +129,16 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 		// 后续地址覆盖前序代理结果，确保最终由排在最后的源仓库决定失败或不可用。
 		// 已成功请求但不存在 manifest 属于不可用状态，而非检查失败。
 		lastErr = err
+		result.RemoteDigest = remoteDigest
 		if err != nil {
 			slog.Debug("inspect image digest from registry", "server", address, "error", err)
 			continue
 		}
-		if ok && remoteDigest != "" {
-			result.RemoteDigest = remoteDigest
+		if result.IsAvailable() {
 			result.Error = ""
 			return result, nil
 		}
-		if ok {
+		if remoteDigest != nil {
 			result.Error = fmt.Sprintf("remote manifest %s:%s returned no digest; cannot check for updates", imageNameDetail.BaseName, imageNameDetail.Version)
 		} else {
 			result.Error = fmt.Sprintf("remote manifest %s:%s was not found; cannot check for updates", imageNameDetail.BaseName, imageNameDetail.Version)

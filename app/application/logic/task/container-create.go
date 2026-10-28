@@ -101,6 +101,7 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (containerID str
 		builder.WithLog(task.BuildParams.Log),
 		builder.WithDns(task.BuildParams.Dns),
 		builder.WithLabel(task.BuildParams.Label...),
+		builder.WithImageDigest(),
 		builder.WithExtraHosts(task.BuildParams.ExtraHosts...),
 		builder.WithDevice(task.BuildParams.Device...),
 		builder.WithGpus(task.BuildParams.Gpus),

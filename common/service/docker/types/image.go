@@ -11,12 +11,12 @@ type ImageDigestInspectResult struct {
 	ImageID      string
 	ImageName    string
 	LocalDigests []string
-	RemoteDigest string
+	RemoteDigest *string // nil 表示未取得 manifest，空字符串表示 manifest 存在但未返回摘要。
 	Error        string
 }
 
 func (self ImageDigestInspectResult) IsAvailable() bool {
-	return self.RemoteDigest != ""
+	return self.RemoteDigest != nil && (*self.RemoteDigest != "" || len(self.LocalDigests) == 0)
 }
 
 func (self ImageDigestInspectResult) IsDifferent() bool {
@@ -24,7 +24,7 @@ func (self ImageDigestInspectResult) IsDifferent() bool {
 		return false
 	}
 	for _, localDigest := range self.LocalDigests {
-		if strings.HasSuffix(localDigest, self.RemoteDigest) {
+		if strings.HasSuffix(localDigest, *self.RemoteDigest) {
 			return false
 		}
 	}
