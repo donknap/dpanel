@@ -70,12 +70,9 @@ func (self Image) TagSync(http *gin.Context) {
 	stopWatchProgress := context.AfterFunc(wsBuffer.Context(), cancelOperation)
 	defer stopWatchProgress()
 
-	oldImage, err := dockerClient.Client.ImageInspect(operationCtx, params.Tag)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
-	}
+	var oldImage image.InspectResponse
 	if params.Type == "pull" {
+		oldImage, _ = dockerClient.Client.ImageInspect(operationCtx, params.Tag)
 		_, err = dockerClient.ImagePull(operationCtx, params.Tag, docker.ImagePullOption{
 			Registry: *registryConfig,
 			Platform: params.Platform,
@@ -111,7 +108,7 @@ func (self Image) TagSync(http *gin.Context) {
 		return
 	}
 
-	if params.Type == "pull" {
+	if params.Type == "pull" && oldImage.ID != "" {
 		newImage, err := dockerClient.Client.ImageInspect(operationCtx, params.Tag)
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)

@@ -312,15 +312,11 @@ func (self ContainerUpgrade) Check(http *gin.Context) {
 		"upgrade":     result.Status == define.ContainerUpgradeStatusUpgrade,
 		"digest":      "",
 		"digestLocal": result.Result.LocalDigests,
+		"message":     result.Error,
 		"status":      result.Status,
 	}
 	if result.Result.RemoteDigest != nil {
 		response["digest"] = *result.Result.RemoteDigest
-	}
-	if result.Status == define.ContainerUpgradeStatusFailed {
-		response["error"] = result.Error
-	} else {
-		response["message"] = result.Error
 	}
 	self.JsonResponseWithoutError(http, response)
 }
@@ -377,7 +373,7 @@ func (self ContainerUpgrade) GetList(http *gin.Context) {
 			"checkedAt":     checkedAt,
 			"containerId":   item.ID,
 			"containerName": containerName,
-			"error":         errorMessage,
+			"message":       errorMessage,
 			"imageId":       item.ImageID,
 			"imageName":     item.Image,
 			"status":        status,
