@@ -3,7 +3,8 @@ package types
 import "strings"
 
 type ImageDigestInspectOption struct {
-	Registry Registry
+	Registry        Registry
+	LocalDigestList []string
 }
 
 type ImageDigestInspectResult struct {
@@ -11,6 +12,7 @@ type ImageDigestInspectResult struct {
 	ImageName    string
 	LocalDigests []string
 	RemoteDigest string
+	Error        string
 }
 
 func (self ImageDigestInspectResult) IsAvailable() bool {

@@ -393,9 +393,19 @@ func (self Compose) ComposeProjectOptionsFn(dbRow *entity.Compose) ([]cli.Projec
 	return optionList, nil
 }
 
-func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (*compose.Task, error, error) {
+func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (taskResult *compose.Task, warning error, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	defer func() {
+		if err == nil || errors.Is(err, ErrMissingComposeFile) || function.IsErrorMessage(err) {
+			return
+		}
+		if function.ErrorHasKeyword(err, "invalid project name") {
+			err = function.ErrorMessage(define.ErrorMessageComposeNameInvalid)
+		} else {
+			err = function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error())
+		}
+	}()
 
 	optionList, err := self.ComposeProjectOptionsFn(dbRow)
 	if err != nil {
@@ -414,7 +424,7 @@ func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (
 	if defaultEnvContent != nil {
 		fileEnv, err := dotenv.UnmarshalWithLookup(string(defaultEnvContent), nil)
 		if err != nil {
-			return task, nil, fmt.Errorf("parse compose .env: %w", err)
+			return task, nil, function.ErrorMessage(define.ErrorMessageComposeEnvInvalid, "error", err.Error())
 		}
 		fileInfo, err := os.Stat(defaultEnvPath)
 		if err != nil {

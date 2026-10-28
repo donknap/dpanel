@@ -1,11 +1,14 @@
 {
-  "app.backupRestoreConfirm": "復元対象が存在しない場合は新規作成し、存在する場合は上書きします。Dockerバージョンの一致を確認してください。続行しますか？",
+  "app.backupRestoreConfirm":
+    "復元対象が存在しない場合は新規作成し、存在する場合は上書きします。Dockerバージョンの一致を確認してください。続行しますか？",
   "app.backupRestoreNoStart": "復元後にコンテナを起動しない",
   "app.createAfterStatus": "コンテナ作成後の状態",
   "app.createAfterStatusOption.create": "作成のみ",
   "app.createAfterStatusOption.start": "コンテナを起動",
-  "app.createMessageNoBridgeNetworkMustHasUseNetwork": "Bridgeネットワーク以外を使用する場合、カスタムネットワークの指定が必須です。",
-  "app.createNetworkDesc": "ホストネットワーク使用時はDockerネットワークをバインドできません。ホストIPまたは127.0.0.1を使用してください。",
+  "app.createMessageNoBridgeNetworkMustHasUseNetwork":
+    "Bridgeネットワーク以外を使用する場合、カスタムネットワークの指定が必須です。",
+  "app.createNetworkDesc":
+    "ホストネットワーク使用時はDockerネットワークをバインドできません。ホストIPまたは127.0.0.1を使用してください。",
   "app.createSiteName": "コンテナID",
   "app.createSiteNameEmpty": "コンテナ名として使用される一意識別子",
   "app.createSiteTitle": "コンテナ説明",
@@ -32,7 +35,8 @@
   "components.appCompose.createFormTypeOption.storagePath": "マウントディレクトリ",
   "components.appCompose.createFormTypeOption.store": "アプリストア",
   "components.appCompose.createFormTypeOption.text": "ローカルタスク",
-  "components.appCompose.createFormTypeOutPathTip": "コンテナが存在する Compose タスクを自動検出します。外部タスクをパネルで編集・補完すると、パネルの管理対象にできます。",
+  "components.appCompose.createFormTypeOutPathTip":
+    "コンテナが存在する Compose タスクを自動検出します。外部タスクをパネルで編集・補完すると、パネルの管理対象にできます。",
   "components.appCompose.createFormTypeRemoteImportGit": "GitリポジトリURL",
   "components.appCompose.createFormTypeRemoteImportGitBranch": "ブランチ",
   "components.appCompose.createFormTypeRemoteImportGitBranchTip": "ブランチ、タグ、リリースに対応",
@@ -40,7 +44,8 @@
   "components.appCompose.createFormTypeStoragePathBeforePath": "ホスト側のディレクトリ",
   "components.appCompose.createFormTypeStoragePathNamePlaceholder": "タスクID",
   "components.appCompose.createFormTypeStoragePathAfterPath": "内の YAML ファイルを編集できます。",
-  "components.appCompose.createFormTypeStoragePathTip": "現在、Compose ディレクトリ内の YAML ファイルを外部から直接編集できないため、「マウントディレクトリ」ではタスクを作成できません。別の作成方法を選択してください。",
+  "components.appCompose.createFormTypeStoragePathTip":
+    "現在、Compose ディレクトリ内の YAML ファイルを外部から直接編集できないため、「マウントディレクトリ」ではタスクを作成できません。別の作成方法を選択してください。",
   "components.appCompose.createFormTypeStoreTip": "先にアプリストアを追加し、ストア内からインストールしてください。",
   "components.appCompose.createFormTypeTextImportCommand": "docker run コマンドから",
   "components.appCompose.createFormTypeTextImportFile": "ローカルYAMLファイルをインポート",
@@ -49,8 +54,10 @@
   "components.appCompose.createTitle": "タスク追加",
   "components.appCompose.createYaml.override": "上書き用YAMLファイル",
   "components.appCompose.createYaml.yaml": "YAMLファイル",
-  "components.appCompose.createYamlDisableEdit": "リモートYAMLファイルは直接編集できません。上書き用YAMLファイルを追加してください。",
-  "components.appCompose.createYamlOverrideTip": "上書き用YAMLファイルを使うと、元のYAMLファイルを変更せずに設定を上書きできます。",
+  "components.appCompose.createYamlDisableEdit":
+    "リモートYAMLファイルは直接編集できません。上書き用YAMLファイルを追加してください。",
+  "components.appCompose.createYamlOverrideTip":
+    "上書き用YAMLファイルを使うと、元のYAMLファイルを変更せずに設定を上書きできます。",
   "components.appCompose.detailContainerTitle": "コンテナ一覧",
   "components.appCompose.drawerTitle": "タスク管理: {name}",
   "components.appCompose.joinContainerInNetwork": "コンテナ追加",
@@ -59,17 +66,23 @@
   "components.appCompose.managerCreatePullImageUseOption.useCommand": "コマンドでイメージを強制取得",
   "components.appCompose.managerCreatePullImageUseOption.useDPanel": "DPanelでイメージを強制取得",
   "components.appCompose.managerCreateRemoveOrphans": "YAMLで定義されなくなったサービスのコンテナを削除",
-  "components.appCompose.managerCreateTip": "現在のYAML内容を適用し、必要に応じてコンテナを作成または更新して起動します。続行しますか？",
+  "components.appCompose.managerCreateTip":
+    "現在のYAML内容を適用し、必要に応じてコンテナを作成または更新して起動します。続行しますか？",
   "components.appCompose.managerDeleteContainerButton": "コンテナ削除",
   "components.appCompose.managerDeleteTaskDeleteImage": "イメージ削除",
   "components.appCompose.managerDeleteTaskDeletePath": "YAMLファイルとタスクディレクトリを削除",
   "components.appCompose.managerDeleteTaskDeleteVolume": "関連ボリュームを削除",
-  "components.appCompose.managerDeleteTaskDeleteVolumeTip": "YAMLで宣言された名前付きボリュームと、コンテナに接続された匿名ボリュームを削除します。外部ボリュームは削除しません。削除されるボリューム内のデータは失われます。",
-  "components.appCompose.managerDeleteTaskTip": "タスクの記録とコンテナを削除し、以下の選択に従ってイメージ、ボリューム、タスクディレクトリを削除します。続行しますか？",
+  "components.appCompose.managerDeleteTaskDeleteVolumeTip":
+    "YAMLで宣言された名前付きボリュームと、コンテナに接続された匿名ボリュームを削除します。外部ボリュームは削除しません。削除されるボリューム内のデータは失われます。",
+  "components.appCompose.managerDeleteTaskTip":
+    "タスクの記録とコンテナを削除し、以下の選択に従ってイメージ、ボリューム、タスクディレクトリを削除します。続行しますか？",
   "components.appCompose.managerDeployButton": "デプロイ",
-  "components.appCompose.manageRemoteSyncTip": "{address} から最新のリモートYAMLファイルまたはリポジトリ内のファイルをプルし、ローカルファイルを上書きします。続行しますか？",
-  "components.appCompose.manageGitSyncTip": "同期すると現在のタスクディレクトリが空になります。設定ファイルやマウントデータがある場合は、事前にバックアップしてください。続行しますか？",
-  "components.appCompose.managerStatusDanglingAlert": "このタスクを管理できません。YAMLファイルと必要な .env ファイルを補完してください。元の作業ディレクトリは変更せず、既存データも移動しません。",
+  "components.appCompose.manageRemoteSyncTip":
+    "{address} から最新のリモートYAMLファイルまたはリポジトリ内のファイルをプルし、ローカルファイルを上書きします。続行しますか？",
+  "components.appCompose.manageGitSyncTip":
+    "同期すると現在のタスクディレクトリが空になります。設定ファイルやマウントデータがある場合は、事前にバックアップしてください。続行しますか？",
+  "components.appCompose.managerStatusDanglingAlert":
+    "このタスクを管理できません。YAMLファイルと必要な .env ファイルを補完してください。元の作業ディレクトリは変更せず、既存データも移動しません。",
   "components.appCompose.managerRedeployButton": "再デプロイ",
   "components.appCompose.managerTitle": "タスク管理",
   "components.appCompose.managerUnpauseButton": "再開",
@@ -77,7 +90,8 @@
   "components.appCompose.selectService": "カスタムサービスをデプロイしますか？",
   "components.appCompose.yamlDrawerTitle": "Compose タスク",
   "components.appCompose.executeTitle": "{action} · {name}",
-  "components.appCompose.executeStopTip": "後続の処理を停止し、現在の処理の中止を試みます。完了した変更は元に戻りません。続行しますか？",
+  "components.appCompose.executeStopTip":
+    "後続の処理を停止し、現在の処理の中止を試みます。完了した変更は元に戻りません。続行しますか？",
   "components.appCompose.executeLogUnavailable": "実行ログを開けません。再試行してください。",
   "components.appCron.cronContainerEntryShell": "実行シェル",
   "components.appCron.cronContainerEntryShellTip": "スクリプト実行環境。sh または bash の -c 引数として実行されます。",
@@ -145,7 +159,8 @@
   "components.appDetail.backupVolumeImageOption.container": "コンテナ内全ファイルをバックアップ",
   "components.appDetail.backupVolumeImageOption.image": "イメージをバックアップ",
   "components.appDetail.backupVolumeImageOption.none": "イメージを除外",
-  "components.appDetail.backupVolumeImageTipOption.container": "復元時、「docker commit」による新イメージを生成します。",
+  "components.appDetail.backupVolumeImageTipOption.container":
+    "復元時、「docker commit」による新イメージを生成します。",
   "components.appDetail.backupVolumeImageTipOption.image": "復元時、スナップショット内のイメージを使用します。",
   "components.appDetail.backupVolumeImageTipOption.none": "復元時、リモートイメージをプルします。",
   "components.appDetail.backupVolumePathOption.all": "全マウントボリューム",
@@ -156,13 +171,15 @@
   "components.appDetail.checkImageUpgradeOption.-3": "検出不可",
   "components.appDetail.commitButton": "イメージ保存",
   "components.appDetail.commitConfirmApplyToContainer": "保存したイメージをすぐに適用してコンテナを再作成",
-  "components.appDetail.commitConfirmDescription": "コンテナのファイルシステムに加えられた変更を新しいイメージとして保存します。マウントされたディレクトリ内のデータは含まれません。",
+  "components.appDetail.commitConfirmDescription":
+    "コンテナのファイルシステムに加えられた変更を新しいイメージとして保存します。マウントされたディレクトリ内のデータは含まれません。",
   "components.appDetail.commitConfirmMerge": "単一レイヤーのイメージに統合",
   "components.appDetail.commitConfirmSaveImageName": "イメージ名",
   "components.appDetail.commitConfirmSaveImageNamePlaceholder": "空欄の場合はシステムが自動処理",
   "components.appDetail.commitConfirmTitle": "現在のコンテナをイメージ化",
   "components.appDetail.copyButton": "複製",
-  "components.appDetail.copyConfirmTip": "同じ設定では起動に失敗する可能性があります。「ランダムポートをバインド」の使用を推奨します。",
+  "components.appDetail.copyConfirmTip":
+    "同じ設定では起動に失敗する可能性があります。「ランダムポートをバインド」の使用を推奨します。",
   "components.appDetail.copyCopyName": "複製後のコンテナ名",
   "components.appDetail.copyEnableRandomPort": "ランダムポートをバインド",
   "components.appDetail.copyEnableStart": "コピー後に起動",
@@ -177,9 +194,11 @@
   "components.appDetail.exportEnableExportToPath": "/dpanel/storage/export/container に保存",
   "components.appDetail.inspectButton": "Inspect",
   "components.appDetail.inspectTitle": "コンテナ Inspect JSON",
-  "components.appDetail.rebuildConfirmTip": "現在の設定でコンテナを再作成します。非マウントデータは初期化されます。続行しますか？",
+  "components.appDetail.rebuildConfirmTip":
+    "現在の設定でコンテナを再作成します。非マウントデータは初期化されます。続行しますか？",
   "components.appDetail.rollbackEmptyTip": "履歴なし",
-  "components.appDetail.rollbackTip": "設定のみ復元します。データを含む復元にはスナップショットを使用してください。ロールバック日時を選択してください。",
+  "components.appDetail.rollbackTip":
+    "設定のみ復元します。データを含む復元にはスナップショットを使用してください。ロールバック日時を選択してください。",
   "components.appDetail.runTimeValue": "作成: {create} / 更新: {upgrade}",
   "components.appDetail.tagCreateTitle": "タグ追加",
   "components.appDetail.tagFormDescription": "説明",
@@ -255,9 +274,11 @@
   "components.appDomain.certFormRenew": "今すぐ更新",
   "components.appDomain.certFormRenewTip": "通常は自動更新されます。強制更新時に使用。",
   "components.appDomain.certFormSslCrtContent": "証明書 (.crt)",
-  "components.appDomain.certFormSslCrtContentTip": ".crt / .pem。BEGIN CERTIFICATE から END CERTIFICATE までの証明書チェーンを指定します。",
+  "components.appDomain.certFormSslCrtContentTip":
+    ".crt / .pem。BEGIN CERTIFICATE から END CERTIFICATE までの証明書チェーンを指定します。",
   "components.appDomain.certFormSslKeyContent": "秘密鍵 (.key)",
-  "components.appDomain.certFormSslKeyContentTip": ".key / .pem。BEGIN PRIVATE KEY から END PRIVATE KEY までを指定します。",
+  "components.appDomain.certFormSslKeyContentTip":
+    ".key / .pem。BEGIN PRIVATE KEY から END PRIVATE KEY までを指定します。",
   "components.appDomain.certFormType": "ソース",
   "components.appDomain.certFormTypeOption.apply": "無料申請",
   "components.appDomain.certFormTypeOption.upload": "手動アップロード",
@@ -289,11 +310,13 @@
   "components.appDomain.createFormTypeOption.proxy": "リバースプロキシ",
   "components.appDomain.createFormTypeOption.redirect": "リダイレクト",
   "components.appDomain.createSelectContainer": "コンテナ選択",
-  "components.appDomain.createSelectContainerDisabledTip": "ホストネットワーク (--network host) 使用時は、IP:Port 形式による転送のみサポートされます",
+  "components.appDomain.createSelectContainerDisabledTip":
+    "ホストネットワーク (--network host) 使用時は、IP:Port 形式による転送のみサポートされます",
   "components.appDomain.createTitle": "ルール編集",
   "components.appDomain.createTriggerButton": "プロキシ追加",
   "components.appDomain.createUser": "カスタム",
-  "components.appDomain.createVhostTip": "拡張設定ファイルは /dpanel/nginx/extra_host/{name}.conf にあります。慎重に編集してください。エラーで Nginx が起動できない場合は、修正後に Nginx 設定を再読み込みしてください。",
+  "components.appDomain.createVhostTip":
+    "拡張設定ファイルは /dpanel/nginx/extra_host/{name}.conf にあります。慎重に編集してください。エラーで Nginx が起動できない場合は、修正後に Nginx 設定を再読み込みしてください。",
   "components.appDomain.dnsApiOption.dns_ali": "Alibaba Cloud",
   "components.appDomain.dnsApiOption.dns_huaweicloud": "Huawei Cloud",
   "components.appDomain.dnsApiOption.dns_tencent": "Tencent Cloud",
@@ -331,7 +354,8 @@
   "components.appForm.createAdvRunCommandHostPidNotice": "ホストのプロセスを共有します。注意してください。",
   "components.appForm.createAdvRunCommandInit": "Initプロセスを使用",
   "components.appForm.createAdvRunCommandPrivileged": "特権モード (Privileged)",
-  "components.appForm.createAdvRunCommandPrivilegedNotice": "特権モードで実行すると、ホストの安全性に影響する可能性があります。注意してください。",
+  "components.appForm.createAdvRunCommandPrivilegedNotice":
+    "特権モードで実行すると、ホストの安全性に影響する可能性があります。注意してください。",
   "components.appForm.createByCommandTitle": "コマンドから",
   "components.appForm.createCapOption.all": "全権限",
   "components.appForm.createCapOption.audit_control": "カーネル監査制御",
@@ -393,7 +417,8 @@
   "components.appForm.createEnvFormEnvCode": "コード入力",
   "components.appForm.createEnvFormEnvImport": ".envインポート",
   "components.appForm.createEnvFormListAddButton": "変数追加",
-  "components.appForm.createEnvFormListInEnvFile": "この変数は.envファイルで定義されています。変更や削除はファイルエディターで行ってください。",
+  "components.appForm.createEnvFormListInEnvFile":
+    "この変数は.envファイルで定義されています。変更や削除はファイルエディターで行ってください。",
   "components.appForm.createEnvFormName": "キー",
   "components.appForm.createEnvFormOnePanel.APP_PORT": "コンテナポート",
   "components.appForm.createEnvFormOnePanel.CODE_DIR": "コードディレクトリ",
@@ -432,7 +457,8 @@
   "components.appForm.createHealthyTimeout": "タイムアウト",
   "components.appForm.createHealthyTitle": "ヘルスチェック",
   "components.appForm.createHookContainerCreate": "作成後スクリプト",
-  "components.appForm.createHookContainerCreateTip": "作成後に実行し、entrypoint と command は変更しません。例：ls -al && touch abc.txt",
+  "components.appForm.createHookContainerCreateTip":
+    "作成後に実行し、entrypoint と command は変更しません。例：ls -al && touch abc.txt",
   "components.appForm.createHookTitle": "Hooks (フック)",
   "components.appForm.createLimitCpus": "CPU上限",
   "components.appForm.createLimitMemory": "メモリ上限",
@@ -489,21 +515,27 @@
   "components.appForm.createSecurityAppArmor": "AppArmor を無効化",
   "components.appForm.createSecurityImageAutoCommit": "コンテナイメージを自動コミット",
   "components.appForm.createSecurityImageAutoCommitMerge": "イメージレイヤーを統合",
-  "components.appForm.createSecurityImageAutoCommitMergeTip": "今回の再作成時のみ、コミットしたイメージを 1 レイヤーに統合し、このサイトの古い自動コミットイメージを削除します。",
-  "components.appForm.createSecurityImageAutoCommitTip": "編集時は現在のコンテナを先にコミットし、そのイメージと編集後の完全な設定を使用して再作成します。無効にすると、フォームで選択したイメージから直接再作成します。自動削除または読み取り専用ルートファイルシステムとは同時に使用できません。",
+  "components.appForm.createSecurityImageAutoCommitMergeTip":
+    "今回の再作成時のみ、コミットしたイメージを 1 レイヤーに統合し、このサイトの古い自動コミットイメージを削除します。",
+  "components.appForm.createSecurityImageAutoCommitTip":
+    "編集時は現在のコンテナを先にコミットし、そのイメージと編集後の完全な設定を使用して再作成します。無効にすると、フォームで選択したイメージから直接再作成します。自動削除または読み取り専用ルートファイルシステムとは同時に使用できません。",
   "components.appForm.createSecurityNoNewPrivileges": "新しい権限の取得を禁止",
-  "components.appForm.createSecurityPrivilegedNotice": "Privileged が有効なため、セキュリティオプションは使用できません。",
+  "components.appForm.createSecurityPrivilegedNotice":
+    "Privileged が有効なため、セキュリティオプションは使用できません。",
   "components.appForm.createSecurityReadonlyRootfs": "ルートファイルシステムを読み取り専用",
-  "components.appForm.createSecurityReadonlyRootfsTip": "コンテナのルートファイルシステムへの書き込みを禁止します。イメージの自動コミットとは同時に使用できません。",
+  "components.appForm.createSecurityReadonlyRootfsTip":
+    "コンテナのルートファイルシステムへの書き込みを禁止します。イメージの自動コミットとは同時に使用できません。",
   "components.appForm.createSecuritySeccomp": "Seccomp を無効化",
   "components.appForm.createSecuritySysctlsAdd": "Sysctl を追加",
   "components.appForm.createSecuritySysctlsTitle": "カーネルパラメータ",
   "components.appForm.createSecurityTitle": "セキュリティオプション",
   "components.appForm.createSelfNetworkIp": "IPアドレス ({ip})",
   "components.appForm.createSelfNetworkIpGateway": "ゲートウェイ ({ip})",
-  "components.appForm.createSelfNetworkIpGatewayTip": "コンテナの {ip} アドレスのゲートウェイを指定します。例: {example}",
+  "components.appForm.createSelfNetworkIpGatewayTip":
+    "コンテナの {ip} アドレスのゲートウェイを指定します。例: {example}",
   "components.appForm.createSelfNetworkIpSubnet": "サブネット ({ip})",
-  "components.appForm.createSelfNetworkIpSubnetTip": "コンテナの {ip} アドレスが属するサブネットを指定します。例: {example}",
+  "components.appForm.createSelfNetworkIpSubnetTip":
+    "コンテナの {ip} アドレスが属するサブネットを指定します。例: {example}",
   "components.appForm.createSelfNetworkIpTip": "コンテナの {ip} アドレスを指定します。例: {example}",
   "components.appForm.createSelfNetworkIpV6Enable": "IPv6有効化",
   "components.appForm.createSelfNetworkTitle": "カスタムネットワーク",
@@ -552,7 +584,8 @@
   "components.appstore.formGitUrl": "Git URL",
   "components.appstore.formGitUrlEmpty": "Git URL または /dpanel/store 内のパス",
   "components.appstore.formJsonUrl": "JSON URL",
-  "components.appstore.formLocalDesc": "/dpanel/store/{name} を作成し、アプリを手動でダウンロードまたは追加してください。",
+  "components.appstore.formLocalDesc":
+    "/dpanel/store/{name} を作成し、アプリを手動でダウンロードまたは追加してください。",
   "components.appstore.formName": "ID",
   "components.appstore.formNameEmpty": "ストア識別子",
   "components.appstore.formRecommend": "おすすめ",
@@ -578,7 +611,8 @@
   "components.backupRestore.step.start": "コンテナを起動",
   "components.backupRestore.step.volume": "データを復元",
   "components.backupRestore.title": "スナップショットを復元",
-  "components.backupRestore.warning": "スナップショットの復元処理は中断できません。完了するまでこのウィンドウを閉じることはできません。",
+  "components.backupRestore.warning":
+    "スナップショットの復元処理は中断できません。完了するまでこのウィンドウを閉じることはできません。",
   "components.commandToYaml.commandInvalid": "有効な docker run コマンドを入力してください",
   "components.commandToYaml.commandPlaceholder": "docker run ... コマンドを入力してください",
   "components.commandToYaml.commandTitle": "docker run コマンド",
@@ -590,9 +624,11 @@
   "components.containerPort.cardDomainTitle": "ドメイン設定",
   "components.containerPort.cardPortTitle": "ポート設定",
   "components.containerPort.checkAction": "ポート確認",
-  "components.containerPort.checkDescription": "ポート確認では、Host ネットワークコンテナの待受ポートを自動検出し、コンテナポートに到達できるか確認します。",
+  "components.containerPort.checkDescription":
+    "ポート確認では、Host ネットワークコンテナの待受ポートを自動検出し、コンテナポートに到達できるか確認します。",
   "components.containerPort.checkResult": "確認完了：合計 {total} 件、失敗 {failed} 件、タイムアウト {timeout} 件",
-  "components.containerPort.checkSummary": "確認完了：合計 {total} 件、利用可能 {success} 件、失敗または利用不可 {unavailable} 件",
+  "components.containerPort.checkSummary":
+    "確認完了：合計 {total} 件、利用可能 {success} 件、失敗または利用不可 {unavailable} 件",
   "components.containerPort.domain": "ドメイン",
   "components.containerPort.pendingDetection": "未検出",
   "components.containerPort.portPrivate": "内部",
@@ -675,7 +711,8 @@
   "components.containerStatus.task.starting": "開始中",
   "components.containerStatus.upgrade.conflict": "更新中",
   "components.containerStatus.upgrade.description.conflict": "別の更新タスクが実行中のため、今回は実行しませんでした",
-  "components.containerStatus.upgrade.description.unavailable": "更新チェックに利用できるリモートイメージがありません",
+  "components.containerStatus.upgrade.description.unavailable":
+    "比較用のイメージダイジェストを取得できないため、更新を確認できません",
   "components.containerStatus.upgrade.failed": "失敗",
   "components.containerStatus.upgrade.ignoreAlways": "常に無視",
   "components.containerStatus.upgrade.ignoreCurrent": "このバージョンを無視",
@@ -687,22 +724,28 @@
   "components.containerUpgrade.affectedContainers": "対象コンテナ",
   "components.containerUpgrade.checkAction": "更新を確認",
   "components.containerUpgrade.checkAll": "すべて確認",
-  "components.containerUpgrade.checkConfirmDescription": "各コンテナのリモートイメージレジストリを順番に照会し、ローカルイメージのダイジェストと比較します。実行中にこのページを離れることはできます。残りのコンテナも確認できるよう、ブラウザーのタブを開いたままにし、再読み込みしないでください。",
+  "components.containerUpgrade.checkConfirmDescription":
+    "各コンテナのリモートイメージレジストリを順番に照会し、ローカルイメージのダイジェストと比較します。実行中にこのページを離れることはできます。残りのコンテナも確認できるよう、ブラウザーのタブを開いたままにし、再読み込みしないでください。",
   "components.containerUpgrade.checkLoadError": "確認データの読み込みに失敗しました",
   "components.containerUpgrade.checkNow": "今すぐ確認",
   "components.containerUpgrade.checkRequestFailed": "確認リクエストに失敗しました",
   "components.containerUpgrade.containerEmpty": "現在の環境にコンテナがありません",
   "components.containerUpgrade.containerLoadError": "コンテナ一覧の読み込みに失敗しました",
-  "components.containerUpgrade.containerLoadErrorDescription": "現在の環境のコンテナ一覧を取得できませんでした。{error}",
+  "components.containerUpgrade.containerLoadErrorDescription":
+    "現在の環境のコンテナ一覧を取得できませんでした。{error}",
   "components.containerUpgrade.cronAddAction": "更新予約",
   "components.containerUpgrade.cronAddTitle": "コンテナ更新スケジュールを追加",
-  "components.containerUpgrade.cronDeleteConfirm": "このスケジュールのコンテナは自動更新されなくなります。削除しますか？",
+  "components.containerUpgrade.cronDeleteConfirm":
+    "このスケジュールのコンテナは自動更新されなくなります。削除しますか？",
   "components.containerUpgrade.cronEditTitle": "コンテナ更新スケジュールを編集",
   "components.containerUpgrade.cronEnable": "スケジュールを有効化",
   "components.containerUpgrade.cronExecution": "更新方法",
-  "components.containerUpgrade.cronExecutionDescription.check": "新しいイメージの有無のみ確認し、コンテナは更新しません",
-  "components.containerUpgrade.cronExecutionDescription.rebuild": "バージョンを比較せず、イメージを取得してコンテナを再作成します",
-  "components.containerUpgrade.cronExecutionDescription.upgrade": "新しいイメージが見つかった場合にコンテナを更新します",
+  "components.containerUpgrade.cronExecutionDescription.check":
+    "新しいイメージの有無のみ確認し、コンテナは更新しません",
+  "components.containerUpgrade.cronExecutionDescription.rebuild":
+    "バージョンを比較せず、イメージを取得してコンテナを再作成します",
+  "components.containerUpgrade.cronExecutionDescription.upgrade":
+    "新しいイメージが見つかった場合にコンテナを更新します",
   "components.containerUpgrade.cronExecutionOption.check": "確認のみ",
   "components.containerUpgrade.cronExecutionOption.rebuild": "常に更新",
   "components.containerUpgrade.cronExecutionOption.upgrade": "確認して更新",
@@ -734,7 +777,8 @@
   "components.containerUpgrade.goCheck": "確認",
   "components.containerUpgrade.ignoreAction": "更新を無視",
   "components.containerUpgrade.ignoreAlways": "常に無視",
-  "components.containerUpgrade.ignoreConfirmDescription": "デフォルトでは現在のイメージバージョンのみを無視し、イメージ更新後は再び確認対象になります。",
+  "components.containerUpgrade.ignoreConfirmDescription":
+    "デフォルトでは現在のイメージバージョンのみを無視し、イメージ更新後は再び確認対象になります。",
   "components.containerUpgrade.ignoreType": "無視する範囲",
   "components.containerUpgrade.ignoreVersion": "今回のみ無視",
   "components.containerUpgrade.imageNameTip": "コンテナイメージをリセットします。互換性を確認してください。",
@@ -749,7 +793,8 @@
   "components.containerUpgrade.preparePullImage": "イメージ取得を準備中",
   "components.containerUpgrade.progressPosition": "{total} 件中 {current} 件目",
   "components.containerUpgrade.pullImage": "イメージ取得",
-  "components.containerUpgrade.rebuildWarning": "現在の設定でコンテナを再作成します。マウントされていないデータは初期状態に戻ります。続行しますか？",
+  "components.containerUpgrade.rebuildWarning":
+    "現在の設定でコンテナを再作成します。マウントされていないデータは初期状態に戻ります。続行しますか？",
   "components.containerUpgrade.recheck": "再確認",
   "components.containerUpgrade.recheckFailed": "チェック失敗",
   "components.containerUpgrade.restoreIgnore": "無視を解除",
@@ -779,9 +824,11 @@
   "components.containerUpgrade.taskContainerCount": "コンテナ {count} 件",
   "components.containerUpgrade.uncheckedCount": "未確認",
   "components.containerUpgrade.upgradeProgress": "更新進捗",
-  "components.containerUpgrade.upgradeStopWarning": "コンテナ更新タスクは中断できません。完了するまでブラウザーのタブを開いたままにし、再読み込みしないでください。",
+  "components.containerUpgrade.upgradeStopWarning":
+    "コンテナ更新タスクは中断できません。完了するまでブラウザーのタブを開いたままにし、再読み込みしないでください。",
   "components.containerUpgrade.upgradeTitle": "コンテナ更新",
-  "components.containerUpgrade.upgradeWarning": "更新ではイメージを取得してコンテナを再作成します。サービスが一時的に中断し、マウントディレクトリ以外のデータは初期状態に戻ります。",
+  "components.containerUpgrade.upgradeWarning":
+    "更新ではイメージを取得してコンテナを再作成します。サービスが一時的に中断し、マウントディレクトリ以外のデータは初期状態に戻ります。",
   "components.dockerEnvCreate.drawerTitle": "Dockerサーバー追加",
   "components.dockerEnvCreate.drawerTitleDefault": "デフォルトサーバー設定",
   "components.dockerEnvCreate.formAddress": "アドレス",
@@ -791,22 +838,26 @@
   "components.dockerEnvCreate.formComposePath": "Composeタスクディレクトリ",
   "components.dockerEnvCreate.formDockerType": "種別",
   "components.dockerEnvCreate.formEnableComposePath": "専用タスクディレクトリ",
-  "components.dockerEnvCreate.formEnableComposePathTip": "この環境の専用タスクディレクトリにComposeタスクを分離して保存します",
+  "components.dockerEnvCreate.formEnableComposePathTip":
+    "この環境の専用タスクディレクトリにComposeタスクを分離して保存します",
   "components.dockerEnvCreate.formEnableSSH": "SSH接続有効",
   "components.dockerEnvCreate.formEnableSSHAlert": "rootまたはdockerグループ所属必須",
   "components.dockerEnvCreate.formEnableSSHTitle": "ホストSSH",
   "components.dockerEnvCreate.formEnableSystemStat": "ホストリソース監視を有効化",
-  "components.dockerEnvCreate.formEnableSystemStatTip": "この Docker 環境を通してホストの CPU、メモリ、ネットワーク、ディスク、プレッシャーを監視します",
+  "components.dockerEnvCreate.formEnableSystemStatTip":
+    "この Docker 環境を通してホストの CPU、メモリ、ネットワーク、ディスク、プレッシャーを監視します",
   "components.dockerEnvCreate.formEnableTLS": "TLS有効化",
   "components.dockerEnvCreate.formEnableTLSMessageUploadError": "証明書エラー: {name}",
   "components.dockerEnvCreate.formEnableTLSTip": "ガイド：https://dpanel.cc/manual/remote",
   "components.dockerEnvCreate.formName": "ID",
-  "components.dockerEnvCreate.formNameEmpty": "Docker環境IDに使用できるのは英字、数字、アンダースコア、ハイフンのみです",
+  "components.dockerEnvCreate.formNameEmpty":
+    "Docker環境IDに使用できるのは英字、数字、アンダースコア、ハイフンのみです",
   "components.dockerEnvCreate.formRemoteType": "接続方式",
   "components.dockerEnvCreate.formServerUrl": "アクセスIP/ドメイン",
   "components.dockerEnvCreate.formServerUrlEmpty": "例: 192.168.1.25、2001:db8:1::2、example.com",
   "components.dockerEnvCreate.formServerUrlTip": "公開ポート用のホスト IP またはドメイン（IPv4 / IPv6）",
-  "components.dockerEnvCreate.formSshServerInfoAddPublicKey": "{user}でログインし、次のコマンドを実行して公開鍵を追加してください",
+  "components.dockerEnvCreate.formSshServerInfoAddPublicKey":
+    "{user}でログインし、次のコマンドを実行して公開鍵を追加してください",
   "components.dockerEnvCreate.formSshServerInfoAddress": "ホストIP",
   "components.dockerEnvCreate.formSshServerInfoAddressEmpty": "接続用IPを入力",
   "components.dockerEnvCreate.formSshServerInfoAuthType": "認証",
@@ -864,7 +915,8 @@
   "components.explorer.toolbarArchiveOverwrite": "同名ファイルを上書き",
   "components.explorer.toolbarArchiveTargetName": "対象名",
   "components.explorer.toolbarArchiveTargetNameInvalid": "パス区切り文字を含まない有効なファイル名を入力してください",
-  "components.explorer.toolbarArchiveTargetSourceConflict": "圧縮ファイルには選択した元ファイルと同じ名前を使用できません",
+  "components.explorer.toolbarArchiveTargetSourceConflict":
+    "圧縮ファイルには選択した元ファイルと同じ名前を使用できません",
   "components.explorer.toolbarCopyButton": "コピー",
   "components.explorer.toolbarCutButton": "切り取り",
   "components.explorer.toolbarDownloadButton": "ダウンロード",
@@ -872,7 +924,8 @@
   "components.explorer.toolbarNewButton": "新規",
   "components.explorer.toolbarPasteButton": "貼り付け",
   "components.explorer.toolbarPasteConflictConfirm": "上書き",
-  "components.explorer.toolbarPasteConflictDirectory": "同名のディレクトリがあります。続行するとディレクトリを統合し、同名の内容を上書きします。",
+  "components.explorer.toolbarPasteConflictDirectory":
+    "同名のディレクトリがあります。続行するとディレクトリを統合し、同名の内容を上書きします。",
   "components.explorer.toolbarPasteConflictFile": "同名のファイルまたは異なる種類の項目があります。置き換えますか？",
   "components.explorer.toolbarPasteConflictTitle": "同名の項目があります",
   "components.explorer.toolbarPermissionButton": "権限",
@@ -902,10 +955,12 @@
   "components.explorer.toolbarRenameConflict": "このディレクトリには同じ名前の項目が既に存在します",
   "components.explorer.toolbarRenameInvalidName": "パス区切り文字を含まない有効な項目名を入力してください",
   "components.explorer.toolbarUnzipButton": "解凍",
-  "components.explorer.toolbarUnzipMessageAllowFileExt": "対応形式: .zip、.tar、.tar.gz/.tgz、.tar.bz2、.tar.xz、.tar.zst、.rar、.7z",
+  "components.explorer.toolbarUnzipMessageAllowFileExt":
+    "対応形式: .zip、.tar、.tar.gz/.tgz、.tar.bz2、.tar.xz、.tar.zst、.rar、.7z",
   "components.explorer.toolbarUnzipSeparateDir": "解凍時に圧縮ファイルと同名のフォルダーを作成",
   "components.explorer.toolbarUploadButton": "アップロード",
-  "components.explorer.toolbarUploadDirectoryTip": "1つまたは複数のファイルに対応し、フォルダ構成を維持してアップロードします",
+  "components.explorer.toolbarUploadDirectoryTip":
+    "1つまたは複数のファイルに対応し、フォルダ構成を維持してアップロードします",
   "components.explorer.toolbarUploadModalTitle": "アップロード",
   "components.explorer.toolbarUploadTitle": "クリックしてファイルを選択するか、ファイルまたはフォルダをここにドラッグ",
   "components.fixedTask.backgroundAction": "バックグラウンドで実行",
@@ -925,9 +980,11 @@
   "components.image.buildxForceRemoveContext": "強制削除",
   "components.image.buildxMirrorUrl": "ミラーURL",
   "components.image.buildxMirrorUrlTip": "ミラーURLを1行に1つ入力してください。BuildKit設定の更新に使用します。",
-  "components.image.buildxMissingContext": "BuildKitビルダーがありません。この画面で作成するか、イメージのビルド時に標準ビルド（docker build）を選択してください。",
+  "components.image.buildxMissingContext":
+    "BuildKitビルダーがありません。この画面で作成するか、イメージのビルド時に標準ビルド（docker build）を選択してください。",
   "components.image.buildxProxyUrl": "プロキシURL",
-  "components.image.buildxProxyUrlTip": "BuildKitビルダー用のプロキシ（127.0.0.1は使用不可）例: http://192.168.0.2:7890",
+  "components.image.buildxProxyUrlTip":
+    "BuildKitビルダー用のプロキシ（127.0.0.1は使用不可）例: http://192.168.0.2:7890",
   "components.image.buildxPullUseDPanel": "DPanelでイメージを取得",
   "components.image.buildxRemoveState": "ストレージを消去（ビルドキャッシュと保存済みのBuildKit設定）",
   "components.image.buildxTitle": "Buildxコンテキスト",
@@ -943,7 +1000,8 @@
   "components.image.containerTarVolumeTip": "永続化するパス（1 行 1 件）",
   "components.image.containerTarWorkDir": "作業ディレクトリ",
   "components.image.containerTarWorkDirEmpty": "デフォルト /",
-  "components.image.containerTarWorkDirTip": "コンテナ内の作業ディレクトリ。通常はコードがあるディレクトリを指定します。",
+  "components.image.containerTarWorkDirTip":
+    "コンテナ内の作業ディレクトリ。通常はコードがあるディレクトリを指定します。",
   "components.image.importLocal": "ローカルイメージ",
   "components.image.importLocalTip": "エクスポート済み .tar（最大 10 件）",
   "components.image.importRemote": "リモートURL",
@@ -958,8 +1016,10 @@
   "components.image.quickTagTitle": "タグ一覧",
   "components.image.quickTitle": "詳細情報",
   "components.image.updateSource": "更新元",
-  "components.image.updateSourceTip": "このイメージには複数の更新元があります。今回のプルに使用する更新元を選択してください。",
-  "components.image.updateConfirm": "選択したイメージを再度プルします。成功すると、現在のイメージの通常タグを新しいイメージへ移行します。",
+  "components.image.updateSourceTip":
+    "このイメージには複数の更新元があります。今回のプルに使用する更新元を選択してください。",
+  "components.image.updateConfirm":
+    "選択したイメージを再度プルします。成功すると、現在のイメージの通常タグを新しいイメージへ移行します。",
   "components.image.registryCreateFormEnableAuth": "認証が必要",
   "components.image.registryCreateFormEnableHttp": "HTTPを許可",
   "components.image.registryCreateFormPassword": "パスワード",
@@ -978,7 +1038,8 @@
   "components.imagePull.backgroundPull": "バックグラウンドで取得",
   "components.imagePull.backgroundPullTip": "このブラウザーで取得を続行します",
   "components.imagePull.complete": "完了",
-  "components.imagePull.configureMirror": "イメージのレジストリにミラーを設定するか、daemon.json にミラーまたはプロキシのアドレスを設定してください。設定後に再試行してください。",
+  "components.imagePull.configureMirror":
+    "イメージのレジストリにミラーを設定するか、daemon.json にミラーまたはプロキシのアドレスを設定してください。設定後に再試行してください。",
   "components.imagePull.drawerTitle": "イメージプル",
   "components.imagePull.imagePlatformEmpty": "OSアーキテクチャに従う",
   "components.imagePull.imageUrlEmpty": "イメージ名/URLを入力",
@@ -1005,7 +1066,8 @@
   "components.network.createFormIpGateway": "ゲートウェイ",
   "components.network.createFormIpRange": "IPレンジ",
   "components.network.createFormIpSubnet": "サブネット",
-  "components.network.createFormIpSubnetTip": "形式：ネットワークアドレス/プレフィックス（例：10.0.0.0/8、172.20.0.0/16、192.168.1.0/24）",
+  "components.network.createFormIpSubnetTip":
+    "形式：ネットワークアドレス/プレフィックス（例：10.0.0.0/8、172.20.0.0/16、192.168.1.0/24）",
   "components.network.createFormIpTitle": "IPv4設定",
   "components.network.createFormIpV6": "IPv6設定",
   "components.network.createFormName": "名前",
@@ -1023,18 +1085,22 @@
   "components.network.selectDrawerTitle": "選択",
   "components.network.selectTriggerButton": "参加",
   "components.passkey.allowHttp": "HTTP を許可",
-  "components.passkey.allowHttpTip": "バックエンドが HTTP Origin を受け入れることだけを許可します。通常のブラウザーでは引き続き HTTPS または localhost が必要です。",
-  "components.passkey.configTip": "rpId にプロトコル、パス、ポートは含められません。origins は https://panel.example.com のような完全な origin にしてください。",
+  "components.passkey.allowHttpTip":
+    "バックエンドが HTTP Origin を受け入れることだけを許可します。通常のブラウザーでは引き続き HTTPS または localhost が必要です。",
+  "components.passkey.configTip":
+    "rpId にプロトコル、パス、ポートは含められません。origins は https://panel.example.com のような完全な origin にしてください。",
   "components.passkey.configTitle": "全体設定",
   "components.passkey.create": "Passkey を追加",
   "components.passkey.createdAt": "作成日時：{time}",
-  "components.passkey.createTip": "確認すると、現在のデバイスまたはパスワードマネージャーを使用して Passkey が作成されます。保存先はブラウザーが選択します。",
+  "components.passkey.createTip":
+    "確認すると、現在のデバイスまたはパスワードマネージャーを使用して Passkey が作成されます。保存先はブラウザーが選択します。",
   "components.passkey.defaultName": "マイ Passkey",
   "components.passkey.disabled": "Passkey の全体設定は無効です。既存の認証情報は削除できます。",
   "components.passkey.empty": "Passkey はありません",
   "components.passkey.enable": "有効化",
   "components.passkey.errorChallengeExpired": "Challenge の有効期限が切れました。再試行してください。",
-  "components.passkey.errorExists": "現在のパスワードマネージャーまたはセキュリティキーには、このサイトの Passkey がすでに存在します。",
+  "components.passkey.errorExists":
+    "現在のパスワードマネージャーまたはセキュリティキーには、このサイトの Passkey がすでに存在します。",
   "components.passkey.errorFailed": "Passkey 操作に失敗しました。再試行してください。",
   "components.passkey.errorNotSecure": "Passkey には HTTPS または localhost でのアクセスが必要です。",
   "components.passkey.errorUnsupported": "このブラウザは WebAuthn / Passkey に対応していません。",
@@ -1043,12 +1109,15 @@
   "components.passkey.mineTitle": "My Passkey",
   "components.passkey.name": "サイト名",
   "components.passkey.namePlaceholder": "認証情報名（デフォルト：マイ Passkey）",
-  "components.passkey.nameTip": "ブラウザーまたはパスワードマネージャーに表示される RP 名です。セキュリティ検証には影響せず、個人の認証情報名とは異なります。",
+  "components.passkey.nameTip":
+    "ブラウザーまたはパスワードマネージャーに表示される RP 名です。セキュリティ検証には影響せず、個人の認証情報名とは異なります。",
   "components.passkey.notUsed": "未使用",
   "components.passkey.origins": "Origins",
-  "components.passkey.originsTip": "完全な Origin をタグ形式で入力します。ポートを使用する場合は http://192.168.1.10:8080 のようにポートも含めてください。",
+  "components.passkey.originsTip":
+    "完全な Origin をタグ形式で入力します。ポートを使用する場合は http://192.168.1.10:8080 のようにポートも含めてください。",
   "components.passkey.rpId": "RP ID",
-  "components.passkey.rpIdTip": "ドメイン名または IP アドレスのみ入力できます。プロトコル、パス、ポートは含めないでください。",
+  "components.passkey.rpIdTip":
+    "ドメイン名または IP アドレスのみ入力できます。プロトコル、パス、ポートは含めないでください。",
   "components.passkey.title": "Passkey 管理",
   "components.permissionButton.batchTitle": "一括設定",
   "components.permissionButton.dataName": "名前",
@@ -1084,7 +1153,8 @@
   "components.systemBasic.loginEntrance": "入口",
   "components.systemBasic.loginEntranceEnable": "有効",
   "components.systemBasic.loginEntranceRestore": "デフォルトに戻す",
-  "components.systemBasic.loginEntranceTip": "有効にすると、パネルに入る前にこのパスへアクセスし、ブラウザーでアクセス資格情報を取得する必要があります。既存のルートと重複しない、長く推測しにくいランダム文字列を使用し、安全に保管してください。",
+  "components.systemBasic.loginEntranceTip":
+    "有効にすると、パネルに入る前にこのパスへアクセスし、ブラウザーでアクセス資格情報を取得する必要があります。既存のルートと重複しない、長く推測しにくいランダム文字列を使用し、安全に保管してください。",
   "components.systemBasic.loginEntranceTitle": "セキュアエントランス",
   "components.systemBasic.loginFailedLockTime": "ロック時間",
   "components.systemBasic.loginFailedLockTimeOption.-1": "永久 (再起動まで)",
@@ -1098,8 +1168,10 @@
   "components.systemBasic.loginNoPasswordTitle": "パスワード不要ログイン",
   "components.systemBasic.loginNoPasswordUrl": "ログイン URL",
   "components.systemBasic.loginNoPasswordUserAgent": "User-Agent",
-  "components.systemBasic.loginNoPasswordWarning": "ログインが不要になります。ローカルまたは内部ネットワークでのみ使用してください。",
-  "components.systemBasic.loginTip": "セキュリティ入口、ログイン失敗時のロック、ログイン後の表示先、二要素認証、Passkey ログインを設定します。",
+  "components.systemBasic.loginNoPasswordWarning":
+    "ログインが不要になります。ローカルまたは内部ネットワークでのみ使用してください。",
+  "components.systemBasic.loginTip":
+    "セキュリティ入口、ログイン失敗時のロック、ログイン後の表示先、二要素認証、Passkey ログインを設定します。",
   "components.systemBasic.loginTitle": "ログイン設定",
   "components.systemBasic.notificationEmailCode": "SMTPパスワード",
   "components.systemBasic.notificationEmailCodeHelp.163": "163 認証コード",
@@ -1112,7 +1184,8 @@
   "components.systemBasic.notificationEmailStatus": "有効化",
   "components.systemBasic.notificationEmailStatusOption.register": "登録通知",
   "components.systemBasic.notificationEmailTestButton": "テスト送信",
-  "components.systemBasic.notificationEmailTestContent": "\n<html><div>\n<div>\n  こんにちは！\n</div>\n<div style=\"padding: 8px 40px 8px 50px;\">\n  <p>送信時刻: {time}</p>\n</div>\n<div>\n  <p>これはテストメールです。返信不要です。</p>\n</div>\n</div></html>",
+  "components.systemBasic.notificationEmailTestContent":
+    '\n<html><div>\n<div>\n  こんにちは！\n</div>\n<div style="padding: 8px 40px 8px 50px;">\n  <p>送信時刻: {time}</p>\n</div>\n<div>\n  <p>これはテストメールです。返信不要です。</p>\n</div>\n</div></html>',
   "components.systemBasic.notificationEmailTestSubject": "DPanelテストメール",
   "components.systemBasic.notificationEmailTestTip": "送信元アドレスにテストメールを送ります。",
   "components.systemBasic.notificationEmailTitle": "メール通知",
@@ -1121,20 +1194,28 @@
   "components.systemBasic.panelProxyAddressPlaceholder": "http://192.168.1.2:7890",
   "components.systemBasic.panelProxyNoProxy": "プロキシ除外アドレス",
   "components.systemBasic.panelProxyValidate": "接続先を確認",
-  "components.systemBasic.panelProxyValidateTip": "オンにすると、プロキシ経由で docker.io と Alibaba Cloud Registry の両方に接続できるか確認します。",
-  "components.systemBasic.panelProxyTip": "パネルのプロキシ設定は、Compose タスク取得、アプリストア同期、イメージビルド時にのみ使用されます。イメージ取得はレジストリミラーまたは daemon.json を設定してください。",
+  "components.systemBasic.panelProxyValidateTip":
+    "オンにすると、プロキシ経由で docker.io と Alibaba Cloud Registry の両方に接続できるか確認します。",
+  "components.systemBasic.panelProxyTip":
+    "パネルのプロキシ設定は、Compose タスク取得、アプリストア同期、イメージビルド時にのみ使用されます。イメージ取得はレジストリミラーまたは daemon.json を設定してください。",
   "components.systemBasic.panelProxyTitle": "プロキシ設定",
   "components.systemBasic.panelTitle": "パネル設定",
   "components.systemBasic.panelUpgradeAccessPort": "アクセス ポート",
-  "components.systemBasic.panelUpgradeActionHint": "設定を確認し、「今すぐ更新」またはコマンドをコピーして手動実行してください。",
+  "components.systemBasic.panelUpgradeActionHint":
+    "設定を確認し、「今すぐ更新」またはコマンドをコピーして手動実行してください。",
   "components.systemBasic.panelUpgradeActionTitle": "更新を実行",
   "components.systemBasic.panelUpgradeAdjustParams": "パラメータ調整",
   "components.systemBasic.panelUpgradeAdjustParamsAction": "更新パラメータを調整",
-  "components.systemBasic.panelUpgradeAlertContent1": "更新時にはパネルコンテナが再作成され、サービスが一時的に中断します。",
-  "components.systemBasic.panelUpgradeAlertContent2": "更新はメンテナンス時間帯に実行し、ロールバック手順を事前に確認してください。",
-  "components.systemBasic.panelUpgradeAlertContent3": "コンテナ名が APP_NAME と一致し、/dpanel が元のデータボリュームに正しくマウントされていることを確認してください。",
-  "components.systemBasic.panelUpgradeAlertContent4": "手動で更新する場合は、コピーしたコマンドをホスト上で実行してください。",
-  "components.systemBasic.panelUpgradeAlertContentWindows": "Windows ではオンライン更新に対応していません。DPanel Desktop をダウンロードして上書きインストールしてください: https://dpanel.cc/install/desktop",
+  "components.systemBasic.panelUpgradeAlertContent1":
+    "更新時にはパネルコンテナが再作成され、サービスが一時的に中断します。",
+  "components.systemBasic.panelUpgradeAlertContent2":
+    "更新はメンテナンス時間帯に実行し、ロールバック手順を事前に確認してください。",
+  "components.systemBasic.panelUpgradeAlertContent3":
+    "コンテナ名が APP_NAME と一致し、/dpanel が元のデータボリュームに正しくマウントされていることを確認してください。",
+  "components.systemBasic.panelUpgradeAlertContent4":
+    "手動で更新する場合は、コピーしたコマンドをホスト上で実行してください。",
+  "components.systemBasic.panelUpgradeAlertContentWindows":
+    "Windows ではオンライン更新に対応していません。DPanel Desktop をダウンロードして上書きインストールしてください: https://dpanel.cc/install/desktop",
   "components.systemBasic.panelUpgradeAlertTitle": "注意事項",
   "components.systemBasic.panelUpgradeBackup": "更新前に自動バックアップ",
   "components.systemBasic.panelUpgradeBaseImageOption.alpine": "Alpine",
@@ -1143,7 +1224,8 @@
   "components.systemBasic.panelUpgradeChannelOption.beta": "テスト",
   "components.systemBasic.panelUpgradeChannelOption.stable": "安定版",
   "components.systemBasic.panelUpgradeChecking": "更新状態を確認中...",
-  "components.systemBasic.panelUpgradeCommandUnavailable": "アップグレードコマンドを生成できませんでした。再試行してください。",
+  "components.systemBasic.panelUpgradeCommandUnavailable":
+    "アップグレードコマンドを生成できませんでした。再試行してください。",
   "components.systemBasic.panelUpgradeCopyCommand": "コマンドをコピー",
   "components.systemBasic.panelUpgradeCurrentConfigParams": "現在の設定パラメータ",
   "components.systemBasic.panelUpgradeCurrentParams": "現在のパラメータ",
@@ -1163,7 +1245,8 @@
   "components.systemBasic.panelUpgradeLogUnavailable": "更新ログがありません、または取得に失敗しました。",
   "components.systemBasic.panelUpgradeModalLatest": "最新バージョン",
   "components.systemBasic.panelUpgradeModalProgress": "更新進捗",
-  "components.systemBasic.panelUpgradeModalRescueTip": "更新に失敗した場合は、コマンドをコピーしてターミナルで続行してください。",
+  "components.systemBasic.panelUpgradeModalRescueTip":
+    "更新に失敗した場合は、コマンドをコピーしてターミナルで続行してください。",
   "components.systemBasic.panelUpgradeModalTitle": "DPanelを更新中",
   "components.systemBasic.panelUpgradeNetworkModeOption.bridge": "Bridge",
   "components.systemBasic.panelUpgradeNetworkModeOption.host": "Host",
@@ -1213,7 +1296,8 @@
   "components.systemBasic.panelUpgradeTip": "DPanel更新ログ: v{version}",
   "components.systemBasic.panelUpgradeTitle": "DPanelを更新",
   "components.systemBasic.panelUpgradeVersion": "製品バージョン",
-  "components.systemBasic.panelUpgradeVersionCheckFailed": "バージョン確認に失敗しました。しばらくしてから再試行してください。",
+  "components.systemBasic.panelUpgradeVersionCheckFailed":
+    "バージョン確認に失敗しました。しばらくしてから再試行してください。",
   "components.systemBasic.panelUpgradeVersionOption.ce": "コミュニティ版",
   "components.systemBasic.panelUpgradeVersionOption.pe": "Pro版",
   "components.systemBasic.panelUpgradeViewLog": "更新ログを見る",
@@ -1222,7 +1306,7 @@
   "components.systemBasic.panelUsageOption.acme": "SSL証明書",
   "components.systemBasic.panelUsageOption.backup": "スナップショット",
   "components.systemBasic.panelUsageOption.cert": "署名証明書",
-  "components.systemBasic.panelUsageOption.compose-local": "Composeタスクデータ",
+  "components.systemBasic.panelUsageOption.compose": "Composeタスクデータ",
   "components.systemBasic.panelUsageOption.database": "DBファイル",
   "components.systemBasic.panelUsageOption.export/container": "コンテナ出力",
   "components.systemBasic.panelUsageOption.export/file": "ファイル出力",
@@ -1239,7 +1323,8 @@
   "components.systemBasic.panelUsagePruneButton": "キャッシュをクリア",
   "components.systemBasic.panelUsagePruneEnableNotice": "通知をクリア",
   "components.systemBasic.panelUsagePruneEnableTempFile": "一時ファイルを削除",
-  "components.systemBasic.panelUsagePruneTip": "一時ファイル、通知、システムイベントを削除し、アプリケーションのメモリを解放します。",
+  "components.systemBasic.panelUsagePruneTip":
+    "一時ファイル、通知、システムイベントを削除し、アプリケーションのメモリを解放します。",
   "components.systemBasic.panelUsageRestoreTip": "現在のデータを上書きします。続行しますか？",
   "components.systemBasic.panelUsageStartBackup": "バックアップ開始",
   "components.systemBasic.panelUsageStatsTitle": "統計情報",
@@ -1301,7 +1386,8 @@
   "components.systemBasic.themeConfigSideSubMenu": "サブメニュー",
   "components.systemBasic.themeConfigSideSubMenuOption.default": "現在のみ",
   "components.systemBasic.themeConfigSideSubMenuOption.keep": "記憶",
-  "components.systemBasic.themeConfigSideSubMenuOptionTip": "現在のみ：選択中の項目だけ展開。記憶：手動の開閉状態を保持。",
+  "components.systemBasic.themeConfigSideSubMenuOptionTip":
+    "現在のみ：選択中の項目だけ展開。記憶：手動の開閉状態を保持。",
   "components.systemBasic.themeConfigTablePageSize": "表示件数",
   "components.systemBasic.themeConfigTablePageSizeOption.5": "5件",
   "components.systemBasic.themeConfigTablePageSizeOption.10": "10件",
@@ -1330,7 +1416,8 @@
   "components.systemBasic.themeConsoleLineHeightTip": "倍率単位",
   "components.systemBasic.themeConsoleLineHeightUnit": "倍",
   "components.systemBasic.themeConsoleTheme": "カラーテーマ",
-  "components.systemBasic.themeConsoleTip": "コンソールとログのフォント、間隔、テーマを設定します。カーソル設定はコンソールのみに適用されます。",
+  "components.systemBasic.themeConsoleTip":
+    "コンソールとログのフォント、間隔、テーマを設定します。カーソル設定はコンソールのみに適用されます。",
   "components.systemBasic.themeConsoleTitle": "コンソール・ログの外観",
   "components.systemBasic.themeUserConfigBackground": "背景",
   "components.systemBasic.themeUserConfigBackgroundEmpty": "画像または mp4 URL。アップロード優先",
@@ -1376,7 +1463,8 @@
   "components.systemBasic.twoFaEmailEmpty": "メールを入力してください",
   "components.systemBasic.twoFaQrcode": "連携用QR",
   "components.systemBasic.twoFaQrcodeTip": "認証アプリでスキャンしてください",
-  "components.systemBasic.twoFaTip": "ユーザー名とパスワードによるログインにのみ適用され、Passkey ログインには適用されません。",
+  "components.systemBasic.twoFaTip":
+    "ユーザー名とパスワードによるログインにのみ適用され、Passkey ログインには適用されません。",
   "components.systemBasic.twoFaTitle": "2FA",
   "components.systemBasic.uploadCertUpload": "ライセンスアップロード",
   "components.systemBasic.userMessagePasswordNotMatch": "パスワード不一致",
@@ -1451,7 +1539,8 @@
   "components.userInvite.formSecurityPassword": "パスワード",
   "components.userInvite.formUsername": "ユーザー名",
   "components.userInvite.formUserRole": "役割",
-  "components.userInvite.formUserRoleTip": "管理者はシステム設定を除くすべての権限を持ちます。オペレーターには初期状態で権限がありません。",
+  "components.userInvite.formUserRoleTip":
+    "管理者はシステム設定を除くすべての権限を持ちます。オペレーターには初期状態で権限がありません。",
   "components.userInvite.formUserStatus": "状態",
   "components.userPermission.canSeeCompose": "Compose",
   "components.userPermission.canSeeComposeList": "タスク表示",
@@ -1594,7 +1683,8 @@
   "image.formBuildEngineOption.build": "標準",
   "image.formBuildEngineOption.buildx": "BuildKit",
   "image.formBuildExtraArgs": "追加 Buildx 引数",
-  "image.formBuildExtraArgsTip": "1 行に 1 つ --option=value を入力。--sbom、--annotation、--no-cache-filter、--add-host、--network、--shm-size、--ulimit、--resource に対応。",
+  "image.formBuildExtraArgsTip":
+    "1 行に 1 つ --option=value を入力。--sbom、--annotation、--no-cache-filter、--add-host、--network、--shm-size、--ulimit、--resource に対応。",
   "image.formBuildGit": "Git URL",
   "image.formBuildGitBranch": "ブランチ",
   "image.formBuildGitEmpty": "https://github.com/donknap/dpanel.git",
@@ -1633,13 +1723,15 @@
   "image.listManageExportTipOption": "エクスポート後、再インポート可能です。続行しますか？",
   "image.listManagePruneOption.enableBuildCache": "キャッシュ削除",
   "image.listManagePruneOption.enableDependImage": "参照中のイメージ",
-  "image.listManagePruneOption.enableUnuseTag": "未使用タグ（digest 付きタグの削除後は更新を検出できない場合があります）",
+  "image.listManagePruneOption.enableUnuseTag":
+    "未使用タグ（digest 付きタグの削除後は更新を検出できない場合があります）",
   "image.listManagePruneTip": "未使用イメージを削除します。続行しますか？",
   "image.listManagePush": "イメージをプッシュ",
   "image.listManagePushImageRespo": "プッシュ先レジストリ",
   "image.listManagePushImageRespoTip": "名前空間を確認してください。",
   "image.listManagePushNewNamespace": "名前空間を上書き",
-  "image.listManagePushNewNamespaceTip": "Docker Hub 以外のプッシュ先を変更（例：mysql:latest → namespace/mysql:latest）",
+  "image.listManagePushNewNamespaceTip":
+    "Docker Hub 以外のプッシュ先を変更（例：mysql:latest → namespace/mysql:latest）",
   "image.listManagePushTip": "プッシュ先レジストリへ送信",
   "image.listPageTitle": "イメージ一覧",
   "image.remoteSearch": "タグ検索",
@@ -1704,19 +1796,28 @@
   "notification.commonExportInPath": "DPanel コンテナ内の {path} にエクスポートしました",
   "notification.commonFileIncorrectFormat": "{name} ファイルエラー",
   "notification.commonIdAlreadyExists": "ID {name} は既に存在します",
-  "notification.commonNotFoundDPanel": "DPanelコンテナが見つかりません。APP_NAMEが正しいか確認して再インストールしてください。",
+  "notification.commonNotFoundDPanel":
+    "DPanelコンテナが見つかりません。APP_NAMEが正しいか確認して再インストールしてください。",
   "notification.commonRequestFailed": "リクエストに失敗しました。しばらくしてから再試行してください。",
   "notification.commonUploadFileEmpty": "アップロードしてください",
   "notification.commonUseWsConnect": "WebSocket を有効にしてください",
-  "notification.composeDeleteFileMustDeleteTask": "タスクのファイルを削除するには、タスクデータも削除する必要があります",
+  "notification.composeDeleteFileMustDeleteTask":
+    "タスクのファイルを削除するには、タスクデータも削除する必要があります",
   "notification.commonDeployIncorrect": "実行に失敗しました。コンソール出力を確認してください。",
   "notification.composeDestroy": "Compose タスク {name} を破棄しました",
-  "notification.composeDisableStorageType": "/dpanel/compose をマウントし、タスクディレクトリとYAMLファイルを作成してください。",
+  "notification.composeDisableStorageType":
+    "/dpanel/compose をマウントし、タスクディレクトリとYAMLファイルを作成してください。",
   "notification.composeDisableStore": "先にストアを追加してください",
-  "notification.composeNotFoundYaml": "現在のタスクのYAMLファイルを取得できません。ディレクトリをマウントするか、タスクを /dpanel/compose に追加してください。",
-  "notification.composeNameInvalid": "タスクIDは英小文字または数字で始まり、英小文字、数字、アンダースコア、ハイフンのみ使用できます。タスクIDまたはディレクトリ名にスペースが含まれていないか確認してください。",
-  "notification.composeParseYamlIncorrect": "YAMLの内容の解析に失敗しました: {error}",
-  "notification.composeRelativeBindOnVolume": "Compose の相対ディレクトリは使用できません。/dpanel をホストにバインドマウントするか、ボリュームの subpath を使用してください。",
+  "notification.composeNotFoundYaml":
+    "現在のタスクのYAMLファイルを取得できません。ディレクトリをマウントするか、タスクを /dpanel/compose に追加してください。",
+  "notification.composeNameInvalid":
+    "タスクIDは英小文字または数字で始まり、英小文字、数字、アンダースコア、ハイフンのみ使用できます。タスクIDまたはディレクトリ名にスペースが含まれていないか確認してください。",
+  "notification.composeEnvInvalid":
+    ".env環境変数ファイルの解析に失敗しました。先に編集して修正してください。エラー: {error}",
+  "notification.composeParseYamlIncorrect":
+    "YAMLの内容の解析に失敗しました。先に編集して修正してください。エラー: {error}",
+  "notification.composeRelativeBindOnVolume":
+    "Compose の相対ディレクトリは使用できません。/dpanel をホストにバインドマウントするか、ボリュームの subpath を使用してください。",
   "notification.confirm.close": "このウィンドウを閉じると現在の操作が中止されます。よろしいですか？",
   "notification.confirm.disable": "無効化または初期設定への復元は取り消せません。続行しますか？",
   "notification.confirm.title": "操作は戻せません。続行しますか？",
@@ -1737,24 +1838,30 @@
   "notification.containerBackupImportFileFailed": "インポート失敗",
   "notification.containerBackupImportFileInCorrect": "ファイルが破損しています",
   "notification.containerBackupRestoreImportImageFailed": "復元失敗。空き容量を確認してください。",
-  "notification.containerBackupRestoreNetworkConflict": "ネットワークが競合しています。{name} という名前のネットワークを手動で作成するか、{subnet} サブネットを使用するネットワークを削除してください。",
+  "notification.containerBackupRestoreNetworkConflict":
+    "ネットワークが競合しています。{name} という名前のネットワークを手動で作成するか、{subnet} サブネットを使用するネットワークを削除してください。",
   "notification.containerCommit": "{name} をイメージとしてコミット中...",
   "notification.containerCommitMerge": "{name} を単一レイヤーイメージとして統合・コミット中...",
   "notification.containerCreate": "作成中",
-  "notification.containerCronExpressionInCorrect": "Cron 式が不正です。「秒 分 時 日 月 曜日」で指定してください。{message}",
+  "notification.containerCronExpressionInCorrect":
+    "Cron 式が不正です。「秒 分 時 日 月 曜日」で指定してください。{message}",
   "notification.containerCronTaskEmpty": "Cron タスクは未起動または一時停止中です。再開または再作成してください。",
-  "notification.containerExplorerContentUnsupportedType": "オンライン編集に未対応です。インポートまたはエクスポートしてください。",
+  "notification.containerExplorerContentUnsupportedType":
+    "オンライン編集に未対応です。インポートまたはエクスポートしてください。",
   "notification.containerExplorerEditDeleteUnsafe": "ファイルの削除は制限されています",
   "notification.containerExplorerEditFileMaxSize": "1 MBを超えるファイルはエクスポートして編集してください",
   "notification.containerExplorerInvalidFilename": "ファイル名の形式が正しくないか、ディレクトリ名と競合しています",
-  "notification.containerExplorerUnzipTargetUnsupportedType": "対応形式: .zip、.tar、.tar.gz/.tgz、.tar.bz2、.tar.xz、.tar.zst、.rar、.7z",
-  "notification.containerMountPathDenied": "マウントディレクトリを作成する権限がありません。ホスト上で直接作成してください",
+  "notification.containerExplorerUnzipTargetUnsupportedType":
+    "対応形式: .zip、.tar、.tar.gz/.tgz、.tar.bz2、.tar.xz、.tar.zst、.rar、.7z",
+  "notification.containerMountPathDenied":
+    "マウントディレクトリを作成する権限がありません。ホスト上で直接作成してください",
   "notification.containerPortRequiresSystemStat": "先にホスト監視を有効にする必要があります。",
   "notification.containerPrune": "{count} コンテナ削除 ({size} 解放)",
   "notification.containerRemove": "削除中",
   "notification.containerStop": "停止中",
   "notification.containerUpgrade": "更新中",
-  "notification.containerUpgradeDPanel": "DPanel自身は更新できません。[システム更新]ページで更新スクリプトを確認してください。",
+  "notification.containerUpgradeDPanel":
+    "DPanel自身は更新できません。[システム更新]ページで更新スクリプトを確認してください。",
   "notification.containerUpgradeTaskRunning": "コンテナ更新スケジュールを実行中です。完了後に再試行してください。",
   "notification.copyFailManual": "コピーに失敗しました。手動で選択してコピーしてください。",
   "notification.dialogOpenChildNotice": "現在の操作を完了するか閉じてから続行してください。",
@@ -1763,7 +1870,8 @@
   "notification.filterKeyword": "キーワードで絞り込み",
   "notification.finish": "成功",
   "notification.finishTheme": "テーマを保存しました。変更を反映するにはページを再読み込みしてください。",
-  "notification.gitPullEarlyEOF": "{name} リポジトリの取得に失敗しました。ミラー URL を使用するか、プロキシ URL を変更してください: {url}",
+  "notification.gitPullEarlyEOF":
+    "{name} リポジトリの取得に失敗しました。ミラー URL を使用するか、プロキシ URL を変更してください: {url}",
   "notification.help": "ヘルプ",
   "notification.homeWsHostConsoleSshNotSetting": "SSH 接続を先に設定してください。",
   "notification.imageBuildPrune": "{size} 解放",
@@ -1776,7 +1884,8 @@
   "notification.imagePull": "{name} プル中",
   "notification.imagePullInvalidAuth": "認証失敗",
   "notification.imagePullRegistryBad": "レジストリ通信エラー",
-  "notification.imagePullServerHttp": "レジストリの HTTP を有効にし、daemon.json の insecure-registries に {name} を追加してください。",
+  "notification.imagePullServerHttp":
+    "レジストリの HTTP を有効にし、daemon.json の insecure-registries に {name} を追加してください。",
   "notification.imagePullTagNotFound": "{tag} が見つかりません",
   "notification.imagePullUseProxy": "ミラー使用: {name}",
   "notification.imageRemoteTagNoPermission": "リモートタグを取得できません。リポジトリまたは権限を確認してください。",
@@ -1970,30 +2079,36 @@
   "notification.logTableView": "リストログ",
   "notification.logUnrecognized": "ログエントリの開始位置を識別できません。コンソール表示を使用してください。",
   "notification.logout": "ログアウト",
-  "notification.panelProxyUnavailable": "プロキシのアドレスが正しくないか、接続先のアドレスにアクセスできません：{error}",
+  "notification.panelProxyUnavailable":
+    "プロキシのアドレスが正しくないか、接続先のアドレスにアクセスできません：{error}",
   "notification.proLicenseFileIsCorrect": "ライセンスエラー。開発者へ連絡してください。",
   "notification.searchEnterTip": "Enter キーで検索",
   "notification.settingBasicEmailInvalid": "メールを送信できません。SMTP 設定を確認してください。",
   "notification.showLineNumber": "行番号を表示",
   "notification.showTime": "時刻表示",
-  "notification.siteDomainCertAddTxtFailed": "DNS 認証に失敗しました。コンソールを確認し、TXT レコードを追加して再試行してください。",
+  "notification.siteDomainCertAddTxtFailed":
+    "DNS 認証に失敗しました。コンソールを確認し、TXT レコードを追加して再試行してください。",
   "notification.siteDomainCertHasBindDomain": "ドメイン使用中のため削除不可",
   "notification.siteDomainCertHasNotDNSName": "ドメイン情報なし。再作成してください。",
   "notification.siteDomainCertIssueFailed": "発行失敗",
   "notification.siteDomainExists": "{domain} は使用済み",
-  "notification.siteDomainJoinDefaultNetworkFailed": "デフォルトネットワークを作成できません。再インストール後、dpanel-local を作成または参加してください。",
+  "notification.siteDomainJoinDefaultNetworkFailed":
+    "デフォルトネットワークを作成できません。再インストール後、dpanel-local を作成または参加してください。",
   "notification.siteDomainNotFoundDPanel": "DPanel コンテナが見つかりません。コンテナ IP で転送してください。",
   "notification.swarmNotInit": "Swarmが初期化されていません",
   "notification.swarmNotManager": "マネージャー権限がありません",
-  "notification.systemEnvApiTooOld": "Docker サーバーへの接続に失敗しました。対象 Docker をアップグレードしてください。({err})",
+  "notification.systemEnvApiTooOld":
+    "Docker サーバーへの接続に失敗しました。対象 Docker をアップグレードしてください。({err})",
   "notification.systemEnvCurrentCanNotDelete": "使用中のため削除不可",
   "notification.systemEnvDefaultCannotDelete": "デフォルトは削除不可",
-  "notification.systemEnvDockerApiFailed": "Docker に接続できません。権限を確認してください。SSH 接続では Docker の実行権限が必要です。エラー：{error}",
+  "notification.systemEnvDockerApiFailed":
+    "Docker に接続できません。権限を確認してください。SSH 接続では Docker の実行権限が必要です。エラー：{error}",
   "notification.systemEnvNameInvalid": "Docker環境IDに使用できるのは英字、数字、アンダースコア、ハイフンのみです",
   "notification.systemEnvTlsInvalidCert": "証明書が必要です",
   "notification.systemStoreDownloadFailed": "{url} のダウンロードに失敗しました: {error}",
   "notification.systemStoreNotFoundGit": "ストアの同期には Git が必要です。先にインストールしてください。",
-  "notification.systemUpgradeDPanelNotFound": "DPanel コンテナが見つからず、更新スクリプトを生成できません。APP_NAME を確認してください。",
+  "notification.systemUpgradeDPanelNotFound":
+    "DPanel コンテナが見つからず、更新スクリプトを生成できません。APP_NAME を確認してください。",
   "notification.tagUrlNotFound": "URLを利用できません",
   "notification.timeRangeOption.last24Hours": "過去 24 時間",
   "notification.timeRangeOption.last3Days": "過去 3 日間",
@@ -2041,7 +2156,8 @@
   "swarm.listServiceStatusOption.DesiredTasks": "期待",
   "swarm.listServiceStatusOption.RunningTasks": "実行中",
   "swarm.listServiceStatusTipOption.CompletedTasks": "ジョブモードで完了したタスク数",
-  "swarm.listServiceStatusTipOption.DesiredTasks": "レプリカサービスではレプリカ数、グローバルサービスでは停止予定でないタスク数",
+  "swarm.listServiceStatusTipOption.DesiredTasks":
+    "レプリカサービスではレプリカ数、グローバルサービスでは停止予定でないタスク数",
   "swarm.listServiceStatusTipOption.RunningTasks": "稼働中のタスク数",
   "swarm.listTaskStatusOption.accepted": "承認済",
   "swarm.listTaskStatusOption.running": "実行中",
@@ -2253,14 +2369,16 @@
   "system.home.overview.systemInfoTitle": "Docker 情報",
   "system.home.overview.systemStat": "ホストリソース監視",
   "system.home.overview.systemStatEnableConfirm": "ホストリソース監視を有効にしますか？",
-  "system.home.overview.systemStatEnableConfirmDescription": "有効にすると、ホストの CPU、メモリ、ネットワーク、ディスク、プレッシャー情報を監視する dpanel-plugin-monitor コンテナが作成されます。",
+  "system.home.overview.systemStatEnableConfirmDescription":
+    "有効にすると、ホストの CPU、メモリ、ネットワーク、ディスク、プレッシャー情報を監視する dpanel-plugin-monitor コンテナが作成されます。",
   "system.home.tag.createButton": "追加",
   "system.home.tag.emptyTip": "コンテナ詳細から追加してください。",
   "system.home.tag.itemDelete": "削除",
   "system.home.tag.itemDetailButton": "詳細",
   "system.home.tag.itemEditButton": "編集",
   "system.log.downloadPanel": "DPanel ログをダウンロード",
-  "system.log.searchPlaceholder": "キーワードを入力。debug:キーワード、@panel、@upgrade、@local、debug@local:キーワードに対応",
+  "system.log.searchPlaceholder":
+    "キーワードを入力。debug:キーワード、@panel、@upgrade、@local、debug@local:キーワードに対応",
   "system.log.source.panel": "DPanel",
   "system.log.source.upgrade": "パネルのアップグレード",
   "system.log.title": "システムログ",

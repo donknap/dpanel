@@ -13,6 +13,7 @@ import (
 	dockerTypes "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/types/define"
 	registrySdk "github.com/we7coreteam/registry-go-sdk"
+	registryTypes "github.com/we7coreteam/registry-go-sdk/types"
 )
 
 var registryManifestAccepts = []string{
@@ -45,6 +46,15 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 	}
 	result.ImageID = imageInfo.ID
 	result.LocalDigests = append(result.LocalDigests, imageInfo.RepoDigests...)
+	for _, localDigest := range option.LocalDigestList {
+		if localDigest = strings.TrimSpace(localDigest); localDigest != "" {
+			result.LocalDigests = append(result.LocalDigests, localDigest)
+		}
+	}
+	if len(result.LocalDigests) == 0 {
+		result.Error = "local image and container have no repository digest; cannot check for updates"
+		return result, nil
+	}
 
 	imageNameDetail := function.ImageTag(result.ImageName)
 	if imageNameDetail.BaseName == "" || imageNameDetail.Version == "" || imageNameDetail.Registry == "" {
@@ -88,7 +98,7 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 		}
 		response, err := registryClient.Do(request)
 		if err != nil {
-			if strings.Contains(err.Error(), "http status code: NOT_FOUND,") {
+			if errors.Is(err, registryTypes.NotFoundCodeErr) {
 				return false, "", nil
 			}
 			return false, "", err
@@ -123,7 +133,13 @@ func (self Client) ImageDigestInspect(ctx context.Context, imageID, imageName st
 		}
 		if ok && remoteDigest != "" {
 			result.RemoteDigest = remoteDigest
+			result.Error = ""
 			return result, nil
+		}
+		if ok {
+			result.Error = fmt.Sprintf("remote manifest %s:%s returned no digest; cannot check for updates", imageNameDetail.BaseName, imageNameDetail.Version)
+		} else {
+			result.Error = fmt.Sprintf("remote manifest %s:%s was not found; cannot check for updates", imageNameDetail.BaseName, imageNameDetail.Version)
 		}
 	}
 	if lastErr != nil {

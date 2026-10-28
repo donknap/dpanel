@@ -46,15 +46,18 @@ func (self Container) CheckUpgrade(dockerSdk *docker.Client, containerInfo conta
 	cacheKey := fmt.Sprintf(storage.CacheKeyContainerUpgradeCheck, dockerSdk.Name, containerInfo.ID)
 	refreshCache := func() ContainerUpgradeCheckResult {
 		imageName := ""
+		var localDigestList []string
 		if containerInfo.Config != nil {
 			imageName = containerInfo.Config.Image
+			localDigestList = strings.Split(containerInfo.Config.Labels[define.DPanelLabelImageDigest], ",")
 		}
 		imageNameDetail := function.ImageTag(imageName)
 		registryConfig := Image{}.GetRegistryConfig(imageNameDetail.Registry)
 		result, err := dockerSdk.ImageDigestInspect(dockerSdk.Ctx, containerInfo.Image, imageName, dockerTypes.ImageDigestInspectOption{
-			Registry: *registryConfig,
+			Registry:        *registryConfig,
+			LocalDigestList: localDigestList,
 		})
-		errorMessage := ""
+		errorMessage := result.Error
 		status := define.ContainerUpgradeStatusLatest
 		if err != nil {
 			errorMessage = err.Error()
@@ -63,9 +66,6 @@ func (self Container) CheckUpgrade(dockerSdk *docker.Client, containerInfo conta
 			status = define.ContainerUpgradeStatusUnavailable
 		} else if result.IsDifferent() {
 			status = define.ContainerUpgradeStatusUpgrade
-			if len(result.LocalDigests) == 0 && containerInfo.Config != nil && strings.Contains(containerInfo.Config.Labels[define.DPanelLabelImageDigest], result.RemoteDigest) {
-				status = define.ContainerUpgradeStatusLatest
-			}
 		}
 		cached := ContainerUpgradeCheckResult{
 			CheckedAt: time.Now().Format(define.DateShowYmdHis),

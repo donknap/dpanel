@@ -86,7 +86,7 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 	if !function.IsEmptyArray(params.DeployServiceName) {
 		composeRow.Setting.DeployServiceName = params.DeployServiceName
 	}
-	tasker, warning, err := logic.Compose{}.GetTasker(dockerSdk, &entity.Compose{
+	tasker, _, err := logic.Compose{}.GetTasker(dockerSdk, &entity.Compose{
 		Name: composeRow.Name,
 		Setting: &accessor.ComposeSettingOption{
 			Type:          composeRow.Setting.Type,
@@ -100,11 +100,6 @@ func (self Compose) ContainerDeploy(http *gin.Context) {
 		},
 	})
 	if err != nil {
-		if function.ErrorHasKeyword(err, "invalid project name") {
-			err = function.ErrorMessage(define.ErrorMessageComposeNameInvalid)
-		} else {
-			err = function.ErrorMessage(define.ErrorMessageComposeParseYamlIncorrect, "error", errors.Join(warning, err).Error())
-		}
 		return
 	}
 	if err = (logic.Compose{}).ValidateRelativeBindMounts(tasker); err != nil {
