@@ -24,7 +24,7 @@ jobs:
             echo "version_param=APP_VERSION=beta" >> $GITHUB_OUTPUT
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
           else
-            echo "release=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            echo "release=${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
             echo "📦 Stable release detected. Using tag $TAG for version."
             echo "version_param=APP_VERSION=$TAG" >> $GITHUB_OUTPUT
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
