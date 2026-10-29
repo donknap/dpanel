@@ -38,6 +38,7 @@ var (
 	CacheKeyAttach                        = "attach:%s"
 	CacheKeyAsset                         = "asset"
 	CacheKeyComposeBackup                 = "compose:backup:%s"
+	CacheKeyPluginItems                   = "plugin:items:%s"
 )
 
 var (

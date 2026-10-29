@@ -577,9 +577,7 @@ func (self Compose) GetFromGit(http *gin.Context) {
 	targetPath := storage.Local{}.GetComposeProjectPath(dockerEnvName, params.Name)
 
 	if strings.Contains(params.Uri, ".git") {
-		err = logic2.Store{}.SyncByGit(params.Uri, logic2.SyncByGitOption{
-			TargetPath: targetPath,
-		})
+		err = logic2.Store{}.SyncByGit(params.Uri, targetPath, logic2.GitOption{})
 	} else {
 		response, err := function.SafeHTTPGet(http.Request.Context(), params.Uri, 30*time.Second, 5<<20)
 		if err != nil {

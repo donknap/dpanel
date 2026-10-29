@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/donknap/dpanel/common/accessor"
@@ -157,6 +156,7 @@ func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 		result.Name = strings.TrimSpace(facade.GetConfig().GetString("app.name"))
 	}
 	result.Version = facade.GetConfig().GetString("app.version")
+	result.Release = facade.GetConfig().GetString("app.release")
 	result.Family = facade.GetConfig().GetString("app.family")
 	result.Env = facade.GetConfig().GetString("app.env")
 	result.BaseURL = facade.GetConfig().GetString("system.baseurl")
@@ -181,11 +181,12 @@ func (self Setting) GetDPanelInfo() types2.DPanelInfo {
 	}
 
 	if len(result.Version) == len(define.DateShowVersion) && strings.Count(result.Version, ".") == 1 {
-		if t, err := time.ParseInLocation(define.DateShowVersion, result.Version, time.UTC); err == nil {
-			result.IsDev = true
-			result.Version = t.Local().Format(define.DateShowVersion)
+		if result.Release == "" {
+			result.Release = result.Version
 		}
+		result.Version = "beta"
 	}
+	result.IsDev = result.Version == "beta"
 	result.BaseImage = ""
 	result.PublicPort = 0
 	if result.RunIn == types2.DPanelRunInHost {

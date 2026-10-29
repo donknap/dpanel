@@ -1,6 +1,6 @@
 # ==============================================================================
 # DPanel Unified Build & Release System
-# [ 模式 A: Beta (未传 APP_VERSION) ]
+# [ 模式 A: Beta (未传 APP_VERSION 或 APP_VERSION=beta) ]
 ##   - Alpine Lite:   dpanel:beta-lite
 ##   - Alpine Prod:   dpanel:beta
 ##   - Debian Lite:   dpanel:beta-lite-debian
@@ -11,12 +11,14 @@
 ##   - Alpine Prod:   dpanel:latest, dpanel:1.9.3
 ##   - Debian Lite:   dpanel:lite-debian, dpanel:1.9.3-lite-debian
 ##   - Debian Prod:   dpanel:latest-debian, dpanel:1.9.3-debian
+# 本地每次社区版 release 都重新生成 runtime/release，同批次产物及后续扩展版构建复用。
+# 显式传入 APP_RELEASE 时使用指定批次；CI 通过此参数统一各构建任务。
 # ==============================================================================
 
 _NULL  :=
 _SPACE := $(_NULL) $(_NULL)
 _COMMA := ,
-_CURRENT_TIME := $(shell TZ=UTC date +%Y%m%d.%H%M)
+_CURRENT_TIME := $(shell TZ=UTC date +%Y%m%d.%H%M%S)
 _TRUE_VALUES := 1 y yes true
 __IS_TRUE = $(filter $(strip $(1)),$(_TRUE_VALUES) $(strip $(2)))
 _BLUE      := $(shell printf '\033[1;34m')
@@ -52,7 +54,11 @@ AGENT_IMAGE_TARGET := dpanel/explorer
 AGENT_IMAGE_DIR    := $(PROJECT_GO_DIR)/asset/agent
 
 # 构建时需要指定的构建参数
-APP_VERSION ?= $(_CURRENT_TIME)
+APP_VERSION ?= beta
+ifeq ($(strip $(APP_RELEASE)),)
+    APP_RELEASE := $(or $(shell cat "$(PROJECT_GO_TARGET)/release" 2>/dev/null),$(_CURRENT_TIME))
+endif
+export APP_RELEASE
 APP_FAMILY  ?= ce
 APP_ENV     ?= lite
 
@@ -73,7 +79,6 @@ LIBC        := musl
 
 BUILD_OS           := $(shell echo "$$(uname)" | tr '[:lower:]' '[:upper:]')
 BUILD_CPUS         := $(shell [ "$$(uname)" = "Darwin" ] && sysctl -n hw.ncpu || nproc)
-BUILD_COPY_LANG    := en-US zh-CN ja-JP
 BUILD_LIBC         := $(shell echo $(LIBC) | tr '[:lower:]' '[:upper:]')
 ARM64_LINUX_LDFLAGS := -linkmode=external -extldflags=-Wl,-z,max-page-size=65536
 
@@ -112,7 +117,7 @@ _RAW_LIST := $(strip \
 )
 DOCKER_PLATFORM := $(subst $(_SPACE),$(_COMMA),$(or $(_RAW_LIST),linux/amd64))
 
-_IS_BETA := $(if $(filter command line,$(origin APP_VERSION)),0,1)
+_IS_BETA := $(if $(filter beta,$(APP_VERSION)),1,0)
 _TAG_SFX := $(if $(filter $(BUILD_LIBC),GNU),-debian,)$(if $(filter windows,$(_BUILD_OS_LOWER)),-windows,)$(if $(filter darwin,$(_BUILD_OS_LOWER)),-darwin,)
 
 _REPO_NAME := $(PROJECT_NAME)
@@ -176,9 +181,10 @@ endif
 DOCKER_PE_LITE_FROM_BASE    := $(if $(filter 1,$(_IS_BETA)),dpanel/dpanel:beta-lite$(_TAG_SFX),dpanel/dpanel:lite$(_TAG_SFX))
 DOCKER_PE_PROD_FROM_BASE    := $(if $(filter 1,$(_IS_BETA)),dpanel/dpanel:beta$(_TAG_SFX),dpanel/dpanel:latest$(_TAG_SFX))
 
-DOCKER_BUILD_ARGS := --builder dpanel-context-local-builder \
+DOCKER_BUILD_ARGS = --builder dpanel-context-local-builder \
 		--platform $(DOCKER_PLATFORM) $(DOCKER_EXT_ARGS) \
 		--build-arg APP_VERSION=${APP_VERSION} \
+		--build-arg APP_RELEASE=${APP_RELEASE} \
 		--build-arg APP_FAMILY=${APP_FAMILY} \
 		--build-arg HTTP_PROXY=${HTTP_PROXY} \
 		--build-arg HTTPS_PROXY=${HTTP_PROXY} \
@@ -188,6 +194,7 @@ DOCKER_BUILD_ARGS := --builder dpanel-context-local-builder \
 		--build-arg PE_PROD_FROM_BASE=${DOCKER_PE_PROD_FROM_BASE} \
 		--annotation "manifest-descriptor:com.dpanel.website=https://deepanel.com" \
 		--annotation "manifest-descriptor:com.dpanel.version=${APP_VERSION}" \
+		--annotation "manifest-descriptor:com.dpanel.release=${APP_RELEASE}" \
 		-f $(DOCKER_FILE) .
 
 define go_build
@@ -201,13 +208,13 @@ define go_build
 	@# --- Compilation Logic ---
 	GOTOOLCHAIN=local CGO_ENABLED=1 GOOS=$(shell echo $(1) | tr '[:upper:]' '[:lower:]') GOARCH=$(2) GOARM=$(3) CC="$(4)" \
 	$(GO_EXECUTABLE) build -p $(BUILD_CPUS) -trimpath \
-	-ldflags="-s -w -X 'main.DPanelVersion=${APP_VERSION}' $(if $(and $(filter linux,$(_BUILD_OS_LOWER)),$(filter arm64,$(2))),$(ARM64_LINUX_LDFLAGS))" \
+	-ldflags="-s -w -X 'main.DPanelVersion=${APP_VERSION}' -X 'main.DPanelRelease=${APP_RELEASE}' $(if $(and $(filter linux,$(_BUILD_OS_LOWER)),$(filter arm64,$(2))),$(ARM64_LINUX_LDFLAGS))" \
 	-tags "${APP_FAMILY},w7_rangine_release,containers_image_openpgp" \
 	-o ${PROJECT_GO_TARGET}/$(TARGET_BIN) ${PROJECT_GO_DIR}/*.go
 	@cp ${PROJECT_GO_DIR}/config.yaml ${PROJECT_GO_TARGET}/config.yaml
 endef
 
-.PHONY: build build-js build-explorer-image build-builder release sync sync-aliyun clean debug test
+.PHONY: build build-js build-explorer-image build-builder release release-prepare sync sync-aliyun clean debug test
 
 build-explorer-image:
 	@echo ">> Building explorer images for: linux/amd64 linux/arm64 linux/arm/v7"
@@ -255,21 +262,26 @@ build-js: debug
 	@echo ">> Pruning redundant original files..."
 	@find ${PROJECT_GO_DIR}/asset/static -type f -name "*.gz" | while read gz_file; do rm -f "$${gz_file%.gz}"; done
 
-	@echo ">> Converting selected locales: $(SUPPORTED_LOCALES)..."
-	@for lang in $(BUILD_COPY_LANG); do \
-		src_file="${PROJECT_JS_DIR}/src/locales/$$lang.ts"; \
-		if [ -f "$$src_file" ]; then \
-			echo "   -> Converting $$lang.ts"; \
-			cat $$src_file | \
-			sed -E 's/export default[[:space:]]+//g' | \
-			sed -E 's/^const[[:space:]]+[a-zA-Z0-9_]+[[:space:]]*=[[:space:]]*//g' | \
-			sed 's/;$$//g' > "${PROJECT_GO_DIR}/asset/static/i18n/$$lang.json"; \
-		else \
-			echo "   !! Warning: $$lang.ts not found, skipping."; \
-		fi \
-	done
+ifeq ($(origin APP_RELEASE),file)
+ifeq ($(APP_FAMILY),ce)
+ifneq ($(filter release,$(MAKECMDGOALS)),)
+APP_RELEASE := $(_CURRENT_TIME)
+debug: release-prepare
+endif
+endif
+endif
+
+release-prepare:
+	@mkdir -p "$(PROJECT_GO_TARGET)"
+	@printf '%s\n' "$(_CURRENT_TIME)" > "$(PROJECT_GO_TARGET)/release"
 
 release: debug
+ifeq ($(origin APP_RELEASE),file)
+	@if [ ! -s "$(PROJECT_GO_TARGET)/release" ]; then \
+		echo "Run make release-prepare or build the community Lite image first."; \
+		exit 1; \
+	fi
+endif
 	@echo ">> Using Dockerfile: $(DOCKER_FILE)"
 	@echo ">> Platforms: $(DOCKER_PLATFORM)"
 	@# AliYun ACR currently rejects BuildKit provenance attestation manifests
@@ -349,6 +361,7 @@ debug:
 	@printf "$(_CYAN)%-20s$(_RESET) : %s\n" "PROJECT_HTTP_PROXY" "$(HTTP_PROXY)"
 	@printf "\n"
 	@printf "$(_CYAN)%-20s$(_RESET) : $(_BOLD)%s$(_RESET)\n" "APP_VERSION" "$(APP_VERSION)"
+	@printf "$(_CYAN)%-20s$(_RESET) : %s\n" "APP_RELEASE" "$(APP_RELEASE)"
 	@printf "$(_CYAN)%-20s$(_RESET) : %s\n" "APP_FAMILY" "$(APP_FAMILY) [ce pe nw xk]"
 	@printf "$(_CYAN)%-20s$(_RESET) : %s\n" "APP_ENV" "$(APP_ENV)"
 	@printf "\n"

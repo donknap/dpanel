@@ -588,6 +588,7 @@ func (self Home) Info(http *gin.Context) {
 	dockerEnv.TlsKey = ""
 
 	dpanelInfoResult := function.StructToMap(dpanelInfo)
+	dpanelInfoResult["version"] = dpanelInfo.ShowVersion()
 	dpanelInfoResult["containerInfo"] = containerInfo
 	loginSetting := logic.Setting{}.GetLoginSetting()
 	if loginSetting.SystemEntrance != nil {

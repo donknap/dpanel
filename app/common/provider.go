@@ -97,6 +97,11 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/store/sync", controller.Store{}.Sync)
 		cors.POST("/common/store/deploy", controller.Store{}.Deploy)
 
+		// 插件源与已导入插件
+		cors.POST("/common/plugin-tap/get-list", controller.PluginTap{}.GetList)
+		cors.POST("/common/plugin-tap/sync", controller.PluginTap{}.Sync)
+		cors.POST("/common/plugin/get-list", controller.Plugin{}.GetList)
+
 		engine.StaticFS("/dpanel/static/store/file", http.FS(logic.StoreLogoFileSystem{}))
 
 		// 计划任务

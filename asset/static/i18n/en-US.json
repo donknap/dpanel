@@ -1,14 +1,11 @@
 {
-  "app.backupRestoreConfirm":
-    "A new container will be created if the target doesn't exist; otherwise, existing data will be overwritten. Ensure Docker versions match. Proceed?",
+  "app.backupRestoreConfirm": "A new container will be created if the target doesn't exist; otherwise, existing data will be overwritten. Ensure Docker versions match. Proceed?",
   "app.backupRestoreNoStart": "Do not start the container after restore",
   "app.createAfterStatus": "After Creation",
   "app.createAfterStatusOption.create": "Create only",
   "app.createAfterStatusOption.start": "Start container",
-  "app.createMessageNoBridgeNetworkMustHasUseNetwork":
-    "A custom network is required when not joining the bridge network.",
-  "app.createNetworkDesc":
-    "Docker networks cannot be bound when using the host network. Use the host IP or 127.0.0.1 to access container ports.",
+  "app.createMessageNoBridgeNetworkMustHasUseNetwork": "A custom network is required when not joining the bridge network.",
+  "app.createNetworkDesc": "Docker networks cannot be bound when using the host network. Use the host IP or 127.0.0.1 to access container ports.",
   "app.createSiteName": "Container ID",
   "app.createSiteNameEmpty": "A unique identifier used as the container name.",
   "app.createSiteTitle": "Container Description",
@@ -35,8 +32,7 @@
   "components.appCompose.createFormTypeOption.storagePath": "Mounted Directory",
   "components.appCompose.createFormTypeOption.store": "App Store",
   "components.appCompose.createFormTypeOption.text": "Local Task",
-  "components.appCompose.createFormTypeOutPathTip":
-    "Automatically detect Compose tasks with existing containers. Edit and complete external tasks in the panel to bring them under panel management.",
+  "components.appCompose.createFormTypeOutPathTip": "Automatically detect Compose tasks with existing containers. Edit and complete external tasks in the panel to bring them under panel management.",
   "components.appCompose.createFormTypeRemoteImportGit": "Git Repository URL",
   "components.appCompose.createFormTypeRemoteImportGitBranch": "Branch",
   "components.appCompose.createFormTypeRemoteImportGitBranchTip": "Supports branches, tags, and releases",
@@ -44,21 +40,17 @@
   "components.appCompose.createFormTypeStoragePathBeforePath": "You can edit YAML files in the host directory",
   "components.appCompose.createFormTypeStoragePathNamePlaceholder": "task ID",
   "components.appCompose.createFormTypeStoragePathAfterPath": ".",
-  "components.appCompose.createFormTypeStoragePathTip":
-    "YAML files in the Compose directory cannot currently be edited directly from outside the panel, so tasks cannot be created using Mounted Directory. Choose another creation method.",
+  "components.appCompose.createFormTypeStoragePathTip": "YAML files in the Compose directory cannot currently be edited directly from outside the panel, so tasks cannot be created using Mounted Directory. Choose another creation method.",
   "components.appCompose.createFormTypeStoreTip": "Add an App Store first, then install directly from the store.",
   "components.appCompose.createFormTypeTextImportCommand": "From docker run",
   "components.appCompose.createFormTypeTextImportFile": "Import local YAML file",
   "components.appCompose.createFormTypeTextImportRemote": "Import remote YAML file",
-  "components.appCompose.createFormTypeTextTip":
-    "Ensure required environment variables are imported when creating the task.",
+  "components.appCompose.createFormTypeTextTip": "Ensure required environment variables are imported when creating the task.",
   "components.appCompose.createTitle": "Add Task",
   "components.appCompose.createYaml.override": "Override YAML File",
   "components.appCompose.createYaml.yaml": "YAML File",
-  "components.appCompose.createYamlDisableEdit":
-    "Remote YAML files cannot be edited directly. Add an override YAML file.",
-  "components.appCompose.createYamlOverrideTip":
-    "Override YAML files allow you to modify specific parameters without altering the original YAML file.",
+  "components.appCompose.createYamlDisableEdit": "Remote YAML files cannot be edited directly. Add an override YAML file.",
+  "components.appCompose.createYamlOverrideTip": "Override YAML files allow you to modify specific parameters without altering the original YAML file.",
   "components.appCompose.detailContainerTitle": "Container List",
   "components.appCompose.drawerTitle": "Task Management: {name}",
   "components.appCompose.joinContainerInNetwork": "Attach Container",
@@ -67,23 +59,17 @@
   "components.appCompose.managerCreatePullImageUseOption.useCommand": "Force pull images using Compose",
   "components.appCompose.managerCreatePullImageUseOption.useDPanel": "Force pull images using DPanel",
   "components.appCompose.managerCreateRemoveOrphans": "Remove containers for services no longer defined in the YAML?",
-  "components.appCompose.managerCreateTip":
-    "Apply the current YAML content, creating or updating containers as needed and starting them. Proceed?",
+  "components.appCompose.managerCreateTip": "Apply the current YAML content, creating or updating containers as needed and starting them. Proceed?",
   "components.appCompose.managerDeleteContainerButton": "Delete Container",
   "components.appCompose.managerDeleteTaskDeleteImage": "Delete image?",
   "components.appCompose.managerDeleteTaskDeletePath": "Delete YAML files and task directory?",
   "components.appCompose.managerDeleteTaskDeleteVolume": "Delete associated volumes?",
-  "components.appCompose.managerDeleteTaskDeleteVolumeTip":
-    "Deletes named volumes declared in the YAML and anonymous volumes attached to the containers, excluding external volumes. Data in deleted volumes will be lost.",
-  "components.appCompose.managerDeleteTaskTip":
-    "Delete the task record and its containers, and remove images, volumes, and the task directory according to the options below. Proceed?",
+  "components.appCompose.managerDeleteTaskDeleteVolumeTip": "Deletes named volumes declared in the YAML and anonymous volumes attached to the containers, excluding external volumes. Data in deleted volumes will be lost.",
+  "components.appCompose.managerDeleteTaskTip": "Delete the task record and its containers, and remove images, volumes, and the task directory according to the options below. Proceed?",
   "components.appCompose.managerDeployButton": "Deploy",
-  "components.appCompose.manageRemoteSyncTip":
-    "Syncing pulls the latest remote YAML file or repository files from {address} and overwrites local files. Proceed?",
-  "components.appCompose.manageGitSyncTip":
-    "Syncing will clear the current task directory. Back up any configuration files or mounted data beforehand. Continue?",
-  "components.appCompose.managerStatusDanglingAlert":
-    "This task cannot be managed. Provide the YAML file and any required .env file. The original working directory remains unchanged, and existing data is not moved.",
+  "components.appCompose.manageRemoteSyncTip": "Syncing pulls the latest remote YAML file or repository files from {address} and overwrites local files. Proceed?",
+  "components.appCompose.manageGitSyncTip": "Syncing will clear the current task directory. Back up any configuration files or mounted data beforehand. Continue?",
+  "components.appCompose.managerStatusDanglingAlert": "This task cannot be managed. Provide the YAML file and any required .env file. The original working directory remains unchanged, and existing data is not moved.",
   "components.appCompose.managerRedeployButton": "Redeploy",
   "components.appCompose.managerTitle": "Task Management",
   "components.appCompose.managerUnpauseButton": "Resume",
@@ -91,12 +77,10 @@
   "components.appCompose.selectService": "Deploy custom container services?",
   "components.appCompose.yamlDrawerTitle": "Compose Task",
   "components.appCompose.executeTitle": "{action} · {name}",
-  "components.appCompose.executeStopTip":
-    "Stop subsequent steps and attempt to stop the current operation? Completed changes will not be rolled back.",
+  "components.appCompose.executeStopTip": "Stop subsequent steps and attempt to stop the current operation? Completed changes will not be rolled back.",
   "components.appCompose.executeLogUnavailable": "Unable to open execution logs. Please retry.",
   "components.appCron.cronContainerEntryShell": "Script Environment",
-  "components.appCron.cronContainerEntryShellTip":
-    "Select the script execution environment. The script is nested within the -c parameter of sh/bash.",
+  "components.appCron.cronContainerEntryShellTip": "Select the script execution environment. The script is nested within the -c parameter of sh/bash.",
   "components.appCron.cronDayOfWeekOption.0": "Every Sunday",
   "components.appCron.cronDayOfWeekOption.1": "Every Monday",
   "components.appCron.cronDayOfWeekOption.2": "Every Tuesday",
@@ -106,8 +90,7 @@
   "components.appCron.cronDayOfWeekOption.6": "Every Saturday",
   "components.appCron.cronFormContainerName": "Target Container",
   "components.appCron.cronFormContainerNameEmpty": "Runs in the DPanel container or current environment by default",
-  "components.appCron.cronFormContainerNameTip":
-    "Ensure the target container includes all dependencies required by your script.",
+  "components.appCron.cronFormContainerNameTip": "Ensure the target container includes all dependencies required by your script.",
   "components.appCron.cronFormEnableRunBlock": "Wait for current task to finish before starting the next",
   "components.appCron.cronFormEnv": "Environment",
   "components.appCron.cronFormEventType": "Event Type",
@@ -139,10 +122,8 @@
   "components.appCron.cronUnitOption.preMonth": "Monthly",
   "components.appCron.cronUnitOption.preWeek": "Weekly",
   "components.appCron.cronUnitTipOption.code": "Custom: {code}",
-  "components.appCron.cronUnitTipOption.preAtDay":
-    "Executes every {dayOfMonth} days at {hours}:{minutes}, starting on the 1st.",
-  "components.appCron.cronUnitTipOption.preAtHour":
-    "Executes every {hours} hours and {minutes} minutes, starting at 00:00.",
+  "components.appCron.cronUnitTipOption.preAtDay": "Executes every {dayOfMonth} days at {hours}:{minutes}, starting on the 1st.",
+  "components.appCron.cronUnitTipOption.preAtHour": "Executes every {hours} hours and {minutes} minutes, starting at 00:00.",
   "components.appCron.cronUnitTipOption.preAtMinute": "Executes every {minutes} minutes, starting at 00:00.",
   "components.appCron.cronUnitTipOption.preAtSecond": "Executes every {seconds} seconds, starting at 00:00.",
   "components.appCron.cronUnitTipOption.preDay": "Executes daily at {hours}:{minutes}",
@@ -153,8 +134,7 @@
   "components.appCron.templateTitle": "Cron Job Script Template",
   "components.appCron.templateTriggerButton": "Script Template",
   "components.appDetail.backupImportEnableRestore": "Restore immediately after import",
-  "components.appDetail.backupImportTarFilePath":
-    "Specify path in panel container (if on host, import via file manager first)",
+  "components.appDetail.backupImportTarFilePath": "Specify path in panel container (if on host, import via file manager first)",
   "components.appDetail.backupImportTarFileUpload": "Select snapshot file (.snapshot)",
   "components.appDetail.backupImportTitle": "Import Snapshot",
   "components.appDetail.backupImportType": "Method",
@@ -165,10 +145,8 @@
   "components.appDetail.backupVolumeImageOption.container": "Back up all files in the container?",
   "components.appDetail.backupVolumeImageOption.image": "Back up the container image?",
   "components.appDetail.backupVolumeImageOption.none": "Skip image backup",
-  "components.appDetail.backupVolumeImageTipOption.container":
-    "On restore, a new image created via 'docker commit' will be imported.",
-  "components.appDetail.backupVolumeImageTipOption.image":
-    "On restore, the image included in the snapshot will be imported.",
+  "components.appDetail.backupVolumeImageTipOption.container": "On restore, a new image created via 'docker commit' will be imported.",
+  "components.appDetail.backupVolumeImageTipOption.image": "On restore, the image included in the snapshot will be imported.",
   "components.appDetail.backupVolumeImageTipOption.none": "On restore, the remote image will be pulled first.",
   "components.appDetail.backupVolumePathOption.all": "Back up all mounted volumes",
   "components.appDetail.backupVolumePathOption.none": "Skip volume backup",
@@ -178,22 +156,19 @@
   "components.appDetail.checkImageUpgradeOption.-3": "Unavailable",
   "components.appDetail.commitButton": "Save as Image",
   "components.appDetail.commitConfirmApplyToContainer": "Apply the saved image and rebuild the container immediately",
-  "components.appDetail.commitConfirmDescription":
-    "Save changes in the container filesystem as a new image. Data in mounted directories is not included.",
+  "components.appDetail.commitConfirmDescription": "Save changes in the container filesystem as a new image. Data in mounted directories is not included.",
   "components.appDetail.commitConfirmMerge": "Flatten into a single-layer image",
   "components.appDetail.commitConfirmSaveImageName": "Image Name",
   "components.appDetail.commitConfirmSaveImageNamePlaceholder": "Leave blank to let the system decide",
   "components.appDetail.commitConfirmTitle": "Save Container as Image",
   "components.appDetail.copyButton": "Clone",
-  "components.appDetail.copyConfirmTip":
-    "Cloned containers have identical configs and may fail to start. Enable [Bind Random Ports] to avoid conflicts.",
+  "components.appDetail.copyConfirmTip": "Cloned containers have identical configs and may fail to start. Enable [Bind Random Ports] to avoid conflicts.",
   "components.appDetail.copyCopyName": "Cloned Container Name",
   "components.appDetail.copyEnableRandomPort": "Bind Random Ports",
   "components.appDetail.copyEnableStart": "Start after cloning?",
   "components.appDetail.deleteConfirmDeleteImage": "Delete image?",
   "components.appDetail.deleteConfirmDeleteVolume": "Delete anonymous volumes?",
-  "components.appDetail.deleteConfirmTip":
-    "Anonymous volumes are created by Docker automatically and are not bound to host paths.",
+  "components.appDetail.deleteConfirmTip": "Anonymous volumes are created by Docker automatically and are not bound to host paths.",
   "components.appDetail.dpanelSelfTip": "Cannot operate on the DPanel container from within itself.",
   "components.appDetail.drawerTitle": "Container Details - {name}",
   "components.appDetail.exportButton": "Export",
@@ -202,11 +177,9 @@
   "components.appDetail.exportEnableExportToPath": "Export to /dpanel/storage/export/container?",
   "components.appDetail.inspectButton": "Inspect",
   "components.appDetail.inspectTitle": "Container Inspect JSON",
-  "components.appDetail.rebuildConfirmTip":
-    "The container will be rebuilt using its current config. Non-mounted data will be reset. Proceed?",
+  "components.appDetail.rebuildConfirmTip": "The container will be rebuilt using its current config. Non-mounted data will be reset. Proceed?",
   "components.appDetail.rollbackEmptyTip": "No rollback data available",
-  "components.appDetail.rollbackTip":
-    "Rollback only restores configuration. Use snapshots for full data recovery. Select a rollback date:",
+  "components.appDetail.rollbackTip": "Rollback only restores configuration. Use snapshots for full data recovery. Select a rollback date:",
   "components.appDetail.runTimeValue": "Created: {create} / Updated: {upgrade}",
   "components.appDetail.tagCreateTitle": "Add Tag",
   "components.appDetail.tagFormDescription": "Description",
@@ -220,8 +193,7 @@
   "components.appDetail.tagFormTitle": "Title",
   "components.appDetail.tagFormUrl": "Access URL",
   "components.appDetail.tagGetUrlDetailButton": "Get Info",
-  "components.appDetail.tagRemoveConfirmTip":
-    "Remove this container's tag association? The container will not be deleted.",
+  "components.appDetail.tagRemoveConfirmTip": "Remove this container's tag association? The container will not be deleted.",
   "components.appDetail.titleBackup": "Backups",
   "components.appDetail.titleBasic": "Basic Info",
   "components.appDetail.titleHealth": "Health Check",
@@ -274,8 +246,7 @@
   "components.appDomain.certFormDeployHookScriptOption.user": "Custom Script",
   "components.appDomain.certFormDeployHookScriptUser": "Custom deploy script",
   "components.appDomain.certFormDnsApi": "Verification Method",
-  "components.appDomain.certFormDnsApiTip":
-    "Nginx verification requires resolving the domain to this server. DNS API requires configuring API keys.",
+  "components.appDomain.certFormDnsApiTip": "Nginx verification requires resolving the domain to this server. DNS API requires configuring API keys.",
   "components.appDomain.certFormDomain": "Domain",
   "components.appDomain.certFormDomainEmpty": "Enter one or more domains",
   "components.appDomain.certFormEmail": "Email",
@@ -284,11 +255,9 @@
   "components.appDomain.certFormRenew": "Force Renew",
   "components.appDomain.certFormRenewTip": "System auto-renews by default. Enable to force renewal.",
   "components.appDomain.certFormSslCrtContent": "Certificate (.crt)",
-  "components.appDomain.certFormSslCrtContentTip":
-    ".crt or .pem; include the full chain from BEGIN CERTIFICATE through END CERTIFICATE.",
+  "components.appDomain.certFormSslCrtContentTip": ".crt or .pem; include the full chain from BEGIN CERTIFICATE through END CERTIFICATE.",
   "components.appDomain.certFormSslKeyContent": "Private Key (.key)",
-  "components.appDomain.certFormSslKeyContentTip":
-    ".key or .pem; include content from BEGIN PRIVATE KEY through END PRIVATE KEY.",
+  "components.appDomain.certFormSslKeyContentTip": ".key or .pem; include content from BEGIN PRIVATE KEY through END PRIVATE KEY.",
   "components.appDomain.certFormType": "Source",
   "components.appDomain.certFormTypeOption.apply": "Request Free Certificate",
   "components.appDomain.certFormTypeOption.upload": "Upload Certificate",
@@ -320,13 +289,11 @@
   "components.appDomain.createFormTypeOption.proxy": "Reverse Proxy",
   "components.appDomain.createFormTypeOption.redirect": "Redirect",
   "components.appDomain.createSelectContainer": "Select Container",
-  "components.appDomain.createSelectContainerDisabledTip":
-    "When using host networking (--network host), forwarding is only supported via IP:Port",
+  "components.appDomain.createSelectContainerDisabledTip": "When using host networking (--network host), forwarding is only supported via IP:Port",
   "components.appDomain.createTitle": "Edit Forwarding Rule",
   "components.appDomain.createTriggerButton": "Add Proxy",
   "components.appDomain.createUser": "Custom",
-  "components.appDomain.createVhostTip":
-    "The extended config file is located at /dpanel/nginx/extra_host/{name}.conf. Edit it carefully. If an error prevents Nginx from starting, fix it and reload the Nginx configuration.",
+  "components.appDomain.createVhostTip": "The extended config file is located at /dpanel/nginx/extra_host/{name}.conf. Edit it carefully. If an error prevents Nginx from starting, fix it and reload the Nginx configuration.",
   "components.appDomain.dnsApiOption.dns_ali": "Alibaba Cloud",
   "components.appDomain.dnsApiOption.dns_huaweicloud": "Huawei Cloud",
   "components.appDomain.dnsApiOption.dns_tencent": "Tencent Cloud",
@@ -364,8 +331,7 @@
   "components.appForm.createAdvRunCommandHostPidNotice": "Shares host PID namespace. Use with extreme caution.",
   "components.appForm.createAdvRunCommandInit": "Use Init Process",
   "components.appForm.createAdvRunCommandPrivileged": "Privileged Mode",
-  "components.appForm.createAdvRunCommandPrivilegedNotice":
-    "Runs the container in privileged mode, which can affect host security. Use with caution.",
+  "components.appForm.createAdvRunCommandPrivilegedNotice": "Runs the container in privileged mode, which can affect host security. Use with caution.",
   "components.appForm.createByCommandTitle": "From Command",
   "components.appForm.createCapOption.all": "All capabilities",
   "components.appForm.createCapOption.audit_control": "Enable/disable kernel audit; change rules.",
@@ -427,8 +393,7 @@
   "components.appForm.createEnvFormEnvCode": "Code Mode",
   "components.appForm.createEnvFormEnvImport": "Import .env File",
   "components.appForm.createEnvFormListAddButton": "Add Variable",
-  "components.appForm.createEnvFormListInEnvFile":
-    "This variable is defined in the .env file. Edit or remove it in the file editor.",
+  "components.appForm.createEnvFormListInEnvFile": "This variable is defined in the .env file. Edit or remove it in the file editor.",
   "components.appForm.createEnvFormName": "Name",
   "components.appForm.createEnvFormOnePanel.APP_PORT": "App Port",
   "components.appForm.createEnvFormOnePanel.CODE_DIR": "Code Dir",
@@ -467,8 +432,7 @@
   "components.appForm.createHealthyTimeout": "Timeout",
   "components.appForm.createHealthyTitle": "Health Check",
   "components.appForm.createHookContainerCreate": "Post-create Script",
-  "components.appForm.createHookContainerCreateTip":
-    "Runs after creation without changing entrypoint or command. Example: ls -al && touch abc.txt",
+  "components.appForm.createHookContainerCreateTip": "Runs after creation without changing entrypoint or command. Example: ls -al && touch abc.txt",
   "components.appForm.createHookTitle": "Hooks",
   "components.appForm.createLimitCpus": "CPU Limit",
   "components.appForm.createLimitMemory": "Memory Limit",
@@ -494,8 +458,7 @@
   "components.appForm.createNetworkAddButton": "Join Network",
   "components.appForm.createNetworkAlise": "Alias",
   "components.appForm.createNetworkAliseEmpty": "Specify network alias",
-  "components.appForm.createNetworkAliseTip":
-    "Containers on the same network can use hostname, domain name, or aliases.",
+  "components.appForm.createNetworkAliseTip": "Containers on the same network can use hostname, domain name, or aliases.",
   "components.appForm.createNetworkName": "Network",
   "components.appForm.createNetworkTitle": "Networks",
   "components.appForm.createNetworkUseBridgeNetwork": "Join Bridge",
@@ -526,26 +489,21 @@
   "components.appForm.createSecurityAppArmor": "Disable AppArmor",
   "components.appForm.createSecurityImageAutoCommit": "Auto-commit container image",
   "components.appForm.createSecurityImageAutoCommitMerge": "Flatten image layers",
-  "components.appForm.createSecurityImageAutoCommitMergeTip":
-    "Applies to this rebuild only: flatten the committed image into one layer and remove older auto-commit images for this site.",
-  "components.appForm.createSecurityImageAutoCommitTip":
-    "When editing, commit the current container first, then rebuild it from that image with the complete edited configuration. When disabled, rebuild directly from the image selected in the form. This cannot be used with auto-remove or a read-only root filesystem.",
+  "components.appForm.createSecurityImageAutoCommitMergeTip": "Applies to this rebuild only: flatten the committed image into one layer and remove older auto-commit images for this site.",
+  "components.appForm.createSecurityImageAutoCommitTip": "When editing, commit the current container first, then rebuild it from that image with the complete edited configuration. When disabled, rebuild directly from the image selected in the form. This cannot be used with auto-remove or a read-only root filesystem.",
   "components.appForm.createSecurityNoNewPrivileges": "No new privileges",
   "components.appForm.createSecurityPrivilegedNotice": "Privileged is enabled; security options are unavailable.",
   "components.appForm.createSecurityReadonlyRootfs": "Read-only root filesystem",
-  "components.appForm.createSecurityReadonlyRootfsTip":
-    "Prevents writes to the container root filesystem. This cannot be used with automatic image commits.",
+  "components.appForm.createSecurityReadonlyRootfsTip": "Prevents writes to the container root filesystem. This cannot be used with automatic image commits.",
   "components.appForm.createSecuritySeccomp": "Disable Seccomp",
   "components.appForm.createSecuritySysctlsAdd": "Add Sysctl",
   "components.appForm.createSecuritySysctlsTitle": "Kernel Parameters",
   "components.appForm.createSecurityTitle": "Security Options",
   "components.appForm.createSelfNetworkIp": "IP Address ({ip})",
   "components.appForm.createSelfNetworkIpGateway": "Gateway ({ip})",
-  "components.appForm.createSelfNetworkIpGatewayTip":
-    "Specify the gateway for the container's {ip} address, e.g., {example}",
+  "components.appForm.createSelfNetworkIpGatewayTip": "Specify the gateway for the container's {ip} address, e.g., {example}",
   "components.appForm.createSelfNetworkIpSubnet": "Subnet ({ip})",
-  "components.appForm.createSelfNetworkIpSubnetTip":
-    "Specify the subnet containing the container's {ip} address, e.g., {example}",
+  "components.appForm.createSelfNetworkIpSubnetTip": "Specify the subnet containing the container's {ip} address, e.g., {example}",
   "components.appForm.createSelfNetworkIpTip": "Specify the container's {ip} address, e.g., {example}",
   "components.appForm.createSelfNetworkIpV6Enable": "Enable IPv6",
   "components.appForm.createSelfNetworkTitle": "Custom Network",
@@ -620,8 +578,7 @@
   "components.backupRestore.step.start": "Start Container",
   "components.backupRestore.step.volume": "Restore Data",
   "components.backupRestore.title": "Restore Snapshot",
-  "components.backupRestore.warning":
-    "The snapshot restore task cannot be interrupted, and this window cannot be closed until it finishes.",
+  "components.backupRestore.warning": "The snapshot restore task cannot be interrupted, and this window cannot be closed until it finishes.",
   "components.commandToYaml.commandInvalid": "Enter a valid docker run command.",
   "components.commandToYaml.commandPlaceholder": "Enter a docker run ... command",
   "components.commandToYaml.commandTitle": "docker run command",
@@ -633,11 +590,9 @@
   "components.containerPort.cardDomainTitle": "Domain Bindings",
   "components.containerPort.cardPortTitle": "Port Bindings",
   "components.containerPort.checkAction": "Check Ports",
-  "components.containerPort.checkDescription":
-    "Port checks automatically discover listeners in host-network containers and test whether container ports are reachable.",
+  "components.containerPort.checkDescription": "Port checks automatically discover listeners in host-network containers and test whether container ports are reachable.",
   "components.containerPort.checkResult": "Check complete: {total} total, {failed} failed, {timeout} timed out",
-  "components.containerPort.checkSummary":
-    "Check complete: {total} checks, {success} available, {unavailable} failed or unavailable",
+  "components.containerPort.checkSummary": "Check complete: {total} checks, {success} available, {unavailable} failed or unavailable",
   "components.containerPort.domain": "Domain",
   "components.containerPort.pendingDetection": "Not Detected",
   "components.containerPort.portPrivate": "Internal",
@@ -720,8 +675,7 @@
   "components.containerStatus.task.starting": "Starting",
   "components.containerStatus.upgrade.conflict": "Updating",
   "components.containerStatus.upgrade.description.conflict": "Another update task is running; this run was skipped",
-  "components.containerStatus.upgrade.description.unavailable":
-    "Cannot obtain image digests for comparison; unable to check for updates",
+  "components.containerStatus.upgrade.description.unavailable": "Cannot obtain image digests for comparison; unable to check for updates",
   "components.containerStatus.upgrade.failed": "Failed",
   "components.containerStatus.upgrade.ignoreAlways": "Permanently Ignored",
   "components.containerStatus.upgrade.ignoreCurrent": "Ignored for This Version",
@@ -733,26 +687,21 @@
   "components.containerUpgrade.affectedContainers": "Affected Containers",
   "components.containerUpgrade.checkAction": "Check Updates",
   "components.containerUpgrade.checkAll": "Check All",
-  "components.containerUpgrade.checkConfirmDescription":
-    "The system checks each container in sequence by querying its remote image registry and comparing the result with the local image digest. You can leave this page while it runs. Keep this browser tab open and do not refresh it, or the remaining containers will not be checked.",
+  "components.containerUpgrade.checkConfirmDescription": "The system checks each container in sequence by querying its remote image registry and comparing the result with the local image digest. You can leave this page while it runs. Keep this browser tab open and do not refresh it, or the remaining containers will not be checked.",
   "components.containerUpgrade.checkLoadError": "Failed to load check data",
   "components.containerUpgrade.checkNow": "Check Now",
   "components.containerUpgrade.checkRequestFailed": "Check request failed",
   "components.containerUpgrade.containerEmpty": "No containers in the current environment",
   "components.containerUpgrade.containerLoadError": "Failed to load containers",
-  "components.containerUpgrade.containerLoadErrorDescription":
-    "The current environment's container list could not be loaded. {error}",
+  "components.containerUpgrade.containerLoadErrorDescription": "The current environment's container list could not be loaded. {error}",
   "components.containerUpgrade.cronAddAction": "Schedule",
   "components.containerUpgrade.cronAddTitle": "Add Schedule",
-  "components.containerUpgrade.cronDeleteConfirm":
-    "Containers in this schedule will no longer update automatically. Delete it?",
+  "components.containerUpgrade.cronDeleteConfirm": "Containers in this schedule will no longer update automatically. Delete it?",
   "components.containerUpgrade.cronEditTitle": "Edit Schedule",
   "components.containerUpgrade.cronEnable": "Enable Schedule",
   "components.containerUpgrade.cronExecution": "Update Method",
-  "components.containerUpgrade.cronExecutionDescription.check":
-    "Check for a newer image without updating the container",
-  "components.containerUpgrade.cronExecutionDescription.rebuild":
-    "Pull the image and rebuild the container without comparing versions",
+  "components.containerUpgrade.cronExecutionDescription.check": "Check for a newer image without updating the container",
+  "components.containerUpgrade.cronExecutionDescription.rebuild": "Pull the image and rebuild the container without comparing versions",
   "components.containerUpgrade.cronExecutionDescription.upgrade": "Update the container when a newer image is found",
   "components.containerUpgrade.cronExecutionOption.check": "Check Only",
   "components.containerUpgrade.cronExecutionOption.rebuild": "Always Update",
@@ -766,8 +715,7 @@
   "components.containerUpgrade.currentCheck": "Checking",
   "components.containerUpgrade.currentContainer": "Current Container",
   "components.containerUpgrade.enableBak": "Back up the old container before updating",
-  "components.containerUpgrade.enableResetImageConfig":
-    "Replace the current container configuration with the image configuration",
+  "components.containerUpgrade.enableResetImageConfig": "Replace the current container configuration with the image configuration",
   "components.containerUpgrade.excludeAffectedContainers": "Select containers to exclude",
   "components.containerUpgrade.filterComposeProject": "Compose Task",
   "components.containerUpgrade.filterField": "Filter Method",
@@ -786,8 +734,7 @@
   "components.containerUpgrade.goCheck": "Check",
   "components.containerUpgrade.ignoreAction": "Ignore Update",
   "components.containerUpgrade.ignoreAlways": "Ignore Permanently",
-  "components.containerUpgrade.ignoreConfirmDescription":
-    "The current image version is ignored by default and will be checked again after the image changes.",
+  "components.containerUpgrade.ignoreConfirmDescription": "The current image version is ignored by default and will be checked again after the image changes.",
   "components.containerUpgrade.ignoreType": "Ignore Scope",
   "components.containerUpgrade.ignoreVersion": "Ignore Once",
   "components.containerUpgrade.imageNameTip": "Reset the container image. Ensure compatibility.",
@@ -802,8 +749,7 @@
   "components.containerUpgrade.preparePullImage": "Preparing to Pull the Image",
   "components.containerUpgrade.progressPosition": "Item {current} of {total}",
   "components.containerUpgrade.pullImage": "Pull Image",
-  "components.containerUpgrade.rebuildWarning":
-    "The container will be rebuilt using its current configuration. Data outside mounted directories will be reset. Proceed?",
+  "components.containerUpgrade.rebuildWarning": "The container will be rebuilt using its current configuration. Data outside mounted directories will be reset. Proceed?",
   "components.containerUpgrade.recheck": "Check Again",
   "components.containerUpgrade.recheckFailed": "Check Failed",
   "components.containerUpgrade.restoreIgnore": "Stop Ignoring",
@@ -833,11 +779,9 @@
   "components.containerUpgrade.taskContainerCount": "{count} containers",
   "components.containerUpgrade.uncheckedCount": "Not Checked",
   "components.containerUpgrade.upgradeProgress": "Update Progress",
-  "components.containerUpgrade.upgradeStopWarning":
-    "The container update cannot be interrupted. Keep this browser tab open and do not refresh it until the task finishes.",
+  "components.containerUpgrade.upgradeStopWarning": "The container update cannot be interrupted. Keep this browser tab open and do not refresh it until the task finishes.",
   "components.containerUpgrade.upgradeTitle": "Container Update",
-  "components.containerUpgrade.upgradeWarning":
-    "The update pulls images and recreates containers. Services may be briefly interrupted, and data outside mounted directories will be reset.",
+  "components.containerUpgrade.upgradeWarning": "The update pulls images and recreates containers. Services may be briefly interrupted, and data outside mounted directories will be reset.",
   "components.dockerEnvCreate.drawerTitle": "Add Docker Server",
   "components.dockerEnvCreate.drawerTitleDefault": "Default Docker Server",
   "components.dockerEnvCreate.formAddress": "API Address",
@@ -847,26 +791,22 @@
   "components.dockerEnvCreate.formComposePath": "Compose Task Directory",
   "components.dockerEnvCreate.formDockerType": "Engine Type",
   "components.dockerEnvCreate.formEnableComposePath": "Dedicated Compose Task Directory",
-  "components.dockerEnvCreate.formEnableComposePathTip":
-    "Keeps Compose tasks isolated to this environment's task directory",
+  "components.dockerEnvCreate.formEnableComposePathTip": "Keeps Compose tasks isolated to this environment's task directory",
   "components.dockerEnvCreate.formEnableSSH": "Enable SSH",
   "components.dockerEnvCreate.formEnableSSHAlert": "Use root or a user in the docker group",
   "components.dockerEnvCreate.formEnableSSHTitle": "Host SSH",
   "components.dockerEnvCreate.formEnableSystemStat": "Enable Host Monitoring",
-  "components.dockerEnvCreate.formEnableSystemStatTip":
-    "Monitors host CPU, memory, network, disk, and pressure metrics through this Docker environment",
+  "components.dockerEnvCreate.formEnableSystemStatTip": "Monitors host CPU, memory, network, disk, and pressure metrics through this Docker environment",
   "components.dockerEnvCreate.formEnableTLS": "Enable TLS",
   "components.dockerEnvCreate.formEnableTLSMessageUploadError": "Certificate import error: {name}",
   "components.dockerEnvCreate.formEnableTLSTip": "Guide: https://dpanel.cc/manual/remote",
   "components.dockerEnvCreate.formName": "ID",
-  "components.dockerEnvCreate.formNameEmpty":
-    "Docker environment ID can only contain letters, numbers, underscores, or hyphens",
+  "components.dockerEnvCreate.formNameEmpty": "Docker environment ID can only contain letters, numbers, underscores, or hyphens",
   "components.dockerEnvCreate.formRemoteType": "Connection Type",
   "components.dockerEnvCreate.formServerUrl": "Access Domain / IP",
   "components.dockerEnvCreate.formServerUrlEmpty": "e.g., 192.168.1.25, 2001:db8:1::2, example.com",
   "components.dockerEnvCreate.formServerUrlTip": "Host IP or domain for published ports (IPv4/IPv6).",
-  "components.dockerEnvCreate.formSshServerInfoAddPublicKey":
-    "Log in as {user} and run the following command to add the public key",
+  "components.dockerEnvCreate.formSshServerInfoAddPublicKey": "Log in as {user} and run the following command to add the public key",
   "components.dockerEnvCreate.formSshServerInfoAddress": "Host IP",
   "components.dockerEnvCreate.formSshServerInfoAddressEmpty": "Enter host IP",
   "components.dockerEnvCreate.formSshServerInfoAuthType": "Authentication",
@@ -924,8 +864,7 @@
   "components.explorer.toolbarArchiveOverwrite": "Overwrite existing file",
   "components.explorer.toolbarArchiveTargetName": "Target Name",
   "components.explorer.toolbarArchiveTargetNameInvalid": "Enter a valid filename without path separators",
-  "components.explorer.toolbarArchiveTargetSourceConflict":
-    "The archive cannot have the same name as a selected source",
+  "components.explorer.toolbarArchiveTargetSourceConflict": "The archive cannot have the same name as a selected source",
   "components.explorer.toolbarCopyButton": "Copy",
   "components.explorer.toolbarCutButton": "Cut",
   "components.explorer.toolbarDownloadButton": "Download",
@@ -933,10 +872,8 @@
   "components.explorer.toolbarNewButton": "New",
   "components.explorer.toolbarPasteButton": "Paste",
   "components.explorer.toolbarPasteConflictConfirm": "Overwrite",
-  "components.explorer.toolbarPasteConflictDirectory":
-    "A directory with the same name exists. Continuing will merge the directories and overwrite matching contents.",
-  "components.explorer.toolbarPasteConflictFile":
-    "A file or item of another type with the same name exists. Replace it?",
+  "components.explorer.toolbarPasteConflictDirectory": "A directory with the same name exists. Continuing will merge the directories and overwrite matching contents.",
+  "components.explorer.toolbarPasteConflictFile": "A file or item of another type with the same name exists. Replace it?",
   "components.explorer.toolbarPasteConflictTitle": "An item with the same name exists",
   "components.explorer.toolbarPermissionButton": "Permissions",
   "components.explorer.toolbarPermissionEveryone": "Others",
@@ -965,12 +902,10 @@
   "components.explorer.toolbarRenameConflict": "An item with the same name already exists in this directory",
   "components.explorer.toolbarRenameInvalidName": "Enter a valid item name without path separators",
   "components.explorer.toolbarUnzipButton": "Extract",
-  "components.explorer.toolbarUnzipMessageAllowFileExt":
-    "Supported: .zip, .tar, .tar.gz/.tgz, .tar.bz2, .tar.xz, .tar.zst, .rar, .7z",
+  "components.explorer.toolbarUnzipMessageAllowFileExt": "Supported: .zip, .tar, .tar.gz/.tgz, .tar.bz2, .tar.xz, .tar.zst, .rar, .7z",
   "components.explorer.toolbarUnzipSeparateDir": "Create a folder named after each archive",
   "components.explorer.toolbarUploadButton": "Upload",
-  "components.explorer.toolbarUploadDirectoryTip":
-    "Select one or more files. Folder uploads preserve their directory structure.",
+  "components.explorer.toolbarUploadDirectoryTip": "Select one or more files. Folder uploads preserve their directory structure.",
   "components.explorer.toolbarUploadModalTitle": "Upload Files",
   "components.explorer.toolbarUploadTitle": "Click to select files, or drag files or folders here",
   "components.fixedTask.backgroundAction": "Run in Background",
@@ -990,30 +925,25 @@
   "components.image.buildxForceRemoveContext": "Force removal",
   "components.image.buildxMirrorUrl": "Registry Mirrors",
   "components.image.buildxMirrorUrlTip": "Enter one mirror URL per line. These URLs update the BuildKit configuration.",
-  "components.image.buildxMissingContext":
-    "No BuildKit builder is available. Create one here, or choose Standard Build (docker build) when building an image.",
+  "components.image.buildxMissingContext": "No BuildKit builder is available. Create one here, or choose Standard Build (docker build) when building an image.",
   "components.image.buildxProxyUrl": "Proxy URL",
-  "components.image.buildxProxyUrlTip":
-    "Proxy for the BuildKit builder (do not use 127.0.0.1). Example: http://192.168.0.2:7890",
+  "components.image.buildxProxyUrlTip": "Proxy for the BuildKit builder (do not use 127.0.0.1). Example: http://192.168.0.2:7890",
   "components.image.buildxPullUseDPanel": "Pull images with DPanel",
   "components.image.buildxRemoveState": "Clear storage (build cache and saved BuildKit config)",
   "components.image.buildxTitle": "Buildx Context",
-  "components.image.containerTarCmdTip":
-    "Specify a startup command for the imported container; otherwise, it will remain stopped",
+  "components.image.containerTarCmdTip": "Specify a startup command for the imported container; otherwise, it will remain stopped",
   "components.image.containerTarEnv": "Environment Variables",
   "components.image.containerTarEnvTip": "Variables for the imported image, one per line",
   "components.image.containerTarExpose": "Exposed Ports",
   "components.image.containerTarExposeTip": "Ports for the imported image, one per line",
-  "components.image.containerTarTip":
-    "Customize imported image parameters here. If no changes are needed, use 'Save as Image' from Container Details instead.",
+  "components.image.containerTarTip": "Customize imported image parameters here. If no changes are needed, use 'Save as Image' from Container Details instead.",
   "components.image.containerTarTitle": "Import Container Tar",
   "components.image.containerTarUploadFile": "Import a TAR archive (.tar files only)",
   "components.image.containerTarVolume": "Volumes",
   "components.image.containerTarVolumeTip": "Persistent directories (one per line)",
   "components.image.containerTarWorkDir": "Working Directory",
   "components.image.containerTarWorkDirEmpty": "Defaults to /",
-  "components.image.containerTarWorkDirTip":
-    "Working directory inside the container, usually where the code is located.",
+  "components.image.containerTarWorkDirTip": "Working directory inside the container, usually where the code is located.",
   "components.image.importLocal": "Local Image",
   "components.image.importLocalTip": "Exported .tar images (max 10)",
   "components.image.importRemote": "Remote URL",
@@ -1029,8 +959,7 @@
   "components.image.quickTitle": "Image Info",
   "components.image.updateSource": "Update source",
   "components.image.updateSourceTip": "This image has multiple update sources. Select the source to use for this pull.",
-  "components.image.updateConfirm":
-    "Updating pulls the selected image again. On success, the ordinary tags on the current image are moved to the new image.",
+  "components.image.updateConfirm": "Updating pulls the selected image again. On success, the ordinary tags on the current image are moved to the new image.",
   "components.image.registryCreateFormEnableAuth": "Require Authentication?",
   "components.image.registryCreateFormEnableHttp": "Allow HTTP?",
   "components.image.registryCreateFormPassword": "Password",
@@ -1049,8 +978,7 @@
   "components.imagePull.backgroundPull": "Pull in Background",
   "components.imagePull.backgroundPullTip": "Keep pulling in this browser",
   "components.imagePull.complete": "Complete",
-  "components.imagePull.configureMirror":
-    "Configure a mirror for the image registry, or add a registry mirror or proxy address in daemon.json. Then retry.",
+  "components.imagePull.configureMirror": "Configure a mirror for the image registry, or add a registry mirror or proxy address in daemon.json. Then retry.",
   "components.imagePull.drawerTitle": "Pull Image",
   "components.imagePull.imagePlatformEmpty": "Defaults to host architecture",
   "components.imagePull.imageUrlEmpty": "Enter image name or URL",
@@ -1095,22 +1023,18 @@
   "components.network.selectDrawerTitle": "Select Network",
   "components.network.selectTriggerButton": "Join",
   "components.passkey.allowHttp": "Allow HTTP",
-  "components.passkey.allowHttpTip":
-    "Only allows the server to accept HTTP origins. Regular browsers still usually require HTTPS or localhost.",
-  "components.passkey.configTip":
-    "rpId must not include protocol, path, or port. Origins must be complete origins, such as https://panel.example.com.",
+  "components.passkey.allowHttpTip": "Only allows the server to accept HTTP origins. Regular browsers still usually require HTTPS or localhost.",
+  "components.passkey.configTip": "rpId must not include protocol, path, or port. Origins must be complete origins, such as https://panel.example.com.",
   "components.passkey.configTitle": "Global configuration",
   "components.passkey.create": "Add Passkey",
   "components.passkey.createdAt": "Created at: {time}",
-  "components.passkey.createTip":
-    "After confirmation, your current device or password manager will create a Passkey. Your browser will choose where it is saved.",
+  "components.passkey.createTip": "After confirmation, your current device or password manager will create a Passkey. Your browser will choose where it is saved.",
   "components.passkey.defaultName": "My Passkey",
   "components.passkey.disabled": "Passkeys are disabled globally. Existing credentials can still be deleted.",
   "components.passkey.empty": "No passkeys",
   "components.passkey.enable": "Enable",
   "components.passkey.errorChallengeExpired": "Challenge expired. Try again.",
-  "components.passkey.errorExists":
-    "A Passkey for this site already exists in the current password manager or security key.",
+  "components.passkey.errorExists": "A Passkey for this site already exists in the current password manager or security key.",
   "components.passkey.errorFailed": "Passkey operation failed. Try again.",
   "components.passkey.errorNotSecure": "Passkeys require HTTPS or local localhost access.",
   "components.passkey.errorUnsupported": "This browser does not support WebAuthn / Passkeys.",
@@ -1119,12 +1043,10 @@
   "components.passkey.mineTitle": "My Passkeys",
   "components.passkey.name": "Site name",
   "components.passkey.namePlaceholder": "Credential name (default: My Passkey)",
-  "components.passkey.nameTip":
-    "The RP name shown by browsers or password managers. It does not affect security validation and differs from a personal credential name.",
+  "components.passkey.nameTip": "The RP name shown by browsers or password managers. It does not affect security validation and differs from a personal credential name.",
   "components.passkey.notUsed": "Not used yet",
   "components.passkey.origins": "Origins",
-  "components.passkey.originsTip":
-    "Enter complete origins as tags, including the port when used, such as http://192.168.1.10:8080.",
+  "components.passkey.originsTip": "Enter complete origins as tags, including the port when used, such as http://192.168.1.10:8080.",
   "components.passkey.rpId": "RP ID",
   "components.passkey.rpIdTip": "Enter a domain name or IP address only, without a protocol, path, or port.",
   "components.passkey.title": "Passkeys",
@@ -1162,8 +1084,7 @@
   "components.systemBasic.loginEntrance": "Entrance",
   "components.systemBasic.loginEntranceEnable": "Enable",
   "components.systemBasic.loginEntranceRestore": "Restore",
-  "components.systemBasic.loginEntranceTip":
-    "When enabled, visitors must open this path first so their browser can obtain access credentials before entering the panel. Use a long, non-obvious random string that does not conflict with an existing route, and store it securely.",
+  "components.systemBasic.loginEntranceTip": "When enabled, visitors must open this path first so their browser can obtain access credentials before entering the panel. Use a long, non-obvious random string that does not conflict with an existing route, and store it securely.",
   "components.systemBasic.loginEntranceTitle": "Secure Entrance",
   "components.systemBasic.loginFailedLockTime": "Lock Duration",
   "components.systemBasic.loginFailedLockTimeOption.-1": "Permanent (requires restart)",
@@ -1178,8 +1099,7 @@
   "components.systemBasic.loginNoPasswordUrl": "Login URL",
   "components.systemBasic.loginNoPasswordUserAgent": "User-Agent",
   "components.systemBasic.loginNoPasswordWarning": "Disables login. Use only on a local or private network.",
-  "components.systemBasic.loginTip":
-    "Configure the security entrance, login lockout, landing page, two-factor authentication, and Passkey sign-in.",
+  "components.systemBasic.loginTip": "Configure the security entrance, login lockout, landing page, two-factor authentication, and Passkey sign-in.",
   "components.systemBasic.loginTitle": "Login",
   "components.systemBasic.notificationEmailCode": "SMTP Password/Auth Code",
   "components.systemBasic.notificationEmailCodeHelp.163": "163 Auth Code",
@@ -1192,8 +1112,7 @@
   "components.systemBasic.notificationEmailStatus": "Enable",
   "components.systemBasic.notificationEmailStatusOption.register": "Registration",
   "components.systemBasic.notificationEmailTestButton": "Test",
-  "components.systemBasic.notificationEmailTestContent":
-    '\n<html><div>\n<div>\n  Hello!\n</div>\n<div style="padding: 8px 40px 8px 50px;">\n  <p>Time sent: {time}</p>\n</div>\n<div>\n  <p>This is a test email, do not reply.</p>\n</div>\n</div></html>',
+  "components.systemBasic.notificationEmailTestContent": "\n<html><div>\n<div>\n  Hello!\n</div>\n<div style=\"padding: 8px 40px 8px 50px;\">\n  <p>Time sent: {time}</p>\n</div>\n<div>\n  <p>This is a test email, do not reply.</p>\n</div>\n</div></html>",
   "components.systemBasic.notificationEmailTestSubject": "DPanel Test Email",
   "components.systemBasic.notificationEmailTestTip": "A test email will be sent.",
   "components.systemBasic.notificationEmailTitle": "Email Settings",
@@ -1202,28 +1121,20 @@
   "components.systemBasic.panelProxyAddressPlaceholder": "http://192.168.1.2:7890",
   "components.systemBasic.panelProxyNoProxy": "No Proxy",
   "components.systemBasic.panelProxyValidate": "Check targets",
-  "components.systemBasic.panelProxyValidateTip":
-    "When enabled, checks whether docker.io and Alibaba Cloud Registry are both reachable through the proxy.",
-  "components.systemBasic.panelProxyTip":
-    "Panel proxy settings apply to fetching Compose tasks, syncing app store data, and image builds. For image pulls, configure a registry mirror or daemon.json instead.",
+  "components.systemBasic.panelProxyValidateTip": "When enabled, checks whether docker.io and Alibaba Cloud Registry are both reachable through the proxy.",
+  "components.systemBasic.panelProxyTip": "Panel proxy settings apply to fetching Compose tasks, syncing app store data, and image builds. For image pulls, configure a registry mirror or daemon.json instead.",
   "components.systemBasic.panelProxyTitle": "Proxy Settings",
   "components.systemBasic.panelTitle": "Panel Settings",
   "components.systemBasic.panelUpgradeAccessPort": "Access Port",
-  "components.systemBasic.panelUpgradeActionHint":
-    "Review the settings, then update DPanel now or copy the command and run it manually.",
+  "components.systemBasic.panelUpgradeActionHint": "Review the settings, then update DPanel now or copy the command and run it manually.",
   "components.systemBasic.panelUpgradeActionTitle": "Run Update",
   "components.systemBasic.panelUpgradeAdjustParams": "Adjust Params",
   "components.systemBasic.panelUpgradeAdjustParamsAction": "Adjust Update Parameters",
-  "components.systemBasic.panelUpgradeAlertContent1":
-    "The update recreates the panel container and briefly interrupts panel service.",
-  "components.systemBasic.panelUpgradeAlertContent2":
-    "Run the update during a maintenance window and prepare a rollback plan.",
-  "components.systemBasic.panelUpgradeAlertContent3":
-    "Ensure the container name matches APP_NAME and /dpanel is mounted to the original data volume.",
-  "components.systemBasic.panelUpgradeAlertContent4":
-    "For a manual update, run the copied command on the host machine.",
-  "components.systemBasic.panelUpgradeAlertContentWindows":
-    "Online updates are not supported on Windows. Download DPanel Desktop and overwrite the current installation: https://dpanel.cc/install/desktop",
+  "components.systemBasic.panelUpgradeAlertContent1": "The update recreates the panel container and briefly interrupts panel service.",
+  "components.systemBasic.panelUpgradeAlertContent2": "Run the update during a maintenance window and prepare a rollback plan.",
+  "components.systemBasic.panelUpgradeAlertContent3": "Ensure the container name matches APP_NAME and /dpanel is mounted to the original data volume.",
+  "components.systemBasic.panelUpgradeAlertContent4": "For a manual update, run the copied command on the host machine.",
+  "components.systemBasic.panelUpgradeAlertContentWindows": "Online updates are not supported on Windows. Download DPanel Desktop and overwrite the current installation: https://dpanel.cc/install/desktop",
   "components.systemBasic.panelUpgradeAlertTitle": "Important Notes",
   "components.systemBasic.panelUpgradeBackup": "Automatically back up before updating",
   "components.systemBasic.panelUpgradeBaseImageOption.alpine": "Alpine",
@@ -1252,8 +1163,7 @@
   "components.systemBasic.panelUpgradeLogUnavailable": "No update log available or failed to load.",
   "components.systemBasic.panelUpgradeModalLatest": "Latest",
   "components.systemBasic.panelUpgradeModalProgress": "Update Progress",
-  "components.systemBasic.panelUpgradeModalRescueTip":
-    "If the update fails, copy the command and continue in a terminal.",
+  "components.systemBasic.panelUpgradeModalRescueTip": "If the update fails, copy the command and continue in a terminal.",
   "components.systemBasic.panelUpgradeModalTitle": "Updating DPanel",
   "components.systemBasic.panelUpgradeNetworkModeOption.bridge": "Bridge",
   "components.systemBasic.panelUpgradeNetworkModeOption.host": "Host",
@@ -1282,8 +1192,7 @@
   "components.systemBasic.panelUpgradeProgressChecking": "Checking service status, current version: {version}",
   "components.systemBasic.panelUpgradeProgressCurrent": "Current version: {version}",
   "components.systemBasic.panelUpgradeProgressReady": "Service is back, current version: {version}",
-  "components.systemBasic.panelUpgradeProgressReconnect":
-    "Service connection interrupted, waiting for panel restart...",
+  "components.systemBasic.panelUpgradeProgressReconnect": "Service connection interrupted, waiting for panel restart...",
   "components.systemBasic.panelUpgradeProgressRefresh": "Update complete. The page will refresh automatically.",
   "components.systemBasic.panelUpgradeProgressSubmitted": "Update request submitted. Monitoring service status...",
   "components.systemBasic.panelUpgradeProgressSubmitting": "Submitting update request...",
@@ -1330,8 +1239,7 @@
   "components.systemBasic.panelUsagePruneButton": "Clear Cache",
   "components.systemBasic.panelUsagePruneEnableNotice": "Clear notifications?",
   "components.systemBasic.panelUsagePruneEnableTempFile": "Clear temp files?",
-  "components.systemBasic.panelUsagePruneTip":
-    "Clears temporary files, notifications, and system events, then releases application memory.",
+  "components.systemBasic.panelUsagePruneTip": "Clears temporary files, notifications, and system events, then releases application memory.",
   "components.systemBasic.panelUsageRestoreTip": "Overwrites current data with backup data. Proceed?",
   "components.systemBasic.panelUsageStartBackup": "Start Backup",
   "components.systemBasic.panelUsageStatsTitle": "Usage Stats",
@@ -1393,8 +1301,7 @@
   "components.systemBasic.themeConfigSideSubMenu": "Submenus",
   "components.systemBasic.themeConfigSideSubMenuOption.default": "Active",
   "components.systemBasic.themeConfigSideSubMenuOption.keep": "Remember",
-  "components.systemBasic.themeConfigSideSubMenuOptionTip":
-    "Active: expand only the current submenu. Remember: preserve manual changes.",
+  "components.systemBasic.themeConfigSideSubMenuOptionTip": "Active: expand only the current submenu. Remember: preserve manual changes.",
   "components.systemBasic.themeConfigTablePageSize": "Rows per Page",
   "components.systemBasic.themeConfigTablePageSizeOption.5": "5",
   "components.systemBasic.themeConfigTablePageSizeOption.10": "10",
@@ -1423,8 +1330,7 @@
   "components.systemBasic.themeConsoleLineHeightTip": "Multiplier",
   "components.systemBasic.themeConsoleLineHeightUnit": "x",
   "components.systemBasic.themeConsoleTheme": "Color Theme",
-  "components.systemBasic.themeConsoleTip":
-    "Set fonts, spacing, and colors for the console and logs. Cursor settings apply only to the console.",
+  "components.systemBasic.themeConsoleTip": "Set fonts, spacing, and colors for the console and logs. Cursor settings apply only to the console.",
   "components.systemBasic.themeConsoleTitle": "Console & Log Appearance",
   "components.systemBasic.themeUserConfigBackground": "Background",
   "components.systemBasic.themeUserConfigBackgroundEmpty": "Image or MP4 URL. Uploaded files take priority.",
@@ -1470,8 +1376,7 @@
   "components.systemBasic.twoFaEmailEmpty": "Enter email",
   "components.systemBasic.twoFaQrcode": "QR Code",
   "components.systemBasic.twoFaQrcodeTip": "Scan with an Authenticator app",
-  "components.systemBasic.twoFaTip":
-    "Only applies to username and password sign-in. It does not apply to Passkey sign-in.",
+  "components.systemBasic.twoFaTip": "Only applies to username and password sign-in. It does not apply to Passkey sign-in.",
   "components.systemBasic.twoFaTitle": "2FA",
   "components.systemBasic.uploadCertUpload": "Upload License",
   "components.systemBasic.userMessagePasswordNotMatch": "Passwords do not match",
@@ -1546,8 +1451,7 @@
   "components.userInvite.formSecurityPassword": "Password",
   "components.userInvite.formUsername": "Username",
   "components.userInvite.formUserRole": "Role",
-  "components.userInvite.formUserRoleTip":
-    "Administrators have all permissions except System by default. Operators have no permissions by default.",
+  "components.userInvite.formUserRoleTip": "Administrators have all permissions except System by default. Operators have no permissions by default.",
   "components.userInvite.formUserStatus": "Status",
   "components.userPermission.canSeeCompose": "Compose",
   "components.userPermission.canSeeComposeList": "View Tasks",
@@ -1690,8 +1594,7 @@
   "image.formBuildEngineOption.build": "Standard Build",
   "image.formBuildEngineOption.buildx": "BuildKit",
   "image.formBuildExtraArgs": "Extra Buildx Arguments",
-  "image.formBuildExtraArgsTip":
-    "One --option=value per line. Supports --sbom, --annotation, --no-cache-filter, --add-host, --network, --shm-size, --ulimit, and --resource.",
+  "image.formBuildExtraArgsTip": "One --option=value per line. Supports --sbom, --annotation, --no-cache-filter, --add-host, --network, --shm-size, --ulimit, and --resource.",
   "image.formBuildGit": "Git Repo URL",
   "image.formBuildGitBranch": "Branch",
   "image.formBuildGitEmpty": "https://github.com/donknap/dpanel.git",
@@ -1736,8 +1639,7 @@
   "image.listManagePushImageRespo": "Target Registry",
   "image.listManagePushImageRespoTip": "Ensure the target namespace exists.",
   "image.listManagePushNewNamespace": "Override Namespace",
-  "image.listManagePushNewNamespaceTip":
-    "Overrides the push path except on Docker Hub (e.g., mysql:latest -> namespace/mysql:latest).",
+  "image.listManagePushNewNamespaceTip": "Overrides the push path except on Docker Hub (e.g., mysql:latest -> namespace/mysql:latest).",
   "image.listManagePushTip": "Push to Target Registries",
   "image.listPageTitle": "Image List",
   "image.remoteSearch": "Search Tags",
@@ -1809,19 +1711,13 @@
   "notification.composeDeleteFileMustDeleteTask": "Task data must also be deleted when deleting task files",
   "notification.commonDeployIncorrect": "Execution failed. Check the console output.",
   "notification.composeDestroy": "Compose task {name} destroyed",
-  "notification.composeDisableStorageType":
-    "Mount /dpanel/compose, then create the task directory and YAML file there.",
+  "notification.composeDisableStorageType": "Mount /dpanel/compose, then create the task directory and YAML file there.",
   "notification.composeDisableStore": "Add an App Store first",
-  "notification.composeNotFoundYaml":
-    "The YAML file for the current task could not be found. Mount the directory or add the task under /dpanel/compose.",
-  "notification.composeNameInvalid":
-    "Task ID must start with a lowercase letter or number and contain only lowercase letters, numbers, underscores, or hyphens. Check the task ID or directory name for spaces.",
-  "notification.composeEnvInvalid":
-    "Failed to parse the .env environment variable file. Please edit and correct it first. Error: {error}",
-  "notification.composeParseYamlIncorrect":
-    "Failed to parse YAML content. Please edit and correct it first. Error: {error}",
-  "notification.composeRelativeBindOnVolume":
-    "Compose relative directories are unavailable. Bind mount /dpanel from the host or use a volume subpath.",
+  "notification.composeNotFoundYaml": "The YAML file for the current task could not be found. Mount the directory or add the task under /dpanel/compose.",
+  "notification.composeNameInvalid": "Task ID must start with a lowercase letter or number and contain only lowercase letters, numbers, underscores, or hyphens. Check the task ID or directory name for spaces.",
+  "notification.composeEnvInvalid": "Failed to parse the .env environment variable file. Please edit and correct it first. Error: {error}",
+  "notification.composeParseYamlIncorrect": "Failed to parse YAML content. Please edit and correct it first. Error: {error}",
+  "notification.composeRelativeBindOnVolume": "Compose relative directories are unavailable. Bind mount /dpanel from the host or use a volume subpath.",
   "notification.confirm.close": "Closing this window will stop the current operation. Continue?",
   "notification.confirm.disable": "Disabling or restoring default settings cannot be undone. Proceed?",
   "notification.confirm.title": "This action is irreversible. Proceed?",
@@ -1842,31 +1738,24 @@
   "notification.containerBackupImportFileFailed": "Snapshot import failed.",
   "notification.containerBackupImportFileInCorrect": "Snapshot file is corrupted.",
   "notification.containerBackupRestoreImportImageFailed": "Image restore failed. Check disk space.",
-  "notification.containerBackupRestoreNetworkConflict":
-    "Network conflict. Manually create network {name}, or delete the network using subnet {subnet}.",
+  "notification.containerBackupRestoreNetworkConflict": "Network conflict. Manually create network {name}, or delete the network using subnet {subnet}.",
   "notification.containerCommit": "Committing {name} as an image...",
   "notification.containerCommitMerge": "Flattening and committing {name} as a single-layer image...",
   "notification.containerCreate": "Creating container...",
-  "notification.containerCronExpressionInCorrect":
-    "Invalid Cron expression. Use: second minute hour day month weekday. {message}",
+  "notification.containerCronExpressionInCorrect": "Invalid Cron expression. Use: second minute hour day month weekday. {message}",
   "notification.containerCronTaskEmpty": "The Cron task has not started or is paused. Resume it or create a new task.",
   "notification.containerExplorerContentUnsupportedType": "Unsupported file type for online editor.",
   "notification.containerExplorerEditDeleteUnsafe": "File deletion is restricted.",
-  "notification.containerExplorerEditFileMaxSize":
-    "Files larger than 1 MB must be edited by exporting and re-importing them.",
-  "notification.containerExplorerInvalidFilename":
-    "Invalid filename format or naming conflict with an existing directory",
-  "notification.containerExplorerUnzipTargetUnsupportedType":
-    "Supported formats: .zip, .tar, .tar.gz/.tgz, .tar.bz2, .tar.xz, .tar.zst, .rar, and .7z.",
-  "notification.containerMountPathDenied":
-    "Permission denied for mount directory creation. Create it directly on the host.",
+  "notification.containerExplorerEditFileMaxSize": "Files larger than 1 MB must be edited by exporting and re-importing them.",
+  "notification.containerExplorerInvalidFilename": "Invalid filename format or naming conflict with an existing directory",
+  "notification.containerExplorerUnzipTargetUnsupportedType": "Supported formats: .zip, .tar, .tar.gz/.tgz, .tar.bz2, .tar.xz, .tar.zst, .rar, and .7z.",
+  "notification.containerMountPathDenied": "Permission denied for mount directory creation. Create it directly on the host.",
   "notification.containerPortRequiresSystemStat": "Host monitoring must be enabled first.",
   "notification.containerPrune": "Pruned {count} containers. Freed {size}.",
   "notification.containerRemove": "Removing container...",
   "notification.containerStop": "Stopping container...",
   "notification.containerUpgrade": "Updating container...",
-  "notification.containerUpgradeDPanel":
-    "DPanel cannot update itself. Use the System Update page to view the update script.",
+  "notification.containerUpgradeDPanel": "DPanel cannot update itself. Use the System Update page to view the update script.",
   "notification.containerUpgradeTaskRunning": "Container update schedule is running. Try again after it finishes.",
   "notification.copyFailManual": "Copy failed. Please select and copy manually.",
   "notification.dialogOpenChildNotice": "Please finish or close the current operation first.",
@@ -2088,29 +1977,24 @@
   "notification.settingBasicEmailInvalid": "SMTP send failed. Check email config.",
   "notification.showLineNumber": "Line numbers",
   "notification.showTime": "Timestamps",
-  "notification.siteDomainCertAddTxtFailed":
-    "DNS verification failed. Check the console, add the TXT record, and retry.",
+  "notification.siteDomainCertAddTxtFailed": "DNS verification failed. Check the console, add the TXT record, and retry.",
   "notification.siteDomainCertHasBindDomain": "Certificate is bound to a domain.",
   "notification.siteDomainCertHasNotDNSName": "Certificate lacks domain info. Regenerate it.",
   "notification.siteDomainCertIssueFailed": "Certificate request failed.",
   "notification.siteDomainExists": "{domain} is already bound.",
-  "notification.siteDomainJoinDefaultNetworkFailed":
-    "Failed to create the default network. Reinstall, then create or join dpanel-local.",
+  "notification.siteDomainJoinDefaultNetworkFailed": "Failed to create the default network. Reinstall, then create or join dpanel-local.",
   "notification.siteDomainNotFoundDPanel": "DPanel container not found. Use raw IP instead.",
   "notification.swarmNotInit": "Docker not running in Swarm mode.",
   "notification.swarmNotManager": "Docker node is not a Swarm Manager.",
   "notification.systemEnvApiTooOld": "Docker server connection failed. Upgrade the target Docker version. ({err})",
   "notification.systemEnvCurrentCanNotDelete": "Cannot delete active server.",
   "notification.systemEnvDefaultCannotDelete": "Cannot delete default server.",
-  "notification.systemEnvDockerApiFailed":
-    "Docker connection failed. Check permissions; for SSH, ensure the user can access Docker. Error: {error}",
-  "notification.systemEnvNameInvalid":
-    "Docker environment ID can only contain letters, numbers, underscores, or hyphens.",
+  "notification.systemEnvDockerApiFailed": "Docker connection failed. Check permissions; for SSH, ensure the user can access Docker. Error: {error}",
+  "notification.systemEnvNameInvalid": "Docker environment ID can only contain letters, numbers, underscores, or hyphens.",
   "notification.systemEnvTlsInvalidCert": "TLS connection missing certificates.",
   "notification.systemStoreDownloadFailed": "Failed to download {url}. {error}",
   "notification.systemStoreNotFoundGit": "Git is required for store sync.",
-  "notification.systemUpgradeDPanelNotFound":
-    "Cannot generate the update script: DPanel container not found. Check APP_NAME.",
+  "notification.systemUpgradeDPanelNotFound": "Cannot generate the update script: DPanel container not found. Check APP_NAME.",
   "notification.tagUrlNotFound": "URL Unavailable",
   "notification.timeRangeOption.last24Hours": "Last 24 hours",
   "notification.timeRangeOption.last3Days": "Last 3 days",
@@ -2158,8 +2042,7 @@
   "swarm.listServiceStatusOption.DesiredTasks": "Desired Tasks",
   "swarm.listServiceStatusOption.RunningTasks": "Running Tasks",
   "swarm.listServiceStatusTipOption.CompletedTasks": "Number of completed job tasks.",
-  "swarm.listServiceStatusTipOption.DesiredTasks":
-    "Expected tasks: replicas for replicated services; non-shutdown tasks for global services.",
+  "swarm.listServiceStatusTipOption.DesiredTasks": "Expected tasks: replicas for replicated services; non-shutdown tasks for global services.",
   "swarm.listServiceStatusTipOption.RunningTasks": "Currently running tasks.",
   "swarm.listTaskStatusOption.accepted": "Accepted",
   "swarm.listTaskStatusOption.running": "Running",
@@ -2221,10 +2104,8 @@
   "swarm.nodeListStatusOptionTip.pause": "Paused. Won't accept new tasks.",
   "swarm.removeButtonTipOption.1": "Requires odd number of managers (>=3) for Raft consensus.",
   "swarm.removeButtonTipOption.2": "The cluster may become unavailable if this node leaves and quorum is lost.",
-  "swarm.removeButtonTipOption.3":
-    "When a worker leaves, its containers stop and become orphaned; clean them up manually.",
-  "swarm.removeButtonTipOption.4":
-    "To remove a worker, leave the Swarm on the target node first, then remove it from a manager node.",
+  "swarm.removeButtonTipOption.3": "When a worker leaves, its containers stop and become orphaned; clean them up manually.",
+  "swarm.removeButtonTipOption.4": "To remove a worker, leave the Swarm on the target node first, then remove it from a manager node.",
   "swarm.serviceCreateListDescriptionEmpty": "Service description",
   "swarm.serviceCreateListNameEmpty": "Unique service name",
   "swarm.serviceCreateTitle": "Create Service",
@@ -2373,16 +2254,14 @@
   "system.home.overview.systemInfoTitle": "Docker Information",
   "system.home.overview.systemStat": "Host Monitoring",
   "system.home.overview.systemStatEnableConfirm": "Enable host monitoring?",
-  "system.home.overview.systemStatEnableConfirmDescription":
-    "This creates the dpanel-plugin-monitor container to monitor host CPU, memory, network, disk, and pressure metrics.",
+  "system.home.overview.systemStatEnableConfirmDescription": "This creates the dpanel-plugin-monitor container to monitor host CPU, memory, network, disk, and pressure metrics.",
   "system.home.tag.createButton": "Add Shortcut",
   "system.home.tag.emptyTip": "Create shortcuts here or in container details.",
   "system.home.tag.itemDelete": "Delete Shortcut",
   "system.home.tag.itemDetailButton": "Details",
   "system.home.tag.itemEditButton": "Edit",
   "system.log.downloadPanel": "Download Panel Log",
-  "system.log.searchPlaceholder":
-    "Enter keywords; supports debug:keyword, @panel, @upgrade, @local, and debug@local:keyword",
+  "system.log.searchPlaceholder": "Enter keywords; supports debug:keyword, @panel, @upgrade, @local, and debug@local:keyword",
   "system.log.source.panel": "DPanel",
   "system.log.source.upgrade": "Panel Upgrade",
   "system.log.title": "System Logs",

@@ -98,7 +98,7 @@ func (self Info) localInfo() homeInfoResponse {
 	return homeInfoResponse{
 		DPanel: systemInfo{
 			Name:           dpanel.Name,
-			Version:        dpanel.Version,
+			Version:        dpanel.ShowVersion(),
 			Family:         dpanel.Family,
 			Environment:    dpanel.Env,
 			RunIn:          dpanel.RunIn,

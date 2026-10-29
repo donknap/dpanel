@@ -1,6 +1,5 @@
 {
-  "app.backupRestoreConfirm":
-    "目标容器不存在时将自动创建并恢复数据，否则仅覆盖现有数据。恢复时请确保 Docker 版本一致，是否确认？",
+  "app.backupRestoreConfirm": "目标容器不存在时将自动创建并恢复数据，否则仅覆盖现有数据。恢复时请确保 Docker 版本一致，是否确认？",
   "app.backupRestoreNoStart": "恢复后不启动容器",
   "app.createAfterStatus": "容器创建后状态",
   "app.createAfterStatusOption.create": "仅创建容器",
@@ -33,8 +32,7 @@
   "components.appCompose.createFormTypeOption.storagePath": "挂载目录",
   "components.appCompose.createFormTypeOption.store": "应用商店",
   "components.appCompose.createFormTypeOption.text": "本地任务",
-  "components.appCompose.createFormTypeOutPathTip":
-    "自动识别已有容器的 Compose 任务。可在面板中编辑并完善外部任务，将其纳入面板管理。",
+  "components.appCompose.createFormTypeOutPathTip": "自动识别已有容器的 Compose 任务。可在面板中编辑并完善外部任务，将其纳入面板管理。",
   "components.appCompose.createFormTypeRemoteImportGit": "Git 仓库地址",
   "components.appCompose.createFormTypeRemoteImportGitBranch": "分支",
   "components.appCompose.createFormTypeRemoteImportGitBranchTip": "支持分支、Tag、Release",
@@ -42,8 +40,7 @@
   "components.appCompose.createFormTypeStoragePathBeforePath": "你可以在宿主机目录",
   "components.appCompose.createFormTypeStoragePathNamePlaceholder": "任务标识",
   "components.appCompose.createFormTypeStoragePathAfterPath": "中修改 YAML 文件。",
-  "components.appCompose.createFormTypeStoragePathTip":
-    "当前无法从外部直接修改 Compose 目录中的 YAML 文件，不能使用“挂载目录”创建任务。请选择其他创建方式。",
+  "components.appCompose.createFormTypeStoragePathTip": "当前无法从外部直接修改 Compose 目录中的 YAML 文件，不能使用“挂载目录”创建任务。请选择其他创建方式。",
   "components.appCompose.createFormTypeStoreTip": "请先添加应用商店，并在商店内完成安装",
   "components.appCompose.createFormTypeTextImportCommand": "通过 docker run 命令",
   "components.appCompose.createFormTypeTextImportFile": "导入本地 YAML 文件",
@@ -53,8 +50,7 @@
   "components.appCompose.createYaml.override": "覆盖 YAML 文件",
   "components.appCompose.createYaml.yaml": "YAML 文件",
   "components.appCompose.createYamlDisableEdit": "远程 YAML 文件无法直接修改，请新增覆盖 YAML 文件",
-  "components.appCompose.createYamlOverrideTip":
-    "覆盖 YAML 文件允许在不改动原始 YAML 文件的情况下，覆盖其中的部分参数配置。",
+  "components.appCompose.createYamlOverrideTip": "覆盖 YAML 文件允许在不改动原始 YAML 文件的情况下，覆盖其中的部分参数配置。",
   "components.appCompose.detailContainerTitle": "容器列表",
   "components.appCompose.drawerTitle": "任务管理 {name}",
   "components.appCompose.joinContainerInNetwork": "关联外部容器",
@@ -68,17 +64,12 @@
   "components.appCompose.managerDeleteTaskDeleteImage": "删除镜像？",
   "components.appCompose.managerDeleteTaskDeletePath": "删除 YAML 文件和任务目录？",
   "components.appCompose.managerDeleteTaskDeleteVolume": "删除关联存储卷？",
-  "components.appCompose.managerDeleteTaskDeleteVolumeTip":
-    "删除 YAML 中声明的命名卷和容器关联的匿名卷，不删除外部卷；被删除卷内的数据将丢失。",
-  "components.appCompose.managerDeleteTaskTip":
-    "将删除任务记录及其容器，并按下方选项清理镜像、存储卷和任务目录，是否继续？",
+  "components.appCompose.managerDeleteTaskDeleteVolumeTip": "删除 YAML 中声明的命名卷和容器关联的匿名卷，不删除外部卷；被删除卷内的数据将丢失。",
+  "components.appCompose.managerDeleteTaskTip": "将删除任务记录及其容器，并按下方选项清理镜像、存储卷和任务目录，是否继续？",
   "components.appCompose.managerDeployButton": "部署",
-  "components.appCompose.manageRemoteSyncTip":
-    "同步操作将从 {address} 拉取最新的远程 YAML 文件或仓库文件并覆盖本地文件，是否确认？",
-  "components.appCompose.manageGitSyncTip":
-    "同步操作会清空当前任务目录，如有配置文件或挂载数据，请提前备份，是否继续？",
-  "components.appCompose.managerStatusDanglingAlert":
-    "无法管理当前任务，请补齐 YAML 文件及所需的 .env 文件。原工作目录不变，不迁移已有数据。",
+  "components.appCompose.manageRemoteSyncTip": "同步操作将从 {address} 拉取最新的远程 YAML 文件或仓库文件并覆盖本地文件，是否确认？",
+  "components.appCompose.manageGitSyncTip": "同步操作会清空当前任务目录，如有配置文件或挂载数据，请提前备份，是否继续？",
+  "components.appCompose.managerStatusDanglingAlert": "无法管理当前任务，请补齐 YAML 文件及所需的 .env 文件。原工作目录不变，不迁移已有数据。",
   "components.appCompose.managerRedeployButton": "重新部署",
   "components.appCompose.managerTitle": "任务管理",
   "components.appCompose.managerUnpauseButton": "恢复",
@@ -99,8 +90,7 @@
   "components.appCron.cronDayOfWeekOption.6": "每周六",
   "components.appCron.cronFormContainerName": "执行容器",
   "components.appCron.cronFormContainerNameEmpty": "默认在 DPanel 容器或当前环境中执行",
-  "components.appCron.cronFormContainerNameTip":
-    "DPanel 面板容器支持 Docker 相关命令。请确保所选容器包含脚本所需的所有命令。",
+  "components.appCron.cronFormContainerNameTip": "DPanel 面板容器支持 Docker 相关命令。请确保所选容器包含脚本所需的所有命令。",
   "components.appCron.cronFormEnableRunBlock": "等待本次任务执行完成后，再发起下次任务",
   "components.appCron.cronFormEnv": "环境变量",
   "components.appCron.cronFormEventType": "事件类型",
@@ -144,8 +134,7 @@
   "components.appCron.templateTitle": "计划任务脚本模板",
   "components.appCron.templateTriggerButton": "脚本模板",
   "components.appDetail.backupImportEnableRestore": "导入完成后直接恢复",
-  "components.appDetail.backupImportTarFilePath":
-    "指定面板容器内文件路径（若文件在宿主机，请先通过文件管理导入面板容器）",
+  "components.appDetail.backupImportTarFilePath": "指定面板容器内文件路径（若文件在宿主机，请先通过文件管理导入面板容器）",
   "components.appDetail.backupImportTarFileUpload": "选择快照文件（.snapshot）",
   "components.appDetail.backupImportTitle": "导入快照",
   "components.appDetail.backupImportType": "导入方式",
@@ -167,15 +156,13 @@
   "components.appDetail.checkImageUpgradeOption.-3": "无法检测",
   "components.appDetail.commitButton": "另存为镜像",
   "components.appDetail.commitConfirmApplyToContainer": "保存后立即应用并重建容器",
-  "components.appDetail.commitConfirmDescription":
-    "将当前容器文件系统中的变更保存为新镜像，挂载目录中的数据不会写入镜像。",
+  "components.appDetail.commitConfirmDescription": "将当前容器文件系统中的变更保存为新镜像，挂载目录中的数据不会写入镜像。",
   "components.appDetail.commitConfirmMerge": "合并为单层镜像",
   "components.appDetail.commitConfirmSaveImageName": "镜像名称",
   "components.appDetail.commitConfirmSaveImageNamePlaceholder": "留空默认由系统处理",
   "components.appDetail.commitConfirmTitle": "将当前容器保存为镜像",
   "components.appDetail.copyButton": "复制",
-  "components.appDetail.copyConfirmTip":
-    "默认情况下，复制的容器与当前容器端口冲突可能导致无法启动。若需同时运行，请开启【绑定随机端口】",
+  "components.appDetail.copyConfirmTip": "默认情况下，复制的容器与当前容器端口冲突可能导致无法启动。若需同时运行，请开启【绑定随机端口】",
   "components.appDetail.copyCopyName": "复制后容器名",
   "components.appDetail.copyEnableRandomPort": "绑定随机端口",
   "components.appDetail.copyEnableStart": "复制后启动容器？",
@@ -190,11 +177,9 @@
   "components.appDetail.exportEnableExportToPath": "仅导出到面板数据目录中？",
   "components.appDetail.inspectButton": "查看 Inspect",
   "components.appDetail.inspectTitle": "容器 Inspect JSON",
-  "components.appDetail.rebuildConfirmTip":
-    "将使用当前配置删除并重建容器，除挂载目录外的数据将全部恢复至初始状态。是否确定？",
+  "components.appDetail.rebuildConfirmTip": "将使用当前配置删除并重建容器，除挂载目录外的数据将全部恢复至初始状态。是否确定？",
   "components.appDetail.rollbackEmptyTip": "暂无回滚数据",
-  "components.appDetail.rollbackTip":
-    "回滚功能仅恢复容器配置信息。若需全量恢复配置及数据，请使用容器快照功能。请选择回滚日期：",
+  "components.appDetail.rollbackTip": "回滚功能仅恢复容器配置信息。若需全量恢复配置及数据，请使用容器快照功能。请选择回滚日期：",
   "components.appDetail.runTimeValue": "创建于：{create} / 更新于：{upgrade}",
   "components.appDetail.tagCreateTitle": "添加容器标签",
   "components.appDetail.tagFormDescription": "描述",
@@ -270,11 +255,9 @@
   "components.appDomain.certFormRenew": "立即续签",
   "components.appDomain.certFormRenewTip": "系统默认自动续签，你也可开启此项强制续签",
   "components.appDomain.certFormSslCrtContent": "证书内容 .crt",
-  "components.appDomain.certFormSslCrtContentTip":
-    "1. 证书扩展名通常为 .crt 或 .pem，请用文本编辑器打开。2. 内容以“-----BEGIN CERTIFICATE-----”开头，“-----END CERTIFICATE-----”结尾。3. 请确保证书内容包含完整证书链。",
+  "components.appDomain.certFormSslCrtContentTip": "1. 证书扩展名通常为 .crt 或 .pem，请用文本编辑器打开。2. 内容以“-----BEGIN CERTIFICATE-----”开头，“-----END CERTIFICATE-----”结尾。3. 请确保证书内容包含完整证书链。",
   "components.appDomain.certFormSslKeyContent": "私钥内容 .key",
-  "components.appDomain.certFormSslKeyContentTip":
-    "1. 私钥扩展名通常为 .key 或 .pem，请用文本编辑器打开。2. 格式以“-----BEGIN PRIVATE KEY-----”开头，“-----END PRIVATE KEY-----”结尾。",
+  "components.appDomain.certFormSslKeyContentTip": "1. 私钥扩展名通常为 .key 或 .pem，请用文本编辑器打开。2. 格式以“-----BEGIN PRIVATE KEY-----”开头，“-----END PRIVATE KEY-----”结尾。",
   "components.appDomain.certFormType": "证书来源",
   "components.appDomain.certFormTypeOption.apply": "申请免费证书",
   "components.appDomain.certFormTypeOption.upload": "上传证书",
@@ -306,13 +289,11 @@
   "components.appDomain.createFormTypeOption.proxy": "反向代理",
   "components.appDomain.createFormTypeOption.redirect": "重定向",
   "components.appDomain.createSelectContainer": "选择容器",
-  "components.appDomain.createSelectContainerDisabledTip":
-    "使用宿主机网络模式 (--network host) 时，仅支持通过 IP:Port 方式进行转发",
+  "components.appDomain.createSelectContainerDisabledTip": "使用宿主机网络模式 (--network host) 时，仅支持通过 IP:Port 方式进行转发",
   "components.appDomain.createTitle": "编辑转发规则",
   "components.appDomain.createTriggerButton": "添加域名转发",
   "components.appDomain.createUser": "自定义",
-  "components.appDomain.createVhostTip":
-    "扩展配置文件位于 /dpanel/nginx/extra_host/{name}.conf。请谨慎修改，如遇错误导致 Nginx 无法启动，请修正后「重载 Nginx 配置」。",
+  "components.appDomain.createVhostTip": "扩展配置文件位于 /dpanel/nginx/extra_host/{name}.conf。请谨慎修改，如遇错误导致 Nginx 无法启动，请修正后「重载 Nginx 配置」。",
   "components.appDomain.dnsApiOption.dns_ali": "阿里云",
   "components.appDomain.dnsApiOption.dns_huaweicloud": "华为云",
   "components.appDomain.dnsApiOption.dns_tencent": "腾讯云",
@@ -350,8 +331,7 @@
   "components.appForm.createAdvRunCommandHostPidNotice": "开启后将共享宿主机 PID 命名空间，请谨慎使用。",
   "components.appForm.createAdvRunCommandInit": "使用 Init 进程",
   "components.appForm.createAdvRunCommandPrivileged": "特权模式",
-  "components.appForm.createAdvRunCommandPrivilegedNotice":
-    "开启后，容器将以特权模式运行，可能影响宿主机安全，请谨慎使用。",
+  "components.appForm.createAdvRunCommandPrivilegedNotice": "开启后，容器将以特权模式运行，可能影响宿主机安全，请谨慎使用。",
   "components.appForm.createByCommandTitle": "通过命令创建",
   "components.appForm.createCapOption.all": "全部能力",
   "components.appForm.createCapOption.audit_control": "启用和禁用内核审计；更改审计过滤规则；检索审计状态和过滤规则。",
@@ -413,8 +393,7 @@
   "components.appForm.createEnvFormEnvCode": "代码模式",
   "components.appForm.createEnvFormEnvImport": "导入 env 文件",
   "components.appForm.createEnvFormListAddButton": "添加环境变量",
-  "components.appForm.createEnvFormListInEnvFile":
-    "该变量存在于 .env 文件中，修改后将同步至该文件。如需删除请直接编辑文件",
+  "components.appForm.createEnvFormListInEnvFile": "该变量存在于 .env 文件中，修改后将同步至该文件。如需删除请直接编辑文件",
   "components.appForm.createEnvFormName": "变量名",
   "components.appForm.createEnvFormOnePanel.APP_PORT": "映射容器内端口",
   "components.appForm.createEnvFormOnePanel.CODE_DIR": "代码目录",
@@ -453,8 +432,7 @@
   "components.appForm.createHealthyTimeout": "超时时间",
   "components.appForm.createHealthyTitle": "健康检查",
   "components.appForm.createHookContainerCreate": "容器创建后执行脚本",
-  "components.appForm.createHookContainerCreateTip":
-    "容器创建后执行的附加脚本，不影响 entrypoint 及 command。例如：ls -al && touch abc.txt && apt update",
+  "components.appForm.createHookContainerCreateTip": "容器创建后执行的附加脚本，不影响 entrypoint 及 command。例如：ls -al && touch abc.txt && apt update",
   "components.appForm.createHookTitle": "附加执行脚本",
   "components.appForm.createLimitCpus": "最大 CPU 配额",
   "components.appForm.createLimitMemory": "最大内存配额",
@@ -511,10 +489,8 @@
   "components.appForm.createSecurityAppArmor": "关闭 AppArmor",
   "components.appForm.createSecurityImageAutoCommit": "自动提交容器镜像",
   "components.appForm.createSecurityImageAutoCommitMerge": "合并镜像层",
-  "components.appForm.createSecurityImageAutoCommitMergeTip":
-    "仅本次重建生效：提交后将镜像层合并为单层，并清理该站点旧的自动提交镜像。",
-  "components.appForm.createSecurityImageAutoCommitTip":
-    "编辑重建时，先将当前容器提交为镜像，再使用该镜像和完整编辑配置重建；关闭后直接使用表单中的镜像重建。不能与自动删除或只读根文件系统同时使用。",
+  "components.appForm.createSecurityImageAutoCommitMergeTip": "仅本次重建生效：提交后将镜像层合并为单层，并清理该站点旧的自动提交镜像。",
+  "components.appForm.createSecurityImageAutoCommitTip": "编辑重建时，先将当前容器提交为镜像，再使用该镜像和完整编辑配置重建；关闭后直接使用表单中的镜像重建。不能与自动删除或只读根文件系统同时使用。",
   "components.appForm.createSecurityNoNewPrivileges": "禁止进程获取新权限",
   "components.appForm.createSecurityPrivilegedNotice": "Privileged 已开启，安全选项暂不可用。",
   "components.appForm.createSecurityReadonlyRootfs": "根文件系统只读",
@@ -711,8 +687,7 @@
   "components.containerUpgrade.affectedContainers": "受影响容器",
   "components.containerUpgrade.checkAction": "检测更新",
   "components.containerUpgrade.checkAll": "检查全部",
-  "components.containerUpgrade.checkConfirmDescription":
-    "系统将依次查询容器镜像的远端仓库，并与本地镜像摘要进行比对。检测期间可以离开当前页面；请保持当前标签页打开，不要刷新，否则剩余容器将不会继续检测。",
+  "components.containerUpgrade.checkConfirmDescription": "系统将依次查询容器镜像的远端仓库，并与本地镜像摘要进行比对。检测期间可以离开当前页面；请保持当前标签页打开，不要刷新，否则剩余容器将不会继续检测。",
   "components.containerUpgrade.checkLoadError": "检查数据加载失败",
   "components.containerUpgrade.checkNow": "立即检查",
   "components.containerUpgrade.checkRequestFailed": "检测接口请求失败",
@@ -774,8 +749,7 @@
   "components.containerUpgrade.preparePullImage": "准备拉取镜像",
   "components.containerUpgrade.progressPosition": "第 {current} 个，共 {total} 个",
   "components.containerUpgrade.pullImage": "拉取镜像",
-  "components.containerUpgrade.rebuildWarning":
-    "将使用当前配置删除并重建容器，除挂载目录外的数据将全部恢复至初始状态。是否确定？",
+  "components.containerUpgrade.rebuildWarning": "将使用当前配置删除并重建容器，除挂载目录外的数据将全部恢复至初始状态。是否确定？",
   "components.containerUpgrade.recheck": "重新检查",
   "components.containerUpgrade.recheckFailed": "重检异常",
   "components.containerUpgrade.restoreIgnore": "取消忽略",
@@ -805,11 +779,9 @@
   "components.containerUpgrade.taskContainerCount": "{count} 个容器",
   "components.containerUpgrade.uncheckedCount": "待检查",
   "components.containerUpgrade.upgradeProgress": "更新进度",
-  "components.containerUpgrade.upgradeStopWarning":
-    "容器更新任务无法中止。请保持当前标签页打开，不要刷新，直到任务完成。",
+  "components.containerUpgrade.upgradeStopWarning": "容器更新任务无法中止。请保持当前标签页打开，不要刷新，直到任务完成。",
   "components.containerUpgrade.upgradeTitle": "容器更新",
-  "components.containerUpgrade.upgradeWarning":
-    "更新将拉取镜像并重新创建容器，服务可能短暂中断；除挂载目录外的数据将恢复至初始状态。",
+  "components.containerUpgrade.upgradeWarning": "更新将拉取镜像并重新创建容器，服务可能短暂中断；除挂载目录外的数据将恢复至初始状态。",
   "components.dockerEnvCreate.drawerTitle": "添加远程 Docker 服务端",
   "components.dockerEnvCreate.drawerTitleDefault": "配置默认 Docker 服务端",
   "components.dockerEnvCreate.formAddress": "地址",
@@ -819,8 +791,7 @@
   "components.dockerEnvCreate.formComposePath": "Compose 任务目录",
   "components.dockerEnvCreate.formDockerType": "服务端类型",
   "components.dockerEnvCreate.formEnableComposePath": "启用独立 Compose 任务目录",
-  "components.dockerEnvCreate.formEnableComposePathTip":
-    "开启后，切换 Docker 环境时仅读取该环境专属任务目录下的 Compose 任务",
+  "components.dockerEnvCreate.formEnableComposePathTip": "开启后，切换 Docker 环境时仅读取该环境专属任务目录下的 Compose 任务",
   "components.dockerEnvCreate.formEnableSSH": "启用宿主机 SSH 连接",
   "components.dockerEnvCreate.formEnableSSHAlert": "请使用 Root 用户或拥有 Docker 权限的用户",
   "components.dockerEnvCreate.formEnableSSHTitle": "主机 SSH",
@@ -828,16 +799,14 @@
   "components.dockerEnvCreate.formEnableSystemStatTip": "通过 Docker 环境监控主机 CPU、内存、网络、磁盘与压力数据",
   "components.dockerEnvCreate.formEnableTLS": "启用 Docker API TLS",
   "components.dockerEnvCreate.formEnableTLSMessageUploadError": "导入 {name} 证书错误",
-  "components.dockerEnvCreate.formEnableTLSTip":
-    "生成教程见：https://donknap.github.io/dpanel-docs/#/zh-cn/manual/remote",
+  "components.dockerEnvCreate.formEnableTLSTip": "生成教程见：https://donknap.github.io/dpanel-docs/#/zh-cn/manual/remote",
   "components.dockerEnvCreate.formName": "标识",
   "components.dockerEnvCreate.formNameEmpty": "Docker 环境标识仅允许英文、数字、下划线或横线",
   "components.dockerEnvCreate.formRemoteType": "连接方式",
   "components.dockerEnvCreate.formServerUrl": "容器端口访问域名",
   "components.dockerEnvCreate.formServerUrlEmpty": "例如：192.168.1.25、2001:db8:1::2、example.com",
   "components.dockerEnvCreate.formServerUrlTip": "设置宿主机 IP 或域名，用于通过端口访问容器（支持 IPv4/IPv6）",
-  "components.dockerEnvCreate.formSshServerInfoAddPublicKey":
-    "使用 {user} 用户登录服务器终端，复制以下命令执行以追加面板公钥",
+  "components.dockerEnvCreate.formSshServerInfoAddPublicKey": "使用 {user} 用户登录服务器终端，复制以下命令执行以追加面板公钥",
   "components.dockerEnvCreate.formSshServerInfoAddress": "主机 IP 地址",
   "components.dockerEnvCreate.formSshServerInfoAddressEmpty": "输入主机 IP 连接地址",
   "components.dockerEnvCreate.formSshServerInfoAuthType": "验证方式",
@@ -933,8 +902,7 @@
   "components.explorer.toolbarRenameConflict": "当前目录已存在同名文件或目录",
   "components.explorer.toolbarRenameInvalidName": "请输入有效的名称，不能包含路径分隔符",
   "components.explorer.toolbarUnzipButton": "解压",
-  "components.explorer.toolbarUnzipMessageAllowFileExt":
-    "支持 .zip、.tar、.tar.gz/.tgz、.tar.bz2、.tar.xz、.tar.zst、.rar、.7z 格式",
+  "components.explorer.toolbarUnzipMessageAllowFileExt": "支持 .zip、.tar、.tar.gz/.tgz、.tar.bz2、.tar.xz、.tar.zst、.rar、.7z 格式",
   "components.explorer.toolbarUnzipSeparateDir": "解压时新建同名目录",
   "components.explorer.toolbarUploadButton": "上传",
   "components.explorer.toolbarUploadDirectoryTip": "支持单个或多个文件，上传目录时保留原有结构",
@@ -957,8 +925,7 @@
   "components.image.buildxForceRemoveContext": "强制删除",
   "components.image.buildxMirrorUrl": "镜像加速地址",
   "components.image.buildxMirrorUrlTip": "每行一个镜像加速地址，用于快速更新 BuildKit 配置",
-  "components.image.buildxMissingContext":
-    "当前没有 BuildKit 构建环境，请在此页面创建，或在构建镜像时选择标准构建（docker build）。",
+  "components.image.buildxMissingContext": "当前没有 BuildKit 构建环境，请在此页面创建，或在构建镜像时选择标准构建（docker build）。",
   "components.image.buildxProxyUrl": "代理地址",
   "components.image.buildxProxyUrlTip": "BuildKit 构建器的代理配置，请勿使用 127.0.0.1。例如：http://192.168.0.2:7890",
   "components.image.buildxPullUseDPanel": "使用面板拉取镜像",
@@ -969,8 +936,7 @@
   "components.image.containerTarEnvTip": "指定导入后镜像所需的环境变量，每行一条",
   "components.image.containerTarExpose": "声明对外映射端口",
   "components.image.containerTarExposeTip": "指定导入后镜像对外暴露的端口，每行一条",
-  "components.image.containerTarTip":
-    "导入容器 Tar 包构建镜像时，可自定义镜像参数。若无需修改，可在容器详情页使用【将容器保存为镜像】。",
+  "components.image.containerTarTip": "导入容器 Tar 包构建镜像时，可自定义镜像参数。若无需修改，可在容器详情页使用【将容器保存为镜像】。",
   "components.image.containerTarTitle": "导入容器 Tar 包",
   "components.image.containerTarUploadFile": "导入容器包（仅限导出容器生成的 .tar 文件）",
   "components.image.containerTarVolume": "存储卷目录",
@@ -1012,8 +978,7 @@
   "components.imagePull.backgroundPull": "后台拉取",
   "components.imagePull.backgroundPullTip": "在当前浏览器中继续拉取",
   "components.imagePull.complete": "完成",
-  "components.imagePull.configureMirror":
-    "可为镜像所属仓库配置加速地址，或在 daemon.json 中配置镜像加速地址或代理地址。完成配置后重试。",
+  "components.imagePull.configureMirror": "可为镜像所属仓库配置加速地址，或在 daemon.json 中配置镜像加速地址或代理地址。完成配置后重试。",
   "components.imagePull.drawerTitle": "拉取远程镜像",
   "components.imagePull.imagePlatformEmpty": "默认当前架构",
   "components.imagePull.imageUrlEmpty": "请输入镜像地址",
@@ -1028,8 +993,7 @@
   "components.network.createFormAttachable": "允许手动附加容器",
   "components.network.createFormDriver": "驱动",
   "components.network.createFormDriverMacvlanParentCard": "父网卡",
-  "components.network.createFormDriverMacvlanParentCardTip":
-    "指定桥接的宿主机主网卡名称（可通过 ip addr 查看，通常为 eth0）",
+  "components.network.createFormDriverMacvlanParentCardTip": "指定桥接的宿主机主网卡名称（可通过 ip addr 查看，通常为 eth0）",
   "components.network.createFormDriverOption": "自定义驱动配置",
   "components.network.createFormDriverOptionName": "名称",
   "components.network.createFormDriverOptionValue": "值",
@@ -1060,8 +1024,7 @@
   "components.network.selectTriggerButton": "加入网络",
   "components.passkey.allowHttp": "允许 HTTP",
   "components.passkey.allowHttpTip": "仅允许后端接受 HTTP Origin；普通浏览器通常仍要求使用 HTTPS 或 localhost。",
-  "components.passkey.configTip":
-    "rpId 不能带协议、路径和端口；origins 必须是完整 origin，例如 https://panel.example.com。",
+  "components.passkey.configTip": "rpId 不能带协议、路径和端口；origins 必须是完整 origin，例如 https://panel.example.com。",
   "components.passkey.configTitle": "全局配置",
   "components.passkey.create": "添加 Passkey",
   "components.passkey.createdAt": "创建时间：{time}",
@@ -1121,8 +1084,7 @@
   "components.systemBasic.loginEntrance": "入口",
   "components.systemBasic.loginEntranceEnable": "启用",
   "components.systemBasic.loginEntranceRestore": "恢复默认",
-  "components.systemBasic.loginEntranceTip":
-    "启用后，访问者需先打开该路径，让浏览器获得访问凭证后才能进入面板。建议使用较长、无明显含义且不与现有路由重复的随机字符串，并妥善保存。",
+  "components.systemBasic.loginEntranceTip": "启用后，访问者需先打开该路径，让浏览器获得访问凭证后才能进入面板。建议使用较长、无明显含义且不与现有路由重复的随机字符串，并妥善保存。",
   "components.systemBasic.loginEntranceTitle": "安全入口",
   "components.systemBasic.loginFailedLockTime": "锁定时间",
   "components.systemBasic.loginFailedLockTimeOption.-1": "永久（直到重启面板容器）",
@@ -1150,8 +1112,7 @@
   "components.systemBasic.notificationEmailStatus": "开启功能",
   "components.systemBasic.notificationEmailStatusOption.register": "注册",
   "components.systemBasic.notificationEmailTestButton": "测试",
-  "components.systemBasic.notificationEmailTestContent":
-    '\n<html><div>\n<div>\n  您好！\n</div>\n<div style="padding: 8px 40px 8px 50px;">\n  <p>发件时间：{time}</p>\n</div>\n<div>\n  <p>此邮件为测试邮件，请勿回复。</p>\n</div>\n</div></html>',
+  "components.systemBasic.notificationEmailTestContent": "\n<html><div>\n<div>\n  您好！\n</div>\n<div style=\"padding: 8px 40px 8px 50px;\">\n  <p>发件时间：{time}</p>\n</div>\n<div>\n  <p>此邮件为测试邮件，请勿回复。</p>\n</div>\n</div></html>",
   "components.systemBasic.notificationEmailTestSubject": "DPanel 测试邮件",
   "components.systemBasic.notificationEmailTestTip": "测试邮件将发送至发件人邮箱中，请注意查收",
   "components.systemBasic.notificationEmailTitle": "邮件服务",
@@ -1160,10 +1121,8 @@
   "components.systemBasic.panelProxyAddressPlaceholder": "http://192.168.1.2:7890",
   "components.systemBasic.panelProxyNoProxy": "不使用代理的地址",
   "components.systemBasic.panelProxyValidate": "验证目标地址",
-  "components.systemBasic.panelProxyValidateTip":
-    "开启后会通过代理验证 docker.io 和阿里云镜像仓库两个地址是否都可访问。",
-  "components.systemBasic.panelProxyTip":
-    "面板代理配置仅适用于获取 Compose 任务、同步应用商店数据、构建镜像等操作。拉取镜像请配置仓库加速地址或 daemon.json。",
+  "components.systemBasic.panelProxyValidateTip": "开启后会通过代理验证 docker.io 和阿里云镜像仓库两个地址是否都可访问。",
+  "components.systemBasic.panelProxyTip": "面板代理配置仅适用于获取 Compose 任务、同步应用商店数据、构建镜像等操作。拉取镜像请配置仓库加速地址或 daemon.json。",
   "components.systemBasic.panelProxyTitle": "代理配置",
   "components.systemBasic.panelTitle": "面板设置",
   "components.systemBasic.panelUpgradeAccessPort": "访问端口",
@@ -1173,11 +1132,9 @@
   "components.systemBasic.panelUpgradeAdjustParamsAction": "调整更新参数",
   "components.systemBasic.panelUpgradeAlertContent1": "升级会重建面板容器，期间面板服务会短暂中断。",
   "components.systemBasic.panelUpgradeAlertContent2": "建议在业务低峰执行，并提前确认回滚方案。",
-  "components.systemBasic.panelUpgradeAlertContent3":
-    "请确认容器名称与 APP_NAME 一致，且 /dpanel 已正确挂载到原数据卷。",
+  "components.systemBasic.panelUpgradeAlertContent3": "请确认容器名称与 APP_NAME 一致，且 /dpanel 已正确挂载到原数据卷。",
   "components.systemBasic.panelUpgradeAlertContent4": "如选择手动执行，请在宿主机运行复制出的命令。",
-  "components.systemBasic.panelUpgradeAlertContentWindows":
-    "Windows 暂不支持在线更新，请前往 DPanel Desktop 下载并覆盖安装：https://dpanel.cc/install/desktop",
+  "components.systemBasic.panelUpgradeAlertContentWindows": "Windows 暂不支持在线更新，请前往 DPanel Desktop 下载并覆盖安装：https://dpanel.cc/install/desktop",
   "components.systemBasic.panelUpgradeAlertTitle": "注意事项",
   "components.systemBasic.panelUpgradeBackup": "自动备份",
   "components.systemBasic.panelUpgradeBaseImageOption.alpine": "Alpine",
@@ -1344,8 +1301,7 @@
   "components.systemBasic.themeConfigSideSubMenu": "子菜单展开/收缩方式",
   "components.systemBasic.themeConfigSideSubMenuOption.default": "默认",
   "components.systemBasic.themeConfigSideSubMenuOption.keep": "保持",
-  "components.systemBasic.themeConfigSideSubMenuOptionTip":
-    "默认：仅展开当前选中项的子菜单；保持：始终保持用户展开或收缩的状态",
+  "components.systemBasic.themeConfigSideSubMenuOptionTip": "默认：仅展开当前选中项的子菜单；保持：始终保持用户展开或收缩的状态",
   "components.systemBasic.themeConfigTablePageSize": "每页条数",
   "components.systemBasic.themeConfigTablePageSizeOption.5": "每页 5 条",
   "components.systemBasic.themeConfigTablePageSizeOption.10": "每页 10 条",
@@ -1391,8 +1347,7 @@
   "components.systemBasic.themeUserConfigBgImageUpload": "背景",
   "components.systemBasic.themeUserConfigBgImageUploadTitle": "上传图片或 mp4",
   "components.systemBasic.themeUserConfigBorderRadius": "圆角",
-  "components.systemBasic.themeUserConfigColorPrimaryTip":
-    "品牌色是体现产品特性最直观的视觉元素。选定品牌主色后，系统将自动生成一套完整的语义化色板",
+  "components.systemBasic.themeUserConfigColorPrimaryTip": "品牌色是体现产品特性最直观的视觉元素。选定品牌主色后，系统将自动生成一套完整的语义化色板",
   "components.systemBasic.themeUserConfigColorTitle": "皮肤色系",
   "components.systemBasic.themeUserConfigLogo": "Logo",
   "components.systemBasic.themeUserConfigLogoEmpty": "指定远程图片，建议宽高：{width} X {height}",
@@ -1639,8 +1594,7 @@
   "image.formBuildEngineOption.build": "标准构建",
   "image.formBuildEngineOption.buildx": "BuildKit 构建",
   "image.formBuildExtraArgs": "自定义 Buildx 参数",
-  "image.formBuildExtraArgsTip":
-    "每行一个 --参数=值；支持 --sbom、--annotation、--no-cache-filter、--add-host、--network、--shm-size、--ulimit、--resource",
+  "image.formBuildExtraArgsTip": "每行一个 --参数=值；支持 --sbom、--annotation、--no-cache-filter、--add-host、--network、--shm-size、--ulimit、--resource",
   "image.formBuildGit": "Git 仓库地址",
   "image.formBuildGitBranch": "分支",
   "image.formBuildGitEmpty": "https://github.com/donknap/dpanel.git",
@@ -1685,8 +1639,7 @@
   "image.listManagePushImageRespo": "目标镜像仓库",
   "image.listManagePushImageRespoTip": "推送前请确保仓库存在该命名空间，若无请先添加",
   "image.listManagePushNewNamespace": "重写仓库命名空间",
-  "image.listManagePushNewNamespaceTip":
-    "可重新定义命名空间（Docker Hub 不受此影响）。配置后 mysql:latest 将推送到 命名空间/mysql:latest",
+  "image.listManagePushNewNamespaceTip": "可重新定义命名空间（Docker Hub 不受此影响）。配置后 mysql:latest 将推送到 命名空间/mysql:latest",
   "image.listManagePushTip": "推送至目标镜像仓库",
   "image.listPageTitle": "镜像列表",
   "image.remoteSearch": "搜索标签",
@@ -1761,12 +1714,10 @@
   "notification.composeDisableStorageType": "请挂载 /dpanel/compose 目录，并在其中创建任务目录及 YAML 文件",
   "notification.composeDisableStore": "请先添加应用商店并从中创建",
   "notification.composeNotFoundYaml": "无法获取当前任务的 YAML 文件，请挂载目录或将任务添加至 /dpanel/compose 目录",
-  "notification.composeNameInvalid":
-    "任务标识只能包含小写字母、数字、下划线或短横线，且必须以小写字母或数字开头。请检查任务标识或目录名是否含空格。",
+  "notification.composeNameInvalid": "任务标识只能包含小写字母、数字、下划线或短横线，且必须以小写字母或数字开头。请检查任务标识或目录名是否含空格。",
   "notification.composeEnvInvalid": ".env 环境变量文件解析失败，请先编辑修正，错误：{error}",
   "notification.composeParseYamlIncorrect": "YAML 内容解析失败，请先编辑修正，错误：{error}",
-  "notification.composeRelativeBindOnVolume":
-    "Compose 相对目录不可用，请将 /dpanel 挂载到宿主机，或使用存储卷 subpath。",
+  "notification.composeRelativeBindOnVolume": "Compose 相对目录不可用，请将 /dpanel 挂载到宿主机，或使用存储卷 subpath。",
   "notification.confirm.close": "关闭当前窗口会导致操作中止，是否确认？",
   "notification.confirm.disable": "禁用或恢复默认配置后不可撤销，是否确认？",
   "notification.confirm.title": "删除、清理、退出、回滚等操作不可恢复，是否确认？",
@@ -1787,8 +1738,7 @@
   "notification.containerBackupImportFileFailed": "导入快照文件失败，请重试",
   "notification.containerBackupImportFileInCorrect": "快照文件不完整或数据损坏",
   "notification.containerBackupRestoreImportImageFailed": "恢复镜像失败，请检查硬盘可用空间或重新生成快照",
-  "notification.containerBackupRestoreNetworkConflict":
-    "网络冲突，请手动创建名称为 {name} 的网络，或删除对应 {subnet} 子网的网络",
+  "notification.containerBackupRestoreNetworkConflict": "网络冲突，请手动创建名称为 {name} 的网络，或删除对应 {subnet} 子网的网络",
   "notification.containerCommit": "正在提交 {name} 容器为镜像",
   "notification.containerCommitMerge": "正在合并提交 {name} 容器为单层镜像",
   "notification.containerCreate": "正在创建容器",
@@ -1798,8 +1748,7 @@
   "notification.containerExplorerEditDeleteUnsafe": "仅允许删除指定文件或目录",
   "notification.containerExplorerEditFileMaxSize": "超过 1MB 的文件请通过导入/导出功能修改",
   "notification.containerExplorerInvalidFilename": "文件名格式非法或与已有目录名冲突",
-  "notification.containerExplorerUnzipTargetUnsupportedType":
-    "不支持的压缩包类型，请使用 .zip、.tar、.tar.gz/.tgz、.tar.bz2、.tar.xz、.tar.zst、.rar 或 .7z",
+  "notification.containerExplorerUnzipTargetUnsupportedType": "不支持的压缩包类型，请使用 .zip、.tar、.tar.gz/.tgz、.tar.bz2、.tar.xz、.tar.zst、.rar 或 .7z",
   "notification.containerMountPathDenied": "没有权限自动创建挂载目录，请在宿主机手动创建",
   "notification.containerPortRequiresSystemStat": "必须先启用主机监控",
   "notification.containerPrune": "已清理 {count} 个容器，释放 {size} 空间",
@@ -1828,7 +1777,7 @@
   "notification.imagePull": "正在拉取 {name} 镜像",
   "notification.imagePullInvalidAuth": "拉取镜像失败，仓库无权限。",
   "notification.imagePullRegistryBad": "远程镜像仓库无法访问",
-  "notification.imagePullServerHttp": '请开启仓库 HTTP 选项，并在 daemon.json 中配置 "insecure-registries": ["{name}"]',
+  "notification.imagePullServerHttp": "请开启仓库 HTTP 选项，并在 daemon.json 中配置 \"insecure-registries\": [\"{name}\"]",
   "notification.imagePullTagNotFound": "镜像 {tag} 不存在或无访问权限",
   "notification.imagePullUseProxy": "使用 {name} 加速拉取镜像",
   "notification.imageRemoteTagNoPermission": "远程 Tag 获取失败，仓库不存在或无访问权限",
@@ -2040,14 +1989,12 @@
   "notification.systemEnvApiTooOld": "Docker 服务端连接失败，请升级目标 Docker 版本：{err}",
   "notification.systemEnvCurrentCanNotDelete": "当前环境正在使用，无法删除",
   "notification.systemEnvDefaultCannotDelete": "默认环境无法删除",
-  "notification.systemEnvDockerApiFailed":
-    "Docker 服务端连接失败，请检查权限。通过 SSH 连接时，请确保连接用户拥有 Docker 权限。错误：{error}",
+  "notification.systemEnvDockerApiFailed": "Docker 服务端连接失败，请检查权限。通过 SSH 连接时，请确保连接用户拥有 Docker 权限。错误：{error}",
   "notification.systemEnvNameInvalid": "Docker 环境标识仅允许英文、数字、下划线或横线",
   "notification.systemEnvTlsInvalidCert": "开启 TLS 连接必须上传证书",
   "notification.systemStoreDownloadFailed": "下载 {url} 失败：{error}",
   "notification.systemStoreNotFoundGit": "同步应用商店需要使用 Git 命令，请先安装",
-  "notification.systemUpgradeDPanelNotFound":
-    "获取 DPanel 容器信息失败，无法生成手动更新脚本。请确保面板容器名称与环境变量 APP_NAME 一致。",
+  "notification.systemUpgradeDPanelNotFound": "获取 DPanel 容器信息失败，无法生成手动更新脚本。请确保面板容器名称与环境变量 APP_NAME 一致。",
   "notification.tagUrlNotFound": "访问地址无法连通",
   "notification.timeRangeOption.last24Hours": "最近 24 小时",
   "notification.timeRangeOption.last3Days": "最近 3 天",
@@ -2095,8 +2042,7 @@
   "swarm.listServiceStatusOption.DesiredTasks": "期望运行任务",
   "swarm.listServiceStatusOption.RunningTasks": "运行中任务",
   "swarm.listServiceStatusTipOption.CompletedTasks": "服务处于 ReplicatedJob 或 GlobalJob 模式下的已完成任务数。",
-  "swarm.listServiceStatusTipOption.DesiredTasks":
-    "服务期望运行的任务数。对于复制服务即副本数，全局服务为期望状态非关闭的任务数。",
+  "swarm.listServiceStatusTipOption.DesiredTasks": "服务期望运行的任务数。对于复制服务即副本数，全局服务为期望状态非关闭的任务数。",
   "swarm.listServiceStatusTipOption.RunningTasks": "服务实际运行中的任务数",
   "swarm.listTaskStatusOption.accepted": "部署中",
   "swarm.listTaskStatusOption.running": "运行中",
@@ -2308,8 +2254,7 @@
   "system.home.overview.systemInfoTitle": "Docker 信息",
   "system.home.overview.systemStat": "主机资源监控",
   "system.home.overview.systemStatEnableConfirm": "开启主机资源监控？",
-  "system.home.overview.systemStatEnableConfirmDescription":
-    "开启后将创建 dpanel-plugin-monitor 容器，用于监控主机 CPU、内存、网络、磁盘与压力数据。",
+  "system.home.overview.systemStatEnableConfirmDescription": "开启后将创建 dpanel-plugin-monitor 容器，用于监控主机 CPU、内存、网络、磁盘与压力数据。",
   "system.home.tag.createButton": "添加快捷标签",
   "system.home.tag.emptyTip": "直接添加分组标签或在容器详情页中添加",
   "system.home.tag.itemDelete": "删除标签",

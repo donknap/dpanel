@@ -11,4 +11,5 @@ const (
 
 const (
 	PanelLabelVersion = "com.dpanel.version"
+	PanelLabelRelease = "com.dpanel.release"
 )

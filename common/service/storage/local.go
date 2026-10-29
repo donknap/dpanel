@@ -52,6 +52,10 @@ func (self Local) GetStorePath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "store")
 }
 
+func (self Local) GetPluginPath() string {
+	return filepath.Join(self.GetStorageLocalPath(), "plugin")
+}
+
 func (self Local) GetLicenseFilePath() string {
 	return filepath.Join(self.GetStorageLocalPath(), "dpanel.lic")
 }

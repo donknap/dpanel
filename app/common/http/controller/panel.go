@@ -1,9 +1,9 @@
 package controller
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -24,9 +24,10 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/ws"
+	types2 "github.com/donknap/dpanel/common/types"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
-	"github.com/mcuadros/go-version"
 	"github.com/mholt/archives"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/we7coreteam/registry-go-sdk"
@@ -308,7 +309,11 @@ func (self Panel) Update(http *gin.Context) {
 		}
 
 	}
-	cmd, err := logic.Panel{}.MakeUpdateCommand(function.StructToMap(params))
+	logFileName := fmt.Sprintf("upgrade-%s.log", time.Now().Format(define.DateYmdHis+".000000000"))
+	logPath := filepath.Join(storage.Local{}.GetStorageLocalPath(), "logs", logFileName)
+	commandParams := function.StructToMap(params)
+	commandParams["logFileName"] = logFileName
+	cmd, err := logic.Panel{}.MakeUpdateCommand(commandParams)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -323,6 +328,7 @@ func (self Panel) Update(http *gin.Context) {
 	commandExecutor, err := local.New(
 		local.WithCommandName("/bin/sh"),
 		local.WithArgs("-c", cmd),
+		local.WithQuiet(),
 	)
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
@@ -330,28 +336,47 @@ func (self Panel) Update(http *gin.Context) {
 	}
 
 	commandExecutor.WorkDir(storage.Local{}.GetStorageLocalPath())
+	progress := ws.NewProgressPip(ws.MessageTypePanelUpdate).KeepAlive()
 	commandOutput, err := commandExecutor.RunInReadPip()
 	if err != nil {
+		progress.Close()
+		_ = commandExecutor.Close()
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
 	defer func() {
 		_ = commandOutput.Close()
-		slog.Debug("panel upgrade output closed", "name", params.Name, "type", dpanelInfo.RunIn)
 	}()
-	scanner := bufio.NewScanner(commandOutput)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		slog.Debug("panel upgrade output", "name", params.Name, "type", dpanelInfo.RunIn, "line", line)
-	}
-	if err := scanner.Err(); err != nil {
-		slog.Debug("panel upgrade output error", "name", params.Name, "type", dpanelInfo.RunIn, "error", err)
+	if _, err := io.Copy(progress, commandOutput); err != nil {
+		progress.Close()
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
+	go func() {
+		defer progress.Close()
+		var logFile *os.File
+		defer func() {
+			if logFile != nil {
+				_ = logFile.Close()
+			}
+		}()
+		function.Wait(progress.Context(), logPath, func(logPath string) bool {
+			var err error
+			if logFile == nil {
+				logFile, err = os.Open(logPath)
+			}
+			if errors.Is(err, os.ErrNotExist) {
+				return false
+			}
+			if err == nil {
+				_, err = io.Copy(progress, logFile)
+			}
+			if err != nil {
+				slog.Warn("panel upgrade log read", "path", logPath, "error", err)
+			}
+			return err != nil
+		})
+	}()
 
 	self.JsonSuccessResponse(http)
 	return
@@ -546,10 +571,10 @@ func (self Panel) BackupImport(http *gin.Context) {
 }
 
 func (self Panel) CheckNewVersion(http *gin.Context) {
-	currentVersion := facade.GetConfig().GetString("app.version")
-	newVersion := ""
+	dpanelInfo := logic.Setting{}.GetDPanelInfo()
+	newDPanelInfo := types2.DPanelInfo{}
 	reference := "latest"
-	if strings.Index(currentVersion, ".") == 8 {
+	if dpanelInfo.Version == "beta" {
 		reference = "beta"
 	}
 	reg := registry.New(
@@ -558,9 +583,17 @@ func (self Panel) CheckNewVersion(http *gin.Context) {
 	)
 	if manifest, _, err := reg.Client().PullManifest("dpanel/dpanel", reference); err == nil {
 		for _, descriptor := range manifest.References() {
-			if ver, ok := descriptor.Annotations[define.PanelLabelVersion]; ok {
-				if version.Compare(ver, currentVersion, ">") {
-					newVersion = ver
+			if remoteVersion := descriptor.Annotations[define.PanelLabelVersion]; remoteVersion != "" {
+				remoteRelease := descriptor.Annotations[define.PanelLabelRelease]
+				if len(remoteVersion) == len(define.DateShowVersion) && strings.Count(remoteVersion, ".") == 1 {
+					if remoteRelease == "" {
+						remoteRelease = remoteVersion
+					}
+					remoteVersion = "beta"
+				}
+				if remoteVersion != dpanelInfo.Version || remoteRelease != "" && remoteRelease != dpanelInfo.Release {
+					newDPanelInfo.Version = remoteVersion
+					newDPanelInfo.Release = remoteRelease
 				}
 				break
 			}
@@ -568,8 +601,8 @@ func (self Panel) CheckNewVersion(http *gin.Context) {
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{
-		"version":    currentVersion,
-		"newVersion": newVersion,
+		"version":    dpanelInfo.ShowVersion(),
+		"newVersion": newDPanelInfo.ShowVersion(),
 	})
 	return
 }

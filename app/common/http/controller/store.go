@@ -195,9 +195,7 @@ func (self Store) Sync(http *gin.Context) {
 				self.JsonResponseWithError(http, os.ErrPermission, 500)
 				return
 			}
-			err = logic.Store{}.SyncByGit(params.Url, logic.SyncByGitOption{
-				TargetPath: storeRootPath,
-			})
+			err = logic.Store{}.SyncByGit(params.Url, storeRootPath, logic.GitOption{})
 			if err != nil {
 				_ = notice.Message{}.Error(".gitPullEarlyEOF", "name", params.Name, "url", params.Url)
 				self.JsonResponseWithError(http, err, 500)
@@ -210,7 +208,9 @@ func (self Store) Sync(http *gin.Context) {
 			return
 		}
 	} else if params.Type == define.StoreTypeCasaOs {
-		err = logic.Store{}.SyncByZip(storeRootPath, params.Url, "Apps")
+		err = logic.Store{}.SyncByZip(params.Url, storeRootPath, logic.ZipOption{
+			Root: "Apps",
+		})
 		if err != nil {
 			self.JsonResponseWithError(http, err, 500)
 			return

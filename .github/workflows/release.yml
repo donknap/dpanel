@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version_param: ${{ steps.set_param.outputs.version_param }}
+      release: ${{ steps.set_param.outputs.release }}
       is_prerelease: ${{ steps.set_param.outputs.is_prerelease }}
     steps:
       - name: Determine Version Param
@@ -18,10 +19,12 @@ jobs:
           TAG=${GITHUB_REF_NAME#v}
           # 严格判断是否以 -beta 结尾
           if [[ "$TAG" == *-beta ]]; then
-            echo "🚧 Beta release detected (tag ends with -beta). Using timestamp for version."
-            echo "version_param=" >> $GITHUB_OUTPUT
+            echo "release=$(date -u +%Y%m%d.%H%M%S)" >> "$GITHUB_OUTPUT"
+            echo "🚧 Beta release detected (tag ends with -beta). Using beta for version."
+            echo "version_param=APP_VERSION=beta" >> $GITHUB_OUTPUT
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
           else
+            echo "release=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
             echo "📦 Stable release detected. Using tag $TAG for version."
             echo "version_param=APP_VERSION=$TAG" >> $GITHUB_OUTPUT
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
@@ -51,6 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+      APP_RELEASE: ${{ needs.prepare.outputs.release }}
     steps:
       - name: Test Env
         run: |
@@ -122,6 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+      APP_RELEASE: ${{ needs.prepare.outputs.release }}
     steps:
       - name: Test Env
         run: |
@@ -204,6 +209,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+      APP_RELEASE: ${{ needs.prepare.outputs.release }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -252,6 +258,7 @@ jobs:
     runs-on: macos-15-intel
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+      APP_RELEASE: ${{ needs.prepare.outputs.release }}
     steps:
       - name: Test Env
         run: |
@@ -299,6 +306,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+      APP_RELEASE: ${{ needs.prepare.outputs.release }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -339,6 +347,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+      APP_RELEASE: ${{ needs.prepare.outputs.release }}
     steps:
       - name: Test Env
         run: |
@@ -428,6 +437,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
+      APP_RELEASE: ${{ needs.prepare.outputs.release }}
     steps:
       - uses: actions/checkout@v4
       - name: Sync images to AliYun

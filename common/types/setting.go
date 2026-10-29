@@ -1,8 +1,12 @@
 package types
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/donknap/dpanel/common/service/docker/types"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 const (
@@ -14,6 +18,7 @@ type DPanelInfo struct {
 	ContainerInfo container.InspectResponse `json:"containerInfo"`
 	Name          string                    `json:"name"`
 	Version       string                    `json:"version"`
+	Release       string                    `json:"release"`
 	Family        string                    `json:"family"`
 	Env           string                    `json:"env"`
 	RunIn         string                    `json:"runIn"`
@@ -37,4 +42,17 @@ type DPanelInfo struct {
 	IsDev  bool `json:"isDev"`
 	IsCe   bool `json:"isCe"`
 	IsLite bool `json:"isLite"`
+}
+
+func (self DPanelInfo) ShowVersion() string {
+	if self.Release == "" {
+		return self.Version
+	}
+	release := self.Release
+	if self.Version == "beta" {
+		if t, err := time.ParseInLocation(define.DateShowRelease, release, time.UTC); err == nil {
+			release = t.Local().Format(define.DateShowRelease)
+		}
+	}
+	return fmt.Sprintf("%s (%s)", self.Version, release)
 }

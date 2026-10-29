@@ -22,13 +22,14 @@ COPY ./ /src
 
 ARG TARGETARCH
 ARG APP_VERSION
+ARG APP_RELEASE
 ARG APP_FAMILY
 
 RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_${TARGETARCH} \
     --mount=type=cache,target=/go/pkg/mod,id=dpanel_mod_cache_${TARGETARCH} \
     --mount=type=bind,from=toolchain,source=/toolchains,target=/toolchains \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
-    COMMON_ARGS="APP_VERSION=${APP_VERSION} APP_FAMILY=${APP_FAMILY-ce} OS=linux" && \
+    COMMON_ARGS="APP_VERSION=${APP_VERSION} APP_RELEASE=${APP_RELEASE} APP_FAMILY=${APP_FAMILY-ce} OS=linux" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
         export CC=$(echo /toolchains/*amd64-musl-*/bin/*-gcc); \
         make build ${COMMON_ARGS} AMD64=1 ARM64=0 ARMV7=0 CC_AMD64=$CC; \

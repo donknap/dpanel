@@ -52,6 +52,7 @@ var (
 )
 
 var DPanelVersion string
+var DPanelRelease string
 
 func main() {
 	storagePath := os.Getenv("DP_SYSTEM_STORAGE_LOCAL_PATH")
@@ -94,6 +95,7 @@ func main() {
 	} else {
 		facade.GetConfig().Set("app.version", DPanelVersion)
 	}
+	facade.GetConfig().Set("app.release", DPanelRelease)
 	initHomeDir()
 
 	// 注册数据库

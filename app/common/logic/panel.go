@@ -17,7 +17,6 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	types2 "github.com/donknap/dpanel/common/types"
-	"github.com/donknap/dpanel/common/types/define"
 )
 
 type Panel struct {
@@ -109,6 +108,10 @@ func (self Panel) ValidateProxy(proxy string, targetUrls []string) error {
 }
 
 func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
+	logFileName, ok := params["logFileName"].(string)
+	if !ok || logFileName == "" {
+		return "", errors.New("invalid update log file name")
+	}
 	args := map[string]any{}
 	if raw, exists := params["params"]; exists && raw != nil {
 		var ok bool
@@ -141,7 +144,6 @@ func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
 		templateParams[key] = value
 	}
 
-	logFileName := fmt.Sprintf("upgrade-%s.log", time.Now().Format(define.DateYmdHis))
 	templateParams["type"] = dpanelInfo.RunIn
 	if dpanelInfo.RunIn == types2.DPanelRunInContainer {
 		mounts := dpanelInfo.DataMounts

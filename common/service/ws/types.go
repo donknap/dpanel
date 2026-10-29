@@ -29,6 +29,7 @@ const (
 	MessageTypeImageBuild             = "image:build:%d"
 	MessageTypeImageImport            = "image:import"
 	MessageTypeProgressClose          = "progress:close"
+	MessageTypePanelUpdate            = "panel:update"
 	MessageTypeDomainApply            = "domain:apply"
 	MessageTypeUserPermission         = "user:permission:%s"
 	MessageTypeSwarmLog               = "swarm:log:%s:%s"

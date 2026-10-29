@@ -23,6 +23,7 @@ COPY ./ /src
 ARG BUILDARCH
 ARG TARGETARCH
 ARG APP_VERSION
+ARG APP_RELEASE
 ARG APP_FAMILY
 
 RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_windows_${TARGETARCH} \
@@ -30,7 +31,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build,id=dpanel_go_build_windows_$
     --mount=type=bind,from=toolchain,source=/toolchains,target=/toolchains \
     export HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTP_PROXY} && \
     export ZIG=/toolchains/${BUILDARCH}-zig/zig && \
-    COMMON_ARGS="APP_VERSION=${APP_VERSION} APP_FAMILY=${APP_FAMILY-ce} BUILD_OS=windows LIBC=gnu" && \
+    COMMON_ARGS="APP_VERSION=${APP_VERSION} APP_RELEASE=${APP_RELEASE} APP_FAMILY=${APP_FAMILY-ce} BUILD_OS=windows LIBC=gnu" && \
     if [ "$TARGETARCH" = "amd64" ]; then \
         export CC_AMD64="$ZIG cc -target x86_64-windows-gnu"; \
         make build ${COMMON_ARGS} PROJECT_NAME=dpanel-ce-windows-amd64.exe AMD64=1 ARM64=0 ARMV7=0; \
