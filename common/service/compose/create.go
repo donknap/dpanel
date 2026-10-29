@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,7 +42,6 @@ func WithYamlContent(content ...string) cli.ProjectOptionsFn {
 				0666,
 			)
 			if err != nil {
-				slog.Debug("compose create withYamlContent", "content", strings.Join(content, ","), "err", err)
 				return err
 			}
 			options.ConfigPaths = append(options.ConfigPaths, tempComposeFile)
@@ -52,7 +50,6 @@ func WithYamlContent(content ...string) cli.ProjectOptionsFn {
 		if !function.IsEmptyMap(options.Environment) {
 			err := os.WriteFile(tempEnvFile, []byte(strings.Join(options.Environment.Values(), "\n")), 0666)
 			if err != nil {
-				slog.Debug("compose create withYamlContent", "content", strings.Join(content, ","), "err", err)
 				return err
 			}
 		}

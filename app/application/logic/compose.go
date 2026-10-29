@@ -476,7 +476,6 @@ func (self Compose) GetTasker(dockerSdk *docker.Client, dbRow *entity.Compose) (
 	}
 	tasker, warning, err := compose.NewCompose(ctx, dockerSdk, projectOptions)
 	if err != nil {
-		slog.Warn("compose get task ", "error", err)
 		return task, warning, err
 	}
 	tasker.Environment = taskEnv

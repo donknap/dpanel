@@ -89,8 +89,8 @@ func (self Client) NetworkConnect(ctx context.Context, networkRow types.NetworkI
 	}
 	err := self.Client.NetworkConnect(ctx, networkRow.Name, containerName, endpointSetting)
 	if err != nil && (networkRow.IpV4 != "" || networkRow.IpV6 != "") {
-		slog.Warn("network connect with ip", "error", err)
 		if function.ErrorHasKeyword(err, "with user configured subnets", "IP address is supported only") {
+			slog.Warn("network connect with ip", "error", err)
 			endpointSetting.IPAMConfig.IPv4Address = ""
 			endpointSetting.IPAMConfig.IPv6Address = ""
 			return self.Client.NetworkConnect(ctx, networkRow.Name, containerName, endpointSetting)

@@ -236,7 +236,6 @@ func (self User) OauthCallback(http *gin.Context) {
 		AutoLogin:   params.AutoLogin,
 	})
 	if err != nil {
-		slog.Debug("oauth callback failed", "provider", params.Provider, "error", err.Error())
 		if !function.IsErrorMessage(err) {
 			self.JsonResponseWithServerError(http, err)
 			return
@@ -270,7 +269,6 @@ func (self User) OauthAuthorize(http *gin.Context) {
 	provider := http.Query("provider")
 	callbackURL, err := oauth.Authorize(provider, http.Request)
 	if err != nil {
-		slog.Debug("oauth authorize failed", "provider", provider, "error", err.Error())
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}

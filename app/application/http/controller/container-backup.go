@@ -348,7 +348,6 @@ func (self ContainerBackup) Restore(http *gin.Context) {
 		containerInfo := container.InspectResponse{}
 		err = json.Unmarshal(config, &containerInfo)
 		if err != nil || containerInfo.ContainerJSONBase == nil {
-			slog.Warn("container backup restore parse container", "json", string(config), "error", err)
 			self.JsonResponseWithError(http, errors.Join(errors.New("failed to parse container configuration"), err), 500)
 			return
 		}

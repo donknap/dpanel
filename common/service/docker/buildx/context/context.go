@@ -92,10 +92,10 @@ func Get(sdk *docker.Client) (Result, error) {
 		}
 		if !target.Running {
 			if err := self.sdk.Client.ContainerStart(self.sdk.Ctx, target.ID, container.StartOptions{}); err != nil && !errdefs.IsNotModified(err) {
-				slog.Warn("start buildkit container failed", "container", target.Name, "error", err)
 				if removeErr := self.removeContainer(target, false); removeErr != nil {
 					return result, errors.Join(fmt.Errorf("start buildkit container %q: %w", target.Name, err), fmt.Errorf("remove buildkit container %q: %w", target.Name, removeErr))
 				}
+				slog.Warn("start buildkit container failed", "container", target.Name, "error", err)
 				return result, nil
 			}
 			target, err = self.getTarget()
