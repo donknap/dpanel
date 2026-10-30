@@ -2,8 +2,10 @@ package logic
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,7 +15,12 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/errdefs"
 	"github.com/donknap/dpanel/common/function"
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	types2 "github.com/donknap/dpanel/common/types"
@@ -198,4 +205,43 @@ func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
 		return "", err
 	}
 	return commandBuffer.String(), nil
+}
+
+func (self Panel) ClearInstallerImage(sdk *docker.Client) {
+	ctx, cancel := context.WithTimeout(sdk.Ctx, 15*time.Minute)
+	defer cancel()
+	imageList, err := sdk.Client.ImageList(ctx, image.ListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("reference", "dpanel/installer:*"),
+			filters.Arg("reference", "docker.io/dpanel/installer:*"),
+			filters.Arg("reference", "registry.cn-hangzhou.aliyuncs.com/dpanel/installer:*"),
+		),
+	})
+	if err != nil {
+		slog.Warn("panel upgrade list installer image", "env", sdk.Name, "error", err)
+		return
+	}
+	for _, item := range imageList {
+		function.Wait(ctx, item.ID, func(imageID string) bool {
+			containerList, err := sdk.Client.ContainerList(ctx, container.ListOptions{
+				All:     true,
+				Filters: filters.NewArgs(filters.Arg("ancestor", imageID)),
+			})
+			if err != nil {
+				slog.Warn("panel upgrade list installer container", "env", sdk.Name, "image", imageID, "error", err)
+				return true
+			}
+			// 新面板启动时安装器仍可能在收尾，等待 --rm 完成，不停止或删除容器。
+			if len(containerList) > 0 {
+				return false
+			}
+			if _, err := sdk.Client.ImageRemove(ctx, imageID, image.RemoveOptions{}); err != nil && !errdefs.IsNotFound(err) {
+				slog.Warn("panel upgrade remove installer image", "env", sdk.Name, "image", imageID, "error", err)
+			}
+			return true
+		})
+	}
+	if ctx.Err() != nil {
+		slog.Warn("panel upgrade wait installer cleanup", "env", sdk.Name, "error", ctx.Err())
+	}
 }

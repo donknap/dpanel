@@ -140,14 +140,9 @@ func (self Compose) Ps(projectNameList ...string) []*compose.ContainerResult {
 
 func (self Compose) Ls() []*compose.ProjectResult {
 	composeGroupContainerList := make(map[string][]container.Summary)
-	if containerList, err := docker.Sdk.Client.ContainerList(docker.Sdk.Ctx, container.ListOptions{
-		All: true,
-	}); err == nil {
+	if containerList, err := docker.Sdk.ComposeContainerList(docker.Sdk.Ctx, ""); err == nil {
 		for _, summary := range containerList {
-			projectName, ok := summary.Labels[define.ComposeLabelProject]
-			if !ok {
-				continue
-			}
+			projectName := summary.Labels[define.ComposeLabelProject]
 			if strings.HasPrefix(projectName, define.ComposeProjectPrefix) {
 				// 将带前缀的任务也当成普通任务进行分组，防止丢失，后续更新全部会恢复到原始名称
 				_, projectName, _ = strings.Cut(projectName, define.ComposeProjectPrefix)

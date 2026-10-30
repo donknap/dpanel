@@ -18,6 +18,34 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 )
 
+// ComposeContainerList 按真实项目名查询容器，空名称查询全部 Compose 容器，包括停止和一次性运行的容器。
+func (self Client) ComposeContainerList(ctx context.Context, projectName string) ([]container.Summary, error) {
+	projectLabel := define.ComposeLabelProject
+	if projectName != "" {
+		if !function.IsSafeString(projectName, function.StringRuleName) {
+			return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
+		}
+		projectLabel += "=" + projectName
+	}
+	containerList, err := self.Client.ContainerList(ctx, container.ListOptions{
+		All:     true,
+		Filters: filters.NewArgs(filters.Arg("label", projectLabel)),
+	})
+	if err != nil {
+		if projectName == "" {
+			return nil, fmt.Errorf("list compose containers: %w", err)
+		}
+		return nil, fmt.Errorf("list compose %q containers: %w", projectName, err)
+	}
+	for _, item := range containerList {
+		name, ok := item.Labels[define.ComposeLabelProject]
+		if !ok || (projectName != "" && name != projectName) {
+			return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
+		}
+	}
+	return containerList, nil
+}
+
 type ComposeRemoveOption struct {
 	CleanNetwork    bool
 	CleanVolume     bool
@@ -46,17 +74,14 @@ func (self Client) ComposeRemove(ctx context.Context, projectName string, option
 		output = io.Discard
 	}
 	projectFilter := filters.NewArgs(filters.Arg("label", define.ComposeLabelProject+"="+projectName))
-	containerList, err := self.Client.ContainerList(ctx, container.ListOptions{All: true, Filters: projectFilter})
+	containerList, err := self.ComposeContainerList(ctx, projectName)
 	if err != nil {
-		return fmt.Errorf("list compose %q containers: %w", projectName, err)
+		return err
 	}
 	containerRemoveList := make([]container.Summary, 0, len(containerList))
 	imageMap := make(map[string]bool)
 	volumeMap := make(map[string]bool)
 	for _, item := range containerList {
-		if item.Labels[define.ComposeLabelProject] != projectName {
-			return function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
-		}
 		if len(option.ServiceNameList) > 0 && !slices.Contains(option.ServiceNameList, item.Labels[define.ComposeLabelService]) {
 			continue
 		}
