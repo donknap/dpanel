@@ -4,14 +4,15 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 )
 
-type InstallAppDetail struct {
+type StoreAppInstallDetail struct {
 	StoreId int32  `json:"storeId" binding:"required,gt=0"`
 	AppName string `json:"appName" binding:"required"`
 	Version string `json:"version" binding:"required"`
 }
 
-type StoreAppItem struct {
+type StoreAppDetail struct {
 	Title        string                         `json:"title"`
+	Titles       map[string]string              `json:"titles,omitempty"`
 	Name         string                         `json:"name"`
 	Logo         string                         `json:"logo"`
 	Content      string                         `json:"content"` // Deprecated: instead Contents["zh"]
@@ -34,9 +35,11 @@ type StoreAppVersionItem struct {
 }
 
 type StoreSettingOption struct {
-	Type      string         `json:"type,omitempty"`
-	Url       string         `json:"url,omitempty"`
-	Apps      []StoreAppItem `json:"apps,omitempty"`
-	Total     int            `json:"total"`
-	UpdatedAt int64          `json:"updatedAt,omitempty"`
+	// Setting 整体使用 JSON 入库，运行时来源不能参与序列化。
+	Mirror    []string         `json:"-"`
+	Type      string           `json:"type,omitempty"`
+	Url       string           `json:"url,omitempty"`
+	Apps      []StoreAppDetail `json:"apps,omitempty"`
+	Total     int              `json:"total"`
+	UpdatedAt int64            `json:"updatedAt,omitempty"`
 }

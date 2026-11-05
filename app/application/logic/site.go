@@ -154,6 +154,11 @@ func (self Site) GetEnvOptionByContainer(md5 string) (envOption accessor.SiteEnv
 	}
 	envOption.Cpus = float32(info.HostConfig.NanoCPUs / 1000000000)
 	envOption.Memory = int(info.HostConfig.Memory / 1024 / 1024)
+	memorySwap := info.HostConfig.MemorySwap
+	if memorySwap > 0 {
+		memorySwap /= 1024 * 1024
+	}
+	envOption.MemorySwap = &memorySwap
 	envOption.ShmSize = units.BytesSize(float64(info.HostConfig.ShmSize))
 	envOption.WorkDir = info.Config.WorkingDir
 	envOption.User = info.Config.User

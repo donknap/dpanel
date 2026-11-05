@@ -1,10 +1,12 @@
 package factor
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
@@ -19,11 +21,12 @@ import (
 )
 
 const (
-	ExplorerName          = "dpanel-plugin-explorer"
-	MonitorName           = "dpanel-plugin-monitor"
-	HostExplorerMountPath = "/mnt_host"
-	DockerRootMountPath   = "/mnt_docker"
-	imageName             = "dpanel/explorer"
+	ExplorerName           = "dpanel-plugin-explorer"
+	MonitorName            = "dpanel-plugin-monitor"
+	HostExplorerMountPath  = "/mnt_host"
+	ImageExplorerMountPath = "/mnt_image"
+	DockerRootMountPath    = "/mnt_docker"
+	imageName              = "dpanel/explorer"
 )
 
 type ExplorerCreateOption struct {
@@ -39,23 +42,32 @@ type HostCreateOption struct{}
 type MonitorCreateOption struct{}
 
 func NewExplorer(sdk *docker.Client, option ExplorerCreateOption) (string, error) {
+	readonlyRootfs := false
 	volumes := append([]types.VolumeItem(nil), option.Volumes...)
 	security := []string{"no-new-privileges:true"}
-	caps := []string{"DAC_OVERRIDE", "DAC_READ_SEARCH", "CHOWN", "FOWNER", "FSETID"}
+	capList := []string{"DAC_OVERRIDE", "DAC_READ_SEARCH", "CHOWN", "FOWNER", "FSETID"}
+	for _, volume := range volumes {
+		if volume.Type == "image" {
+			readonlyRootfs = true
+			capList = []string{"DAC_OVERRIDE", "DAC_READ_SEARCH"}
+			break
+		}
+	}
 	pid := ""
 	if option.HostPID {
 		pid = "host"
 		security = append(security, "apparmor=unconfined")
-		caps = append(caps, "SYS_PTRACE")
+		capList = append(capList, "SYS_PTRACE")
 	}
 	return create(sdk, ExplorerName, function.Sha256Struct(struct {
 		Version string
 		Option  ExplorerCreateOption
 	}{"agent-factor-explorer-v2", option}), append([]builder.Option{
 		builder.WithNetworkMode("none"),
+		builder.WithReadonlyRootfs(readonlyRootfs),
 		builder.WithSecurityOpt(security...),
 		builder.WithCapDrop("ALL"),
-		builder.WithCap(caps...),
+		builder.WithCap(capList...),
 		builder.WithPid(pid),
 		builder.WithEnv(types.EnvItem{Name: "DP_AGENT_CAPS", Value: "fs"}),
 		builder.WithLabel(
@@ -179,6 +191,12 @@ func create(sdk *docker.Client, name, hash string, options []builder.Option) (st
 		return "", err
 	}
 	if err = sdk.Client.ContainerStart(sdk.Ctx, id, container.StartOptions{}); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		cleanupSdk := &docker.Client{Name: sdk.Name, Client: sdk.Client, Ctx: ctx}
+		if cleanupErr := destroy(cleanupSdk, id); cleanupErr != nil {
+			return "", errors.Join(err, fmt.Errorf("clean agent container %s: %w", id, cleanupErr))
+		}
 		return "", err
 	}
 	function.Wait(sdk.Ctx, id, func(value string) bool {

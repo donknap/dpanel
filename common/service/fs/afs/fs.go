@@ -12,12 +12,12 @@ type TransferFile struct {
 	Target string
 }
 
-type Fs interface {
-	afero.Fs
+type ReadFs interface {
 	afero.LinkReader
 	afero.Lstater
-
-	RemoveAll(string) error
+	Name() string
+	Open(string) (afero.File, error)
+	Stat(string) (os.FileInfo, error)
 	ReadDir(string) ([]os.FileInfo, error)
 	List(string) ([]*fs.FileData, error)
 	Info(string) (*fs.FileData, error)
@@ -26,11 +26,17 @@ type Fs interface {
 	Destroy() error
 	PathSize(string) (int64, error)
 	Users() (fs.IdentityList, error)
+	Export([]TransferFile) error
+}
+
+type Fs interface {
+	ReadFs
+	afero.Fs
+	RemoveAll(string) error
 	Copy(source, target string, overwrite bool) error
 	Move(source, target string, overwrite bool) error
 	ChmodAll(string, os.FileMode, bool) error
 	ChownAll(string, *int, *int, bool) error
 	Import([]TransferFile) error
-	Export([]TransferFile) error
 	UnArchive([]string, string) error
 }

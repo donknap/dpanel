@@ -21,7 +21,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/app/application/logic"
-	logic2 "github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/dao"
 	"github.com/donknap/dpanel/common/entity"
@@ -30,6 +29,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker"
 	types2 "github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
+	sourcesync "github.com/donknap/dpanel/common/service/sync"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
@@ -576,34 +576,14 @@ func (self Compose) GetFromGit(http *gin.Context) {
 	var err error
 	targetPath := storage.Local{}.GetComposeProjectPath(dockerEnvName, params.Name)
 
-	if strings.Contains(params.Uri, ".git") {
-		err = logic2.Store{}.SyncByGit(params.Uri, targetPath, logic2.GitOption{})
+	if sourcesync.IsGit(params.Uri) {
+		err = sourcesync.ByGit(http.Request.Context(), params.Uri, targetPath, storage.Local{}.GetLocalTempDir(), sourcesync.GitOption{})
 	} else {
-		response, err := function.SafeHTTPGet(http.Request.Context(), params.Uri, 30*time.Second, 5<<20)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer func() {
-			_ = response.Body.Close()
-		}()
-		if response.StatusCode != http2.StatusOK {
-			self.JsonResponseWithError(http, fmt.Errorf("remote compose returned %s", response.Status), 500)
-			return
-		}
-		file, err := os.OpenFile(filepath.Join(targetPath, define.ComposeProjectDeployComposeFileName), os.O_RDWR|os.O_TRUNC, 0666)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
-		defer func() {
-			_ = file.Close()
-		}()
-		_, err = io.Copy(file, response.Body)
-		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
-		}
+		err = sourcesync.ByUrl(http.Request.Context(), params.Uri, filepath.Join(targetPath, define.ComposeProjectDeployComposeFileName), sourcesync.UrlOption{
+			Timeout:             30 * time.Second,
+			MaxBytes:            5 << 20,
+			RequireExistingFile: true,
+		})
 	}
 
 	if err != nil {

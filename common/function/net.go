@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"net/netip"
@@ -33,6 +34,21 @@ func CheckTCP(ctx context.Context, address string) error {
 	}
 	_ = connection.Close()
 	return nil
+}
+
+// CheckHTTP 只测量收到响应头的耗时，HTTP 状态码不表示目标资源可用。
+func CheckHTTP(ctx context.Context, address string) (time.Duration, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	start := time.Now()
+	// 探测不读取响应体，不能用完整文件大小限制排除下载地址。
+	response, err := SafeHTTPGet(ctx, address, 3*time.Second, math.MaxInt64)
+	duration := time.Since(start)
+	if err != nil {
+		return duration, err
+	}
+	_ = response.Body.Close()
+	return duration, nil
 }
 
 // ParseURL parses URLs and registry addresses without a scheme.
@@ -151,6 +167,10 @@ func IsLoopbackHost(host string) bool {
 }
 
 func SafeHTTPAddresses(rawURL string, flags ...int) ([]net.IP, error) {
+	return safeHTTPAddresses(context.Background(), rawURL, flags...)
+}
+
+func safeHTTPAddresses(ctx context.Context, rawURL string, flags ...int) ([]net.IP, error) {
 	uri, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
@@ -172,7 +192,7 @@ func SafeHTTPAddresses(rawURL string, flags ...int) ([]net.IP, error) {
 		}
 		return nil, errors.New("loopback address is not allowed")
 	}
-	ips, err := net.DefaultResolver.LookupIP(context.Background(), "ip", host)
+	ips, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +237,7 @@ func SafeHTTPGet(ctx context.Context, rawURL string, timeout time.Duration, maxB
 	if maxBodySize <= 0 {
 		return nil, errors.New("http max body size must be greater than zero")
 	}
-	addresses, err := SafeHTTPAddresses(rawURL)
+	addresses, err := safeHTTPAddresses(ctx, rawURL)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +249,7 @@ func SafeHTTPGet(ctx context.Context, rawURL string, timeout time.Duration, maxB
 			if len(via) >= 10 {
 				return errors.New("stopped after 10 redirects")
 			}
-			redirectAddresses, err := SafeHTTPAddresses(request.URL.String())
+			redirectAddresses, err := safeHTTPAddresses(request.Context(), request.URL.String())
 			if err != nil {
 				return err
 			}

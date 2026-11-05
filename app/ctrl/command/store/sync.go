@@ -42,10 +42,7 @@ func (self Sync) Handle(cmd *cobra.Command, args []string) {
 	}
 
 	appList, err := proxyClient.CommonStoreSync(&common.StoreSyncOption{
-		Id:   store.ID,
-		Name: store.Name,
-		Type: store.Setting.Type,
-		Url:  store.Setting.Url,
+		Id: store.ID,
 	})
 	if err != nil {
 		utils.Result{}.Error(err)

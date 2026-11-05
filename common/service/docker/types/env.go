@@ -76,3 +76,34 @@ type EnvValueRule struct {
 func (self EnvValueRule) IsInEnvFile() bool {
 	return self.Kind&EnvValueRuleInEnvFile != 0
 }
+
+func NewEnvValueRule(field map[string]string, call func(item *EnvValueRule)) *EnvValueRule {
+	valueRule := &EnvValueRule{}
+
+	if field["required"] == "true" {
+		valueRule.Kind |= EnvValueRuleRequired
+	}
+	if field["disabled"] == "true" {
+		valueRule.Kind |= EnvValueRuleDisabled
+	}
+
+	switch field["type"] {
+	case "text":
+		valueRule.Kind |= EnvValueTypeText
+		break
+	case "number":
+		valueRule.Kind |= EnvValueTypeNumber
+		break
+	case "select":
+		if field["multiple"] == "true" {
+			valueRule.Kind |= EnvValueTypeSelectMultiple
+		} else {
+			valueRule.Kind |= EnvValueTypeSelect
+		}
+	}
+
+	if call != nil {
+		call(valueRule)
+	}
+	return valueRule
+}

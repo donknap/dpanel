@@ -1,4 +1,4 @@
-package logic
+package sync
 
 import (
 	"archive/tar"
@@ -20,43 +20,14 @@ import (
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/oci"
-	"github.com/donknap/dpanel/common/service/storage"
-	"github.com/donknap/dpanel/common/types/define"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
-type SyncOption struct {
-	Context context.Context
-}
-
-type GitOption struct {
-	SyncOption
-	TempDownloadPath string
-	RemoveGit        bool
-	MaxBytes         int64
-}
-
-type ZipOption struct {
-	SyncOption
-	Root string
-}
-
-type OciOption struct {
-	SyncOption
-	Platform       v1.Platform
-	ExpectedLabels map[string]string
-}
-
-func (self Store) SyncByGit(source, targetPath string, option GitOption) error {
-	if source == "" || targetPath == "" {
-		return fmt.Errorf("source and target path are required")
+func ByGit(ctx context.Context, source, targetPath, tempPath string, option GitOption) (err error) {
+	if source == "" || targetPath == "" || tempPath == "" {
+		return fmt.Errorf("source, target path and temporary path are required")
 	}
 	if _, err := exec2.LookPath("git"); err != nil {
-		return function.ErrorMessage(define.ErrorMessageSystemStoreNotFoundGit)
-	}
-	ctx := option.Context
-	if ctx == nil {
-		ctx = context.Background()
+		return fmt.Errorf("find git executable: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
@@ -70,20 +41,19 @@ func (self Store) SyncByGit(source, targetPath string, option GitOption) error {
 		branch = ""
 	}
 
-	// 先创建一个临时目录，下载完成后再同步数据，否则失败时原先的数据会被删除
-	if option.TempDownloadPath == "" {
-		// 仅当内部生成临时目录的时候才删除，如果是外部传递的，由外部来维护
-		var err error
-		option.TempDownloadPath, err = storage.Local{}.CreateTempDir("")
-		if err != nil {
-			return err
-		}
-		defer func() {
-			_ = os.RemoveAll(option.TempDownloadPath)
-		}()
+	// 下载完成后才覆盖目标，避免下载失败破坏已有内容。
+	if err = os.MkdirAll(tempPath, 0700); err != nil {
+		return err
 	}
+	downloadPath, err := os.MkdirTemp(tempPath, "git-*")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = errors.Join(err, os.RemoveAll(downloadPath))
+	}()
 
-	slog.Debug("store git download", "path", option.TempDownloadPath)
+	slog.Debug("sync git download", "path", downloadPath)
 
 	args := []string{
 		"clone", "--depth", "1",
@@ -91,7 +61,7 @@ func (self Store) SyncByGit(source, targetPath string, option GitOption) error {
 	if branch != "" {
 		args = append(args, "-b", branch)
 	}
-	args = append(args, gitUrl, option.TempDownloadPath)
+	args = append(args, gitUrl, downloadPath)
 	cmd, err := local.New(
 		local.WithCommandName("git"),
 		local.WithArgs(args...),
@@ -107,13 +77,13 @@ func (self Store) SyncByGit(source, targetPath string, option GitOption) error {
 		return err
 	}
 	if option.RemoveGit {
-		if err = os.RemoveAll(filepath.Join(option.TempDownloadPath, ".git")); err != nil {
+		if err = os.RemoveAll(filepath.Join(downloadPath, ".git")); err != nil {
 			return err
 		}
 	}
 	if option.MaxBytes > 0 {
 		var total int64
-		err = filepath.WalkDir(option.TempDownloadPath, func(file string, entry fs.DirEntry, err error) error {
+		err = filepath.WalkDir(downloadPath, func(file string, entry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -137,50 +107,31 @@ func (self Store) SyncByGit(source, targetPath string, option GitOption) error {
 			return err
 		}
 	}
-	if filepath.Clean(option.TempDownloadPath) != filepath.Clean(targetPath) {
-		err = os.RemoveAll(targetPath)
-		if err != nil {
-			return err
-		}
-		err = os.CopyFS(targetPath, os.DirFS(option.TempDownloadPath))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err = function.CopyDir(targetPath, downloadPath, function.CopyDirOption{Truncate: true})
+	return err
 }
 
-// SyncByZip 同步远程 zip
+// ByZip 同步远程 zip
 // Root 只筛选归档内目录，解压时保留该目录前缀。
-func (self Store) SyncByZip(source, targetPath string, option ZipOption) error {
-	if source == "" || targetPath == "" {
-		return fmt.Errorf("source and target path are required")
+func ByZip(ctx context.Context, source, targetPath, tempPath string, option ZipOption) (err error) {
+	if source == "" || targetPath == "" || tempPath == "" {
+		return fmt.Errorf("source, target path and temporary path are required")
 	}
-	zipTempFile, err := storage.Local{}.CreateTempFile("")
+	if err = os.MkdirAll(tempPath, 0700); err != nil {
+		return err
+	}
+	zipTempFile, err := os.CreateTemp(tempPath, "zip-*.zip")
 	if err != nil {
 		return err
 	}
 	defer func() {
-		_ = zipTempFile.Close()
-		_ = os.RemoveAll(zipTempFile.Name())
+		err = errors.Join(err, os.Remove(zipTempFile.Name()))
 	}()
 
-	ctx := option.Context
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	response, err := function.SafeHTTPGet(ctx, source, 30*time.Minute, 20<<30)
-	if err != nil {
+	if err = zipTempFile.Close(); err != nil {
 		return err
 	}
-	defer func() {
-		_ = response.Body.Close()
-	}()
-	if response.StatusCode != http.StatusOK {
-		return function.ErrorMessage(define.ErrorMessageSystemStoreDownloadFailed, "url", source, "error", response.Status)
-	}
-	_, err = io.Copy(zipTempFile, response.Body)
-	if err != nil {
+	if err = ByUrl(ctx, source, zipTempFile.Name(), UrlOption{}); err != nil {
 		return err
 	}
 	zipArchive, err := zip.OpenReader(zipTempFile.Name())
@@ -190,6 +141,14 @@ func (self Store) SyncByZip(source, targetPath string, option ZipOption) error {
 	defer func() {
 		_ = zipArchive.Close()
 	}()
+	if err = os.MkdirAll(targetPath, os.ModePerm); err != nil {
+		return err
+	}
+	root, err := os.OpenRoot(targetPath)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
 	for _, file := range zipArchive.File {
 		if file.FileInfo().IsDir() {
 			continue
@@ -208,18 +167,22 @@ func (self Store) SyncByZip(source, targetPath string, option ZipOption) error {
 				continue
 			}
 		}
-		targetFilePath := function.SafePathJoin(targetPath, archiveFilePath)
-		err = func() error {
-			err = os.MkdirAll(filepath.Dir(targetFilePath), os.ModePerm)
+		if option.StripRoot && option.Root != "" {
+			rootPath := strings.TrimPrefix(path2.Clean("/"+option.Root), "/")
+			archiveFilePath = strings.TrimPrefix(archiveFilePath, rootPath+"/")
+		}
+		targetFilePath := filepath.FromSlash(archiveFilePath)
+		err = func() (err error) {
+			err = root.MkdirAll(filepath.Dir(targetFilePath), os.ModePerm)
 			if err != nil {
 				return err
 			}
-			targetFile, err := os.OpenFile(targetFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+			targetFile, err := root.OpenFile(targetFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 			if err != nil {
 				return err
 			}
 			defer func() {
-				_ = targetFile.Close()
+				err = errors.Join(err, targetFile.Close())
 			}()
 
 			sourceFile, err := file.Open()
@@ -240,33 +203,31 @@ func (self Store) SyncByZip(source, targetPath string, option ZipOption) error {
 	return nil
 }
 
-func (self Store) SyncByOci(source, targetPath string, maxBytes int64, maxEntry int, option OciOption) error {
-	if source == "" || targetPath == "" {
-		return fmt.Errorf("source and target path are required")
-	}
-	if maxBytes <= 0 || maxEntry <= 0 {
-		return fmt.Errorf("OCI source size and entry limits are required")
-	}
-	ctx := option.Context
-	if ctx == nil {
-		ctx = context.Background()
+func ByOci(ctx context.Context, source, targetPath, tempPath string, option OciOption) (err error) {
+	if source == "" || targetPath == "" || tempPath == "" {
+		return fmt.Errorf("source, target path and temporary path are required")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	archiveFile, err := os.CreateTemp(storage.Local{}.GetLocalTempDir(), "dpanel-oci-*.tar")
+	if err = os.MkdirAll(tempPath, 0700); err != nil {
+		return err
+	}
+	archiveFile, err := os.CreateTemp(tempPath, "oci-*.tar")
 	if err != nil {
 		return err
 	}
 	archivePath := archiveFile.Name()
+	defer func() {
+		err = errors.Join(err, os.Remove(archivePath))
+	}()
 	if err = archiveFile.Close(); err != nil {
-		_ = os.Remove(archivePath)
 		return err
 	}
-	defer os.Remove(archivePath)
 
-	// 文件内容之外，tar 还包含条目头、对齐填充和结束块。
-	archiveMaxBytes := maxBytes + int64(maxEntry)*1024 + 1024
-	labels, err := oci.PullImage(ctx, source, archivePath, option.Platform, archiveMaxBytes)
+	labels, err := oci.PullImage(ctx, source, archivePath, oci.PullOption{
+		Platform:     option.Platform,
+		DockerClient: option.DockerClient,
+	})
 	if err != nil {
 		return err
 	}
@@ -289,8 +250,7 @@ func (self Store) SyncByOci(source, targetPath string, maxBytes int64, maxEntry 
 	}
 	defer root.Close()
 	reader := tar.NewReader(archiveFile)
-	var total int64
-	for count := 0; ; count++ {
+	for {
 		if err = ctx.Err(); err != nil {
 			return err
 		}
@@ -300,9 +260,6 @@ func (self Store) SyncByOci(source, targetPath string, maxBytes int64, maxEntry 
 		}
 		if err != nil {
 			return err
-		}
-		if count >= maxEntry {
-			return fmt.Errorf("OCI source archive has too many entries")
 		}
 		name := strings.TrimPrefix(header.Name, "./")
 		if name == "" && header.Typeflag == tar.TypeDir {
@@ -328,10 +285,9 @@ func (self Store) SyncByOci(source, targetPath string, maxBytes int64, maxEntry 
 		default:
 			return fmt.Errorf("unsupported OCI source archive entry %q", header.Name)
 		}
-		if size < 0 || size > maxBytes-total {
-			return fmt.Errorf("OCI source archive exceeds %d bytes", maxBytes)
+		if size < 0 {
+			return fmt.Errorf("invalid OCI source entry size for %q", header.Name)
 		}
-		total += size
 		if err = root.MkdirAll(filepath.Dir(name), 0700); err != nil {
 			return err
 		}
@@ -350,30 +306,38 @@ func (self Store) SyncByOci(source, targetPath string, maxBytes int64, maxEntry 
 	}
 }
 
-func (self Store) SyncByUrl(targetPath, url string) error {
-	_ = os.MkdirAll(filepath.Dir(targetPath), os.ModePerm)
-	file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
+func ByUrl(ctx context.Context, source, targetPath string, option UrlOption) error {
+	if source == "" || targetPath == "" {
+		return fmt.Errorf("source and target path are required")
+	}
+	if option.Timeout < 0 || option.MaxBytes < 0 {
+		return fmt.Errorf("URL source timeout and size limit must not be negative")
+	}
+	if option.Timeout == 0 {
+		option.Timeout = 30 * time.Minute
+	}
+	if option.MaxBytes == 0 {
+		option.MaxBytes = 20 << 30
+	}
+	response, err := function.SafeHTTPGet(ctx, source, option.Timeout, option.MaxBytes)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = file.Close()
-	}()
-
-	response, err := function.SafeHTTPGet(context.Background(), url, 30*time.Minute, 20<<30)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = response.Body.Close()
-	}()
-
+	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return function.ErrorMessage(define.ErrorMessageSystemStoreDownloadFailed, "url", url, "error", response.Status)
+		return fmt.Errorf("source download returned %s", response.Status)
+	}
+	flag := os.O_WRONLY | os.O_TRUNC
+	if !option.RequireExistingFile {
+		if err = os.MkdirAll(filepath.Dir(targetPath), os.ModePerm); err != nil {
+			return err
+		}
+		flag |= os.O_CREATE
+	}
+	file, err := os.OpenFile(targetPath, flag, 0666)
+	if err != nil {
+		return err
 	}
 	_, err = io.Copy(file, response.Body)
-	if err != nil {
-		return err
-	}
-	return nil
+	return errors.Join(err, file.Close())
 }

@@ -1,12 +1,15 @@
 package define
 
 const (
+	StoreTypeDPanel        = "dpanel"
 	StoreTypeOnePanel      = "1panel"
 	StoreTypeOnePanelLocal = "1panel-local"
 	StoreTypePortainer     = "portainer"
 	StoreTypeCasaOs        = "casaos"
 	StoreTypeBaoTa         = "baota"
 )
+
+const StoreSystemPluginName = "dpanel-plugin"
 
 const (
 	StoreTypeOnePanelNetwork = "1panel-network"

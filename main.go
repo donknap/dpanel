@@ -103,6 +103,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	db.Logger = function.SQLLogger{Interface: db.Logger}
 	dao.SetDefault(db)
 
 	// 注册资源
@@ -238,6 +239,7 @@ func initDb() error {
 		&migrate.Upgrade20250401{},
 		&migrate.Upgrade20250521{},
 		&migrate.Upgrade20261011{},
+		&migrate.Upgrade20261030{},
 	}
 	for _, updater := range migrateTableData {
 		slog.Info("main", "migrate", updater.Version())

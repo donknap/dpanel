@@ -65,6 +65,8 @@ const (
 
 type CopyDirOption struct {
 	Mode CopyMode
+	// Truncate 清空目标目录后复制；排除项不保护旧文件，复制失败不恢复原目录。
+	Truncate bool
 	// 使用源目录内以 / 分隔的精确相对路径，不匹配子目录中的同名文件。
 	ExcludeFileList []string
 }
@@ -80,6 +82,11 @@ func CopyDir(targetPath, sourcePath string, option CopyDirOption) ([]string, err
 		return nil, err
 	}
 	defer func() { _ = source.Close() }()
+	if option.Truncate {
+		if err = os.RemoveAll(targetPath); err != nil {
+			return nil, err
+		}
+	}
 	if err = os.MkdirAll(targetPath, os.ModePerm); err != nil {
 		return nil, err
 	}

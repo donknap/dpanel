@@ -93,6 +93,7 @@ func (self Docker) ContainerCreate(task *CreateContainerOption) (containerID str
 		builder.WithRestartPolicy(task.BuildParams.RestartPolicy),
 		builder.WithCpus(task.BuildParams.Cpus),
 		builder.WithMemory(task.BuildParams.Memory),
+		builder.WithMemorySwap(task.BuildParams.MemorySwap),
 		builder.WithShmSize(task.BuildParams.ShmSize),
 		builder.WithWorkDir(task.BuildParams.WorkDir),
 		builder.WithUser(task.BuildParams.User),

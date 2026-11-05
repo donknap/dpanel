@@ -14,8 +14,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/errdefs"
-	"github.com/donknap/dpanel/app/common/logic/baota"
-	"github.com/donknap/dpanel/app/common/logic/onepanel"
+	"github.com/donknap/dpanel/app/common/logic/store"
 	"github.com/donknap/dpanel/common/accessor"
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
@@ -25,7 +24,6 @@ import (
 	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
-	"gopkg.in/yaml.v3"
 )
 
 type StoreLogoFileSystem struct {
@@ -64,7 +62,7 @@ type Store struct {
 }
 
 type StoreAppComposeOption struct {
-	accessor.InstallAppDetail
+	accessor.StoreAppInstallDetail
 	TaskName    string
 	Username    string
 	Environment []types.EnvItem
@@ -75,39 +73,21 @@ type ComposeDetail struct {
 	Yaml        [2]string
 	ComposeFile string
 	SourceDir   string
-	TempDir     string
 }
 
 func (self Store) GetAppComposeDetail(storeRow *entity.Store, option StoreAppComposeOption) (_ *ComposeDetail, err error) {
-	if storeRow.Setting == nil {
-		return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
+	source, err := store.New(storeRow, filepath.Join(storage.Local{}.GetStorePath(), ".temp"))
+	if err != nil {
+		return nil, err
 	}
-	app, _, ok := function.PluckArrayItemWalk(storeRow.Setting.Apps, func(item accessor.StoreAppItem) bool {
-		return item.Name == option.AppName
-	})
-	if !ok {
-		return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
+	if err = source.PreInstall(option.StoreAppInstallDetail); err != nil {
+		return nil, err
 	}
-	if !function.IsSafeString(storeRow.Name, function.StringRuleName) || !function.IsSafeString(app.Name, function.StringRuleName) {
-		return nil, os.ErrPermission
+	app, version, err := store.GetApp(storeRow, option.StoreAppInstallDetail)
+	if err != nil {
+		return nil, err
 	}
-	version, ok := app.Version[option.Version]
-	if !ok {
-		return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
-	}
-	for count := 0; version.Ref != ""; count++ {
-		if count >= len(app.Version) {
-			return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
-		}
-		version, ok = app.Version[version.Ref]
-		if !ok {
-			return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
-		}
-	}
-	composePath, err := filepath.Rel(storeRow.Name, function.SlashPathToSystem(version.ComposeFile))
-	if err != nil || !filepath.IsLocal(composePath) || composePath == "." {
-		return nil, os.ErrPermission
-	}
+	composePath, _ := filepath.Rel(storeRow.Name, function.SlashPathToSystem(version.ComposeFile))
 	detail := &ComposeDetail{
 		Detail: &entity.Compose{
 			Title:   app.Title,
@@ -116,38 +96,14 @@ func (self Store) GetAppComposeDetail(storeRow *entity.Store, option StoreAppCom
 		ComposeFile: filepath.Base(composePath),
 		SourceDir:   filepath.Join(storage.Local{}.GetStorePath(), storeRow.Name, filepath.Dir(composePath)),
 	}
-	defer func() {
-		if err != nil && detail.TempDir != "" {
-			err = errors.Join(err, os.RemoveAll(detail.TempDir))
-		}
-	}()
-	var root *os.Root
-	if storeRow.Setting.Type == define.StoreTypeBaoTa {
-		detail.TempDir, err = storage.Local{}.CreateTempDir("")
-		if err != nil {
-			return nil, err
-		}
-		if err = self.SyncByZip(version.Download, detail.TempDir, ZipOption{
-			Root: option.AppName,
-		}); err != nil {
-			return nil, err
-		}
-		root, err = os.OpenRoot(detail.TempDir)
-		if err != nil {
-			return nil, err
-		}
-		composePath = filepath.Join(option.AppName, detail.ComposeFile)
-		detail.SourceDir = filepath.Join(detail.TempDir, option.AppName)
-	} else {
-		storeRoot, err := os.OpenRoot(storage.Local{}.GetStorePath())
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = storeRoot.Close() }()
-		root, err = storeRoot.OpenRoot(storeRow.Name)
-		if err != nil {
-			return nil, err
-		}
+	storeRoot, err := os.OpenRoot(storage.Local{}.GetStorePath())
+	if err != nil {
+		return nil, err
+	}
+	defer storeRoot.Close()
+	root, err := storeRoot.OpenRoot(storeRow.Name)
+	if err != nil {
+		return nil, err
 	}
 	defer func() { _ = root.Close() }()
 	appRoot, err := root.OpenRoot(filepath.Dir(composePath))
@@ -180,27 +136,11 @@ func (self Store) GetAppComposeDetail(storeRow *entity.Store, option StoreAppCom
 	// 提交时以界面中的变量为准，只有读取初值时才补充商店默认值和 .env。
 	if option.Environment == nil {
 		environment = append(environment, version.Environment...)
-		if storeRow.Setting.Type == define.StoreTypeOnePanel || storeRow.Setting.Type == define.StoreTypeOnePanelLocal {
-			environment = append(environment, onepanel.DefaultEnv[option.AppName]...)
-			environment = append(environment, onepanel.CommonEnv[define.StoreEnvContainerName])
-		}
 	}
 	for index, item := range environment {
 		if item.Rule != nil {
 			rule := *item.Rule
 			item.Rule = &rule
-		}
-		if option.Environment == nil && storeRow.Setting.Type == define.StoreTypeBaoTa {
-			if value, _, ok := function.PluckMapItemWalk(baota.CommonEnv, func(_ int, value types.EnvItem) bool {
-				return value.Name == item.Name
-			}); ok {
-				item.Value = value.Value
-				if item.Rule == nil {
-					item.Rule = &types.EnvValueRule{}
-				}
-				item.Rule.Kind |= value.Rule.Kind
-				item.Rule.Option = value.Rule.Option
-			}
 		}
 		environment[index] = item
 	}
@@ -325,101 +265,4 @@ func (self Store) InstallApp(dockerSdk *docker.Client, storeType string, detail 
 		}
 	}
 	return fileList, nil
-}
-
-func (self Store) GetAppByCasaos(storePath string) ([]accessor.StoreAppItem, error) {
-	if !filepath.IsAbs(storePath) {
-		storePath = filepath.Join(storage.Local{}.GetStorePath(), storePath, "Apps")
-	}
-	result := make([]accessor.StoreAppItem, 0)
-
-	err := filepath.WalkDir(storePath, func(path string, d fs.DirEntry, err error) error {
-		if path == storePath {
-			return nil
-		}
-		if !d.IsDir() {
-			return nil
-		}
-
-		appName, _ := filepath.Rel(storePath, path)
-		appPath := filepath.Join(storePath, appName)
-
-		storeItem := accessor.StoreAppItem{
-			Name:     appName,
-			Version:  make(map[string]accessor.StoreAppVersionItem),
-			Contents: make(map[string]string),
-		}
-
-		composeYaml, err := os.ReadFile(filepath.Join(appPath, "docker-compose.yml"))
-		if err != nil {
-			return err
-		}
-		yamlData := new(function.ConfigMap)
-		err = yaml.Unmarshal(composeYaml, &yamlData)
-		if err != nil {
-			return err
-		}
-		storeItem.Description = yamlData.GetString("x-casaos.description.zh_cn")
-		storeItem.Descriptions = map[string]string{
-			define.LangZh: yamlData.GetString("x-casaos.description.zh_cn"),
-			define.LangEn: yamlData.GetString("x-casaos.description.en_us"),
-		}
-		storeItem.Tag = []string{
-			yamlData.GetString("x-casaos.category"),
-		}
-		storeItem.Logo = yamlData.GetString("x-casaos.icon")
-		if v := yamlData.GetString("x-casaos.tips.before_install.zh_cn"); v != "" {
-			storeItem.Content = "markdown-file://" + v
-			storeItem.Contents[define.LangZh] = "markdown://" + v
-		}
-		if v := yamlData.GetString("x-casaos.tips.before_install.en_us"); v != "" {
-			storeItem.Contents[define.LangEn] = "markdown://" + v
-		}
-		resourcePath, _ := filepath.Rel(filepath.Dir(filepath.Dir(storePath)), appPath)
-		storeItem.Version["latest"] = accessor.StoreAppVersionItem{
-			Name:        "latest",
-			ComposeFile: filepath.Join(resourcePath, "docker-compose.yml"),
-			Environment: make([]types.EnvItem, 0),
-		}
-		if err == nil {
-			result = append(result, storeItem)
-		}
-		return filepath.SkipDir
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-func (self Store) ParseSettingField(field map[string]string, call func(item *types.EnvValueRule)) *types.EnvValueRule {
-	valueRule := &types.EnvValueRule{}
-
-	if field["required"] == "true" {
-		valueRule.Kind |= types.EnvValueRuleRequired
-	}
-	if field["disabled"] == "true" {
-		valueRule.Kind |= types.EnvValueRuleDisabled
-	}
-
-	switch field["type"] {
-	case "text":
-		valueRule.Kind |= types.EnvValueTypeText
-		break
-	case "number":
-		valueRule.Kind |= types.EnvValueTypeNumber
-		break
-	case "select":
-		if field["multiple"] == "true" {
-			valueRule.Kind |= types.EnvValueTypeSelectMultiple
-		} else {
-			valueRule.Kind |= types.EnvValueTypeSelect
-		}
-	}
-
-	if call != nil {
-		call(valueRule)
-	}
-	return valueRule
 }

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	http2 "net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -28,6 +27,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/storage"
+	sourcesync "github.com/donknap/dpanel/common/service/sync"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
@@ -168,28 +168,18 @@ func (self Image) ImportByImageTar(http *gin.Context) {
 	if !function.IsEmptyArray(params.RemoteUrl) {
 		for _, s := range params.RemoteUrl {
 			err := func() error {
-				response, err := function.SafeHTTPGet(http.Request.Context(), s, 30*time.Minute, 20<<30)
-				if err != nil {
-					return err
-				}
-				defer func() {
-					_ = response.Body.Close()
-				}()
-				if response.StatusCode != http2.StatusOK {
-					return fmt.Errorf("remote image returned %s", response.Status)
-				}
 				tempFile, err := storage.Local{}.CreateTempFile("")
 				if err != nil {
 					return err
 				}
-				defer func() {
-					_ = tempFile.Close()
-				}()
-				if _, err = io.Copy(tempFile, response.Body); err != nil {
+				remoteTempPathList = append(remoteTempPathList, tempFile.Name())
+				if err = tempFile.Close(); err != nil {
+					return err
+				}
+				if err = sourcesync.ByUrl(http.Request.Context(), s, tempFile.Name(), sourcesync.UrlOption{}); err != nil {
 					return err
 				}
 				tarPathList = append(tarPathList, tempFile.Name())
-				remoteTempPathList = append(remoteTempPathList, tempFile.Name())
 				return nil
 			}()
 			if err != nil {
@@ -366,8 +356,8 @@ func (self Image) GetDetail(http *gin.Context) {
 	if params.ShowLayer {
 		layer, err = docker.Sdk.Client.ImageHistory(docker.Sdk.Ctx, params.Md5)
 		if err != nil {
-			self.JsonResponseWithError(http, err, 500)
-			return
+			slog.Warn("image history query failed", "imageId", imageDetail.ID, "error", err)
+			layer = make([]image.HistoryResponseItem, 0)
 		}
 	}
 

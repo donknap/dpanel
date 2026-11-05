@@ -26,6 +26,7 @@ type SiteEnvOption struct {
 	RestartPolicy   *types.RestartPolicy     `json:"restartPolicy,omitempty"`
 	Cpus            float32                  `json:"cpus,omitempty"`
 	Memory          int                      `json:"memory,omitempty"`
+	MemorySwap      *int64                   `json:"memorySwap,omitempty" binding:"omitempty,gte=-1"`
 	ShmSize         string                   `json:"shmsize,omitempty"`
 	WorkDir         string                   `json:"workDir,omitempty"`
 	User            string                   `json:"user,omitempty"`

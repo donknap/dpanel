@@ -7,17 +7,44 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/donknap/dpanel/common/service/docker"
 	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/daemon"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 )
 
+type PullOption struct {
+	Platform     v1.Platform
+	DockerClient *docker.Client
+}
+
 // PullImage writes the selected image filesystem as a tar archive and returns its labels.
-func PullImage(ctx context.Context, reference, archivePath string, platform v1.Platform, maxBytes int64) (map[string]string, error) {
-	if platform.OS == "" || platform.Architecture == "" || maxBytes <= 0 {
-		return nil, fmt.Errorf("OCI platform and archive size limit are required")
+func PullImage(ctx context.Context, reference, archivePath string, option PullOption) (map[string]string, error) {
+	platform := option.Platform
+	if platform.OS == "" && platform.Architecture == "" {
+		platform = v1.Platform{OS: "linux", Architecture: "amd64"}
 	}
-	image, err := crane.Pull(reference, crane.WithContext(ctx), crane.WithPlatform(&platform))
+	if platform.OS == "" || platform.Architecture == "" {
+		return nil, fmt.Errorf("OCI platform is required")
+	}
+	var image v1.Image
+	var err error
+	if option.DockerClient == nil {
+		image, err = crane.Pull(reference, crane.WithContext(ctx), crane.WithPlatform(&platform))
+	} else {
+		_, err = option.DockerClient.ImagePull(ctx, reference, docker.ImagePullOption{Platform: platform.String()})
+		if err != nil {
+			return nil, err
+		}
+		var imageReference name.Reference
+		imageReference, err = name.ParseReference(reference)
+		if err != nil {
+			return nil, err
+		}
+		image, err = daemon.Image(imageReference, daemon.WithClient(option.DockerClient.Client), daemon.WithContext(ctx), daemon.WithUnbufferedOpener())
+	}
 	if err != nil {
 		return nil, fmt.Errorf("pull OCI image %s: %w", reference, err)
 	}
@@ -43,12 +70,9 @@ func PullImage(ctx context.Context, reference, archivePath string, platform v1.P
 	}()
 	stream := mutate.Extract(image)
 	defer stream.Close()
-	written, err := io.Copy(file, io.LimitReader(stream, maxBytes+1))
+	_, err = io.Copy(file, stream)
 	if err != nil {
 		return nil, fmt.Errorf("export OCI image filesystem: %w", err)
-	}
-	if written > maxBytes {
-		return nil, fmt.Errorf("OCI image filesystem archive exceeds %d bytes", maxBytes)
 	}
 	if err = ctx.Err(); err != nil {
 		return nil, err

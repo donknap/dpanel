@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"math"
 	"net"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
@@ -215,10 +218,19 @@ func WithTmpfs(items ...types.VolumeItem) Option {
 func WithVolume(item ...types.VolumeItem) Option {
 	return func(self *Builder) error {
 		self.hostConfig.Binds = make([]string, 0)
+		self.hostConfig.Mounts = slices.DeleteFunc(self.hostConfig.Mounts, func(item mount.Mount) bool {
+			return item.Type == mount.TypeImage
+		})
 
 		for _, volumeItem := range item {
 			if volumeItem.Dest == "" || volumeItem.Host == "" {
 				return errors.New("volume host path or dest path is empty")
+			}
+			if volumeItem.Type == string(mount.TypeImage) {
+				self.hostConfig.Mounts = append(self.hostConfig.Mounts, mount.Mount{
+					Type: mount.TypeImage, Source: volumeItem.Host, Target: volumeItem.Dest, ReadOnly: true,
+				})
+				continue
 			}
 			permission := "rw"
 			if volumeItem.Permission == "readonly" {
@@ -386,6 +398,31 @@ func WithMemory(size int) Option {
 			return nil
 		}
 		self.hostConfig.Memory = int64(size) * 1024 * 1024
+		return nil
+	}
+}
+
+// WithMemorySwap 设置内存与 swap 的总上限（MiB）；nil 保留原配置，0 恢复默认，-1 不限。
+// 正数依赖已设置的内存上限，应在 WithMemory 之后应用。
+func WithMemorySwap(size *int64) Option {
+	return func(self *Builder) error {
+		if size == nil {
+			return nil
+		}
+		if *size < -1 || *size > math.MaxInt64/(1024*1024) {
+			return errors.New("memory swap limit is out of range")
+		}
+		if *size <= 0 {
+			self.hostConfig.MemorySwap = *size
+			return nil
+		}
+		if self.hostConfig.Memory <= 0 {
+			return errors.New("memory swap limit requires a memory limit")
+		}
+		if *size*1024*1024 < self.hostConfig.Memory {
+			return errors.New("memory swap total must be greater than or equal to the memory limit")
+		}
+		self.hostConfig.MemorySwap = *size * 1024 * 1024
 		return nil
 	}
 }
