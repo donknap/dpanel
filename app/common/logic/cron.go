@@ -114,7 +114,7 @@ func (self Cron) AddCronJob(task *entity.Cron) error {
 
 		var commandArgs []string
 		if containerName != "" {
-			options := make([]docker.Option, 0, 2)
+			options := []docker.Option{docker.WithReachabilityCheck()}
 			if dockerEnv.RemoteType != define.DockerRemoteTypeSock {
 				sockName := dockerEnv.GetSockName()
 				if strings.HasPrefix(sockName, "unix://") {

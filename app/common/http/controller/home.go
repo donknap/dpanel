@@ -38,6 +38,7 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/tunnel"
 	"github.com/donknap/dpanel/common/service/ws"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
@@ -328,6 +329,9 @@ func (self Home) WsSshConsole(http *gin.Context) {
 	defer func() {
 		if !clientReady {
 			_ = client.Close()
+			if sshClient != nil {
+				sshClient.Close()
+			}
 		}
 	}()
 
@@ -339,7 +343,26 @@ func (self Home) WsSshConsole(http *gin.Context) {
 		if !dockerEnv.EnableSSH || dockerEnv.SshServerInfo == nil {
 			return function.ErrorMessage(define.ErrorMessageHomeWsHostConsoleSshNotSetting)
 		}
-		sshClient, err = ssh.NewClient(ssh.WithServerInfo(dockerEnv.SshServerInfo)...)
+		optionList := []ssh.Option{
+			ssh.WithServerInfo(dockerEnv.SshServerInfo),
+			ssh.WithConnectContext(http.Request.Context()),
+		}
+		if dockerEnv.Tunnel != nil {
+			tunnelClient, err := ssh.NewClient(
+				ssh.WithServerInfo(dockerEnv.Tunnel.SSH),
+				ssh.WithConnectContext(http.Request.Context()),
+			)
+			if err != nil {
+				return err
+			}
+			t, err := tunnel.New(tunnel.WithSSH(tunnelClient))
+			if err != nil {
+				return err
+			}
+			defer t.Close()
+			optionList = append(optionList, ssh.WithDial(t.DialContext))
+		}
+		sshClient, err = ssh.NewClient(optionList...)
 		if err != nil {
 			return err
 		}
@@ -583,6 +606,7 @@ func (self Home) Info(http *gin.Context) {
 
 	dockerEnv := *dockerSdk.DockerEnv
 	dockerEnv.SshServerInfo = nil
+	dockerEnv.Tunnel = nil
 	dockerEnv.TlsCert = ""
 	dockerEnv.TlsCa = ""
 	dockerEnv.TlsKey = ""
@@ -815,6 +839,10 @@ func (self Home) GetStatList(http *gin.Context) {
 			return
 		case <-progressDone:
 			slog.Debug("home get stat list progress done")
+			self.JsonResponseWithoutError(http, runtimeStat{
+				DockerEnvName: sdk.Name,
+				Docker:        make([]*stats.Usage, 0),
+			})
 			return
 		case value, ok := <-dockerData:
 			if !ok {

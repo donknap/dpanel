@@ -86,10 +86,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 		return
 	}
 
-	dockerStatusCacheKey := fmt.Sprintf(storage.CacheKeyDockerStatus, e.DockerEnvName)
-	storage.Cache.Set(dockerStatusCacheKey, e.Status, cache.DefaultExpiration)
-
-	slog.Debug("docker daemon/event status", "cacheKey", dockerStatusCacheKey, "status", e.Status)
+	slog.Debug("docker daemon/event status", "name", e.DockerEnvName, "status", e.Status)
 
 	// 连接失败时保留错误状态，供环境列表展示断连原因
 	if !e.Status.Available {
@@ -106,7 +103,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 	if docker.Sdk.Name == dockerEnv.Name {
 		if _, err := docker.Sdk.Client.Ping(docker.Sdk.Ctx); err != nil {
 			docker.Sdk.Close()
-			if v, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithSockProxy()); err == nil {
+			if v, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithReachabilityCheck(), docker.WithSockProxy()); err == nil {
 				docker.Sdk = v
 				slog.Debug("docker daemon/event update docker.Sdk", "address", v.Client.DaemonHost())
 			}
@@ -123,7 +120,7 @@ func (self Docker) Daemon(e event.DockerDaemonPayload) {
 
 	slog.Debug("docker daemon/event update dpanel info", "name", facade.GetConfig().GetString("app.name"))
 
-	sdk, err := docker.NewClientWithDockerEnv(dockerEnv)
+	sdk, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithReachabilityCheck())
 	if err != nil {
 		return
 	}

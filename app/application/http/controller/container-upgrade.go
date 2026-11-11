@@ -314,6 +314,7 @@ func (self ContainerUpgrade) Check(http *gin.Context) {
 		"digestLocal": result.Result.LocalDigests,
 		"message":     result.Error,
 		"status":      result.Status,
+		"checkedAt":   result.CheckedAt,
 	}
 	if result.Result.RemoteDigest != nil {
 		response["digest"] = *result.Result.RemoteDigest

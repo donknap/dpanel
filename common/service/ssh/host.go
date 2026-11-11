@@ -12,8 +12,6 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 )
 
-var keyErr *knownhosts.KeyError
-
 func NewDefaultKnownHostCallback() *DefaultKnownHostsCallback {
 	path := ""
 	if v, err := os.UserHomeDir(); err == nil {
@@ -60,6 +58,7 @@ func (self DefaultKnownHostsCallback) check(hostname string, remote net.Addr, ke
 	}
 	// Make sure that the error returned from the callback is host not in file error.
 	// If keyErr.Want is greater than 0 length, that means host is in file with different key.
+	var keyErr *knownhosts.KeyError
 	if errors.As(err, &keyErr) && len(keyErr.Want) > 0 {
 		return true, keyErr
 	}
@@ -80,10 +79,12 @@ func (self DefaultKnownHostsCallback) add(hostname string, remote net.Addr, key 
 	}()
 	remoteNormalized := knownhosts.Normalize(remote.String())
 	hostNormalized := knownhosts.Normalize(hostname)
-	addresses := []string{remoteNormalized}
-
-	if hostNormalized != remoteNormalized {
-		addresses = append(addresses, hostNormalized)
+	addresses := []string{hostNormalized}
+	// 转发连接的远端地址可能是 0.0.0.0:0，只记录实际目标，避免污染 known_hosts。
+	if address, ok := remote.(*net.TCPAddr); !ok || address.Port != 0 || !address.IP.IsUnspecified() {
+		if hostNormalized != remoteNormalized {
+			addresses = append(addresses, remoteNormalized)
+		}
 	}
 	_, err = f.WriteString(knownhosts.Line(addresses, key) + "\n")
 	return err
@@ -91,7 +92,7 @@ func (self DefaultKnownHostsCallback) add(hostname string, remote net.Addr, key 
 
 func (self DefaultKnownHostsCallback) Delete(address string, port int) error {
 	host := ""
-	if port == 22 {
+	if port == 0 || port == 22 {
 		host = address
 	} else {
 		host = fmt.Sprintf("[%s]:%d", address, port)

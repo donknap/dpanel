@@ -1,6 +1,8 @@
 package store
 
 import (
+	"context"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,7 +16,9 @@ import (
 	"github.com/donknap/dpanel/common/entity"
 	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/docker"
+	"github.com/donknap/dpanel/common/service/exec/local"
 	"github.com/donknap/dpanel/common/service/storage"
+	sourcesync "github.com/donknap/dpanel/common/service/sync"
 	"github.com/donknap/dpanel/common/types/define"
 )
 
@@ -81,6 +85,73 @@ func New(storeRow *entity.Store, tempPath string, optionList ...SourceOption) (S
 	default:
 		return nil, fmt.Errorf("unsupported store type %q", storeRow.Setting.Type)
 	}
+}
+
+// Check 返回远端内容标识，不同步文件或更新本地版本记录。
+func (self source) Check(ctx context.Context) (string, error) {
+	if self.row.Setting.Type != define.StoreTypeDPanel && self.row.Setting.Type != define.StoreTypeOnePanel {
+		return "", ErrUnsupported
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	if len(self.row.Setting.Mirror) > 0 {
+		var err error
+		for _, address := range self.row.Setting.Mirror {
+			if err = ctx.Err(); err != nil {
+				return "", err
+			}
+			if sourcesync.IsGit(address) || !sourcesync.IsOci(address) {
+				err = fmt.Errorf("store update mirror must be an OCI image")
+				continue
+			}
+			var release string
+			release, err = sourcesync.Release(ctx, address, "")
+			if err != nil {
+				continue
+			}
+			if release == "" {
+				err = fmt.Errorf("store image has no release annotation")
+				continue
+			}
+			return release, nil
+		}
+		return "", err
+	}
+	if !sourcesync.IsGit(self.row.Setting.Url) {
+		return "", ErrUnsupported
+	}
+	gitURL, branch, _ := strings.Cut(self.row.Setting.Url, "#")
+	refList := []string{"HEAD"}
+	if branch != "" {
+		refList = []string{"refs/heads/" + branch, "refs/tags/" + branch + "^{}", "refs/tags/" + branch}
+	}
+	cmd, err := local.New(
+		local.WithCommandName("git"),
+		local.WithArgs(append([]string{"ls-remote", "--exit-code", "--", gitURL}, refList...)...),
+		local.WithEnv(append(os.Environ(), "GIT_TERMINAL_PROMPT=0")),
+		local.WithCtx(ctx),
+	)
+	if err != nil {
+		return "", err
+	}
+	defer cmd.Close()
+	content, err := cmd.RunWithResult()
+	if err != nil {
+		return "", err
+	}
+	for _, ref := range refList {
+		for line := range strings.SplitSeq(string(content), "\n") {
+			fieldList := strings.Fields(line)
+			if len(fieldList) != 2 || fieldList[1] != ref {
+				continue
+			}
+			if _, err = hex.DecodeString(fieldList[0]); err != nil || (len(fieldList[0]) != 40 && len(fieldList[0]) != 64) {
+				return "", fmt.Errorf("store Git source returned an invalid commit")
+			}
+			return fieldList[0], nil
+		}
+	}
+	return "", fmt.Errorf("store Git source has no matching commit")
 }
 
 func (self source) saveList(appList []accessor.StoreAppDetail) error {

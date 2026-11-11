@@ -2,11 +2,12 @@ package ssh
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
-	"github.com/donknap/dpanel/common/function"
 	"github.com/donknap/dpanel/common/service/storage"
 	"golang.org/x/crypto/ssh"
 )
@@ -63,35 +64,57 @@ func WithAddress(address string, port int) Option {
 	}
 }
 
-func WithServerInfo(info *ServerInfo) []Option {
-	if info != nil && info.Password != "" {
-		if w, err := function.RSADecode(info.Password, nil); err == nil {
-			info.Password = w
+// WithServerInfo 默认使用端口 22；未指定认证方式时，有私钥使用 pem，否则使用 basic。
+func WithServerInfo(info *ServerInfo) Option {
+	return func(self *Client) error {
+		if info == nil || strings.TrimSpace(info.Address) == "" || strings.TrimSpace(info.Username) == "" || info.Port < 0 || info.Port > 65535 {
+			return errors.New("invalid SSH server configuration")
+		}
+		// 配置可由多个连接共用，默认值和凭据解密只作用于本次副本。
+		serverInfo, err := info.Decrypt(false)
+		if err != nil {
+			return err
+		}
+		if serverInfo.Port == 0 {
+			serverInfo.Port = 22
+		}
+		if serverInfo.AuthType == "" {
+			serverInfo.AuthType = SshAuthTypeBasic
+			if serverInfo.PrivateKey != "" {
+				serverInfo.AuthType = SshAuthTypePem
+			}
+		}
+		if err := WithAddress(serverInfo.Address, serverInfo.Port)(self); err != nil {
+			return err
+		}
+		switch serverInfo.AuthType {
+		case SshAuthTypePem:
+			return WithAuthPem(serverInfo.Username, serverInfo.PrivateKey, serverInfo.Password)(self)
+		case SshAuthTypeBasic:
+			return WithAuthBasic(serverInfo.Username, serverInfo.Password)(self)
+		case SshAuthTypePemDefault:
+			var rsaKeyContent []byte
+			if v, ok := storage.Cache.Get(storage.CacheKeyRsaKey); ok {
+				rsaKeyContent = v.([]byte)
+			}
+			return WithAuthDefaultPem(serverInfo.Username, rsaKeyContent)(self)
+		default:
+			return errors.New("unsupported SSH authentication type")
 		}
 	}
-	option := make([]Option, 0)
-	option = append(option, WithAddress(info.Address, info.Port))
-	if info.AuthType == SshAuthTypePem {
-		pk := info.PrivateKey
-		if v, err := function.RSADecode(info.PrivateKey, nil); err == nil {
-			pk = v
-		}
-		option = append(option, WithAuthPem(info.Username, pk, info.Password))
-	} else if info.AuthType == SshAuthTypeBasic {
-		option = append(option, WithAuthBasic(info.Username, info.Password))
-	} else if info.AuthType == SshAuthTypePemDefault {
-		var rsaKeyContent []byte
-		if v, ok := storage.Cache.Get(storage.CacheKeyRsaKey); ok {
-			rsaKeyContent = v.([]byte)
-		}
-		option = append(option, WithAuthDefaultPem(info.Username, rsaKeyContent))
-	}
-	return option
 }
 
 func WithSftpClient() Option {
 	return func(self *Client) error {
 		self.needSftp = true
+		return nil
+	}
+}
+
+// WithDial 指定底层拨号，nil 使用直连；返回的连接由本客户端关闭。
+func WithDial(dial func(context.Context, string, string) (net.Conn, error)) Option {
+	return func(self *Client) error {
+		self.dial = dial
 		return nil
 	}
 }

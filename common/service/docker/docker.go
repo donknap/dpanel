@@ -2,14 +2,13 @@ package docker
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -17,12 +16,12 @@ import (
 	"time"
 
 	dockerclient "github.com/docker/docker/client"
-	"github.com/docker/go-connections/tlsconfig"
 	dockerconn "github.com/donknap/dpanel/common/service/docker/conn"
 	"github.com/donknap/dpanel/common/service/docker/conn/listener"
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/tunnel"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/gin-gonic/gin"
 )
@@ -43,27 +42,32 @@ func NewClientWithDockerEnv(dockerEnv *types.DockerEnv, opts ...Option) (*Client
 	options = append(options, WithSockName(dockerEnv.GetSockName()))
 	options = append(options, WithDockerEnv(dockerEnv))
 	options = append(options, WithName(dockerEnv.Name))
+	options = append(options, opts...)
 	switch dockerEnv.RemoteType {
 	case define.DockerRemoteTypeSSH:
 		options = append(options, WithSSH(dockerEnv.SshServerInfo, define.DockerConnectServerTimeout))
 	case define.DockerRemoteTypeWSL:
 		options = append(options, WithWSL(dockerEnv.Address))
 	case define.DockerRemoteTypeTcp:
-		options = append(options, WithTCP(dockerEnv.Address, dockerEnv.EnableTLS, dockerEnv.TlsCa, dockerEnv.TlsCert, dockerEnv.TlsKey))
+		options = append(options, WithTCP(dockerEnv.Address, dockerconn.TCPOption{
+			EnableTLS: dockerEnv.EnableTLS,
+			CaPath:    dockerEnv.TlsCa,
+			CertPath:  dockerEnv.TlsCert,
+			KeyPath:   dockerEnv.TlsKey,
+		}))
 	case define.DockerRemoteTypeSock:
 		options = append(options, WithSock(dockerEnv.Address))
 	default:
 		return nil, errors.New("invalid Docker remote type")
 	}
-	options = append(options, opts...)
 	return NewClient(options...)
 }
 
 func NewEmptyClient(dockerEnv *types.DockerEnv) *Client {
 	v, err := NewClient(
-		WithSock(dockerclient.DefaultDockerHost),
 		WithName(dockerEnv.Name),
 		WithDockerEnv(dockerEnv),
+		WithDefaultDial(),
 	)
 	if err != nil {
 		panic(err)
@@ -89,6 +93,7 @@ func NewClient(opts ...Option) (*Client, error) {
 	for _, opt := range opts {
 		err := opt(c)
 		if err != nil {
+			c.Close()
 			return nil, err
 		}
 	}
@@ -150,6 +155,31 @@ func WithName(name string) Option {
 	}
 }
 
+// WithReachabilityCheck 使用监控缓存快速拒绝不可达环境，不主动探测连接。
+func WithReachabilityCheck() Option {
+	return func(self *Client) error {
+		if status, ok := storage.LoadCache[types.DockerStatus](fmt.Sprintf(storage.CacheKeyDockerStatus, self.Name)); ok && status.Reachable != nil && !*status.Reachable {
+			return errors.New("docker server is unreachable")
+		}
+		return nil
+	}
+}
+
+func WithDefaultDial() Option {
+	return func(self *Client) error {
+		self.Option = append(self.Option, dockerclient.WithDialContext(func(ctx context.Context, _, _ string) (net.Conn, error) {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			if status, ok := storage.LoadCache[types.DockerStatus](fmt.Sprintf(storage.CacheKeyDockerStatus, self.Name)); ok && !status.Available && status.Message != "" {
+				return nil, errors.New(status.Message)
+			}
+			return nil, errors.New("docker client is not initialized")
+		}))
+		return nil
+	}
+}
+
 // WithSockName 指定 WithSockProxy 使用的本地代理入口，不改变 Docker SDK 的上游地址。
 func WithSockName(name string) Option {
 	return func(self *Client) error {
@@ -186,7 +216,19 @@ func WithDockerEnv(info *types.DockerEnv) Option {
 	}
 }
 
-func WithTCP(address string, enableTLS bool, caPath, certPath, keyPath string) Option {
+func WithTCP(address string, option dockerconn.TCPOption) Option {
+	if option.EnableTLS {
+		certPath := storage.Local{}.GetCertPath()
+		if option.CaPath != "" {
+			option.CaPath = filepath.Join(certPath, option.CaPath)
+		}
+		if option.CertPath != "" {
+			option.CertPath = filepath.Join(certPath, option.CertPath)
+		}
+		if option.KeyPath != "" {
+			option.KeyPath = filepath.Join(certPath, option.KeyPath)
+		}
+	}
 	return func(self *Client) error {
 		endpoint, err := url.Parse(address)
 		if err != nil {
@@ -195,33 +237,28 @@ func WithTCP(address string, enableTLS bool, caPath, certPath, keyPath string) O
 		if endpoint.Scheme != "tcp" || endpoint.Host == "" {
 			return errors.New("invalid TCP Docker address")
 		}
-		var config *tls.Config
-		if enableTLS {
-			if caPath == "" || certPath == "" || keyPath == "" {
-				return errors.New("invalid TLS configuration")
-			}
-			certRealPath := map[string]string{
-				"ca":   filepath.Join(storage.Local{}.GetCertPath(), caPath),
-				"cert": filepath.Join(storage.Local{}.GetCertPath(), certPath),
-				"key":  filepath.Join(storage.Local{}.GetCertPath(), keyPath),
-			}
-			for _, path := range certRealPath {
-				if _, err := os.Stat(path); err != nil {
-					return errors.New("cert file not found: " + path)
-				}
-			}
-			config, err = tlsconfig.Client(tlsconfig.Options{
-				CAFile:             certRealPath["ca"],
-				CertFile:           certRealPath["cert"],
-				KeyFile:            certRealPath["key"],
-				ExclusiveRootPools: true,
-			})
-			if err != nil {
-				return err
-			}
-		}
+		lock := sync.Mutex{}
 		dialContext := func(ctx context.Context, _, _ string) (net.Conn, error) {
-			return dockerconn.NewTCP(ctx, endpoint.Host, config)
+			dialOption := option
+			if self.DockerEnv != nil && self.DockerEnv.Tunnel != nil {
+				// 串行完成跳板 SSH 认证，避免并发统计触发 MaxStartups 限流。
+				lock.Lock()
+				tunnelClient, err := ssh.NewClient(
+					ssh.WithServerInfo(self.DockerEnv.Tunnel.SSH),
+					ssh.WithConnectContext(ctx),
+				)
+				lock.Unlock()
+				if err != nil {
+					return nil, err
+				}
+				t, err := tunnel.New(tunnel.WithSSH(tunnelClient))
+				if err != nil {
+					return nil, err
+				}
+				defer t.Close()
+				dialOption.Dial = t.DialContext
+			}
+			return dockerconn.NewTCP(ctx, endpoint.Host, dialOption)
 		}
 		transport := &http.Transport{
 			IdleConnTimeout:     time.Minute,
@@ -229,7 +266,7 @@ func WithTCP(address string, enableTLS bool, caPath, certPath, keyPath string) O
 			MaxIdleConns:        100,
 			DialContext:         dialContext,
 		}
-		if enableTLS {
+		if option.EnableTLS {
 			// SDK 使用 https，代理使用 http；两者都复用 TCP conn 已完成的 TLS 握手。
 			transport.DialTLSContext = dialContext
 			self.Option = append(self.Option, dockerclient.WithScheme("https"))
@@ -243,7 +280,7 @@ func WithTCP(address string, enableTLS bool, caPath, certPath, keyPath string) O
 func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 	return func(self *Client) error {
 		cmdName := "docker"
-		if self.DockerEnv.DockerType == "podman" {
+		if self.DockerEnv != nil && self.DockerEnv.DockerType == "podman" {
 			cmdName = "podman"
 		}
 		lock := sync.Mutex{}
@@ -261,12 +298,31 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 				lock.Lock()
 				if serverInfo == nil {
 					lock.Unlock()
-					slog.Warn("ssh client nil", "name", self.Name, "dockerEnv", self.DockerEnv)
+					slog.Warn("ssh client nil", "name", self.Name)
 					return nil, errors.New("nil serverInfo")
 				}
-				opts := ssh.WithServerInfo(serverInfo)
-				opts = append(opts, ssh.WithConnectContext(ctx))
-				opts = append(opts, ssh.WithTimeout(timeout))
+				opts := []ssh.Option{
+					ssh.WithServerInfo(serverInfo),
+					ssh.WithConnectContext(ctx),
+					ssh.WithTimeout(timeout),
+				}
+				if self.DockerEnv != nil && self.DockerEnv.Tunnel != nil {
+					tunnelClient, err := ssh.NewClient(
+						ssh.WithServerInfo(self.DockerEnv.Tunnel.SSH),
+						ssh.WithConnectContext(ctx),
+					)
+					if err != nil {
+						lock.Unlock()
+						return nil, err
+					}
+					t, err := tunnel.New(tunnel.WithSSH(tunnelClient))
+					if err != nil {
+						lock.Unlock()
+						return nil, err
+					}
+					defer t.Close()
+					opts = append(opts, ssh.WithDial(t.DialContext))
+				}
 				sshClient, err := ssh.NewClient(opts...)
 				lock.Unlock()
 				if err != nil {
@@ -338,7 +394,7 @@ func WithSockProxy() Option {
 		}
 		address := self.proxySockName
 		localSock, _, err := listener.New(address)
-		slog.Debug("docker with socket proxy", "address", address, "sock", localSock)
+		slog.Info("docker with socket proxy", "address", address, "sock", localSock)
 		if err != nil {
 			return err
 		}

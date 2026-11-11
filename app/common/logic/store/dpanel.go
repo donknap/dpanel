@@ -53,8 +53,7 @@ func (self DPanel) Sync(ctx context.Context, sourceURL string) ([]accessor.Store
 	repositoryURL = strings.TrimSuffix(repositoryURL, ".git")
 	if sourcesync.IsGit(sourceURL) {
 		err = sourcesync.ByGit(ctx, sourceURL, stagePath, stageRoot, sourcesync.GitOption{
-			RemoveGit: true,
-			MaxBytes:  100 << 20,
+			MaxBytes: 100 << 20,
 		})
 	} else if sourcesync.IsOci(sourceURL) {
 		err = sourcesync.ByOci(ctx, sourceURL, stagePath, stageRoot, sourcesync.OciOption{

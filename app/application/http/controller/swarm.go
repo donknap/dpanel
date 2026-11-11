@@ -72,7 +72,7 @@ func (self Swarm) InfoJoin(http *gin.Context) {
 		self.JsonResponseWithError(http, err, 500)
 		return
 	}
-	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv)
+	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithReachabilityCheck())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return

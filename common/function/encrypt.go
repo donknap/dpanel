@@ -259,6 +259,13 @@ func Sha256Struct(data interface{}) string {
 	return Sha256(b)
 }
 
+type Sensitive[T any] interface {
+	// Encrypt 使用旧值恢复占位符并尝试加密；加密失败保留待加密值，无法恢复占位符时返回错误。old 可为 nil。
+	Encrypt(old T) error
+	// Decrypt 解密敏感字段并返回副本，解密失败时保留原值以兼容明文；mask 为 true 时对结果脱敏。
+	Decrypt(mask bool) (T, error)
+}
+
 // MaskSensitiveValue 将敏感值转换为占位符
 func MaskSensitiveValue(value string) string {
 	if value == "" || IsSensitivePlaceholder(value) {

@@ -19,6 +19,7 @@ import (
 	event2 "github.com/donknap/dpanel/common/service/notice"
 	"github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/tunnel"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-gonic/gin"
@@ -73,31 +74,27 @@ func (self Env) GetList(http *gin.Context) {
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Name < result[j].Name
 	})
+	for i, item := range result {
+		response := *item
+		status := types2.DockerStatus{
+			Available: false,
+			Message:   "",
+		}
+		if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyDockerStatus, item.Name)); ok {
+			status = v.(types2.DockerStatus)
+		}
+		response.DockerStatus = &status
+		response.SshServerInfo, _ = response.SshServerInfo.Decrypt(true)
+		response.Tunnel, _ = response.Tunnel.Decrypt(true)
+		if response.TlsKey != "" {
+			response.TlsKey = function.MaskSensitiveValue(response.TlsKey)
+		}
+		result[i] = &response
+	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"currentName":  current.Name,
 		"currentTitle": current.Title,
-		"list": function.PluckArrayWalk(result, func(item *types2.DockerEnv) (*types2.DockerEnv, bool) {
-			status := types2.DockerStatus{
-				Available: false,
-				Message:   "",
-			}
-			if v, ok := storage.Cache.Get(fmt.Sprintf(storage.CacheKeyDockerStatus, item.Name)); ok {
-				status = v.(types2.DockerStatus)
-			}
-			item.DockerStatus = &status
-			if item.SshServerInfo != nil {
-				if item.SshServerInfo.Password != "" {
-					item.SshServerInfo.Password = function.MaskSensitiveValue(item.SshServerInfo.Password)
-				}
-				if item.SshServerInfo.PrivateKey != "" {
-					item.SshServerInfo.PrivateKey = function.MaskSensitiveValue(item.SshServerInfo.PrivateKey)
-				}
-			}
-			if item.TlsKey != "" {
-				item.TlsKey = function.MaskSensitiveValue(item.TlsKey)
-			}
-			return item, true
-		}),
+		"list":         result,
 	})
 	return
 }
@@ -127,34 +124,25 @@ func (self Env) Create(http *gin.Context) {
 		self.JsonResponseWithError(http, function.ErrorMessage(define.ErrorMessageSystemEnvTlsInvalidCert), 500)
 		return
 	}
-	var oldDockerEnv *types2.DockerEnv
+	oldDockerEnv := &types2.DockerEnv{}
 	if v, err := (logic.Env{}).GetEnvByName(params.Name); err == nil {
 		oldDockerEnv = v
-		if params.SshServerInfo != nil {
-			if function.IsSensitivePlaceholder(params.SshServerInfo.Password) {
-				params.SshServerInfo.Password = oldDockerEnv.SshServerInfo.Password
-			}
-			if function.IsSensitivePlaceholder(params.SshServerInfo.PrivateKey) {
-				params.SshServerInfo.PrivateKey = oldDockerEnv.SshServerInfo.PrivateKey
-			}
-		}
 		if function.IsSensitivePlaceholder(params.TlsKey) {
 			params.TlsKey = oldDockerEnv.TlsKey
 		}
+	}
+	if err := params.SshServerInfo.Encrypt(oldDockerEnv.SshServerInfo); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if err := params.Tunnel.Encrypt(oldDockerEnv.Tunnel); err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
 	}
 	if params.Enable == nil {
 		params.Enable = function.Ptr(true)
 	}
 	check := params.Check == nil || *params.Check
-
-	if params.EnableSSH {
-		if v, err := function.RSADecode(params.SshServerInfo.Password, nil); err == nil {
-			params.SshServerInfo.Password = v
-		}
-		if v, err := function.RSADecode(params.SshServerInfo.PrivateKey, nil); err == nil {
-			params.SshServerInfo.PrivateKey = v
-		}
-	}
 
 	defaultEnv := params.DockerEnv.IsDefault()
 
@@ -184,6 +172,7 @@ func (self Env) Create(http *gin.Context) {
 		ComposePath:       params.ComposePath,
 		EnableSSH:         params.EnableSSH,
 		SshServerInfo:     params.SshServerInfo,
+		Tunnel:            params.Tunnel,
 		RemoteType:        params.RemoteType,
 		DockerType:        params.DockerType,
 		Enable:            params.Enable,
@@ -230,12 +219,36 @@ func (self Env) Create(http *gin.Context) {
 
 	var dockerClient *docker.Client
 	if check {
+		knownHostsCallback := ssh.NewDefaultKnownHostCallback()
+		if (params.EnableSSH || params.RemoteType == define.DockerRemoteTypeSSH) && params.SshServerInfo != nil && params.SshServerInfo.Address != "" {
+			_ = knownHostsCallback.Delete(params.SshServerInfo.Address, params.SshServerInfo.Port)
+		}
+		if (params.EnableSSH || params.RemoteType == define.DockerRemoteTypeSSH || params.RemoteType == define.DockerRemoteTypeTcp) && params.Tunnel != nil && params.Tunnel.SSH != nil && params.Tunnel.SSH.Address != "" {
+			_ = knownHostsCallback.Delete(params.Tunnel.SSH.Address, params.Tunnel.SSH.Port)
+		}
 		if params.EnableSSH {
-			knownHostsCallback := ssh.NewDefaultKnownHostCallback()
-			if params.SshServerInfo != nil && params.SshServerInfo.Address != "" {
-				_ = knownHostsCallback.Delete(params.SshServerInfo.Address, params.SshServerInfo.Port)
+			optionList := []ssh.Option{
+				ssh.WithServerInfo(params.SshServerInfo),
+				ssh.WithConnectContext(http.Request.Context()),
 			}
-			sshClient, err := ssh.NewClient(ssh.WithServerInfo(params.SshServerInfo)...)
+			if params.Tunnel != nil {
+				tunnelClient, err := ssh.NewClient(
+					ssh.WithServerInfo(params.Tunnel.SSH),
+					ssh.WithConnectContext(http.Request.Context()),
+				)
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+				t, err := tunnel.New(tunnel.WithSSH(tunnelClient))
+				if err != nil {
+					self.JsonResponseWithError(http, err, 500)
+					return
+				}
+				defer t.Close()
+				optionList = append(optionList, ssh.WithDial(t.DialContext))
+			}
+			sshClient, err := ssh.NewClient(optionList...)
 			if err != nil {
 				self.JsonResponseWithError(http, err, 500)
 				return
@@ -261,17 +274,6 @@ func (self Env) Create(http *gin.Context) {
 			return
 		}
 		dockerClient = client
-	}
-
-	if params.EnableSSH {
-		// ssh 密码加密
-		if v, err := function.RSAEncode(params.SshServerInfo.Password); err == nil && params.SshServerInfo.Password != "" {
-			params.SshServerInfo.Password = v
-		}
-		// ssh 证书加密
-		if v, err := function.RSAEncode(params.SshServerInfo.PrivateKey); err == nil && params.SshServerInfo.PrivateKey != "" {
-			params.SshServerInfo.PrivateKey = v
-		}
 	}
 
 	if dockerClient != nil {
@@ -328,7 +330,7 @@ func (self Env) Switch(http *gin.Context) {
 		return
 	}
 	oldDockerClient := docker.Sdk
-	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv)
+	dockerClient, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithReachabilityCheck())
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
@@ -424,7 +426,7 @@ func (self Env) GetDetail(http *gin.Context) {
 	if dockerEnv.EnableSystemStat {
 		dockerSdk := docker.Sdk
 		if dockerEnv.Name != docker.Sdk.Name {
-			dockerSdk, err = docker.NewClientWithDockerEnv(dockerEnv)
+			dockerSdk, err = docker.NewClientWithDockerEnv(dockerEnv, docker.WithReachabilityCheck())
 			if err == nil {
 				defer dockerSdk.Close()
 			}
@@ -450,7 +452,10 @@ func (self Env) GetDetail(http *gin.Context) {
 	if dockerEnv.ServerUrl == "" {
 		dockerEnv.ServerUrl = "127.0.0.1"
 	}
-	self.JsonResponseWithoutError(http, dockerEnv)
+	response := *dockerEnv
+	response.SshServerInfo, _ = response.SshServerInfo.Decrypt(true)
+	response.Tunnel, _ = response.Tunnel.Decrypt(true)
+	self.JsonResponseWithoutError(http, &response)
 	return
 }
 

@@ -14,7 +14,7 @@ type Plugin struct {
 
 func (self Plugin) Destroy(e event.DockerDaemonPayload) {
 	if dockerEnv, err := (logic.Env{}).GetEnvByName(e.DockerEnvName); err == nil {
-		if dockerSdk, err := docker.NewClientWithDockerEnv(dockerEnv); err == nil {
+		if dockerSdk, err := docker.NewClientWithDockerEnv(dockerEnv, docker.WithReachabilityCheck()); err == nil {
 			if err := factor.DestroyAll(dockerSdk); err != nil {
 				slog.Debug("agent destroy", "name", e.DockerEnvName, "error", err)
 			}

@@ -11,13 +11,12 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func NewClient(opt ...Option) (*Client, error) {
+func NewClient(opt ...Option) (client *Client, err error) {
 	c := &Client{
 		sshClientConfig: &ssh.ClientConfig{
 			Timeout: time.Second * 5,
 		},
 	}
-	var err error
 	knownHostsCallback := NewDefaultKnownHostCallback()
 	c.sshClientConfig.HostKeyCallback = knownHostsCallback.Handler
 
@@ -33,6 +32,11 @@ func NewClient(opt ...Option) (*Client, error) {
 	} else {
 		c.ctx, c.ctxCancel = context.WithCancel(c.ctx)
 	}
+	defer func() {
+		if err != nil {
+			c.Close()
+		}
+	}()
 
 	connectCtx := c.ctx
 	if c.connectCtx != nil {
@@ -44,7 +48,11 @@ func NewClient(opt ...Option) (*Client, error) {
 		defer connectCancel()
 	}
 
-	conn, err := (&net.Dialer{}).DialContext(connectCtx, c.protocol, c.address)
+	dialContext := c.dial
+	if dialContext == nil {
+		dialContext = (&net.Dialer{}).DialContext
+	}
+	conn, err := dialContext(connectCtx, c.protocol, c.address)
 	if err != nil {
 		if connectCtx.Err() != nil {
 			err = connectCtx.Err()
@@ -52,12 +60,17 @@ func NewClient(opt ...Option) (*Client, error) {
 		return nil, err
 	}
 	connectDone := make(chan struct{})
-	defer close(connectDone)
-	go func() {
-		select {
-		case <-connectCtx.Done():
-			_ = conn.Close()
-		case <-connectDone:
+	stopConnect := context.AfterFunc(connectCtx, func() {
+		defer close(connectDone)
+		_ = conn.Close()
+	})
+	defer func() {
+		// 返回前停止并等待取消处理，避免释放建连上下文时关闭已建立的连接。
+		if !stopConnect() {
+			<-connectDone
+		}
+		if err == nil && connectCtx.Err() != nil {
+			client, err = nil, connectCtx.Err()
 		}
 	}()
 

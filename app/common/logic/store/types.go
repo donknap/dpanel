@@ -15,6 +15,7 @@ type SourceOption struct {
 }
 
 type StoreSource interface {
+	Check(ctx context.Context) (string, error)
 	Sync(ctx context.Context, sourceURL string) ([]accessor.StoreAppDetail, error)
 	GetList() ([]accessor.StoreAppDetail, error)
 	PreInstall(detail accessor.StoreAppInstallDetail) error

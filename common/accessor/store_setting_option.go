@@ -39,6 +39,7 @@ type StoreSettingOption struct {
 	Mirror    []string         `json:"-"`
 	Type      string           `json:"type,omitempty"`
 	Url       string           `json:"url,omitempty"`
+	Release   string           `json:"release,omitempty"`
 	Apps      []StoreAppDetail `json:"apps,omitempty"`
 	Total     int              `json:"total"`
 	UpdatedAt int64            `json:"updatedAt,omitempty"`

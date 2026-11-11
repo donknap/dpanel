@@ -28,6 +28,7 @@ type DockerEnv struct {
 	ComposePath       string          `json:"composePath,omitempty"`
 	EnableSSH         bool            `json:"enableSSH,omitempty"`
 	SshServerInfo     *ssh.ServerInfo `json:"sshServerInfo,omitempty"`
+	Tunnel            *TunnelInfo     `json:"tunnel,omitempty"`
 	RemoteType        string          `json:"remoteType"`           // 连接客户端类型，支持 sock ssh tcp wsl
 	DockerType        string          `json:"dockerType,omitempty"` // 远程客户端类型，docker podman
 	DockerInfo        *DockerInfo     `json:"dockerInfo,omitempty"`
@@ -38,6 +39,9 @@ type DockerEnv struct {
 // IsRemote 按连接类型、地址和面板运行系统判断 Docker 连接是否按远程处理。
 // 这里判断的是常见连接拓扑；回环端口若被转发到其他主机，仍会按本地处理。
 func (self DockerEnv) IsRemote() bool {
+	if self.Tunnel != nil && (self.RemoteType == define.DockerRemoteTypeTcp || self.RemoteType == define.DockerRemoteTypeSSH) {
+		return true
+	}
 	switch self.RemoteType {
 	case define.DockerRemoteTypeWSL:
 		// WSL 有独立的 Linux 运行环境，即使从 Windows 本机连接也按远程处理。

@@ -95,6 +95,7 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		cors.POST("/common/store/get-app-detail", controller.Store{}.GetAppDetail)
 		cors.POST("/common/store/delete", controller.Store{}.Delete)
 		cors.POST("/common/store/sync", controller.Store{}.Sync)
+		cors.POST("/common/store/check-update", controller.Store{}.CheckUpdate)
 		cors.POST("/common/store/deploy", controller.Store{}.Deploy)
 
 		cors.POST("/common/plugin/get-list", controller.Plugin{}.GetList)

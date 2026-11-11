@@ -363,7 +363,7 @@ func initDocker() error {
 	}
 	go func() {
 		// 改为异步连接后，如果用户在连接期间切换到其它服务端。如果在连接期间用户主动切换了连接，这里就不再赋值了
-		if dockerClient, err := docker.NewClientWithDockerEnv(defaultDockerEnv, docker.WithSockProxy()); err == nil {
+		if dockerClient, err := docker.NewClientWithDockerEnv(defaultDockerEnv, docker.WithReachabilityCheck(), docker.WithSockProxy()); err == nil {
 			if _, err = dockerClient.Client.Info(dockerClient.GetTryCtx()); err == nil && docker.Sdk.Name == dockerClient.Name {
 				docker.Sdk = dockerClient
 			} else {

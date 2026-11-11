@@ -193,6 +193,39 @@ func (self Store) GetList(http *gin.Context) {
 	return
 }
 
+func (self Store) CheckUpdate(http *gin.Context) {
+	var params struct {
+		Id int32 `json:"id" binding:"required,gt=0"`
+	}
+	if !self.Validate(http, &params) {
+		return
+	}
+	storeRow, err := dao.Store.Where(dao.Store.ID.Eq(params.Id)).First()
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	source, err := storelogic.New(storeRow, filepath.Join(storage.Local{}.GetStorePath(), ".temp"))
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	if storeRow.Setting.Release == "" {
+		self.JsonResponseWithoutError(http, gin.H{"release": "", "remoteRelease": "", "hasUpdate": true})
+		return
+	}
+	release, err := source.Check(http.Request.Context())
+	if err != nil {
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
+	self.JsonResponseWithoutError(http, gin.H{
+		"release":       storeRow.Setting.Release,
+		"remoteRelease": release,
+		"hasUpdate":     storeRow.Setting.Release != release,
+	})
+}
+
 func (self Store) Sync(http *gin.Context) {
 	type ParamsValidate struct {
 		Id int32 `json:"id" binding:"required,gt=0"`
@@ -275,6 +308,7 @@ func (self Store) Sync(http *gin.Context) {
 	sourceList = append(sourceList, storeRow.Setting.Url)
 	sourceList = append(sourceList, daemonSourceList...)
 	var appList []accessor.StoreAppDetail
+	var syncSourceURL string
 	for _, address := range sourceList {
 		if err = http.Request.Context().Err(); err != nil {
 			break
@@ -294,6 +328,7 @@ func (self Store) Sync(http *gin.Context) {
 		}
 		appList, err = source.Sync(http.Request.Context(), address)
 		if err == nil {
+			syncSourceURL = address
 			break
 		}
 		if sourcesync.IsGit(address) && strings.Contains(err.Error(), "early EOF") {
@@ -304,6 +339,22 @@ func (self Store) Sync(http *gin.Context) {
 	if err != nil {
 		self.JsonResponseWithError(http, err, 500)
 		return
+	}
+
+	storePath := function.SafePathJoin(storage.Local{}.GetStorePath(), storeRow.Name)
+	release, err := sourcesync.Release(http.Request.Context(), syncSourceURL, storePath)
+	if err != nil {
+		slog.Warn("store sync release lookup failed", "name", storeRow.Name, "error", err)
+	} else {
+		storeRow.Setting.Release = release
+		if err = dao.Store.Save(storeRow); err != nil {
+			slog.Warn("store sync release save failed", "name", storeRow.Name, "error", err)
+		}
+	}
+	if sourcesync.IsGit(syncSourceURL) {
+		if err := os.RemoveAll(filepath.Join(storePath, ".git")); err != nil {
+			slog.Warn("store sync Git directory cleanup failed", "name", storeRow.Name, "error", err)
+		}
 	}
 
 	self.JsonResponseWithoutError(http, gin.H{

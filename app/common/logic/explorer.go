@@ -25,6 +25,7 @@ import (
 	"github.com/donknap/dpanel/common/service/notice"
 	serviceSsh "github.com/donknap/dpanel/common/service/ssh"
 	"github.com/donknap/dpanel/common/service/storage"
+	"github.com/donknap/dpanel/common/service/tunnel"
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/h2non/filetype"
 )
@@ -94,8 +95,26 @@ func (self Explorer) Afs(ctx context.Context, mountPoint ExplorerMountPoint, doc
 		if !dockerEnv.EnableSSH || dockerEnv.SshServerInfo == nil {
 			return nil, function.ErrorMessage(define.ErrorMessageCommonDataNotFoundOrDeleted)
 		}
-		options := []serviceSsh.Option{serviceSsh.WithContext(ctx), serviceSsh.WithSftpClient()}
-		options = append(options, serviceSsh.WithServerInfo(dockerEnv.SshServerInfo)...)
+		options := []serviceSsh.Option{
+			serviceSsh.WithServerInfo(dockerEnv.SshServerInfo),
+			serviceSsh.WithContext(ctx),
+			serviceSsh.WithSftpClient(),
+		}
+		if dockerEnv.Tunnel != nil {
+			tunnelClient, err := serviceSsh.NewClient(
+				serviceSsh.WithServerInfo(dockerEnv.Tunnel.SSH),
+				serviceSsh.WithConnectContext(ctx),
+			)
+			if err != nil {
+				return nil, err
+			}
+			t, err := tunnel.New(tunnel.WithSSH(tunnelClient))
+			if err != nil {
+				return nil, err
+			}
+			defer t.Close()
+			options = append(options, serviceSsh.WithDial(t.DialContext))
+		}
 		sshClient, err := serviceSsh.NewClient(options...)
 		if err != nil {
 			return nil, err

@@ -13,4 +13,5 @@ type DockerInfo struct {
 type DockerStatus struct {
 	Available bool   `json:"available"`
 	Message   string `json:"message"`
+	Reachable *bool  `json:"reachable,omitempty"` // nil 表示未探测或不适用。
 }
