@@ -522,6 +522,42 @@ func (self Compose) getDPanelProjectName(name string) string {
 	return fmt.Sprintf(define.ComposeProjectName, strings.ReplaceAll(name, "@", "-"))
 }
 
+func (self Compose) WriteEnvFile(envFilePath string, envList []types2.EnvItem) error {
+	envContent, err := os.ReadFile(envFilePath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	envLineMap := make(map[string]string, len(envList))
+	for _, item := range envList {
+		envLineMap[item.Name] = fmt.Sprintf("%s=%s", item.Name, strconv.Quote(strings.ReplaceAll(item.Value, "$", "$$")))
+	}
+	envLineList := make([]string, 0, len(envList))
+	if len(envContent) > 0 {
+		for _, line := range strings.Split(strings.TrimSuffix(string(envContent), "\n"), "\n") {
+			if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+				envLineList = append(envLineList, line)
+				continue
+			}
+			name, _, _ := strings.Cut(strings.TrimSpace(line), "=")
+			name = strings.TrimSpace(strings.TrimPrefix(name, "export "))
+			if envLine, ok := envLineMap[name]; ok {
+				envLineList = append(envLineList, envLine)
+				delete(envLineMap, name)
+			}
+		}
+	}
+	for _, item := range envList {
+		if envLine, ok := envLineMap[item.Name]; ok {
+			envLineList = append(envLineList, envLine)
+			delete(envLineMap, item.Name)
+		}
+	}
+	if len(envLineList) > 0 && bytes.HasSuffix(envContent, []byte("\n")) {
+		envLineList = append(envLineList, "")
+	}
+	return os.WriteFile(envFilePath, []byte(strings.Join(envLineList, "\n")), 0o600)
+}
+
 func (self Compose) ParseEnvItemValue(env []types2.EnvItem) ([]types2.EnvItem, error) {
 	envMap, err := dotenv.UnmarshalWithLookup(strings.Join(function.PluckArrayWalk(env, func(item types2.EnvItem) (string, bool) {
 		return item.String(), true

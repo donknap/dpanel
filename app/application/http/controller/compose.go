@@ -280,18 +280,16 @@ func (self Compose) Create(http *gin.Context) {
 			})
 		}
 	}
-	envLineList := make([]string, 0, len(composeRow.Setting.Environment))
-	for index, item := range composeRow.Setting.Environment {
-		envLineList = append(envLineList, fmt.Sprintf("%s=%s", item.Name, strconv.Quote(strings.ReplaceAll(item.Value, "$", "$$"))))
+	envFilePath := filepath.Join(composeDir, define.ComposeDefaultEnvFileName)
+	if err = (logic.Compose{}).WriteEnvFile(envFilePath, composeRow.Setting.Environment); err != nil {
+		return
+	}
+	for index := range composeRow.Setting.Environment {
 		if composeRow.Setting.Environment[index].Rule == nil {
 			composeRow.Setting.Environment[index].Rule = &types2.EnvValueRule{Kind: types2.EnvValueRuleInEnvFile}
 		} else {
 			composeRow.Setting.Environment[index].Rule.Kind |= types2.EnvValueRuleInEnvFile
 		}
-	}
-	envFilePath := filepath.Join(composeDir, define.ComposeDefaultEnvFileName)
-	if err = os.WriteFile(envFilePath, []byte(strings.Join(envLineList, "\n")), 0o600); err != nil {
-		return
 	}
 	fileInfo, err := os.Stat(composeFile)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
