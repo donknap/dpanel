@@ -25,6 +25,11 @@ type SettingValueOption struct {
 	Tag                         []Tag                        `json:"tag,omitempty"`
 	Login                       *Login                       `json:"login,omitempty"`
 	ConsoleInstance             *ConsoleInstance             `json:"consoleInstance,omitempty"`
+	Menu                        *Menu                        `json:"menu,omitempty"`
+}
+
+type Menu struct {
+	List []string `json:"List"`
 }
 
 type UserSetting struct {

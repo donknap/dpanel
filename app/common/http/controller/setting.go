@@ -126,6 +126,7 @@ func (self Setting) SaveConfig(http *gin.Context) {
 		Notification *accessor.Notification       `json:"notification"`
 		Login        *accessor.Login              `json:"login"`
 		TwoFa        *accessor.TwoFa              `json:"twoFa"`
+		Menu         *accessor.Menu               `json:"menu"`
 	}
 	params := ParamsValidate{}
 	if !self.Validate(http, &params) {
@@ -189,6 +190,16 @@ func (self Setting) SaveConfig(http *gin.Context) {
 			if strings.HasPrefix(key, "login:failed") {
 				storage.Cache.Delete(key)
 			}
+		}
+	}
+
+	if params.Menu != nil {
+		settingRow = &entity.Setting{
+			GroupName: logic.SettingGroupSetting,
+			Name:      logic.SettingGroupSettingMenu,
+			Value: &accessor.SettingValueOption{
+				Menu: params.Menu,
+			},
 		}
 	}
 

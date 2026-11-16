@@ -818,12 +818,38 @@ func (self Home) GetStatList(http *gin.Context) {
 	// Docker 与系统统计独立采样，发送时使用各自最近一帧。
 	readerCtx, cancel := context.WithCancel(sdk.Ctx)
 	defer cancel()
-	dockerData := (statLogic.Stat{}).ReadDockerStat(readerCtx, sdk)
+	stopRequestCancel := context.AfterFunc(http.Request.Context(), cancel)
+	defer stopRequestCancel()
+	if progress != nil {
+		stopProgressCancel := context.AfterFunc(progress.Context(), cancel)
+		defer stopProgressCancel()
+	}
+	dockerData, err := (statLogic.Stat{}).ReadDockerStat(readerCtx, sdk)
+	if err != nil {
+		if readerCtx.Err() != nil {
+			self.JsonResponseWithoutError(http, runtimeStat{
+				DockerEnvName: sdk.Name,
+				Docker:        make([]*stats.Usage, 0),
+			})
+			return
+		}
+		cancel()
+		if progress != nil {
+			progress.Close()
+		}
+		self.JsonResponseWithError(http, err, 500)
+		return
+	}
 
-	var systemData <-chan statLogic.SystemStatFrame
-	var systemRetry <-chan time.Time
+	errChan := make(chan error, 1)
+	var systemData chan statLogic.SystemStatFrame
 	if sdk.DockerEnv.EnableSystemStat {
-		systemData = (statLogic.Stat{}).ReadSystemStat(readerCtx, sdk)
+		systemData = make(chan statLogic.SystemStatFrame)
+		go func(result chan<- statLogic.SystemStatFrame) {
+			if err := (statLogic.Stat{}).ReadSystemStat(readerCtx, sdk, result); err != nil {
+				errChan <- err
+			}
+		}(systemData)
 	}
 
 	// 固定间隔组装快照；普通请求返回一次，WebSocket 持续广播。
@@ -833,6 +859,20 @@ func (self Home) GetStatList(http *gin.Context) {
 	var latestSystem *statLogic.SystemStatFrame
 	for {
 		select {
+		case err := <-errChan:
+			if readerCtx.Err() != nil {
+				self.JsonResponseWithoutError(http, runtimeStat{
+					DockerEnvName: sdk.Name,
+					Docker:        make([]*stats.Usage, 0),
+				})
+				return
+			}
+			cancel()
+			if progress != nil {
+				progress.Close()
+			}
+			self.JsonResponseWithError(http, err, 500)
+			return
 		case <-http.Request.Context().Done():
 			return
 		case <-sdk.Ctx.Done():
@@ -854,18 +894,9 @@ func (self Home) GetStatList(http *gin.Context) {
 			if !ok {
 				systemData = nil
 				latestSystem = nil
-				if params.Follow {
-					systemRetry = time.After(3 * time.Second)
-				}
 				continue
 			}
 			latestSystem = &value
-		case <-systemRetry:
-			systemRetry = nil
-			if progress.Context().Err() != nil {
-				return
-			}
-			systemData = (statLogic.Stat{}).ReadSystemStat(readerCtx, sdk)
 		case <-ticker.C:
 			result := runtimeStat{
 				DockerEnvName: sdk.Name,

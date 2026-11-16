@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -19,39 +18,29 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/stats"
 )
 
-func (self Stat) ReadSystemStat(ctx context.Context, dockerSdk *docker.Client) <-chan SystemStatFrame {
-	result := make(chan SystemStatFrame)
-	go func() {
-		defer close(result)
-
-		err := streamSystem(ctx, dockerSdk, func(value systemStatSample) error {
-			frame := SystemStatFrame{System: value.system, Containers: value.containers}
-			select {
-			case result <- frame:
-				return nil
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		})
-		if err != nil && ctx.Err() == nil && !errors.Is(err, context.Canceled) {
-			slog.Warn("stream system stat", "dockerEnvName", dockerSdk.Name, "error", err)
+func (self Stat) ReadSystemStat(ctx context.Context, dockerSdk *docker.Client, result chan<- SystemStatFrame) error {
+	defer close(result)
+	return streamSystem(ctx, dockerSdk, func(value systemStatSample) error {
+		frame := SystemStatFrame{System: value.system, Containers: value.containers}
+		select {
+		case result <- frame:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
 		}
-	}()
-	return result
+	})
 }
 
 func streamSystem(ctx context.Context, dockerSdk *docker.Client, handle func(systemStatSample) error) error {
 	targets := make([]serviceAgent.ContainerTarget, 0)
 	containerList, err := dockerSdk.Client.ContainerList(ctx, container.ListOptions{})
 	if err != nil {
-		slog.Warn("list containers for agent stat", "dockerEnvName", dockerSdk.Name, "error", err)
+		return err
 	} else {
 		for _, item := range containerList {
 			containerInfo, err := dockerSdk.Client.ContainerInspect(ctx, item.ID)
 			if err != nil {
-				slog.Warn("inspect container for agent stat", "dockerEnvName", dockerSdk.Name,
-					"container", item.ID, "error", err)
-				continue
+				return err
 			}
 			if containerInfo.HostConfig == nil || containerInfo.State == nil || containerInfo.State.Pid <= 0 ||
 				!strings.Contains(strings.ToLower(containerInfo.HostConfig.Runtime), "sysbox") {

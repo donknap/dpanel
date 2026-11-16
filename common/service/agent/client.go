@@ -92,7 +92,10 @@ func (self *Client) exec(ctx context.Context, result any, args ...string) error 
 
 	message := agentTypes.Message[json.RawMessage]{}
 	if err := decodeJSON(output, &message); err != nil {
-		return errors.Join(execErr, fmt.Errorf("decode agent response: %w", err))
+		if execErr != nil {
+			return execErr
+		}
+		return fmt.Errorf("decode agent response: %w", err)
 	}
 	if message.Code != 200 {
 		if message.Error != "" {
