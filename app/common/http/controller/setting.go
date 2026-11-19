@@ -81,6 +81,15 @@ func (self Setting) GetSetting(http *gin.Context) {
 	if !self.Validate(http, &params) {
 		return
 	}
+	if params.GroupName == logic.SettingGroupSetting && params.Name == logic.SettingGroupSettingSystem {
+		system, err := logic.Setting{}.GetSystem()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		self.JsonResponseWithoutError(http, system)
+		return
+	}
 	row, err := logic.Setting{}.GetValue(params.GroupName, params.Name)
 	if err != nil {
 		self.JsonResponseWithoutError(http, gin.H{})
@@ -121,6 +130,9 @@ func (self Setting) GetLoginSetting(http *gin.Context) {
 
 func (self Setting) SaveConfig(http *gin.Context) {
 	type ParamsValidate struct {
+		System *struct {
+			WelcomeTourFinish *bool `json:"welcomeTourFinish"`
+		} `json:"system"`
 		Theme        *accessor.ThemeConfig        `json:"theme"`
 		Console      *accessor.ThemeConsoleConfig `json:"console"`
 		Notification *accessor.Notification       `json:"notification"`
@@ -133,7 +145,7 @@ func (self Setting) SaveConfig(http *gin.Context) {
 		return
 	}
 
-	settingRow := &entity.Setting{}
+	var settingRow *entity.Setting
 
 	if params.Theme != nil {
 		settingRow = &entity.Setting{
@@ -203,15 +215,36 @@ func (self Setting) SaveConfig(http *gin.Context) {
 		}
 	}
 
-	err := logic.Setting{}.Save(settingRow)
-	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+	var settingList []*entity.Setting
+	if settingRow != nil {
+		settingList = append(settingList, settingRow)
 	}
-	facade.GetEvent().Publish(event.SettingSaveEvent, event.SettingPayload{
-		GroupName: settingRow.GroupName,
-		Name:      settingRow.Name,
-	})
+	if params.System != nil && params.System.WelcomeTourFinish != nil {
+		system, err := logic.Setting{}.GetSystem()
+		if err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		system.WelcomeTourFinish = *params.System.WelcomeTourFinish
+		settingList = append(settingList, &entity.Setting{
+			GroupName: logic.SettingGroupSetting,
+			Name:      logic.SettingGroupSettingSystem,
+			Value: &accessor.SettingValueOption{
+				System: &system,
+			},
+		})
+	}
+
+	for _, settingRow := range settingList {
+		if err := (logic.Setting{}).Save(settingRow); err != nil {
+			self.JsonResponseWithError(http, err, 500)
+			return
+		}
+		facade.GetEvent().Publish(event.SettingSaveEvent, event.SettingPayload{
+			GroupName: settingRow.GroupName,
+			Name:      settingRow.Name,
+		})
+	}
 
 	self.JsonSuccessResponse(http)
 	return

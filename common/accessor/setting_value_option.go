@@ -11,6 +11,7 @@ import (
 
 type SettingValueOption struct {
 	UserSetting
+	System                      *System                      `json:"system,omitempty"`
 	Docker                      map[string]*types2.DockerEnv `json:"docker,omitempty"`
 	DiskUsage                   *DiskUsage                   `json:"diskUsage,omitempty"`
 	TwoFa                       *TwoFa                       `json:"twoFa,omitempty"`
@@ -26,6 +27,10 @@ type SettingValueOption struct {
 	Login                       *Login                       `json:"login,omitempty"`
 	ConsoleInstance             *ConsoleInstance             `json:"consoleInstance,omitempty"`
 	Menu                        *Menu                        `json:"menu,omitempty"`
+}
+
+type System struct {
+	WelcomeTourFinish bool `json:"welcomeTourFinish"`
 }
 
 type Menu struct {

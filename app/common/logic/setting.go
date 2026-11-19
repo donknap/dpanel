@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,11 +19,13 @@ import (
 	"github.com/donknap/dpanel/common/types/define"
 	"github.com/patrickmn/go-cache"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"gorm.io/gorm"
 )
 
 // 全局配置
 var (
 	SettingGroupSetting                     = "setting"
+	SettingGroupSettingSystem               = "system"
 	SettingGroupSettingDocker               = "docker" // docker env
 	SettingGroupSettingTwoFa                = "twoFa"  // 双因素
 	SettingGroupSettingPasskey              = "passkey"
@@ -89,6 +92,23 @@ func (self Setting) GetValue(groupName string, name string) (*entity.Setting, er
 	}
 	return setting, nil
 
+}
+
+func (self Setting) GetSystem() (accessor.System, error) {
+	setting, err := dao.Setting.Where(
+		dao.Setting.GroupName.Eq(SettingGroupSetting),
+		dao.Setting.Name.Eq(SettingGroupSettingSystem),
+	).First()
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return accessor.System{}, nil
+	}
+	if err != nil {
+		return accessor.System{}, err
+	}
+	if setting.Value == nil || setting.Value.System == nil {
+		return accessor.System{}, fmt.Errorf("%s:%s setting value is empty", SettingGroupSetting, SettingGroupSettingSystem)
+	}
+	return *setting.Value.System, nil
 }
 
 // GetLoginSetting returns the persisted login settings together with the
