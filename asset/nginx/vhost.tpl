@@ -6,7 +6,11 @@ server {
     listen [::]:80;
     server_name {{.serverName}} {{range $index, $value := .serverNameAlias}}{{$value}} {{end}};
 
-    return 301 https://$host$request_uri;
+    include /etc/nginx/conf.d/include/challenge.conf;
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
 }
 {{end}}
 
@@ -31,6 +35,9 @@ server {
     {{else}}
     listen {{.serverPort}};
     listen [::]:{{.serverPort}};
+    {{if eq (print .serverPort) "80"}}
+    include /etc/nginx/conf.d/include/challenge.conf;
+    {{end}}
     {{end}}
 
     server_name {{.serverName}} {{range $index, $value := .serverNameAlias}}{{$value}} {{end}};
