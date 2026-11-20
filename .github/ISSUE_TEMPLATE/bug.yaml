@@ -1,0 +1,106 @@
+name: "🐛 Bug 反馈 / Bug Report"
+description: "反馈 DPanel 使用问题 / Report a bug in DPanel"
+title: "[BUG] "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你帮助改进 DPanel！请尽量完整填写以下信息，提交前先升级到最新版本，并检查是否已有相同的问题反馈。
+
+        Thank you for helping improve DPanel! Please provide as much detail as possible. Before reporting, update to the latest version and check for existing issues.
+
+  - type: input
+    id: version
+    attributes:
+      label: "DPanel 版本 / DPanel Version"
+      description: "查看【概览】→【系统信息】→【面板信息】。 / Find it under Overview → System Information → Panel Information."
+      placeholder: "例如 / e.g. 1.11.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-type
+    attributes:
+      label: "安装方式 / Installation Method"
+      description: "请选择 DPanel 的安装方式。 / Select how you installed DPanel."
+      options:
+        - "Docker 容器 / Docker Run"
+        - "Docker Compose"
+        - "二进制程序 / Binary"
+        - "DPanel Desktop"
+        - "其他 / Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: install-command
+    attributes:
+      label: "安装命令或部署配置 / Installation Command or Configuration"
+      description: |
+        请提供完整的安装命令或部署配置。 / Please provide your installation command or deployment configuration.
+
+        - Docker：提供 `docker run` 命令。 / Provide the `docker run` command.
+        - Docker Compose：提供 `compose.yaml` 配置。 / Provide your `compose.yaml` configuration.
+        - 二进制 / Binary：提供启动命令和参数。 / Provide the startup command and arguments.
+        - Desktop / 其他 / Other：说明安装来源和启动方式。 / Describe the installation source and launch method.
+
+        **提交前请删除密码、Token、密钥等敏感信息。 / Remove passwords, tokens, keys, and other secrets before submitting.**
+      placeholder: "粘贴安装命令或配置…… / Paste the installation command or configuration…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "问题描述 / Problem Description"
+      description: "说明实际情况及预期结果。 / Describe what happened and what you expected."
+      placeholder: |
+        实际情况 / Actual behavior:
+
+        预期结果 / Expected behavior:
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: "复现步骤 / Steps to Reproduce"
+      description: "请依次列出复现问题的操作。 / List the steps needed to reproduce the bug."
+      placeholder: |
+        1. 打开…… / Open…
+        2. 点击…… / Click…
+        3. 出现…… / Observe…
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "错误日志 / Error Logs"
+      description: |
+        在【系统】→【系统日志】查看，或执行 `docker logs dpanel`（将 `dpanel` 替换为实际容器名）。
+        Find logs under System → System Logs, or run `docker logs dpanel` (replace `dpanel` with your container name).
+        请删除敏感信息。 / Remove sensitive information before posting.
+      placeholder: "粘贴相关日志（如有） / Paste relevant logs (if any)"
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: "截图及补充信息 / Screenshots and Additional Information"
+      description: "可直接粘贴或拖拽截图，并补充系统环境等信息。 / Paste or drag screenshots here, and include any other relevant environment details."
+      placeholder: "截图、系统环境或其他说明 / Screenshots, environment, or other details"
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ### QQ 群反馈 / QQ Support Group
+        DPanel QQ 群 / QQ group: **837583876**
+
+        建议保留 GitHub Issue 以便问题跟踪。 / Please keep the GitHub issue open for tracking and follow-up.
