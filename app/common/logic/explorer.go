@@ -190,7 +190,7 @@ func newExplorerHostFs(ctx context.Context, options ...hostfs.Option) (serviceaf
 func newExplorerAgentFs(mountPoint ExplorerMountPoint, mountName string, dockerSdk *docker.Client, createOption factor.ExplorerCreateOption, fsOptions ...dockerfs.Option) (serviceafs.Fs, error) {
 	mounts := (Setting{}).GetDPanelInfo().DataMounts
 	if len(mounts) == 0 || mounts[0].Host == "" || mounts[0].Dest != "/dpanel" {
-		return nil, errors.New("dpanel data mount is unavailable")
+		return nil, function.ErrorMessage(define.ErrorMessageCommonNotFoundDPanel)
 	}
 	lock := storage.NewMutex(fmt.Sprintf(storage.CacheKeyExplorerAfsLock, dockerSdk.Name, factor.ExplorerName))
 	lock.Lock()

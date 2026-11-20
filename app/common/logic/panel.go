@@ -24,6 +24,7 @@ import (
 	"github.com/donknap/dpanel/common/service/docker/types"
 	"github.com/donknap/dpanel/common/service/storage"
 	types2 "github.com/donknap/dpanel/common/types"
+	"github.com/donknap/dpanel/common/types/define"
 )
 
 type Panel struct {
@@ -155,7 +156,7 @@ func (self Panel) MakeUpdateCommand(params map[string]any) (string, error) {
 	if dpanelInfo.RunIn == types2.DPanelRunInContainer {
 		mounts := dpanelInfo.DataMounts
 		if len(mounts) == 0 || mounts[0].Dest != "/dpanel" {
-			return "", errors.New("dpanel data mount is unavailable")
+			return "", function.ErrorMessage(define.ErrorMessageCommonNotFoundDPanel)
 		}
 		seen := make(map[string]struct{}, len(mounts))
 		templateMounts := make([]map[string]any, 0, len(mounts))
