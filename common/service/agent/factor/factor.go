@@ -268,18 +268,13 @@ func DestroyAll(sdk *docker.Client) error {
 	if err != nil {
 		return err
 	}
-	imageMap := make(map[string]struct{})
+	imageMap := map[string]struct{}{imageName: {}}
 	for _, containerInfo := range containerList {
 		agentName := containerInfo.Labels[define.DPanelLabelContainerName]
 		if agentName != ExplorerName && agentName != MonitorName {
 			continue
 		}
-		if agentName == MonitorName && sdk.DockerEnv.EnableSystemStat {
-			continue
-		}
-		if !sdk.DockerEnv.EnableSystemStat {
-			imageMap[containerInfo.Image] = struct{}{}
-		}
+		imageMap[containerInfo.Image] = struct{}{}
 		err = errors.Join(err, destroy(sdk, containerInfo.ID))
 	}
 	for imageName := range imageMap {
