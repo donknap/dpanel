@@ -159,6 +159,8 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 	_ = facade.GetEvent().Subscribe(event.DockerMessageEvent, events.Docker{}.Message)
 
 	_ = facade.Event.Subscribe(event.PluginDestroy, events.Plugin{}.Destroy)
+	_ = facade.Event.SubscribeAsync(event.AppBootstrap, events.App{}.Bootstrap, false)
+	_ = facade.Event.Subscribe(event.AppShutdown, events.App{}.Shutdown)
 	// 启动时，初始化计划任务
 	crontab.Client.Start()
 
@@ -193,9 +195,9 @@ func (provider *Provider) Register(httpServer *httpserver.Server) {
 		if env.Enable != nil && !*env.Enable {
 			continue
 		}
-		facade.Event.Publish(event.PluginDestroy, event.DockerDaemonPayload{
-			DockerEnvName: env.Name,
-		})
 		notice.Monitor.Join(env)
 	}
+	facade.Event.Publish(event.AppBootstrap, event.AppBootstrapPayload{
+		DockerEnvList: dockerEnvList,
+	})
 }

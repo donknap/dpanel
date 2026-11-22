@@ -169,7 +169,7 @@ func create(sdk *docker.Client, name, hash string, options []builder.Option) (st
 				return name, nil
 			}
 		}
-		if err = destroy(sdk, name); err != nil {
+		if err = destroy(sdk.Ctx, sdk, name); err != nil {
 			return "", err
 		}
 	}
@@ -193,8 +193,7 @@ func create(sdk *docker.Client, name, hash string, options []builder.Option) (st
 	if err = sdk.Client.ContainerStart(sdk.Ctx, id, container.StartOptions{}); err != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		cleanupSdk := &docker.Client{Name: sdk.Name, Client: sdk.Client, Ctx: ctx}
-		if cleanupErr := destroy(cleanupSdk, id); cleanupErr != nil {
+		if cleanupErr := destroy(ctx, sdk, id); cleanupErr != nil {
 			return "", errors.Join(err, fmt.Errorf("clean agent container %s: %w", id, cleanupErr))
 		}
 		return "", err
@@ -247,10 +246,10 @@ func Destroy(sdk *docker.Client, name string) error {
 	mutex := storage.NewMutex(fmt.Sprintf(storage.CacheKeyAgentLock, sdk.Name))
 	mutex.Lock()
 	defer mutex.Unlock()
-	return destroy(sdk, name)
+	return destroy(sdk.Ctx, sdk, name)
 }
 
-func DestroyAll(sdk *docker.Client) error {
+func DestroyAll(ctx context.Context, sdk *docker.Client) error {
 	if sdk == nil || sdk.Client == nil {
 		return errors.New("docker client is required for agent container destroy")
 	}
@@ -258,10 +257,19 @@ func DestroyAll(sdk *docker.Client) error {
 		return errors.New("docker environment is required for agent container destroy")
 	}
 	mutex := storage.NewMutex(fmt.Sprintf(storage.CacheKeyAgentLock, sdk.Name))
-	mutex.Lock()
+	// 清理与容器创建共用锁，等待锁也要遵守清理期限。
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for !mutex.TryLock() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
 	defer mutex.Unlock()
 
-	containerList, err := sdk.ContainerList(sdk.Ctx, container.ListOptions{
+	containerList, err := sdk.ContainerList(ctx, container.ListOptions{
 		All:     true,
 		Filters: filters.NewArgs(filters.Arg(docker.ContainerFilterLabel, define.DPanelLabelContainerName)),
 	})
@@ -270,23 +278,29 @@ func DestroyAll(sdk *docker.Client) error {
 	}
 	imageMap := map[string]struct{}{imageName: {}}
 	for _, containerInfo := range containerList {
+		if ctx.Err() != nil {
+			return errors.Join(err, ctx.Err())
+		}
 		agentName := containerInfo.Labels[define.DPanelLabelContainerName]
 		if agentName != ExplorerName && agentName != MonitorName {
 			continue
 		}
 		imageMap[containerInfo.Image] = struct{}{}
-		err = errors.Join(err, destroy(sdk, containerInfo.ID))
+		err = errors.Join(err, destroy(ctx, sdk, containerInfo.ID))
 	}
 	for imageName := range imageMap {
-		err = errors.Join(err, sdk.ImageRemove(sdk.Ctx, filters.NewArgs(
+		if ctx.Err() != nil {
+			return errors.Join(err, ctx.Err())
+		}
+		err = errors.Join(err, sdk.ImageRemove(ctx, filters.NewArgs(
 			filters.Arg(docker.ImageFilterReference, imageName),
 		)))
 	}
 	return err
 }
 
-func destroy(sdk *docker.Client, name string) error {
-	info, err := sdk.Client.ContainerInspect(sdk.Ctx, name)
+func destroy(ctx context.Context, sdk *docker.Client, name string) error {
+	info, err := sdk.Client.ContainerInspect(ctx, name)
 	if errdefs.IsNotFound(err) {
 		return nil
 	}
@@ -294,17 +308,20 @@ func destroy(sdk *docker.Client, name string) error {
 		return err
 	}
 	if info.State != nil && info.State.Running {
-		if err = sdk.Client.ContainerStop(sdk.Ctx, info.ID, container.StopOptions{}); err != nil && !errdefs.IsNotFound(err) {
+		if err = sdk.Client.ContainerStop(ctx, info.ID, container.StopOptions{}); err != nil && !errdefs.IsNotFound(err) {
 			return err
 		}
 	}
-	if err = sdk.Client.ContainerRemove(sdk.Ctx, info.ID, container.RemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
+	if err = sdk.Client.ContainerRemove(ctx, info.ID, container.RemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
 		return err
 	}
-	function.Wait(sdk.Ctx, info.ID, func(value string) bool {
-		_, err := sdk.Client.ContainerInspect(sdk.Ctx, value)
+	function.Wait(ctx, info.ID, func(value string) bool {
+		_, err := sdk.Client.ContainerInspect(ctx, value)
 		return errdefs.IsNotFound(err)
 	})
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	slog.Debug("agent container removed", "name", name, "id", info.ID)
 	return nil
 }

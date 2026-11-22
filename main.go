@@ -33,6 +33,7 @@ import (
 	"github.com/donknap/dpanel/common/service/fs/staticfs"
 	"github.com/donknap/dpanel/common/service/storage"
 	"github.com/donknap/dpanel/common/types/define"
+	"github.com/donknap/dpanel/common/types/event"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickmn/go-cache"
@@ -178,6 +179,9 @@ func main() {
 
 	new(ctrl.Provider).Command(facade.GetConsole())
 	myApp.RunConsole()
+	if isAppServer() {
+		facade.Event.Publish(event.AppShutdown)
+	}
 }
 
 func isAppServer() bool {
