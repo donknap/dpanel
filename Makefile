@@ -192,6 +192,9 @@ DOCKER_BUILD_ARGS = --builder dpanel-context-local-builder \
 		--secret id=GARBLE_SEED,env=GARBLE_SEED \
 		--build-arg PE_LITE_FROM_BASE=${DOCKER_PE_LITE_FROM_BASE} \
 		--build-arg PE_PROD_FROM_BASE=${DOCKER_PE_PROD_FROM_BASE} \
+		--label "com.dpanel.website=https://deepanel.com" \
+		--label "com.dpanel.version=${APP_VERSION}" \
+		--label "com.dpanel.release=${APP_RELEASE}" \
 		--annotation "manifest-descriptor:com.dpanel.website=https://deepanel.com" \
 		--annotation "manifest-descriptor:com.dpanel.version=${APP_VERSION}" \
 		--annotation "manifest-descriptor:com.dpanel.release=${APP_RELEASE}" \

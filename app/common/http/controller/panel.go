@@ -573,6 +573,7 @@ func (self Panel) BackupImport(http *gin.Context) {
 func (self Panel) CheckNewVersion(http *gin.Context) {
 	dpanelInfo := logic.Setting{}.GetDPanelInfo()
 	newDPanelInfo := types2.DPanelInfo{}
+	var remoteMeta map[string]string
 	reference := "latest"
 	if dpanelInfo.Version == "beta" {
 		reference = "beta"
@@ -585,6 +586,7 @@ func (self Panel) CheckNewVersion(http *gin.Context) {
 		for _, descriptor := range manifest.References() {
 			if remoteVersion := descriptor.Annotations[define.PanelLabelVersion]; remoteVersion != "" {
 				remoteRelease := descriptor.Annotations[define.PanelLabelRelease]
+				remoteMeta = map[string]string{"version": remoteVersion, "release": remoteRelease}
 				if len(remoteVersion) == len(define.DateShowVersion) && strings.Count(remoteVersion, ".") == 1 {
 					if remoteRelease == "" {
 						remoteRelease = remoteVersion
@@ -603,6 +605,7 @@ func (self Panel) CheckNewVersion(http *gin.Context) {
 	self.JsonResponseWithoutError(http, gin.H{
 		"version":    dpanelInfo.ShowVersion(),
 		"newVersion": newDPanelInfo.ShowVersion(),
+		"meta":       remoteMeta,
 	})
 	return
 }

@@ -17,6 +17,7 @@ import (
 type App struct{}
 
 func (self App) Bootstrap(e event.AppBootstrapPayload) {
+	slog.Debug("event trigger", "name", "app bootstrap")
 	dockerEnv := e.DockerEnvList[define.DockerDefaultClientName]
 	if dockerEnv == nil || (dockerEnv.Enable != nil && !*dockerEnv.Enable) {
 		return
@@ -31,7 +32,7 @@ func (self App) Bootstrap(e event.AppBootstrapPayload) {
 }
 
 func (self App) Shutdown() {
-	slog.Info("app shutdown")
+	slog.Debug("event trigger", "name", "app shutdown")
 	dockerEnvList := make(map[string]*types.DockerEnv)
 	logic.Setting{}.GetByKey(logic.SettingGroupSetting, logic.SettingGroupSettingDocker, &dockerEnvList)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
