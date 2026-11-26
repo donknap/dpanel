@@ -2,6 +2,7 @@ package controller
 
 import (
 	"log/slog"
+	"net/http"
 
 	"github.com/donknap/dpanel/app/common/logic"
 	"github.com/donknap/dpanel/app/common/logic/oauth"
@@ -204,6 +205,7 @@ func (self User) CreateFounder(http *gin.Context) {
 }
 
 func (self User) OauthCallback(http *gin.Context) {
+	http.Header("Cache-Control", "no-store")
 	type ParamsValidate struct {
 		Provider    string `json:"provider"`
 		Code        string `json:"code" binding:"required"`
@@ -265,14 +267,16 @@ func (self User) OauthProviders(http *gin.Context) {
 	return
 }
 
-func (self User) OauthAuthorize(http *gin.Context) {
-	provider := http.Query("provider")
-	callbackURL, err := oauth.Authorize(provider, http.Request)
+func (self User) OauthAuthorize(ctx *gin.Context) {
+	ctx.Header("Cache-Control", "no-store")
+	ctx.Header("Referrer-Policy", "no-referrer")
+	provider := ctx.Query("provider")
+	callbackURL, err := oauth.Authorize(provider, ctx.Request)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
+		self.JsonResponseWithError(ctx, err, 500)
 		return
 	}
 	slog.Debug("oauth authorize redirect", "provider", provider, "callbackURLGenerated", callbackURL != "")
-	http.Redirect(302, callbackURL)
+	ctx.Redirect(http.StatusFound, callbackURL)
 	return
 }

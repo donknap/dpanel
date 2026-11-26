@@ -279,9 +279,10 @@ func WithTCP(address string, option dockerconn.TCPOption) Option {
 
 func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 	return func(self *Client) error {
-		cmdName := "docker"
+		// 非交互 SSH 的 PATH 可能缺少 Docker CLI 所在的 /usr/local/bin。
+		cmd := `PATH="${PATH:+$PATH:}/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin" docker`
 		if self.DockerEnv != nil && self.DockerEnv.DockerType == "podman" {
-			cmdName = "podman"
+			cmd = "podman"
 		}
 		lock := sync.Mutex{}
 		transport := &http.Transport{
@@ -330,7 +331,7 @@ func WithSSH(serverInfo *ssh.ServerInfo, timeout time.Duration) Option {
 				}
 
 				// 直接返回包装好的 Conn，完全由 http.Client 的生命周期来控制底层 SSH Client 的闭合，去掉了之前导致泄漏的监听协程
-				conn, err := dockerconn.NewSSH(sshClient, cmdName, "system", "dial-stdio")
+				conn, err := dockerconn.NewSSH(sshClient, cmd, "system", "dial-stdio")
 				if err != nil {
 					sshClient.Close()
 					return nil, err

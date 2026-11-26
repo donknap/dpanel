@@ -118,7 +118,7 @@ _RAW_LIST := $(strip \
 DOCKER_PLATFORM := $(subst $(_SPACE),$(_COMMA),$(or $(_RAW_LIST),linux/amd64))
 
 _IS_BETA := $(if $(filter beta,$(APP_VERSION)),1,0)
-_TAG_SFX := $(if $(filter $(BUILD_LIBC),GNU),-debian,)$(if $(filter windows,$(_BUILD_OS_LOWER)),-windows,)$(if $(filter darwin,$(_BUILD_OS_LOWER)),-darwin,)
+_TAG_SFX := $(if $(filter windows darwin synology,$(_BUILD_OS_LOWER)),-$(_BUILD_OS_LOWER),$(if $(filter GNU,$(BUILD_LIBC)),-debian,))
 
 _REPO_NAME := $(PROJECT_NAME)
 ifeq ($(APP_FAMILY),nw)
@@ -158,10 +158,10 @@ DOCKER_TAG_PROD := $(strip \
     ,) \
 )
 
-ifeq ($(_BUILD_OS_LOWER),windows)
-    DOCKER_FILE := ./docker/Dockerfile-windows
+ifneq ($(filter windows synology,$(_BUILD_OS_LOWER)),)
+    DOCKER_FILE := ./docker/Dockerfile-$(_BUILD_OS_LOWER)
     ifeq ($(APP_FAMILY),pe)
-        DOCKER_FILE := ./docker/Dockerfile-pe-windows
+        DOCKER_FILE := ./docker/Dockerfile-pe-$(_BUILD_OS_LOWER)
     endif
 else ifeq ($(_BUILD_OS_LOWER),darwin)
     DOCKER_FILE := ./docker/Dockerfile-darwin
@@ -331,6 +331,7 @@ sync-aliyun:
 	@$(MAKE) sync APP_FAMILY=ce APP_ENV=all BUILD_OS=linux LIBC=musl
 	@$(MAKE) sync APP_FAMILY=ce APP_ENV=all BUILD_OS=linux LIBC=gnu
 	@$(MAKE) sync APP_FAMILY=ce APP_ENV=all BUILD_OS=windows
+	@$(MAKE) sync APP_FAMILY=ce APP_ENV=all BUILD_OS=synology
 	@$(MAKE) sync APP_FAMILY=ce APP_ENV=all BUILD_OS=darwin
 
 	@$(MAKE) sync APP_FAMILY=nw APP_ENV=lite BUILD_OS=linux
@@ -338,6 +339,7 @@ sync-aliyun:
 	@$(MAKE) sync APP_FAMILY=pe APP_ENV=all BUILD_OS=linux LIBC=musl
 	@$(MAKE) sync APP_FAMILY=pe APP_ENV=all BUILD_OS=linux LIBC=gnu
 	@$(MAKE) sync APP_FAMILY=pe APP_ENV=all BUILD_OS=windows
+	@$(MAKE) sync APP_FAMILY=pe APP_ENV=all BUILD_OS=synology
 	@$(MAKE) sync APP_FAMILY=pe APP_ENV=all BUILD_OS=darwin
 
 test:

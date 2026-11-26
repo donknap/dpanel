@@ -1,0 +1,33 @@
+ARG TARGETARCH
+FROM --platform=${BUILDPLATFORM} dpanel/builder:${TARGETARCH}-synology-7.1 AS toolchain
+FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
+WORKDIR /src
+
+COPY . .
+ARG TARGETARCH
+ARG APP_VERSION=beta
+ARG APP_RELEASE
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=bind,from=toolchain,source=/toolchains,target=/toolchains \
+    COMMON_ARGS="APP_FAMILY=ce BUILD_OS=linux LIBC=gnu" && \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        export CC_AMD64=/toolchains/amd64-synology-7.1/bin/x86_64-pc-linux-gnu-gcc; \
+        make build ${COMMON_ARGS} PROJECT_NAME=dpanel-ce-synology-amd64 AMD64=1 ARM64=0 ARMV7=0; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        export CC_ARM64=/toolchains/arm64-synology-7.1/bin/aarch64-unknown-linux-gnu-gcc; \
+        make build ${COMMON_ARGS} PROJECT_NAME=dpanel-ce-synology-arm64 AMD64=0 ARM64=1 ARMV7=0; \
+    else \
+        echo "Unsupported Synology architecture: $TARGETARCH" >&2; exit 1; \
+    fi
+
+FROM scratch AS binary-export
+ARG TARGETARCH
+COPY --from=builder /src/runtime/dpanel-ce-synology-${TARGETARCH} /
+
+FROM scratch AS lite
+ARG TARGETARCH
+COPY --from=builder /src/runtime/dpanel-ce-synology-${TARGETARCH} /app/server/dpanel
+COPY ./config.yaml /app/server/config.yaml
+
+FROM lite AS production

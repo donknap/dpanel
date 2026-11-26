@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/donknap/dpanel/common/function"
@@ -72,8 +73,9 @@ func (self Container) GetProcessInfo(http *gin.Context) {
 
 	psInfo, err := docker.Sdk.Client.ContainerTop(docker.Sdk.Ctx, params.Id, nil)
 	if err != nil {
-		self.JsonResponseWithError(http, err, 500)
-		return
+		slog.Warn("container process query failed", "containerId", params.Id, "error", err)
+		psInfo.Titles = []string{}
+		psInfo.Processes = [][]string{}
 	}
 	self.JsonResponseWithoutError(http, gin.H{
 		"list": psInfo,

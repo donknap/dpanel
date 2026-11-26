@@ -19,6 +19,14 @@ import (
 )
 
 func New(opts ...Option) (exec.Executor, error) {
+	c, err := newLocal(opts...)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func newLocal(opts ...Option) (*Local, error) {
 	var err error
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -39,6 +47,22 @@ func New(opts ...Option) (exec.Executor, error) {
 	}
 
 	return c, nil
+}
+
+// RunWithStdout 只返回成功命令的标准输出，不将诊断输出混入结果或错误。
+func RunWithStdout(opts ...Option) ([]byte, error) {
+	c, err := newLocal(opts...)
+	if err != nil {
+		return nil, err
+	}
+	defer c.Close()
+	c.debug()
+	c.cmd.Stderr = io.Discard
+	out, err := c.cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func QuickRun(cmdStrOrArr ...string) ([]byte, error) {

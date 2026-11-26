@@ -1,0 +1,38 @@
+ARG TARGETARCH
+FROM --platform=linux/amd64 dpanel/builder:${TARGETARCH}-synology-7.1 AS toolchain
+FROM --platform=linux/amd64 golang:1.25-bookworm AS builder
+RUN go install mvdan.cc/garble@v0.15.0
+WORKDIR /src
+
+COPY . .
+ARG TARGETARCH
+ARG APP_VERSION=beta
+ARG APP_RELEASE
+# The Makefile debug target and command echo both print the Garble seed.
+RUN --mount=type=secret,id=GARBLE_SEED,required=true \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=bind,from=toolchain,source=/toolchains,target=/toolchains \
+    go test -count=1 -run '^TestGenerateDefines$' ./app/pro/tests/obfuscate_test.go && \
+    GARBLE_SEED=$(cat /run/secrets/GARBLE_SEED) && test -n "$GARBLE_SEED" && export GARBLE_SEED && \
+    COMMON_ARGS="APP_FAMILY=pe BUILD_OS=linux LIBC=gnu GARBLE=1" && \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        export CC_AMD64=/toolchains/amd64-synology-7.1/bin/x86_64-pc-linux-gnu-gcc; \
+        make -s -o debug build ${COMMON_ARGS} PROJECT_NAME=dpanel-pe-synology-amd64 AMD64=1 ARM64=0 ARMV7=0; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        export CC_ARM64=/toolchains/arm64-synology-7.1/bin/aarch64-unknown-linux-gnu-gcc; \
+        make -s -o debug build ${COMMON_ARGS} PROJECT_NAME=dpanel-pe-synology-arm64 AMD64=0 ARM64=1 ARMV7=0; \
+    else \
+        echo "Unsupported Synology architecture: $TARGETARCH" >&2; exit 1; \
+    fi
+
+FROM scratch AS binary-export
+ARG TARGETARCH
+COPY --from=builder /src/runtime/dpanel-pe-synology-${TARGETARCH} /
+
+FROM scratch AS lite
+ARG TARGETARCH
+COPY --from=builder /src/runtime/dpanel-pe-synology-${TARGETARCH} /app/server/dpanel
+COPY ./config.yaml /app/server/config.yaml
+
+FROM lite AS production

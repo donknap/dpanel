@@ -19,9 +19,10 @@ func (self DebugMiddleware) Process(ctx *gin.Context) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	if strings.Contains(ctx.Request.URL.String(), "/dpanel/api") {
+	requestPath := ctx.Request.URL.Path
+	if strings.Contains(requestPath, "/dpanel/api") {
 		slog.Info("runtime",
-			"url", ctx.Request.URL,
+			"url", requestPath,
 			"goroutine", fmt.Sprintf("%d", runtime.NumGoroutine()),
 			"client", ws.GetCollect().Total(),
 			"progress", ws.GetCollect().ProgressTotal(),

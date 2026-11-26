@@ -118,11 +118,11 @@ jobs:
             build_os: linux
             armv7: 0
             make_args: "APP_FAMILY=nw APP_ENV=lite OS=linux PUSH=hub"
-          - family: sy
-            libc: musl
-            build_os: linux
+          - family: ce
+            libc: gnu
+            build_os: synology
             armv7: 0
-            make_args: ""
+            make_args: "BUILD_OS=synology APP_FAMILY=ce APP_ENV=all PUSH=hub LIBC=gnu"
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -169,15 +169,6 @@ jobs:
         run: |
           make release APP_FAMILY=nw APP_ENV=lite ${{ env.VERSION_PARAM }} AMD64=1 ARM64=1 OS=linux PUSH=hub
 
-      - name: Build SY (Synology) Version
-        if: matrix.family == 'sy'
-        run: |
-          # Synology Toolchains
-          curl -Lo armv8-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/armv8-synology.txz && tar -Jvxf armv8-synology.txz
-          curl -Lo amd64-synology.txz https://github.com/DPanel-dev/actions/releases/download/build-toolchain/amd64-synology.txz && tar -Jvxf amd64-synology.txz
-          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-arm64 ARM64=1 CC_ARM64=${PWD}/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc
-          make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-synology-amd64 AMD64=1 CC_AMD64=${PWD}/x86_64-pc-linux-gnu/bin/x86_64-pc-linux-gnu-gcc
-
       - name: Flatten Artifact Directories
         run: |
           find runtime -mindepth 2 -type f -name 'dpanel-*' -exec mv -f {} runtime/ \; || true
@@ -206,6 +197,10 @@ jobs:
             build_os: windows
             armv7: 0
             make_args: "BUILD_OS=windows APP_FAMILY=pe APP_ENV=all PUSH=hub GARBLE=1"
+          - libc: gnu
+            build_os: synology
+            armv7: 0
+            make_args: "BUILD_OS=synology APP_FAMILY=pe APP_ENV=all PUSH=hub LIBC=gnu GARBLE=1"
     runs-on: ubuntu-latest
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
@@ -255,7 +250,7 @@ jobs:
     strategy:
       matrix:
         family: [ce, pe]
-    runs-on: macos-15-intel
+    runs-on: macos-15
     env:
       VERSION_PARAM: ${{ needs.prepare.outputs.version_param }}
       APP_RELEASE: ${{ needs.prepare.outputs.release }}
@@ -286,12 +281,16 @@ jobs:
         run: |
           export CC=$(which clang)
           if [ "${{ matrix.family }}" = "pe" ]; then
-            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-pe-darwin-amd64 APP_FAMILY=pe AMD64=1 ARM64=0 ARMV7=0 GARBLE=1 GARBLE_SEED=${GARBLE_SEED} CC_AMD64="$CC"
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-pe-darwin-amd64 APP_FAMILY=pe AMD64=1 ARM64=0 ARMV7=0 GARBLE=1 GARBLE_SEED=${GARBLE_SEED} CC_AMD64="$CC -arch x86_64"
             make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-pe-darwin-arm64 APP_FAMILY=pe AMD64=0 ARM64=1 ARMV7=0 GARBLE=1 GARBLE_SEED=${GARBLE_SEED} CC_ARM64="$CC -arch arm64"
           else
-            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-amd64 APP_FAMILY=ce AMD64=1 ARM64=0 ARMV7=0 CC_AMD64="$CC"
+            make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-amd64 APP_FAMILY=ce AMD64=1 ARM64=0 ARMV7=0 CC_AMD64="$CC -arch x86_64"
             make build ${{ env.VERSION_PARAM }} PROJECT_NAME=dpanel-ce-darwin-arm64 APP_FAMILY=ce AMD64=0 ARM64=1 ARMV7=0 CC_ARM64="$CC -arch arm64"
           fi
+      - name: Verify Darwin architectures
+        run: |
+          lipo "runtime/dpanel-${{ matrix.family }}-darwin-amd64" -verify_arch x86_64
+          lipo "runtime/dpanel-${{ matrix.family }}-darwin-arm64" -verify_arch arm64
       - name: Upload Release Assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

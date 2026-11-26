@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	ProviderFnnas   = "fnnas"
-	ProviderPasskey = "passkey"
+	ProviderFnnas    = "fnnas"
+	ProviderPasskey  = "passkey"
+	ProviderSynology = "synology"
 )
 
 type Provider interface {
@@ -51,6 +52,8 @@ func providerByName(provider string) (Provider, error) {
 		return Fnnas{}, nil
 	case ProviderPasskey:
 		return Passkey{}, nil
+	case ProviderSynology:
+		return Synology{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported oauth provider: %s", provider)
 	}

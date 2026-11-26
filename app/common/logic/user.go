@@ -3,6 +3,7 @@ package logic
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/docker/go-units"
@@ -22,7 +23,8 @@ import (
 )
 
 var (
-	loginSetting = accessor.Login{
+	founderCreateLock sync.Mutex
+	loginSetting      = accessor.Login{
 		FailedEnable:   true,
 		FailedTotal:    5,
 		FailedLockTime: 900,
@@ -114,6 +116,8 @@ func (self User) GetFounderUser() (*entity.Setting, error) {
 }
 
 func (self User) CreateFounderUser(username string, password string) (*entity.Setting, error) {
+	founderCreateLock.Lock()
+	defer founderCreateLock.Unlock()
 	if founder, err := dao.Setting.Where(dao.Setting.GroupName.Eq(SettingGroupUser)).
 		Where(dao.Setting.Name.Eq(SettingGroupUserFounder)).
 		First(); err == nil && founder != nil {
