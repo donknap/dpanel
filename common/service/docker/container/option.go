@@ -430,7 +430,7 @@ func WithMemorySwap(size *int64) Option {
 func WithShmSize(size string) Option {
 	return func(self *Builder) error {
 		d, _ := units.RAMInBytes(size)
-		if d == 0 {
+		if d <= 0 {
 			return nil
 		}
 		self.hostConfig.ShmSize = d

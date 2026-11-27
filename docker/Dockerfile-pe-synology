@@ -1,6 +1,6 @@
 ARG TARGETARCH
-FROM --platform=linux/amd64 dpanel/builder:${TARGETARCH}-synology-7.1 AS toolchain
-FROM --platform=linux/amd64 golang:1.25-bookworm AS builder
+FROM --platform=${BUILDPLATFORM} dpanel/builder:${TARGETARCH}-synology-7.1 AS toolchain
+FROM --platform=${BUILDPLATFORM} golang:1.25-bookworm AS builder
 RUN go install mvdan.cc/garble@v0.15.0
 WORKDIR /src
 
