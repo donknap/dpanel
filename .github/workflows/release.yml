@@ -431,6 +431,20 @@ jobs:
           git tag -f "$TAG"
           git push origin "$TAG" --force
 
+      - name: Checkout synology
+        uses: actions/checkout@v4
+        with:
+          repository: DPanel-dev/synology
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
+          path: synology
+
+      - name: Push tag to synology
+        working-directory: ./synology
+        run: |
+          git push origin --delete "refs/tags/$GITHUB_REF_NAME" || true
+          git tag -f "$GITHUB_REF_NAME"
+          git push --force origin "refs/tags/$GITHUB_REF_NAME"
+
   sync-aliyun:
     needs: [prepare, push-tags-to-related-repos]
     runs-on: ubuntu-latest
